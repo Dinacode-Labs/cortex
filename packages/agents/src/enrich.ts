@@ -23,7 +23,9 @@ export interface GraphExtraction {
   relations: ExtractedRelation[];
 }
 
-const ETYPES = entityType.options;
+// Excluimos 'project' de la extracción: el proyecto es el contenedor, no una
+// entidad a extraer (si no, el LLM crea "proyectos" espurios de las cabeceras).
+const ETYPES = entityType.options.filter((t) => t !== "project");
 const RTYPES = relationType.options;
 
 const SYSTEM =
@@ -35,7 +37,9 @@ function prompt(content: string): string {
   return `De la siguiente pieza de conocimiento, extrae:
 1) "entities": entidades de dominio CONCRETAS y reutilizables. Cada una { "name": string, "type": uno de [${ETYPES.join(", ")}] }.
    Incluye clientes, servicios, integraciones, proveedores externos, módulos/áreas, tecnologías, repositorios, decisiones o incidencias nombradas, y personas SOLO si son relevantes (responsables, dueños de decisión). Usa el nombre canónico natural; NO dupliques variantes (p.ej. "Pasión"/"Pasion"/"pasion.net" → "Pasion").
-   NO extraigas saludos, confirmaciones, ni menciones triviales.
+   NO extraigas saludos, confirmaciones, ni menciones triviales. NO extraigas el
+   proyecto/producto como entidad de tipo proyecto (los productos como Pasion o
+   Sitiocasa son "client"); ignora las cabeceras tipo "[Plane PUBLI-xx ...]".
 2) "relations": relaciones SIGNIFICATIVAS entre entidades, o entre la ENTRADA y una entidad. Cada una { "source": string, "target": string, "type": uno de [${RTYPES.join(", ")}] }.
    PRIORIZA relaciones semánticas: affects, caused_by, depends_on, resolved_by, supersedes, contradicts, implemented_by. Usa "related_to" SOLO si ninguna otra encaja, y evita relaciones triviales o de "discussed_in" genérico.
    Usa "ENTRADA" como source cuando la relación parte de esta pieza (p.ej. una incidencia ENTRADA affects un servicio, ENTRADA caused_by un proveedor).
