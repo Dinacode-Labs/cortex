@@ -5,9 +5,11 @@ import { closeSql } from "@cortex/database";
 import { loadEnv, saveContextInput, searchContextInput } from "@cortex/shared";
 import {
   getContextPack,
+  lintProject,
   listDecisions,
   renderContextPack,
   renderDecisions,
+  renderLintReport,
   renderSaveResult,
   renderSearchHits,
   saveContext,
@@ -179,6 +181,25 @@ server.registerTool(
       return text(renderSearchHits(hits));
     } catch (e) {
       return errorText(`Error al responder: ${(e as Error).message}`);
+    }
+  },
+);
+
+server.registerTool(
+  "lint_project_context",
+  {
+    title: "Lint del conocimiento del proyecto",
+    description:
+      "Analiza la salud de la memoria de un proyecto: contradicciones, posibles " +
+      "duplicados, entidades huérfanas, baja confianza, histórico y huecos (áreas " +
+      "con incidencias pero sin decisiones documentadas).",
+    inputSchema: { project: z.string().describe("Nombre del proyecto") },
+  },
+  async ({ project }) => {
+    try {
+      return text(renderLintReport(await lintProject(project)));
+    } catch (e) {
+      return errorText(`Error en lint: ${(e as Error).message}`);
     }
   },
 );

@@ -34,8 +34,10 @@ con 5 tools.
 - `get_project_context_pack` — paquete de contexto de un proyecto/área.
 - `list_project_decisions` — decisiones técnicas del proyecto.
 - `validate_context_entry` — validar / rechazar / marcar obsoleta una entrada.
-- `ask_project_context` — pregunta en lenguaje natural; recupera y sintetiza una
-  respuesta fundamentada (requiere LLM; si no, devuelve la búsqueda).
+- `ask_project_context` — pregunta en lenguaje natural; recupera (híbrido + rerank)
+  y sintetiza una respuesta fundamentada (requiere LLM; si no, devuelve la búsqueda).
+- `lint_project_context` — salud del conocimiento: contradicciones, duplicados,
+  entidades huérfanas, huecos (áreas con incidencias sin decisiones).
 
 ## Prompts de demo
 
