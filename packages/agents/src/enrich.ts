@@ -1,11 +1,12 @@
 import { entityType, relationType } from "@cortex/shared";
 import type { EntityType, RelationType } from "@cortex/shared";
-import { chat } from "./openrouter.js";
+import { runAgent } from "./mastra.js";
 
 /**
  * Agente de extracción de grafo (§7 Entity Resolution + Knowledge Graph Agents).
  * Dada una entrada de conocimiento, extrae entidades de dominio y relaciones
  * reales entre ellas (y con la propia entrada), para construir el grafo (§6).
+ * Implementado como Agent de Mastra (rol "graph", ver mastra.ts).
  */
 
 export interface ExtractedEntity {
@@ -27,11 +28,6 @@ export interface GraphExtraction {
 // entidad a extraer (si no, el LLM crea "proyectos" espurios de las cabeceras).
 const ETYPES = entityType.options.filter((t) => t !== "project");
 const RTYPES = relationType.options;
-
-const SYSTEM =
-  "Eres el agente de grafo de conocimiento de Dinacode Cortex. Extraes entidades " +
-  "de dominio y relaciones de piezas de conocimiento de proyectos software. " +
-  "Respondes SIEMPRE en español y SOLO con JSON válido.";
 
 function prompt(content: string): string {
   return `De la siguiente pieza de conocimiento, extrae:
@@ -66,13 +62,7 @@ export async function extractGraph(content: string): Promise<GraphExtraction | n
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await chat(
-        [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: prompt(content) },
-        ],
-        { jsonObject: true, maxTokens: 1200 },
-      );
+      const raw = await runAgent("graph", prompt(content), { maxOutputTokens: 1200 });
       const text = extractJson(raw).trim();
       if (!text) throw new Error("respuesta vacía");
       const parsed = JSON.parse(text) as {

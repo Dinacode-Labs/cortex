@@ -220,3 +220,24 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   Skills por symlink → `git pull` actualiza; re-`--apply` re-registra. OpenCode best-effort.
 - **Revisar cuando:** añadamos prompts/políticas corporativas, un `--remove`, o
   separemos el harness a un repo propio (`dinacode-ai-config`).
+
+## ADR-0015 · Capa de agentes con Mastra (Agents reales)
+
+- **Estado:** aceptada.
+- **Contexto:** §7 preveía varios agentes Mastra, pero la implementación usaba
+  funciones LLM directas (`chat()`) porque el `structuredOutput` de Mastra se
+  colgaba con DeepSeek vía OpenRouter (ADR-0006). Mastra quedaba infrautilizado
+  (solo el workflow de captura).
+- **Decisión:** re-arquitecturada la capa `agents` a **Agents de Mastra reales**
+  (`mastra.ts`), uno por rol: `classifier`, `graph`, `reranker`, `retriever`. El
+  LLM se accede vía `@ai-sdk/openai-compatible` (nan/OpenRouter, provider-agnóstico).
+  Los roles que devuelven JSON usan un `fetch` que **fuerza `response_format:
+  json_object`** (qwen3.6 NO respeta el `structuredOutput` de Mastra de forma fiable
+  —inventa claves—, pero con json_object es rápido ~0.5s y válido). El `retriever`
+  usa texto libre. Eliminado el cliente `chat()` directo; `openrouter.ts` queda solo
+  como resolución de config.
+- **Consecuencias:** honra §7; disponibles instructions/observabilidad/evals de
+  Mastra por agente; misma fiabilidad y velocidad que antes. El workflow de captura
+  (`workflows.ts`) ahora orquesta un Agent real.
+- **Revisar cuando:** el modelo mejore la adherencia a `structuredOutput` (podríamos
+  quitar el `fetch` y usar esquemas zod), o queramos `memory`/`tools` por agente.
