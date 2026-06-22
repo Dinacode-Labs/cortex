@@ -96,7 +96,7 @@ def main():
     if args.cmd == "create":
         c, b = cj("POST", f"{B}/issues/", json.loads(args.json))
         d = json.loads(b) if b.startswith("{") else {}
-        print(c, "PUBLI-%s" % d.get("sequence_id"), d.get("id", b[:200])); return
+        print(c, "#%s" % d.get("sequence_id"), d.get("id", b[:200])); return
 
     if args.cmd == "comment":
         c, b = cj("POST", f"{B}/issues/{args.issue}/comments/", {"comment_html": args.html})

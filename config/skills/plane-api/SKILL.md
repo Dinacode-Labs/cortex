@@ -24,12 +24,11 @@ relations, etc. — prefer it for one-off operations. This skill covers the **ga
 
 Scripts resolve `PLANE_BASE_URL`, `PLANE_WORKSPACE_SLUG`, `PLANE_API_KEY` from env, or
 from the `plane` MCP server block in `~/.claude.json`. So normally **no setup needed**.
-**Default workspace: `dinacode`.** Env vars take precedence over the `~/.claude.json`
-block, so to work in another workspace just prefix the command with the slug, e.g.
-`PLANE_WORKSPACE_SLUG=publimil python plane.py list --project <pid>` (publimil project
-`LevelUp` / `PUBLI`, id `d4daca1d-acbe-49f7-b1cd-e94313eee9d2`).
+Env vars take precedence over the `~/.claude.json` block, so to target a specific
+workspace/project prefix the command with the slug, e.g.
+`PLANE_WORKSPACE_SLUG=<slug> python plane.py list --project <project-id>`.
 Token is the user's **personal** Plane PAT (works across their workspaces) — it lives
-only in `~/.claude.json`, **never commit it**.
+only in env / `~/.claude.json`, **never commit it**.
 
 ## How we hit Plane by API (the important bits)
 

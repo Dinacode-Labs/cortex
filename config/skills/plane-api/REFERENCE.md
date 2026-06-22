@@ -56,8 +56,3 @@ Trello creds live in `~/.trello-cli/config.json` (`ApiKey`, `Token`). Export as
 - `mcp__plane__*` feature endpoints for **epics / work-item-types / project-features**
   return 404 on this build → not available via API. Group work with a parent issue +
   sub-issues (set `parent`) instead of native Epics.
-
-## Context
-Tasks were migrated from Trello (boards Pasion + Destacamos.com) into project `LevelUp`
-(`PUBLI`). See the user-memory `project-plane-migration` and the repo
-`docs/plan-migracion-trello-a-plane.md` for the full migration record.

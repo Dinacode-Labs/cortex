@@ -103,12 +103,12 @@ Comprueba con `/mcp` (debe aparecer `cortex` con sus tools).
 ## Prompts de demo
 
 Antes de tocar un módulo (§15.3):
-> Antes de tocar la facturación de **LevelUp Pasión**, usa `get_project_context_pack`
+> Antes de tocar el módulo de pagos de **<Proyecto>**, usa `get_project_context_pack`
 > (o `ask_project_context`) y dime qué debo tener en cuenta.
 
 Capturar tras una tarea (skill `cortex-capture` / `/cortex-save`):
-> Guarda en Cortex (LevelUp Pasión) la decisión: "Se cachean las respuestas del ERP
-> con Redis para evitar timeouts en facturación."
+> Guarda en Cortex (<Proyecto>) la decisión: "Se añadió caché en X para evitar
+> timeouts en Y."
 
 ## Skills vendorizadas
 `config/skills/` contiene copias curadas para distribución interna de Dinacode

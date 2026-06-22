@@ -37,9 +37,9 @@ def resolve():
         try:
             cfg = json.load(open(os.path.expanduser("~/.claude.json")))
             # Prefer the GLOBAL (top-level) mcpServers.plane block as the default —
-            # project-scoped blocks (e.g. levelup→publimil) must not win the global
-            # default, which is dinacode. Claude Code rewrites ~/.claude.json on restart
-            # and restores project blocks, so a deterministic preference is required.
+            # project-scoped blocks must not win the global default. Claude Code
+            # rewrites ~/.claude.json on restart and restores project blocks, so a
+            # deterministic preference is required.
             top = (((cfg.get("mcpServers") or {}).get("plane") or {}).get("env")) or {}
             env = top if top.get("PLANE_API_KEY") else (_scan_for_plane(cfg) or {})
             base = base or env.get("PLANE_BASE_URL")
