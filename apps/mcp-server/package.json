@@ -1,0 +1,20 @@
+{
+  "name": "@cortex/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cortex-mcp": "src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@cortex/core": "workspace:*",
+    "@cortex/database": "workspace:*",
+    "@cortex/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.76"
+  }
+}

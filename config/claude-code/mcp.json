@@ -1,0 +1,12 @@
+{
+  "//": "Ejemplo de configuración MCP para Claude Code. Para activarlo, copia este",
+  "//2": "contenido a un .mcp.json en la raíz del repo, o usa `claude mcp add` (ver",
+  "//3": "config/claude-code/README.md). Requiere Postgres levantado (pnpm db:up) y",
+  "//4": "datos sembrados (pnpm db:seed).",
+  "mcpServers": {
+    "cortex": {
+      "command": "pnpm",
+      "args": ["--filter", "@cortex/mcp-server", "start"]
+    }
+  }
+}

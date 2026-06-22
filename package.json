@@ -15,7 +15,8 @@
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
     "db:migrate": "pnpm --filter @cortex/database run migrate",
-    "db:seed": "pnpm --filter @cortex/database run seed"
+    "db:seed": "pnpm --filter @cortex/core run seed",
+    "mcp": "pnpm --filter @cortex/mcp-server start"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
