@@ -109,6 +109,7 @@ pnpm workflow:capture "Migramos a generación asíncrona con colas" "Acme Portal
 | `pnpm db:seed` | Carga datos de demo (idempotente) |
 | `pnpm --filter @cortex/core run ingest "<Proyecto>" <items.json>` | Ingesta masiva (2 fases + embeddings por lotes) |
 | `pnpm --filter @cortex/core run lint "<Proyecto>"` | Lint del conocimiento (contradicciones, huecos, duplicados…) |
+| `pnpm --filter @cortex/core run lint-act "<Proyecto>"` | Plan de acciones del Lint (dry-run: tareas a abrir, duplicados a consolidar) |
 | `pnpm --filter @cortex/core run index-code "<Proyecto>" <ruta-repo>` | Indexa el código de un repo local (chunks + embeddings) |
 | `pnpm --filter @cortex/core run temporal` | Invalidación bi-temporal (cierra ventana de hechos no vigentes) |
 | `pnpm --filter @cortex/core run connect-github "<Proyecto>" <owner/repo>` | Ingesta de PRs/issues de GitHub (vía `gh`) |
