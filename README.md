@@ -16,6 +16,7 @@ Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisi
 
 ![Dashboard](./docs/screenshot-dashboard.png)
 ![Preguntar al agente de recuperación](./docs/screenshot-ask.png)
+![Grafo de conocimiento](./docs/screenshot-graph-entities.png)
 ![Context pack](./docs/screenshot-context-pack.png)
 
 ## Arquitectura (demo)
