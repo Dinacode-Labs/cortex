@@ -219,6 +219,7 @@ export function layout(title: string, body: string): string {
       <a href="/graph">Grafo</a>
       <a href="/code">Código</a>
       <a href="/lint">Lint</a>
+      <a href="/usage">Coste IA</a>
       <a href="/?capture=1">Capturar</a>
     </nav>
   </header>

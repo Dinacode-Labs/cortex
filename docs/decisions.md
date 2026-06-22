@@ -241,3 +241,20 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   (`workflows.ts`) ahora orquesta un Agent real.
 - **Revisar cuando:** el modelo mejore la adherencia a `structuredOutput` (podríamos
   quitar el `fetch` y usar esquemas zod), o queramos `memory`/`tools` por agente.
+
+## ADR-0016 · Observabilidad de coste/uso de IA
+
+- **Estado:** aceptada. Dos capas (A propia + B Mastra).
+- **Contexto:** no medíamos tokens ni coste de las llamadas a IA (LLM + embeddings).
+  Con nan el coste es 0, pero hay que **medir consumo y poder estimar coste** si se
+  cambia a OpenAI/Anthropic/Voyage (principio de trazabilidad §5.5).
+- **Decisión (A — tracking propio):** tabla `llm_usage` (migración 0005) +
+  `recordUsage()`/`getUsageSummary()` en `@cortex/core`. Cada Agent de Mastra
+  registra tokens (`runAgent` captura `usage`); los embeddings emiten tokens por un
+  **sink** (`@cortex/embeddings` es hoja, no acopla a core). Tabla de precios por
+  modelo para **estimar** coste (nan = 0). Panel en la UI (`/usage`): totales,
+  por operación/agente, por modelo y últimas llamadas.
+- **Decisión (B — Mastra):** instancia de Mastra con AI tracing/telemetry para
+  trazas por agente (token usage + latencia). *(Ver commit de B.)*
+- **Revisar cuando:** queramos coste por proyecto (propagar `project` a `recordUsage`),
+  presupuestos/alertas, o exportar a un backend de observabilidad (OTel/Langfuse).

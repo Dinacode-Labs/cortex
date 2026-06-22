@@ -6,6 +6,7 @@ import { OpenAICompatibleEmbeddingProvider, VoyageEmbeddingProvider } from "./re
 export { type EmbeddingProvider, l2normalize } from "./provider.js";
 export { LocalEmbeddingProvider } from "./local.js";
 export { OpenAICompatibleEmbeddingProvider, VoyageEmbeddingProvider } from "./remote.js";
+export { setEmbeddingUsageSink, type EmbeddingUsage } from "./usage-sink.js";
 
 let cached: EmbeddingProvider | undefined;
 

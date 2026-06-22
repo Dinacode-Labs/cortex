@@ -45,6 +45,8 @@ contexto al cambiar de tarea, módulo, proyecto o persona.
 - **Multi-fuente** — ingesta desde Plane, Google Chat, GitHub y repos de código,
   unificadas en un mismo grafo.
 - **MCP corporativo** — 8 tools neutras consumibles por Claude Code / Codex / OpenCode.
+- **Observabilidad de coste IA** — tokens y coste estimado por operación/agente y
+  modelo (LLM + embeddings), con panel `/usage`.
 - **Harness distribuible** — `cortex sync` instala el MCP + skills + comandos del
   toolbelt de Dinacode en los agentes del dev.
 
