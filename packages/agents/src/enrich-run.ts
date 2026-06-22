@@ -22,7 +22,22 @@ async function main(): Promise<void> {
     return;
   }
   const sql = getSql();
-  const entries = await listEntries({ project, limit: limit ?? 2000 });
+  let entries = await listEntries({ project, limit: limit ?? 2000 });
+
+  // Modo reanudar: salta las entradas que ya tienen alguna entidad (no-proyecto).
+  if (process.env.CORTEX_ENRICH_ONLY_MISSING === "1") {
+    const enriched = new Set(
+      ((await sql`
+        SELECT DISTINCT cee.context_entry_id AS id
+        FROM context_entry_entities cee
+        JOIN entities en ON en.id = cee.entity_id AND en.type <> 'project'
+      `) as unknown as { id: string }[]).map((r) => r.id),
+    );
+    const before = entries.length;
+    entries = entries.filter((e) => !enriched.has(e.id));
+    console.log(`Reanudar: ${before - entries.length} ya enriquecidas, ${entries.length} pendientes.`);
+  }
+
   console.log(`Enriqueciendo ${entries.length} entradas de "${project}" (conc=${CONCURRENCY})...`);
 
   let cursor = 0;
