@@ -15,7 +15,8 @@
     "lint-act": "tsx src/lint-act.ts",
     "index-code": "tsx src/index-code.ts",
     "temporal": "tsx src/temporal-run.ts",
-    "connect-github": "tsx src/connect-github.ts"
+    "connect-github": "tsx src/connect-github.ts",
+    "connect-notion-export": "tsx src/connect-notion-export.ts"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",

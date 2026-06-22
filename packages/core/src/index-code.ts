@@ -16,8 +16,10 @@ async function main(): Promise<void> {
     return;
   }
   console.log(`Indexando código de ${resolve(repoPath)} en "${project}"...`);
+  const maxChunks = process.env.CORTEX_MAX_CHUNKS ? Number(process.env.CORTEX_MAX_CHUNKS) : undefined;
   const r = await indexRepo(project, resolve(repoPath), {
     repoName,
+    maxChunks,
     onProgress: (done, total) => {
       if (done % 320 === 0 || done === total) console.log(`  ${done}/${total} chunks`);
     },
