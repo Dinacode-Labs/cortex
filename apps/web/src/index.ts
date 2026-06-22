@@ -10,6 +10,7 @@ import {
   getContextPack,
   getEntryDetail,
   getProjectGraph,
+  getRecentTraces,
   getUsageSummary,
   lintProject,
   listEntries,
@@ -403,6 +404,7 @@ app.get("/lint", async (c) => {
 // --- Coste / uso de IA -------------------------------------------------------
 app.get("/usage", async (c) => {
   const u = await getUsageSummary();
+  const traces = await getRecentTraces(12);
   const num = (n: number) => n.toLocaleString("es-ES");
   const money = (n: number) => (n > 0 ? `$${n.toFixed(4)}` : "—");
   const th = 'style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted)"';
@@ -423,6 +425,27 @@ app.get("/usage", async (c) => {
   const table = (head: string, rows: string) =>
     `<table style="width:100%;border-collapse:collapse">${head}${rows || `<tr><td ${td} colspan="5"><span class="sub">Sin datos todavía.</span></td></tr>`}</table>`;
 
+  const spanRow = (s: (typeof traces)[number]["spans"][number]) => {
+    const indent = s.parentSpanId ? 18 : 0;
+    const toks = (s.inputTokens ?? 0) + (s.outputTokens ?? 0);
+    return `<div style="padding:3px 0;padding-left:${indent}px;border-bottom:1px solid var(--color-border);font-size:13px">
+      <span class="sub" style="font-variant-numeric:tabular-nums">${esc(s.spanType ?? "")}</span>
+      ${esc((s.name ?? s.entityName ?? "").slice(0, 80))}
+      ${s.durationMs != null ? `<span class="sub"> · ${num(s.durationMs)}ms</span>` : ""}
+      ${toks ? `<span class="sub"> · ${num(toks)} tok</span>` : ""}
+      ${s.status === "error" ? " ⚠️" : ""}</div>`;
+  };
+  const tracesHtml = traces.length
+    ? traces
+        .map(
+          (t) =>
+            `<div class="panel"><h2 style="font-size:15px;margin-bottom:6px">🧵 ${esc(t.rootName)}
+              <span class="sub" style="font-weight:400"> · ${num(t.totalDurationMs)}ms · ${num(t.totalTokens)} tok · ${esc(t.startedAt.replace("T", " ").slice(0, 19))}</span></h2>
+              ${t.spans.map(spanRow).join("")}</div>`,
+        )
+        .join("")
+    : `<div class="panel"><span class="sub">Sin trazas todavía. Ejecuta una operación con LLM (ask, enrich…).</span></div>`;
+
   const body = `
     <p><a class="back" href="/">← Inicio</a></p>
     <h1>Coste / uso de IA</h1>
@@ -435,7 +458,9 @@ app.get("/usage", async (c) => {
     </div>
     <div class="panel"><h2>Por operación / agente</h2>${table(`<tr><th ${th}>Operación</th><th ${th} style="text-align:right">Llamadas</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, opRows)}</div>
     <div class="panel"><h2>Por modelo</h2>${table(`<tr><th ${th}>Modelo</th><th ${th} style="text-align:right">Llamadas</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, modelRows)}</div>
-    <div class="panel"><h2>Últimas llamadas</h2>${table(`<tr><th ${th}>Fecha</th><th ${th}>Operación</th><th ${th}>Modelo</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, recentRows)}</div>`;
+    <div class="panel"><h2>Últimas llamadas</h2>${table(`<tr><th ${th}>Fecha</th><th ${th}>Operación</th><th ${th}>Modelo</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, recentRows)}</div>
+    <h2 style="margin-top:28px">Trazas recientes <span class="sub">· AI tracing de Mastra (árbol de spans)</span></h2>
+    ${tracesHtml}`;
   return c.html(layout("Coste IA", body));
 });
 
