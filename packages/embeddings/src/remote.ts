@@ -1,25 +1,60 @@
 import { type EmbeddingProvider } from "./provider.js";
 
-/** OpenAI text-embedding-3-small (1536 dims). Requiere OPENAI_API_KEY. */
-export class OpenAIEmbeddingProvider implements EmbeddingProvider {
-  readonly model = "text-embedding-3-small";
-  readonly version = "1";
-  readonly dim = 1536;
+/** POST con reintentos exponenciales en 429/5xx (nan: 60 rpm, 3 en paralelo). */
+async function postWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
+  const max = 6;
+  for (let attempt = 0; attempt < max; attempt++) {
+    const res = await fetch(url, init);
+    if (res.ok) return res;
+    if ((res.status === 429 || res.status >= 500) && attempt < max - 1) {
+      const wait = Math.min(15000, 800 * 2 ** attempt);
+      await new Promise((r) => setTimeout(r, wait));
+      continue;
+    }
+    throw new Error(`${label} error ${res.status}: ${await res.text()}`);
+  }
+  throw new Error(`${label}: reintentos agotados`);
+}
 
-  constructor(private readonly apiKey: string) {}
+/**
+ * Proveedor de embeddings para cualquier endpoint OpenAI-compatible
+ * (/v1/embeddings): OpenAI, nan.builders, etc. Configurable por base URL, modelo
+ * y dimensión.
+ */
+export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
+  readonly model: string;
+  readonly version: string;
+  readonly dim: number;
+  private readonly apiKey: string;
+  private readonly baseURL: string;
+
+  constructor(opts: {
+    apiKey: string;
+    baseURL: string;
+    model: string;
+    dim: number;
+    version?: string;
+  }) {
+    this.apiKey = opts.apiKey;
+    this.baseURL = opts.baseURL.replace(/\/$/, "");
+    this.model = opts.model;
+    this.dim = opts.dim;
+    this.version = opts.version ?? "1";
+  }
 
   async embed(texts: string[]): Promise<number[][]> {
-    const res = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${this.apiKey}`,
+    const res = await postWithRetry(
+      `${this.baseURL}/embeddings`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ model: this.model, input: texts }),
       },
-      body: JSON.stringify({ model: this.model, input: texts }),
-    });
-    if (!res.ok) {
-      throw new Error(`OpenAI embeddings error ${res.status}: ${await res.text()}`);
-    }
+      `Embeddings ${this.model}`,
+    );
     const json = (await res.json()) as { data: { embedding: number[]; index: number }[] };
     return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
   }

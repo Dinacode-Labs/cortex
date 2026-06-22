@@ -72,6 +72,11 @@ export interface SaveContextOptions {
   /** Si false, no invoca el clasificador LLM (lo usa el workflow, que clasifica
    *  en un paso previo y pasa type/title/summary explícitos). Por defecto true. */
   useClassifier?: boolean;
+  /** Si false, omite los loops de duplicados/contradicciones (ingesta masiva).
+   *  Por defecto true. */
+  detectImprovements?: boolean;
+  /** Si true, no genera el embedding aquí (la ingesta los hace por lotes después). */
+  skipEmbedding?: boolean;
 }
 
 export async function saveContext(
@@ -123,7 +128,7 @@ export async function saveContext(
   `) as unknown as Row[];
   const entry = rowToContextEntry(entryRows[0]!);
 
-  await storeEmbedding(sql, provider, entry.id, embedText);
+  if (!opts.skipEmbedding) await storeEmbedding(sql, provider, entry.id, embedText);
 
   // Enlace de entidades (grafo relacional)
   const entityIds: string[] = [];
@@ -143,7 +148,10 @@ export async function saveContext(
   }
   if (projectId) await linkEntryToEntity(sql, entry.id, projectId);
 
-  const warnings = await detectImprovements(sql, entry, projectId, embedText, entityIds);
+  const warnings =
+    (opts.detectImprovements ?? true)
+      ? await detectImprovements(sql, entry, projectId, embedText, entityIds)
+      : [];
   return { entry, warnings };
 }
 

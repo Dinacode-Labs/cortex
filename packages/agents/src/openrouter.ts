@@ -1,26 +1,46 @@
 import { getEnv, loadEnv } from "@cortex/shared";
 
 /**
- * Acceso a LLM vía OpenRouter. Para extracción estructurada usamos el endpoint
- * directo en modo `json_object` (fiable con DeepSeek). Mastra se usa aparte para
- * generación de texto (ver synthesize.ts). Ver ADR-0006 en docs/decisions.md.
+ * Acceso a LLM por endpoint OpenAI-compatible (/v1/chat/completions). Soporta
+ * varios proveedores vía LLM_PROVIDER:
+ *   - "nan"        -> servidor nan.builders (modelos free; OpenAI-compatible)
+ *   - "openrouter" -> OpenRouter (DeepSeek, etc.)
+ * Para extracción estructurada usamos modo json_object (ver classify.ts).
+ * Ver ADR-0006/0008 en docs/decisions.md.
  */
 
-const BASE_URL = "https://openrouter.ai/api/v1";
-
 export interface LlmConfig {
+  provider: string;
   apiKey: string;
   model: string;
+  baseURL: string;
 }
 
-/** Devuelve la config LLM si está habilitada (LLM_PROVIDER=openrouter + key). */
+/** Devuelve la config LLM si está habilitada, o null. */
 export function getLlmConfig(): LlmConfig | null {
   loadEnv();
   const provider = getEnv("LLM_PROVIDER", "none").toLowerCase();
-  if (provider !== "openrouter") return null;
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) return null;
-  return { apiKey, model: getEnv("OPENROUTER_MODEL", "deepseek/deepseek-v4-pro") };
+  if (provider === "nan") {
+    const apiKey = process.env.NAN_API_KEY;
+    if (!apiKey) return null;
+    return {
+      provider,
+      apiKey,
+      model: getEnv("NAN_LLM_MODEL", "qwen3.6"),
+      baseURL: getEnv("NAN_BASE_URL", "https://api.nan.builders/v1"),
+    };
+  }
+  if (provider === "openrouter") {
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) return null;
+    return {
+      provider,
+      apiKey,
+      model: getEnv("OPENROUTER_MODEL", "deepseek/deepseek-v4-pro"),
+      baseURL: "https://openrouter.ai/api/v1",
+    };
+  }
+  return null;
 }
 
 export function isLlmEnabled(): boolean {
@@ -39,15 +59,12 @@ interface ChatOptions {
   signal?: AbortSignal;
 }
 
-/** Llamada cruda a chat/completions. Devuelve el texto del primer choice. */
-export async function chat(
-  messages: ChatMessage[],
-  opts: ChatOptions = {},
-): Promise<string> {
+/** Llamada a chat/completions. Devuelve el texto del primer choice. */
+export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<string> {
   const cfg = getLlmConfig();
-  if (!cfg) throw new Error("LLM no habilitado (LLM_PROVIDER/OPENROUTER_API_KEY).");
+  if (!cfg) throw new Error("LLM no habilitado (LLM_PROVIDER / API key).");
 
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${cfg.apiKey}`,
@@ -65,7 +82,7 @@ export async function chat(
   });
 
   if (!res.ok) {
-    throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+    throw new Error(`LLM ${cfg.provider} ${res.status}: ${await res.text()}`);
   }
   const json = (await res.json()) as {
     choices?: { message?: { content?: string } }[];
