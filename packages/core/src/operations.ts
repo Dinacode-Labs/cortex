@@ -265,7 +265,7 @@ export async function listDecisions(project: string, limit = 20): Promise<Contex
   const rows = (await sql`
     SELECT * FROM context_entries
     WHERE project_id = ${projectId} AND type = 'decision'
-      AND status NOT IN ('rejected')
+      AND status NOT IN ('rejected') AND valid_to IS NULL
     ORDER BY created_at DESC
     LIMIT ${limit}
   `) as unknown as Row[];
@@ -301,8 +301,11 @@ export interface ContextPack {
   totalEntries: number;
 }
 
-/** Genera un paquete de contexto para herramientas de IA (Claude Code/Codex). §12.10, §15.3. */
-export async function getContextPack(project: string, area?: string): Promise<ContextPack> {
+/**
+ * Genera un paquete de contexto para herramientas de IA (Claude Code/Codex).
+ * §12.10, §15.3. Por defecto solo hechos VIGENTES; `asOf` para point-in-time.
+ */
+export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
   const sql = getSql();
   const projectId = await findProjectId(sql, project);
   if (!projectId) {
@@ -310,11 +313,11 @@ export async function getContextPack(project: string, area?: string): Promise<Co
   }
 
   const [decisions, constraints, risks, technicalDebt, conventions] = await Promise.all([
-    entriesByType(sql, projectId, "decision"),
-    entriesByType(sql, projectId, "constraint"),
-    entriesByType(sql, projectId, "risk"),
-    entriesByType(sql, projectId, "technical_debt"),
-    entriesByType(sql, projectId, "convention"),
+    entriesByType(sql, projectId, "decision", asOf),
+    entriesByType(sql, projectId, "constraint", asOf),
+    entriesByType(sql, projectId, "risk", asOf),
+    entriesByType(sql, projectId, "technical_debt", asOf),
+    entriesByType(sql, projectId, "convention", asOf),
   ]);
 
   const moduleRows = (await sql`
@@ -338,6 +341,7 @@ export async function getContextPack(project: string, area?: string): Promise<Co
       queryText: area,
       projectId,
       limit: 5,
+      asOf,
     });
   }
 
@@ -383,12 +387,17 @@ async function entriesByType(
   sql: Sql,
   projectId: string,
   type: ContextEntryType,
+  asOf?: Date,
   limit = 20,
 ): Promise<ContextEntry[]> {
+  const temporal = asOf
+    ? sql`AND valid_from <= ${asOf} AND (valid_to IS NULL OR valid_to > ${asOf})`
+    : sql`AND valid_to IS NULL`;
   const rows = (await sql`
     SELECT * FROM context_entries
     WHERE project_id = ${projectId} AND type = ${type}
       AND status NOT IN ('rejected', 'obsolete')
+      ${temporal}
     ORDER BY created_at DESC
     LIMIT ${limit}
   `) as unknown as Row[];

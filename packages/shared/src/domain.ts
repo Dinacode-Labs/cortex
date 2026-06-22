@@ -120,6 +120,10 @@ export const contextEntry = z.object({
   updatedAt: z.date(),
   supersededBy: z.string().uuid().nullable(),
   metadata: z.record(z.unknown()),
+  // Bi-temporalidad: ventana de validez del hecho. validTo null = vigente.
+  validFrom: z.date(),
+  validTo: z.date().nullable(),
+  observedAt: z.date(),
 });
 export type ContextEntry = z.infer<typeof contextEntry>;
 
