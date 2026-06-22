@@ -20,7 +20,6 @@ Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisi
 ![Lint del conocimiento](./docs/screenshot-lint.png)
 ![Búsqueda de código](./docs/screenshot-code.png)
 ![Context pack point-in-time (bi-temporal)](./docs/screenshot-pack-pointintime.png)
-![Context pack](./docs/screenshot-context-pack.png)
 
 ## Arquitectura (demo)
 

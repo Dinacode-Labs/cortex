@@ -178,3 +178,19 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   "ganador" claro) — el lint las reporta para revisión humana.
 - **Revisar cuando:** queramos decay adaptativo (por velocity/volatility) o
   invalidación por recencia en contradicciones.
+
+## ADR-0013 · UI con el sistema de diseño de Dinacode
+
+- **Estado:** aceptada (demo).
+- **Contexto:** la UI usaba una paleta genérica (morado/oscuro). Dinacode tiene un
+  design system en Open Design (`Dinacode Design System`, vinculado a
+  `dinacode-web`).
+- **Decisión:** aplicar los tokens del DS a la UI web (`apps/web/src/views.ts`):
+  azul eléctrico `#0099ff`, tinta de marca `#01001c`, tipografías Inter +
+  JetBrains Mono, rampa de radios/espaciado/sombras y componentes (cards, botones,
+  chips, inputs) del DS. Cabecera con el logo Dinacode + tag "Cortex". Tema claro;
+  lienzo del grafo en tinta de marca. Capturas del README regeneradas.
+- **Fuente:** Open Design (`colors_and_type.css`, `DESIGN.md`, `assets/logo.svg`),
+  extraído de `dinacode-web/src/app/globals.css`.
+- **Revisar cuando:** queramos modo oscuro conmutable o extraer los tokens a un
+  paquete compartido (`@cortex/ui`).
