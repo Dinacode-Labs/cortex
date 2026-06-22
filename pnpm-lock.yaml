@@ -77,6 +77,9 @@ importers:
       '@mastra/core':
         specifier: ^1.45.0
         version: 1.45.0(ai@6.0.208(zod@4.4.3))(express@5.2.1)(zod@4.4.3)
+      '@mastra/observability':
+        specifier: ^1.15.0
+        version: 1.15.0(@mastra/core@1.45.0(ai@6.0.208(zod@4.4.3))(express@5.2.1)(zod@4.4.3))(zod@4.4.3)
       '@openrouter/ai-sdk-provider':
         specifier: ^2.9.1
         version: 2.9.1(ai@6.0.208(zod@4.4.3))(zod@4.4.3)
@@ -359,6 +362,13 @@ packages:
     resolution: {integrity: sha512-UPpNL+iJVfypfc7IOKL9fhmoKKDe6IA6y+DwZDRSTN+uz/ft194e+TrB4LnBdYtTTeLhDO96mxW2rp9LK0ULhg==}
     engines: {node: '>=22.13.0'}
     peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+
+  '@mastra/observability@1.15.0':
+    resolution: {integrity: sha512-AeeZ0TbWY1DTTMiyXzMEBJmy0VYN7qWrgFglNYQ7ZctwJQqGPFDz/r+CmNxVNmnOvXQDqcx7Lngerv4hHyGC2g==}
+    engines: {node: '>=22.13.0'}
+    peerDependencies:
+      '@mastra/core': '>=1.16.0-0 <2.0.0-0'
       zod: ^3.25.0 || ^4.0.0
 
   '@mastra/schema-compat@1.3.0':
@@ -1395,6 +1405,11 @@ snapshots:
       - rxjs
       - supports-color
       - utf-8-validate
+
+  '@mastra/observability@1.15.0(@mastra/core@1.45.0(ai@6.0.208(zod@4.4.3))(express@5.2.1)(zod@4.4.3))(zod@4.4.3)':
+    dependencies:
+      '@mastra/core': 1.45.0(ai@6.0.208(zod@4.4.3))(express@5.2.1)(zod@4.4.3)
+      zod: 4.4.3
 
   '@mastra/schema-compat@1.3.0(zod@4.4.3)':
     dependencies:

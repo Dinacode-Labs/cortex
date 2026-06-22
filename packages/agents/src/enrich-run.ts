@@ -1,6 +1,7 @@
 import { closeSql, getSql } from "@cortex/database";
 import { linkEntryToEntity, listEntries, relate, resolveEntity } from "@cortex/core";
 import { extractGraph } from "./enrich.js";
+import { shutdownObservability } from "./mastra.js";
 
 /**
  * Pase de enriquecimiento de grafo (§7/§12.4): recorre las entradas de un proyecto,
@@ -97,6 +98,7 @@ main()
     process.exitCode = 1;
   })
   .finally(async () => {
+    await shutdownObservability(); // flush de spans de tracing (ADR-0016 B)
     await closeSql();
     // Los Agents de Mastra (@ai-sdk) dejan handles abiertos que impiden que el
     // proceso salga; en un CLI forzamos la salida tras cerrar la BD.

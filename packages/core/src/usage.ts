@@ -99,6 +99,71 @@ export async function getUsageSummary(): Promise<UsageSummary> {
   };
 }
 
+// --- Trazas de IA (observabilidad B: spans de Mastra en ai_traces) -----------
+export interface TraceSpan {
+  spanId: string;
+  parentSpanId: string | null;
+  name: string | null;
+  spanType: string | null;
+  entityName: string | null;
+  model: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  durationMs: number | null;
+  status: string | null;
+}
+export interface TraceTree {
+  traceId: string;
+  startedAt: string;
+  rootName: string;
+  totalDurationMs: number;
+  totalTokens: number;
+  spans: TraceSpan[];
+}
+
+/** Últimas N trazas (árbol de spans por trace_id), recientes primero. */
+export async function getRecentTraces(limit = 15): Promise<TraceTree[]> {
+  const sql = getSql();
+  type R = Record<string, unknown>;
+  const rows = (await sql`
+    WITH recent AS (
+      SELECT trace_id, max(started_at) AS ts FROM ai_traces
+      GROUP BY trace_id ORDER BY ts DESC LIMIT ${limit}
+    )
+    SELECT a.*, r.ts AS _ts FROM ai_traces a JOIN recent r ON r.trace_id = a.trace_id
+    ORDER BY r.ts DESC, a.started_at ASC NULLS LAST
+  `) as unknown as R[];
+
+  const byTrace = new Map<string, TraceTree>();
+  for (const r of rows) {
+    const tid = String(r.trace_id);
+    let t = byTrace.get(tid);
+    if (!t) {
+      t = { traceId: tid, startedAt: new Date(r._ts as string).toISOString(), rootName: "", totalDurationMs: 0, totalTokens: 0, spans: [] };
+      byTrace.set(tid, t);
+    }
+    const span: TraceSpan = {
+      spanId: String(r.span_id),
+      parentSpanId: (r.parent_span_id as string) ?? null,
+      name: (r.name as string) ?? null,
+      spanType: (r.span_type as string) ?? null,
+      entityName: (r.entity_name as string) ?? null,
+      model: (r.model as string) ?? null,
+      inputTokens: r.input_tokens == null ? null : Number(r.input_tokens),
+      outputTokens: r.output_tokens == null ? null : Number(r.output_tokens),
+      durationMs: r.duration_ms == null ? null : Number(r.duration_ms),
+      status: (r.status as string) ?? null,
+    };
+    t.spans.push(span);
+    if (!r.parent_span_id || r.span_type === "agent_run") {
+      t.rootName = span.entityName || span.name || span.spanType || "traza";
+      t.totalDurationMs = span.durationMs ?? t.totalDurationMs;
+    }
+    t.totalTokens += (span.inputTokens ?? 0) + (span.outputTokens ?? 0);
+  }
+  return [...byTrace.values()];
+}
+
 // Registra el uso de embeddings (el paquete embeddings emite tokens vía su sink).
 setEmbeddingUsageSink((u) => {
   void recordUsage({

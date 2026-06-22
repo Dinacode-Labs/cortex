@@ -254,7 +254,16 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   **sink** (`@cortex/embeddings` es hoja, no acopla a core). Tabla de precios por
   modelo para **estimar** coste (nan = 0). Panel en la UI (`/usage`): totales,
   por operación/agente, por modelo y últimas llamadas.
-- **Decisión (B — Mastra):** instancia de Mastra con AI tracing/telemetry para
-  trazas por agente (token usage + latencia). *(Ver commit de B.)*
-- **Revisar cuando:** queramos coste por proyecto (propagar `project` a `recordUsage`),
-  presupuestos/alertas, o exportar a un backend de observabilidad (OTel/Langfuse).
+- **Decisión (B — Mastra AI tracing):** los Agents se sirven desde una instancia
+  `Mastra` con `Observability` (`@mastra/observability`) y un **exporter propio**
+  (`CortexTraceExporter`) que persiste cada span (`agent_run → model_generation →
+  model_inference…`) en la tabla `ai_traces` (migración 0006) de nuestra Postgres.
+  Se descartó el storage propio de Mastra (`@mastra/pg`/`libsql`) por fricción
+  (init `id`, spans no persistían); el exporter propio inserta inmediato (fiable en
+  CLI). Los CLI llaman `shutdownObservability()` antes de `process.exit` para flushar.
+  La UI `/usage` muestra coste (A) + **árbol de trazas** (B). model_chunk/step se
+  filtran como ruido.
+- **Revisar cuando:** queramos coste por proyecto (propagar `project`),
+  presupuestos/alertas, una página de traza individual, o un bridge OTel/Langfuse
+  (la config lo soporta). Pendiente menor: silenciar el warning de in-memory store de
+  Mastra (no usamos su storage).

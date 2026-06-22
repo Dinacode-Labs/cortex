@@ -1,7 +1,10 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { Agent } from "@mastra/core/agent";
+import { Mastra } from "@mastra/core";
+import { Observability } from "@mastra/observability";
 import { recordUsage } from "@cortex/core";
 import { getLlmConfig } from "./openrouter.js";
+import { CortexTraceExporter } from "./trace-exporter.js";
 
 /**
  * Agentes de Mastra de Cortex (§7). Un Agent por rol del pipeline de inteligencia:
@@ -50,9 +53,9 @@ const jsonFetch: typeof fetch = async (url, init) => {
   return fetch(url as Parameters<typeof fetch>[0], init);
 };
 
-let cache: Record<AgentRole, Agent> | null | undefined;
+let mastra: Mastra | null | undefined;
 
-function build(): Record<AgentRole, Agent> | null {
+function build(): Mastra | null {
   const cfg = getLlmConfig();
   if (!cfg) return null;
   const model = (json: boolean) =>
@@ -71,13 +74,32 @@ function build(): Record<AgentRole, Agent> | null {
       instructions: INSTRUCTIONS[role],
       model: JSON_ROLES.has(role) ? jsonModel : textModel,
     });
-  return { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever") };
+  // Instancia Mastra: agentes registrados + observabilidad (AI tracing) hacia
+  // nuestro exporter (ADR-0016 parte B). Los agentes se sirven desde aquí para
+  // que `generate()` emita spans.
+  return new Mastra({
+    agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever") },
+    observability: new Observability({
+      configs: { default: { serviceName: "cortex", exporters: [new CortexTraceExporter()] } },
+    }),
+  } as ConstructorParameters<typeof Mastra>[0]);
 }
 
 /** Devuelve el Agent del rol, o null si no hay LLM configurado. */
 export function getAgent(role: AgentRole): Agent | null {
-  if (cache === undefined) cache = build();
-  return cache ? cache[role] : null;
+  if (mastra === undefined) mastra = build();
+  return mastra ? (mastra.getAgent(role) as Agent) : null;
+}
+
+/** Flushea/cierra la observabilidad (para CLIs que terminan con process.exit). */
+export async function shutdownObservability(): Promise<void> {
+  if (mastra) {
+    try {
+      await (mastra as unknown as { shutdown?: () => Promise<void> }).shutdown?.();
+    } catch {
+      /* best-effort */
+    }
+  }
 }
 
 /** Ejecuta el agente del rol y devuelve su texto. Lanza si no hay LLM. */
