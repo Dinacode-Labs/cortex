@@ -1,4 +1,5 @@
 import { type EmbeddingProvider } from "./provider.js";
+import { reportEmbeddingUsage } from "./usage-sink.js";
 
 /** POST con reintentos exponenciales en 429/5xx (nan: 60 rpm, 3 en paralelo). */
 async function postWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
@@ -55,7 +56,15 @@ export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
       },
       `Embeddings ${this.model}`,
     );
-    const json = (await res.json()) as { data: { embedding: number[]; index: number }[] };
+    const json = (await res.json()) as {
+      data: { embedding: number[]; index: number }[];
+      usage?: { total_tokens?: number; prompt_tokens?: number };
+    };
+    reportEmbeddingUsage({
+      model: this.model,
+      totalTokens: json.usage?.total_tokens ?? json.usage?.prompt_tokens ?? 0,
+      count: texts.length,
+    });
     return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
   }
 }
@@ -80,7 +89,11 @@ export class VoyageEmbeddingProvider implements EmbeddingProvider {
     if (!res.ok) {
       throw new Error(`Voyage embeddings error ${res.status}: ${await res.text()}`);
     }
-    const json = (await res.json()) as { data: { embedding: number[]; index: number }[] };
+    const json = (await res.json()) as {
+      data: { embedding: number[]; index: number }[];
+      usage?: { total_tokens?: number };
+    };
+    reportEmbeddingUsage({ model: this.model, totalTokens: json.usage?.total_tokens ?? 0, count: texts.length });
     return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
   }
 }

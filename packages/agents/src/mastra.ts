@@ -1,5 +1,6 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { Agent } from "@mastra/core/agent";
+import { recordUsage } from "@cortex/core";
 import { getLlmConfig } from "./openrouter.js";
 
 /**
@@ -89,6 +90,23 @@ export async function runAgent(
   if (!agent) throw new Error("LLM no habilitado (LLM_PROVIDER / API key).");
   const options: Record<string, unknown> = { maxRetries: opts.maxRetries ?? 6 };
   if (opts.maxOutputTokens) options.maxOutputTokens = opts.maxOutputTokens;
-  const res = await agent.generate(prompt, options as never);
-  return (res as { text?: string }).text ?? "";
+  const t0 = Date.now();
+  const res = (await agent.generate(prompt, options as never)) as {
+    text?: string;
+    usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number };
+  };
+  const cfg = getLlmConfig();
+  const u = res.usage ?? {};
+  if (cfg) {
+    await recordUsage({
+      operation: role,
+      provider: cfg.provider,
+      model: cfg.model,
+      inputTokens: u.inputTokens ?? u.promptTokens ?? 0,
+      outputTokens: u.outputTokens ?? u.completionTokens ?? 0,
+      totalTokens: u.totalTokens,
+      durationMs: Date.now() - t0,
+    });
+  }
+  return res.text ?? "";
 }

@@ -10,6 +10,7 @@ import {
   getContextPack,
   getEntryDetail,
   getProjectGraph,
+  getUsageSummary,
   lintProject,
   listEntries,
   listProjects,
@@ -397,6 +398,45 @@ app.get("/lint", async (c) => {
     </div>
     ${report}`;
   return c.html(layout("Lint", body));
+});
+
+// --- Coste / uso de IA -------------------------------------------------------
+app.get("/usage", async (c) => {
+  const u = await getUsageSummary();
+  const num = (n: number) => n.toLocaleString("es-ES");
+  const money = (n: number) => (n > 0 ? `$${n.toFixed(4)}` : "—");
+  const th = 'style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted)"';
+  const td = 'style="padding:6px 10px;border-bottom:1px solid var(--color-border)"';
+  const tdr = 'style="padding:6px 10px;border-bottom:1px solid var(--color-border);text-align:right;font-variant-numeric:tabular-nums"';
+  const stat = (label: string, value: string) =>
+    `<div class="panel" style="flex:1;min-width:140px"><div class="sub">${esc(label)}</div><div style="font-size:24px;font-weight:700">${value}</div></div>`;
+
+  const opRows = u.byOperation
+    .map((o) => `<tr><td ${td}>${esc(o.operation)} <span class="sub">${esc(o.kind)}</span></td><td ${tdr}>${num(o.calls)}</td><td ${tdr}>${num(o.totalTokens)}</td><td ${tdr}>${money(o.costUsd)}</td></tr>`)
+    .join("");
+  const modelRows = u.byModel
+    .map((m) => `<tr><td ${td}>${esc(m.model)} <span class="sub">${esc(m.provider)}</span></td><td ${tdr}>${num(m.calls)}</td><td ${tdr}>${num(m.totalTokens)}</td><td ${tdr}>${money(m.costUsd)}</td></tr>`)
+    .join("");
+  const recentRows = u.recent
+    .map((r) => `<tr><td ${td}><span class="sub">${esc(r.createdAt.replace("T", " ").slice(0, 19))}</span></td><td ${td}>${esc(r.operation)}</td><td ${td}>${esc(r.model)}</td><td ${tdr}>${num(r.totalTokens)}</td><td ${tdr}>${money(r.costUsd)}</td></tr>`)
+    .join("");
+  const table = (head: string, rows: string) =>
+    `<table style="width:100%;border-collapse:collapse">${head}${rows || `<tr><td ${td} colspan="5"><span class="sub">Sin datos todavía.</span></td></tr>`}</table>`;
+
+  const body = `
+    <p><a class="back" href="/">← Inicio</a></p>
+    <h1>Coste / uso de IA</h1>
+    <p class="sub">Observabilidad de tokens y coste por operación y modelo (ADR-0016). El coste se estima con precios públicos por modelo; <b>nan = gratis</b>, por eso $0 hoy.</p>
+    <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
+      ${stat("Llamadas", num(u.totals.calls))}
+      ${stat("Tokens (total)", num(u.totals.totalTokens))}
+      ${stat("Tokens in / out", `${num(u.totals.inputTokens)} / ${num(u.totals.outputTokens)}`)}
+      ${stat("Coste estimado", money(u.totals.costUsd))}
+    </div>
+    <div class="panel"><h2>Por operación / agente</h2>${table(`<tr><th ${th}>Operación</th><th ${th} style="text-align:right">Llamadas</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, opRows)}</div>
+    <div class="panel"><h2>Por modelo</h2>${table(`<tr><th ${th}>Modelo</th><th ${th} style="text-align:right">Llamadas</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, modelRows)}</div>
+    <div class="panel"><h2>Últimas llamadas</h2>${table(`<tr><th ${th}>Fecha</th><th ${th}>Operación</th><th ${th}>Modelo</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, recentRows)}</div>`;
+  return c.html(layout("Coste IA", body));
 });
 
 // --- Grafo de conocimiento ---------------------------------------------------
