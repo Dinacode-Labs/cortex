@@ -27,11 +27,18 @@ un MCP corporativo. Documento fundacional: `dinacode-cortex-contexto-y-plan-demo
 packages/
   shared/      # tipos del dominio, enums, schemas zod (modelo §14 del plan)
   database/    # esquema SQL + migraciones + cliente Postgres
+  embeddings/  # proveedor de embeddings enchufable (local | openai | voyage)
+  core/        # operaciones de dominio: save/search/context-pack + loops de mejora
 apps/
-  mcp-server/  # (próximamente) servidor MCP con las tools corporativas
+  mcp-server/  # servidor MCP (stdio) con las 5 tools corporativas
+  web/         # UI web de demo (Hono, render en servidor)
 docs/
   decisions.md # ADR ligero: decisiones = hipótesis a revisar
+  demo-script.md
 ```
+
+`@cortex/core` es determinista (sin LLM); Mastra se superpondrá como capa de
+inteligencia. Tanto el MCP como la UI son consumidores de `@cortex/core`.
 
 ## Comandos
 

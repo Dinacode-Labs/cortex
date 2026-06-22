@@ -10,8 +10,11 @@ Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisi
 
 > Estado: **demo funcional en construcción**. Lo implementado hasta ahora cubre
 > captura, almacenamiento híbrido, búsqueda semántica, context packs, loops de
-> mejora (duplicados/contradicciones) y el servidor MCP. Pendiente: agentes
-> Mastra (capa de inteligencia con LLM) y UI.
+> mejora (duplicados/contradicciones), el servidor MCP y una UI web de demo.
+> Pendiente: agentes Mastra (capa de inteligencia con LLM).
+
+![Dashboard](./docs/screenshot-dashboard.png)
+![Context pack](./docs/screenshot-context-pack.png)
 
 ## Arquitectura (demo)
 
@@ -19,9 +22,10 @@ Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisi
 Claude Code / Codex / ChatGPT
         │  (MCP)
         ▼
-  @cortex/mcp-server         apps/mcp-server   — 5 tools corporativas
-        │
-        ▼
+  @cortex/mcp-server   apps/mcp-server  ─┐   — 5 tools corporativas
+  @cortex/web          apps/web         ─┤   — UI web de demo (Hono, SSR)
+        │                                │
+        ▼                                ▼
   @cortex/core               packages/core     — operaciones de dominio
         │                                         (clasificar, entidades,
         │                                          embeddings, loops de mejora)
@@ -44,6 +48,12 @@ cp .env.example .env      # por defecto: embeddings locales, sin claves
 pnpm db:up                # Postgres + pgvector (Docker, puerto host 5433)
 pnpm db:migrate           # crea el esquema
 pnpm db:seed              # datos de demo: proyecto Acme Portal
+```
+
+Lanza la UI de demo:
+
+```bash
+pnpm web                  # http://localhost:8080
 ```
 
 Para conectar Claude Code al MCP, ver [`config/claude-code/README.md`](./config/claude-code/README.md).
@@ -71,4 +81,5 @@ Tras cambiar de proveedor, re-siembra (`pnpm db:seed`) para regenerar embeddings
 | `pnpm db:migrate` | Aplica migraciones |
 | `pnpm db:seed` | Carga datos de demo (idempotente) |
 | `pnpm mcp` | Arranca el servidor MCP (stdio) |
+| `pnpm web` | Arranca la UI web de demo |
 | `pnpm typecheck` | Comprueba tipos en todos los paquetes |
