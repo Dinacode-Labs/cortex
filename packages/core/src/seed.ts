@@ -115,6 +115,16 @@ const ENTRIES: SeedEntry[] = [
 async function seed(): Promise<void> {
   const sql = getSql();
 
+  // Salvaguarda: el seed BORRA todas las tablas y recarga el demo Acme. Para no
+  // destruir datos reales (p.ej. una ingesta de proyecto), exige confirmación.
+  if (process.env.CORTEX_SEED_CONFIRM !== "1") {
+    throw new Error(
+      "db:seed VACÍA todas las tablas y recarga el proyecto demo 'Acme Portal'. " +
+        "Si de verdad quieres descartar los datos actuales, ejecútalo con " +
+        "CORTEX_SEED_CONFIRM=1.",
+    );
+  }
+
   console.log("Vaciando tablas de conocimiento...");
   await sql`TRUNCATE context_entry_entities, embeddings, relations, context_entries, sources, entities RESTART IDENTITY CASCADE`;
 
