@@ -177,6 +177,8 @@ export const saveContextInput = z.object({
   title: z.string().optional(),
   /** Tipo de conocimiento; si falta, lo propone el agente de clasificación. */
   type: contextEntryType.optional(),
+  /** Resumen opcional precalculado (p.ej. por un workflow); si falta, se deriva. */
+  summary: z.string().optional(),
   confidence: confidenceLevel.optional(),
   /** De dónde viene. Por defecto "manual". */
   sourceType: sourceType.optional(),
