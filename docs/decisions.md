@@ -208,7 +208,8 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   del MCP y el formato de skill/comando. Instalación **manual documentada** para
   **Claude Code, Codex y OpenCode**. Skills/comandos se activan por symlink desde
   `config/` a `~/.claude/` (global) o `.claude/` (proyecto).
-- **Próximo paso:** `cortex sync` — instalador idempotente que detecte agentes
-  instalados y registre MCP + skills + comandos (y a futuro prompts/políticas).
-- **Revisar cuando:** construyamos `cortex sync` o separemos el harness a un repo
-  propio (`dinacode-ai-config`).
+- **Instalador:** `cortex sync` (`scripts/cortex-sync.ts`, `pnpm cortex:sync`) —
+  idempotente, dry-run por defecto, `--apply` para escribir. Detecta Claude Code /
+  Codex / OpenCode y registra MCP + skill + comando en cada uno. OpenCode best-effort.
+- **Revisar cuando:** añadamos prompts/políticas corporativas, un `--remove`, o
+  separemos el harness a un repo propio (`dinacode-ai-config`).

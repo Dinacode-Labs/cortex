@@ -18,7 +18,8 @@
     "db:seed": "pnpm --filter @cortex/core run seed",
     "mcp": "pnpm --filter @cortex/mcp-server start",
     "web": "pnpm --filter @cortex/web start",
-    "workflow:capture": "pnpm --filter @cortex/agents demo:capture"
+    "workflow:capture": "pnpm --filter @cortex/agents demo:capture",
+    "cortex:sync": "tsx scripts/cortex-sync.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
