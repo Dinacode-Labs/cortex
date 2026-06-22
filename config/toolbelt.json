@@ -19,7 +19,13 @@
     "atlassian": {
       "transport": "http",
       "url": "https://mcp.atlassian.com/v1/mcp",
-      "auth": "OAuth de Atlassian en el primer uso (no requiere env)",
+      "auth": "OAuth de Atlassian en el primer uso (no requiere env) — cubre Jira + Confluence",
+      "agents": ["claude", "opencode"]
+    },
+    "notion": {
+      "transport": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "auth": "OAuth de Notion en el primer uso (no requiere env)",
       "agents": ["claude", "opencode"]
     },
     "chrome-devtools": {
@@ -35,6 +41,7 @@
     { "name": "plane-api", "auth": "PAT de Plane (env o ~/.claude.json)" },
     { "name": "google-chat", "auth": "OAuth de Google: python3 scripts/auth.py" },
     { "name": "bkt", "auth": "app password de Bitbucket (keyring)" },
+    { "name": "agent-teams", "auth": "token de Microsoft Teams (auto-extraído del Teams desktop)" },
     { "name": "expect", "auth": "ninguna" }
   ],
   "commands": [
