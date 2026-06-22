@@ -96,4 +96,9 @@ main()
     console.error("Error en enriquecimiento:", e);
     process.exitCode = 1;
   })
-  .finally(() => closeSql());
+  .finally(async () => {
+    await closeSql();
+    // Los Agents de Mastra (@ai-sdk) dejan handles abiertos que impiden que el
+    // proceso salga; en un CLI forzamos la salida tras cerrar la BD.
+    process.exit(process.exitCode ?? 0);
+  });
