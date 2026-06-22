@@ -70,6 +70,10 @@ export async function hybridSearch(
     limit: number;
     excludeId?: string;
     includeArchived?: boolean;
+    /** Consulta point-in-time: hechos válidos en esa fecha. */
+    asOf?: Date;
+    /** Incluir hechos ya invalidados (histórico/superseded). Por defecto false. */
+    includeHistorical?: boolean;
   },
 ): Promise<SearchHit[]> {
   const pool = Math.max(args.limit * 4, 40);
@@ -80,6 +84,11 @@ export async function hybridSearch(
   if (args.type) filters = sql`${filters} AND ce.type = ${args.type}`;
   if (args.excludeId) filters = sql`${filters} AND ce.id <> ${args.excludeId}`;
   if (!args.includeArchived) filters = sql`${filters} AND ce.status NOT IN ('rejected', 'obsolete')`;
+  if (args.asOf) {
+    filters = sql`${filters} AND ce.valid_from <= ${args.asOf} AND (ce.valid_to IS NULL OR ce.valid_to > ${args.asOf})`;
+  } else if (!args.includeHistorical) {
+    filters = sql`${filters} AND ce.valid_to IS NULL`;
+  }
 
   // Rama vectorial.
   const vectors = await provider.embed([args.queryText]);
@@ -150,6 +159,8 @@ export async function vectorSearch(
     excludeId?: string;
     /** Excluir entradas rechazadas/obsoletas por defecto. */
     includeArchived?: boolean;
+    asOf?: Date;
+    includeHistorical?: boolean;
   },
 ): Promise<SearchHit[]> {
   const vectors = await provider.embed([args.queryText]);
@@ -160,6 +171,11 @@ export async function vectorSearch(
   if (args.type) where = sql`${where} AND ce.type = ${args.type}`;
   if (args.excludeId) where = sql`${where} AND ce.id <> ${args.excludeId}`;
   if (!args.includeArchived) where = sql`${where} AND ce.status NOT IN ('rejected', 'obsolete')`;
+  if (args.asOf) {
+    where = sql`${where} AND ce.valid_from <= ${args.asOf} AND (ce.valid_to IS NULL OR ce.valid_to > ${args.asOf})`;
+  } else if (!args.includeHistorical) {
+    where = sql`${where} AND ce.valid_to IS NULL`;
+  }
 
   const rows = (await sql`
     SELECT ce.*, e.vector <=> ${lit}::vector AS distance

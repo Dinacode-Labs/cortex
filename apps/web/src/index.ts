@@ -158,9 +158,14 @@ app.get("/entry/:id", async (c) => {
       <button class="secondary" type="submit">${label}</button>
     </form>`;
 
+  const iso = (d: unknown) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? "").slice(0, 10));
+  const temporalBadge = entry.validTo
+    ? badge(`no vigente desde ${iso(entry.validTo)}`, "#cf222e")
+    : badge("vigente", "#1a7f37");
+
   const body = `
     <p><a class="back" href="/">← Inicio</a></p>
-    <div class="card-head" style="margin-bottom:8px">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)} ${badge("vigencia: " + entry.validity, "#57606a")}</div>
+    <div class="card-head" style="margin-bottom:8px">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)} ${temporalBadge}</div>
     <h1>${esc(entry.title)}</h1>
 
     <div class="content-block">${esc(entry.content)}</div>
@@ -174,6 +179,8 @@ app.get("/entry/:id", async (c) => {
         <dt>Confianza</dt><dd>${esc(entry.confidence)}</dd>
         <dt>Fuente</dt><dd>${esc(entry.sourceType)}${entry.sourceReference ? ` · ${esc(entry.sourceReference)}` : ""}</dd>
         <dt>Autor</dt><dd>${esc(entry.createdBy ?? "—")}</dd>
+        <dt>Vigencia</dt><dd>${entry.validTo ? `cerrada el ${iso(entry.validTo)} (${esc(entry.validity)})` : "vigente"}</dd>
+        <dt>Válida desde</dt><dd>${iso(entry.validFrom)}</dd>
         <dt>Creada</dt><dd>${esc(entry.createdAt instanceof Date ? entry.createdAt.toISOString() : entry.createdAt)}</dd>
       </dl>
     </div>
@@ -277,9 +284,11 @@ app.get("/ask", async (c) => {
 app.get("/pack", async (c) => {
   const project = c.req.query("project") ?? "";
   const area = c.req.query("area") || undefined;
+  const asOfStr = c.req.query("asof");
+  const asOf = asOfStr ? new Date(asOfStr) : undefined;
   let pack;
   try {
-    pack = await getContextPack(project, area);
+    pack = await getContextPack(project, area, asOf);
   } catch {
     return c.html(layout("Context pack", `<p><a class="back" href="/">← Inicio</a></p><div class="empty">Proyecto no encontrado.</div>`), 404);
   }
@@ -294,12 +303,14 @@ app.get("/pack", async (c) => {
   const body = `
     <p><a class="back" href="/">← Inicio</a></p>
     <h1>Context Pack — ${esc(pack.project)}</h1>
-    <p class="sub">${pack.totalEntries} entradas · generado ${esc(pack.generatedAt.toISOString())}</p>
+    <p class="sub">${pack.totalEntries} entradas · ${asOf ? `vigente a fecha <b>${esc(asOfStr ?? "")}</b>` : "estado actual"} · generado ${esc(pack.generatedAt.toISOString())}</p>
     <form class="row" method="get" action="/pack" style="margin-bottom:16px">
       <input type="hidden" name="project" value="${esc(pack.project)}">
       <input type="text" name="area" placeholder="Área/módulo, p.ej. facturación" value="${esc(area ?? "")}">
-      <button type="submit">Enfocar área</button>
+      <input type="date" name="asof" value="${esc(asOfStr ?? "")}" title="Point-in-time: contexto vigente a esta fecha">
+      <button type="submit">Generar</button>
     </form>
+    ${asOf ? `<div class="warn">⏳ Vista <b>point-in-time</b>: hechos vigentes el ${esc(asOfStr ?? "")} (incluye los que después se invalidaron).</div>` : ""}
     ${sec("Decisiones técnicas vigentes", pack.decisions)}
     ${sec("Restricciones activas", pack.constraints)}
     ${sec("Riesgos conocidos", pack.risks)}

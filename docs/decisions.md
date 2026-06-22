@@ -159,3 +159,22 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   generados, chunking sintáctico, code-graph/LSP (Serena), sync incremental
   (Merkle), y permitir indexar repos remotos (clonado).
 - **Revisar cuando:** abordemos code-graph/símbolos o sync incremental.
+
+## ADR-0012 · Grafo bi-temporal (validez en el tiempo, invalidar ≠ borrar)
+
+- **Estado:** aceptada (demo). Patrón Zep/Graphiti (competitive-landscape.md).
+- **Contexto:** en consultoría las decisiones cambian; servir conocimiento
+  obsoleto es un riesgo. Faltaba modelar la validez temporal de los hechos.
+- **Decisión:** columnas `valid_from`, `valid_to`, `observed_at` en
+  `context_entries` y `relations` (`created_at` = recorded_at). `valid_to NULL` =
+  vigente. **Invalidar = cerrar la ventana, nunca borrar** (`applyTemporalInvalidation`):
+  estado `Histórico` de Plane (legacy) y supersesiones entrada→entrada cierran la
+  ventana. Retrieval/context-pack devuelven **solo vigentes por defecto**; soportan
+  consultas **point-in-time** (`asOf`) en web (`/pack`), MCP (`get_project_context_pack`)
+  y core. Backfill de fechas reales desde Plane (creación/archivado) y chat.
+- **Resultado (LevelUp):** 266 vigentes / 147 históricos; point-in-time real
+  (a 2026-05-28: 182 hechos; a 06-12: 239; ahora: 266).
+- **Limitación:** las contradicciones entre entidades no se auto-invalidan (no hay
+  "ganador" claro) — el lint las reporta para revisión humana.
+- **Revisar cuando:** queramos decay adaptativo (por velocity/volatility) o
+  invalidación por recencia en contradicciones.

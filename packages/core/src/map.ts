@@ -22,6 +22,9 @@ export function rowToContextEntry(row: Row): ContextEntry {
     updatedAt: row.updated_at,
     supersededBy: row.superseded_by ?? null,
     metadata: row.metadata ?? {},
+    validFrom: row.valid_from,
+    validTo: row.valid_to ?? null,
+    observedAt: row.observed_at,
   };
 }
 
