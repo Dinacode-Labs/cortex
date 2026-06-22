@@ -194,3 +194,21 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   extraído de `dinacode-web/src/app/globals.css`.
 - **Revisar cuando:** queramos modo oscuro conmutable o extraer los tokens a un
   paquete compartido (`@cortex/ui`).
+
+## ADR-0014 · Harness de IA distribuible (config/) y multi-agente
+
+- **Estado:** aceptada (estructura); instalador pendiente.
+- **Contexto:** §13. El valor está en que cualquier developer conecte SUS agentes a
+  Cortex desde cualquier proyecto. El MCP ya es global (scope user); faltaba un
+  bundle versionado y un plan de distribución multi-agente.
+- **Decisión:** `config/` es la **fuente única versionada** del harness, separando
+  lo compartido (`mcp/cortex.json`, `skills/`, `commands/`) de las instrucciones
+  por agente (en `config/README.md`). Las capacidades viven como **tools MCP**
+  (`mcp__cortex__*`), portables a cualquier agente con MCP; solo cambia el registro
+  del MCP y el formato de skill/comando. Instalación **manual documentada** para
+  **Claude Code, Codex y OpenCode**. Skills/comandos se activan por symlink desde
+  `config/` a `~/.claude/` (global) o `.claude/` (proyecto).
+- **Próximo paso:** `cortex sync` — instalador idempotente que detecte agentes
+  instalados y registre MCP + skills + comandos (y a futuro prompts/políticas).
+- **Revisar cuando:** construyamos `cortex sync` o separemos el harness a un repo
+  propio (`dinacode-ai-config`).

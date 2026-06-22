@@ -2,7 +2,7 @@
 
 Secuencia para enseñar la demo funcional (§15 y §20.8 del plan). Asume Postgres
 levantado y datos sembrados (`pnpm db:up && pnpm db:migrate && pnpm db:seed`) y el
-MCP conectado a Claude Code (ver `config/claude-code/README.md`).
+MCP conectado al agente (ver `config/README.md`).
 
 Escenario: proyecto **Acme Portal**, cliente **Acme Corp**, stack Laravel + Vue +
 PostgreSQL, con un módulo legacy de facturación sensible.
