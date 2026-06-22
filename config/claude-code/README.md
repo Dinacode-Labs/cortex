@@ -41,6 +41,25 @@ con 5 tools.
 - `search_project_code` — búsqueda híbrida sobre el código indexado del proyecto
   (devuelve ruta:líneas + fragmento). Requiere indexar antes (`index-code`).
 
+## Captura automática (skill + comando)
+
+`config/claude-code/skills/cortex-capture/` — skill que, al terminar una tarea (o
+si dices "guarda en Cortex"), resume el trabajo y lo guarda con
+`save_project_context` (`sourceType: claude_code`), avisando de duplicados/
+contradicciones. Cierra el bucle **trabajas → Cortex aprende**.
+
+`config/claude-code/commands/cortex-save.md` — comando `/cortex-save [proyecto]`
+para dispararlo a mano.
+
+Activación:
+- **En este repo** ya están activos (symlinks en `.claude/skills` y `.claude/commands`).
+- **Global** (todos tus proyectos): copia o symlinkea a `~/.claude/skills/` y
+  `~/.claude/commands/`:
+  ```bash
+  ln -s "$PWD/config/claude-code/skills/cortex-capture" ~/.claude/skills/cortex-capture
+  ln -s "$PWD/config/claude-code/commands/cortex-save.md" ~/.claude/commands/cortex-save.md
+  ```
+
 ## Prompts de demo
 
 Consulta antes de tocar un módulo (§15.3):
