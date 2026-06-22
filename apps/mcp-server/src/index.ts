@@ -12,8 +12,10 @@ import {
   renderSearchHits,
   saveContext,
   searchContext,
+  setClassifier,
   validateEntry,
 } from "@cortex/core";
+import { classifyEntry, isLlmEnabled, synthesizeContextAnswer } from "@cortex/agents";
 import { z } from "zod";
 
 /**
@@ -26,6 +28,9 @@ import { z } from "zod";
  */
 
 loadEnv();
+
+// Capa de inteligencia (Mastra/LLM) opcional: si hay LLM, enriquece la captura.
+if (isLlmEnabled()) setClassifier(classifyEntry);
 
 const server = new McpServer({ name: "cortex", version: "0.0.0" });
 
@@ -138,10 +143,45 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  "ask_project_context",
+  {
+    title: "Preguntar al contexto del proyecto",
+    description:
+      "Hace una pregunta en lenguaje natural sobre un proyecto. Recupera el " +
+      "contexto relevante y sintetiza una respuesta fundamentada (agente de " +
+      "recuperación Mastra). Requiere LLM configurado; si no, usa la búsqueda.",
+    inputSchema: {
+      question: z.string().describe("Pregunta en lenguaje natural"),
+      project: z.string().optional().describe("Nombre del proyecto"),
+    },
+  },
+  async ({ question, project }) => {
+    try {
+      const hits = await searchContext({ query: question, project, limit: 6 });
+      const answer = await synthesizeContextAnswer(
+        question,
+        hits.map((h) => ({
+          title: h.entry.title,
+          summary: h.entry.summary ?? h.entry.content,
+          type: h.entry.type,
+        })),
+      );
+      if (answer) {
+        return text(`${answer}\n\n---\nFuentes consultadas:\n${renderSearchHits(hits)}`);
+      }
+      // Sin LLM: devolvemos los resultados de búsqueda.
+      return text(renderSearchHits(hits));
+    } catch (e) {
+      return errorText(`Error al responder: ${(e as Error).message}`);
+    }
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[cortex-mcp] servidor MCP listo (stdio).");
+  console.error(`[cortex-mcp] servidor MCP listo (stdio). LLM: ${isLlmEnabled() ? "on" : "off"}.`);
 }
 
 const shutdown = async () => {

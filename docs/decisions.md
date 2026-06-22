@@ -62,14 +62,21 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   calidad de búsqueda solo se ve con un proveedor real. Documentado para la demo.
 - **Revisar cuando:** fijemos proveedor oficial (coste/calidad multilingüe ES/EN).
 
-## ADR-0006 · Mastra como runtime de agentes y workflows
+## ADR-0006 · Mastra como runtime de agentes — validación parcial
 
-- **Estado:** aceptada como hipótesis de partida (§9.1); pendiente de validar en código.
-- **Contexto:** decisión inicial del plan. A validar: soporte MCP, workflows largos,
-  testing, observabilidad, versionado de agents/tools.
-- **Decisión:** usar Mastra para ingestion/classification/retrieval/context-pack.
-- **Alternativas:** LangGraph, LlamaIndex Workflows, CrewAI, o orquestación ad hoc.
-- **Revisar cuando:** tengamos 2-3 workflows reales y podamos medir el encaje.
+- **Estado:** parcialmente validada. En uso para generación de texto; para salida
+  estructurada usamos un cliente directo (ver ADR-0008).
+- **Contexto:** decisión inicial del plan (§9.1). A validar: estructurado, MCP,
+  workflows, observabilidad.
+- **Decisión:** `@cortex/agents` usa el `Agent` de Mastra (`@mastra/core`) para el
+  agente de **recuperación** (síntesis de respuesta en prosa), que funciona bien
+  con DeepSeek vía OpenRouter.
+- **Hallazgo:** la **salida estructurada** de Mastra (`structuredOutput`) se
+  **colgaba** con DeepSeek V4 Pro vía OpenRouter (probablemente intenta modo
+  `json_schema`, no soportado por el modelo). La generación de texto plano sí va.
+- **Alternativas:** LangGraph, LlamaIndex Workflows, CrewAI, orquestación ad hoc.
+- **Revisar cuando:** probemos otro modelo/proveedor o nuevas versiones de Mastra;
+  evaluar workflows de Mastra para los loops del §12.
 
 ## ADR-0007 · MCP como interfaz estándar hacia las herramientas de IA
 
@@ -77,5 +84,24 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Contexto:** §8. Claude Code primero, Codex/ChatGPT después, sin acoplar.
 - **Decisión:** servidor MCP (TypeScript SDK oficial) que expone tools neutras:
   `save_project_context`, `search_project_context`, `get_project_context_pack`,
-  `list_project_decisions`, `validate_context_entry`.
+  `list_project_decisions`, `validate_context_entry`, `ask_project_context`.
 - **Revisar cuando:** definamos auth/permisos por developer y proyecto.
+
+## ADR-0008 · LLM vía OpenRouter (DeepSeek V4 Pro); estructurado por cliente directo
+
+- **Estado:** aceptada (demo, de prueba).
+- **Contexto:** necesitábamos un LLM para enriquecer captura y sintetizar
+  respuestas. Disponible una key de OpenRouter.
+- **Decisión:** `LLM_PROVIDER=openrouter` con `OPENROUTER_MODEL=deepseek/deepseek-v4-pro`.
+  - **Clasificación/extracción (estructurada):** llamada directa a
+    `chat/completions` con `response_format: json_object` + validación zod + 1
+    reintento (DeepSeek es modelo de razonamiento: `max_tokens` amplio para que
+    quede espacio al JSON tras el razonamiento).
+  - **Síntesis de retrieval (texto):** `Agent` de Mastra.
+- **Acoplamiento:** `@cortex/core` no depende de `@cortex/agents`; los entrypoints
+  registran el clasificador con `setClassifier(...)` cuando hay LLM. Sin LLM, todo
+  cae a heurísticas. Precedencia: input explícito > LLM > heurística.
+- **Nota de versiones:** `@cortex/agents` usa zod v4 / AI SDK v6 (los exige Mastra),
+  aislado del resto del repo que usa zod v3 (MCP SDK). No se cruzan schemas.
+- **Revisar cuando:** fijemos proveedor/modelo definitivo (coste/calidad/latencia;
+  DeepSeek razona y añade latencia).

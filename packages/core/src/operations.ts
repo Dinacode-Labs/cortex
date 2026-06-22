@@ -4,6 +4,7 @@ import {
   type ContextEntry,
   type ContextEntryType,
   type ContextEntryStatus,
+  type EntityType,
   type SaveContextInput,
   type SearchContextInput,
   saveContextInput,
@@ -23,6 +24,29 @@ import {
 import { storeEmbedding, vectorSearch, type SearchHit } from "./vectors.js";
 
 export type { SearchHit } from "./vectors.js";
+
+// --- Hook de clasificación opcional (capa LLM) -------------------------------
+
+export interface ClassifierResult {
+  type?: ContextEntryType;
+  title?: string;
+  summary?: string;
+  entities?: { name: string; type: EntityType }[];
+}
+
+/** Función de enriquecimiento por LLM. Devuelve null si no puede clasificar. */
+export type Classifier = (content: string) => Promise<ClassifierResult | null>;
+
+let classifier: Classifier | null = null;
+
+/**
+ * Registra (o desregistra con null) un clasificador LLM. Lo cablean los
+ * entrypoints (mcp-server, web) cuando hay LLM disponible, manteniendo @cortex/core
+ * desacoplado de Mastra/@cortex/agents. Sin clasificador, se usan heurísticas.
+ */
+export function setClassifier(fn: Classifier | null): void {
+  classifier = fn;
+}
 
 // --- save_project_context ----------------------------------------------------
 
@@ -49,13 +73,21 @@ export async function saveContext(input: SaveContextInput): Promise<SaveContextR
   const sql = getSql();
   const provider = getEmbeddingProvider();
 
-  const type = parsed.type ?? classifyType(parsed.content);
-  const title = parsed.title ?? deriveTitle(parsed.content);
-  const summary = summarize(parsed.content);
+  // Capa LLM opcional: precedencia input explícito > LLM > heurística.
+  const llm = classifier ? await classifier(parsed.content).catch(() => null) : null;
+  const type = parsed.type ?? llm?.type ?? classifyType(parsed.content);
+  const title = parsed.title ?? llm?.title ?? deriveTitle(parsed.content);
+  const summary = llm?.summary ?? summarize(parsed.content);
   const sourceType = parsed.sourceType ?? "manual";
   const embedText = `${title}\n\n${parsed.content}`;
   // metadata es JSON validado por zod; lo casteamos al tipo que espera sql.json.
-  const meta = (parsed.metadata ?? {}) as Parameters<typeof sql.json>[0];
+  const meta = {
+    ...(parsed.metadata ?? {}),
+    enrichedBy: llm ? "llm" : "heuristic",
+  } as Parameters<typeof sql.json>[0];
+
+  // Entidades: heurísticas + las que detecte el LLM, deduplicadas.
+  const detectedEntities = mergeEntities(extractEntities(parsed.content), llm?.entities ?? []);
 
   let projectId: string | null = null;
   if (parsed.project) {
@@ -82,9 +114,9 @@ export async function saveContext(input: SaveContextInput): Promise<SaveContextR
 
   await storeEmbedding(sql, provider, entry.id, embedText);
 
-  // Extracción y enlace de entidades (grafo relacional)
+  // Enlace de entidades (grafo relacional)
   const entityIds: string[] = [];
-  for (const e of extractEntities(parsed.content)) {
+  for (const e of detectedEntities) {
     const ent = await resolveEntity(sql, e.name, e.type);
     entityIds.push(ent.id);
     await linkEntryToEntity(sql, entry.id, ent.id);
@@ -289,6 +321,20 @@ export async function getContextPack(project: string, area?: string): Promise<Co
 }
 
 // --- helpers -----------------------------------------------------------------
+
+/** Une entidades heurísticas y de LLM, deduplicando por (tipo + nombre canónico). */
+function mergeEntities(
+  ...lists: { name: string; type: EntityType }[][]
+): { name: string; type: EntityType }[] {
+  const byKey = new Map<string, { name: string; type: EntityType }>();
+  for (const list of lists) {
+    for (const e of list) {
+      const key = `${e.type}:${canonicalize(e.name)}`;
+      if (!byKey.has(key)) byKey.set(key, e);
+    }
+  }
+  return [...byKey.values()];
+}
 
 async function findProjectId(sql: Sql, project: string): Promise<string | null> {
   const canonical = canonicalize(project);
