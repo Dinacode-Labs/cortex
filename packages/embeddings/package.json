@@ -1,0 +1,15 @@
+{
+  "name": "@cortex/embeddings",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cortex/shared": "workspace:*"
+  }
+}

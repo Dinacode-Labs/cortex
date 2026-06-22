@@ -1,5 +1,5 @@
 {
-  "name": "@cortex/database",
+  "name": "@cortex/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,11 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "migrate": "tsx src/migrate.ts"
+    "seed": "tsx src/seed.ts"
   },
   "dependencies": {
-    "@cortex/shared": "workspace:*",
-    "postgres": "^3.4.5"
+    "@cortex/database": "workspace:*",
+    "@cortex/embeddings": "workspace:*",
+    "@cortex/shared": "workspace:*"
   }
 }
