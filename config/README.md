@@ -30,7 +30,20 @@ pnpm db:migrate
 Copia `.env.example` a `.env` (LLM/embeddings). El comando del MCP usa
 `pnpm -C <ruta-al-repo-cortex> --filter @cortex/mcp-server start`.
 
-## Instalación por agente (manual, hoy)
+## Instalación con `cortex sync` (recomendado)
+
+Instalador idempotente que detecta qué agentes tienes (Claude Code / Codex /
+OpenCode) y registra en cada uno el MCP `cortex` + la skill + el comando.
+
+```bash
+pnpm cortex:sync                 # dry-run: muestra el plan, no escribe nada
+pnpm cortex:sync --apply         # aplica en todos los agentes detectados
+pnpm cortex:sync --apply --agents claude,codex   # solo algunos
+```
+Reversible/idempotente (vuelve a ejecutarlo para actualizar). OpenCode es
+best-effort: si no puede editar `opencode.json`, imprime el snippet para pegarlo.
+
+## Instalación por agente (manual, alternativa)
 
 ### Claude Code
 ```bash
@@ -80,7 +93,7 @@ Capturar tras una tarea (skill `cortex-capture` / `/cortex-save`):
 > Guarda en Cortex (LevelUp Pasión) la decisión: "Se cachean las respuestas del ERP
 > con Redis para evitar timeouts en facturación."
 
-## Próximo paso: `cortex sync`
-Instalador idempotente que haga todo lo de arriba en un comando, detectando qué
-agentes hay instalados (Claude/Codex/OpenCode) y registrando MCP + skills + comandos
-en cada uno (y a futuro prompts/políticas corporativas).
+## A futuro
+- `cortex sync` ya cubre MCP + skills + comandos. Ampliar a **prompts/políticas
+  corporativas** (§13) y a un comando de **desinstalación** (`--remove`).
+- Empaquetar `cortex sync` como bin `cortex` (hoy `pnpm cortex:sync`).
