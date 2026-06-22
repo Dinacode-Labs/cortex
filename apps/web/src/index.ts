@@ -16,8 +16,8 @@ import {
   setClassifier,
   validateEntry,
 } from "@cortex/core";
-import { classifyEntry, isLlmEnabled } from "@cortex/agents";
-import { badge, confidenceBadge, entryCard, esc, layout, statusBadge, typeBadge } from "./views.js";
+import { classifyEntry, isLlmEnabled, synthesizeContextAnswer } from "@cortex/agents";
+import { badge, confidenceBadge, entryCard, esc, layout, mdLite, statusBadge, typeBadge } from "./views.js";
 
 /**
  * UI mínima de demo (§16). Renderizado en servidor (Hono), sin build de
@@ -78,7 +78,8 @@ app.get("/", async (c) => {
     : "";
 
   const packLink = project
-    ? `<a class="pill" href="/pack?project=${encodeURIComponent(project)}">📦 Ver context pack de ${esc(project)}</a>`
+    ? `<a class="pill" href="/pack?project=${encodeURIComponent(project)}">📦 Context pack de ${esc(project)}</a>
+       <a class="pill" href="/ask?project=${encodeURIComponent(project)}">💬 Preguntar sobre ${esc(project)}</a>`
     : "";
 
   const body = `
@@ -220,6 +221,49 @@ app.post("/save", async (c) => {
     <p style="margin-top:16px"><a href="/entry/${esc(entry.id)}"><button>Ver entrada</button></a>
     <a href="/?capture=1"><button class="secondary">Capturar otra</button></a></p>`;
   return c.html(layout("Guardado", body));
+});
+
+// --- Preguntar (agente de recuperación) --------------------------------------
+app.get("/ask", async (c) => {
+  const q = c.req.query("q") ?? "";
+  const project = c.req.query("project") || undefined;
+  const projects = await listProjects();
+
+  let answerHtml = "";
+  if (q) {
+    const hits = await searchContext({ query: q, project, limit: 6 });
+    const answer = await synthesizeContextAnswer(
+      q,
+      hits.map((h) => ({ title: h.entry.title, summary: h.entry.summary ?? h.entry.content, type: h.entry.type })),
+    );
+    const sources = hits.length
+      ? `<div class="panel"><h2>Fuentes consultadas</h2>${hits
+          .map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#6e4cff")} <a href="/entry/${esc(h.entry.id)}">${esc(h.entry.title)}</a></div>`)
+          .join("")}</div>`
+      : `<div class="empty">Sin contexto relevante.</div>`;
+    answerHtml = answer
+      ? `<div class="answer">${mdLite(answer)}</div>${sources}`
+      : `<div class="warn">⚠️ LLM no configurado (LLM_PROVIDER=openrouter). Mostrando solo la búsqueda.</div>${sources}`;
+  }
+
+  const projectOptions = [
+    `<option value="">(todos los proyectos)</option>`,
+    ...projects.map((p) => `<option value="${esc(p.entity.name)}" ${project === p.entity.name ? "selected" : ""}>${esc(p.entity.name)}</option>`),
+  ].join("");
+
+  const body = `
+    <p><a class="back" href="/">← Inicio</a></p>
+    <h1>Preguntar a Cortex</h1>
+    <p class="sub">El agente de recuperación (Mastra) responde fundamentándose en el contexto guardado.</p>
+    <div class="panel">
+      <form class="row" method="get" action="/ask">
+        <input type="text" name="q" placeholder="p.ej. ¿qué cuidados con el módulo de facturación?" value="${esc(q)}" required>
+        <select name="project">${projectOptions}</select>
+        <button type="submit">Preguntar</button>
+      </form>
+    </div>
+    ${q ? `<h2 style="font-size:17px">${esc(q)}</h2>${answerHtml}` : ""}`;
+  return c.html(layout("Preguntar", body));
 });
 
 // --- Context pack ------------------------------------------------------------

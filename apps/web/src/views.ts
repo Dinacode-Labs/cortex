@@ -10,6 +10,29 @@ export function esc(s: unknown): string {
     .replaceAll("'", "&#39;");
 }
 
+/**
+ * Markdown ligero y seguro: escapa todo primero y luego aplica negritas,
+ * listas con viñetas y párrafos. Suficiente para la prosa del agente LLM.
+ */
+export function mdLite(text: string): string {
+  const lines = esc(text).split(/\r?\n/);
+  const out: string[] = [];
+  let inList = false;
+  const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith("- ")) {
+      if (!inList) { out.push("<ul>"); inList = true; }
+      out.push(`<li>${bold(line.slice(2))}</li>`);
+    } else {
+      if (inList) { out.push("</ul>"); inList = false; }
+      if (line) out.push(`<p>${bold(line)}</p>`);
+    }
+  }
+  if (inList) out.push("</ul>");
+  return out.join("\n");
+}
+
 const STATUS_COLORS: Record<string, string> = {
   validated: "#1a7f37",
   verified: "#1a7f37",
@@ -96,6 +119,10 @@ export function layout(title: string, body: string): string {
     .meta { display:grid; grid-template-columns:140px 1fr; gap:6px 12px; margin:14px 0; }
     .meta dt { color:var(--muted); }
     .content-block { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:14px; }
+    .answer { background:#fff; border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:8px; padding:4px 18px; margin:14px 0; }
+    .answer p { margin:10px 0; }
+    .answer ul { margin:10px 0; padding-left:22px; }
+    .answer li { margin:4px 0; }
     .warn { background:#fff8c5; border:1px solid #d4a72c66; border-radius:8px; padding:12px; margin:10px 0; }
     .warn.contradiction { background:#ffebe9; border-color:#cf222e66; }
     .tags a { font-size:13px; color:var(--accent); text-decoration:none; margin-right:10px; }
@@ -111,6 +138,7 @@ export function layout(title: string, body: string): string {
     <span class="logo">Dinacode <b>Cortex</b></span>
     <nav>
       <a href="/">Inicio</a>
+      <a href="/ask">Preguntar</a>
       <a href="/?capture=1">Capturar</a>
     </nav>
   </header>

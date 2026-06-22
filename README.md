@@ -15,6 +15,7 @@ Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisi
 > heurísticas); con LLM mejora la clasificación y habilita respuestas en prosa.
 
 ![Dashboard](./docs/screenshot-dashboard.png)
+![Preguntar al agente de recuperación](./docs/screenshot-ask.png)
 ![Context pack](./docs/screenshot-context-pack.png)
 
 ## Arquitectura (demo)
