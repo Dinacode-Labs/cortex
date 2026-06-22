@@ -24,6 +24,10 @@ const LANG: Record<string, string> = {
 const MAX_FILE_BYTES = 200_000;
 const CHUNK_LINES = 60;
 const OVERLAP = 10;
+// Cap por chunk y presupuesto de caracteres por petición de embeddings, para no
+// exceder el contexto del modelo (qwen3-embedding: 32768 tokens) con código denso.
+const MAX_CHUNK_CHARS = 4000;
+const BATCH_CHAR_BUDGET = 28_000;
 
 function ignoredFile(name: string): boolean {
   return (
@@ -116,8 +120,9 @@ export function chunkFile(file: CodeFile): CodeChunk[] {
   const step = CHUNK_LINES - OVERLAP;
   for (let i = 0; i < lines.length; i += step) {
     const slice = lines.slice(i, i + CHUNK_LINES);
-    const body = slice.join("\n");
+    let body = slice.join("\n");
     if (body.trim().length < 10) continue;
+    if (body.length > MAX_CHUNK_CHARS) body = body.slice(0, MAX_CHUNK_CHARS); // líneas minificadas/enormes
     const startLine = i + 1;
     const endLine = Math.min(i + CHUNK_LINES, lines.length);
     chunks.push({
@@ -251,8 +256,17 @@ export async function indexRepo(
   // Limpia el código previo de este repo en el proyecto (reindexado idempotente).
   await sql`DELETE FROM code_chunks WHERE project_id = ${projectId} AND repo = ${repoName}`;
 
-  for (let i = 0; i < all.length; i += batchSize) {
-    const batch = all.slice(i, i + batchSize);
+  let i = 0;
+  let done = 0;
+  while (i < all.length) {
+    // Lote acotado por nº y por presupuesto de caracteres (≈ tokens) por petición.
+    const batch: CodeChunk[] = [];
+    let chars = 0;
+    while (i < all.length && batch.length < batchSize && (batch.length === 0 || chars + all[i]!.content.length <= BATCH_CHAR_BUDGET)) {
+      chars += all[i]!.content.length;
+      batch.push(all[i]!);
+      i++;
+    }
     const vecs = await provider.embed(batch.map((c) => c.content));
     for (let j = 0; j < batch.length; j++) {
       const c = batch[j]!;
@@ -262,7 +276,8 @@ export async function indexRepo(
                 ${c.content}, ${provider.model}, ${provider.dim}, ${toVectorLiteral(vecs[j]!)}::vector)
       `;
     }
-    opts.onProgress?.(Math.min(i + batchSize, all.length), all.length);
+    done += batch.length;
+    opts.onProgress?.(done, all.length);
   }
 
   return { files: files.length, chunks: all.length, skippedOverCap };
