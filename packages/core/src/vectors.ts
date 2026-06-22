@@ -21,6 +21,34 @@ export async function storeEmbedding(
   `;
 }
 
+/**
+ * Genera y guarda embeddings por lotes (1 petición por lote). Respeta los límites
+ * del proveedor (p.ej. nan: 60 rpm, 3 en paralelo) haciendo lotes secuenciales.
+ */
+export async function storeEmbeddingsBatch(
+  sql: Sql,
+  provider: EmbeddingProvider,
+  rows: { contextEntryId: string; text: string }[],
+  opts: { batchSize?: number; onProgress?: (done: number) => void } = {},
+): Promise<void> {
+  const batchSize = opts.batchSize ?? 32;
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const chunk = rows.slice(i, i + batchSize);
+    const vectors = await provider.embed(chunk.map((r) => r.text));
+    for (let j = 0; j < chunk.length; j++) {
+      const vec = vectors[j]!;
+      await sql`
+        INSERT INTO embeddings (context_entry_id, embedding_model, embedding_version, dim, vector, chunk_index)
+        VALUES (${chunk[j]!.contextEntryId}, ${provider.model}, ${provider.version}, ${provider.dim},
+                ${toVectorLiteral(vec)}::vector, 0)
+        ON CONFLICT (context_entry_id, embedding_model, embedding_version, chunk_index)
+        DO UPDATE SET vector = EXCLUDED.vector, dim = EXCLUDED.dim, created_at = now()
+      `;
+    }
+    opts.onProgress?.(Math.min(i + batchSize, rows.length));
+  }
+}
+
 export interface SearchHit {
   entry: ContextEntry;
   /** Similitud coseno en [0,1] (1 = idéntico). */

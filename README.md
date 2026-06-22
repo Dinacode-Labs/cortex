@@ -104,6 +104,7 @@ pnpm workflow:capture "Migramos a generación asíncrona con colas" "Acme Portal
 | `pnpm db:up` / `pnpm db:down` | Levanta / para Postgres |
 | `pnpm db:migrate` | Aplica migraciones |
 | `pnpm db:seed` | Carga datos de demo (idempotente) |
+| `pnpm --filter @cortex/core run ingest "<Proyecto>" <items.json>` | Ingesta masiva (2 fases + embeddings por lotes) |
 | `pnpm mcp` | Arranca el servidor MCP (stdio) |
 | `pnpm web` | Arranca la UI web de demo |
 | `pnpm typecheck` | Comprueba tipos en todos los paquetes |
