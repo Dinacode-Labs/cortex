@@ -17,7 +17,8 @@
     "db:migrate": "pnpm --filter @cortex/database run migrate",
     "db:seed": "pnpm --filter @cortex/core run seed",
     "mcp": "pnpm --filter @cortex/mcp-server start",
-    "web": "pnpm --filter @cortex/web start"
+    "web": "pnpm --filter @cortex/web start",
+    "workflow:capture": "pnpm --filter @cortex/agents demo:capture"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

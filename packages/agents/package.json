@@ -7,9 +7,12 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "demo:capture": "tsx src/demo-capture.ts"
   },
   "dependencies": {
+    "@cortex/core": "workspace:*",
+    "@cortex/database": "workspace:*",
     "@cortex/shared": "workspace:*",
     "@mastra/core": "^1.45.0",
     "@openrouter/ai-sdk-provider": "^2.9.1",

@@ -74,9 +74,13 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Hallazgo:** la **salida estructurada** de Mastra (`structuredOutput`) se
   **colgaba** con DeepSeek V4 Pro vía OpenRouter (probablemente intenta modo
   `json_schema`, no soportado por el modelo). La generación de texto plano sí va.
+- **Workflows:** `captureContextWorkflow` (§20.4) implementado con
+  `createWorkflow`/`createStep` (classify → persist) y verificado. Demuestra el
+  motor de workflows de Mastra con pasos observables. Ejecutable:
+  `pnpm workflow:capture "<texto>" "<proyecto>"`.
 - **Alternativas:** LangGraph, LlamaIndex Workflows, CrewAI, orquestación ad hoc.
 - **Revisar cuando:** probemos otro modelo/proveedor o nuevas versiones de Mastra;
-  evaluar workflows de Mastra para los loops del §12.
+  ampliar a los demás workflows del §20.4 (context pack, dedup/contradicción batch).
 
 ## ADR-0007 · MCP como interfaz estándar hacia las herramientas de IA
 

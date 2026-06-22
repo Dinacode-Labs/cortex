@@ -62,6 +62,12 @@ importers:
 
   packages/agents:
     dependencies:
+      '@cortex/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cortex/database':
+        specifier: workspace:*
+        version: link:../database
       '@cortex/shared':
         specifier: workspace:*
         version: link:../shared

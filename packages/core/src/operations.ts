@@ -68,22 +68,33 @@ export interface SaveContextResult {
  * Guarda una pieza de contexto con baja fricción: clasifica, resume, extrae
  * entidades, genera embedding y ejecuta los loops de detección. §11, §15.2.
  */
-export async function saveContext(input: SaveContextInput): Promise<SaveContextResult> {
+export interface SaveContextOptions {
+  /** Si false, no invoca el clasificador LLM (lo usa el workflow, que clasifica
+   *  en un paso previo y pasa type/title/summary explícitos). Por defecto true. */
+  useClassifier?: boolean;
+}
+
+export async function saveContext(
+  input: SaveContextInput,
+  opts: SaveContextOptions = {},
+): Promise<SaveContextResult> {
   const parsed = saveContextInput.parse(input);
   const sql = getSql();
   const provider = getEmbeddingProvider();
 
   // Capa LLM opcional: precedencia input explícito > LLM > heurística.
-  const llm = classifier ? await classifier(parsed.content).catch(() => null) : null;
+  const useClassifier = opts.useClassifier ?? true;
+  const llm = useClassifier && classifier ? await classifier(parsed.content).catch(() => null) : null;
   const type = parsed.type ?? llm?.type ?? classifyType(parsed.content);
   const title = parsed.title ?? llm?.title ?? deriveTitle(parsed.content);
-  const summary = llm?.summary ?? summarize(parsed.content);
+  const summary = parsed.summary ?? llm?.summary ?? summarize(parsed.content);
   const sourceType = parsed.sourceType ?? "manual";
   const embedText = `${title}\n\n${parsed.content}`;
   // metadata es JSON validado por zod; lo casteamos al tipo que espera sql.json.
+  const enrichedBy = llm ? "llm" : ((parsed.metadata?.enrichedBy as string | undefined) ?? "heuristic");
   const meta = {
     ...(parsed.metadata ?? {}),
-    enrichedBy: llm ? "llm" : "heuristic",
+    enrichedBy,
   } as Parameters<typeof sql.json>[0];
 
   // Entidades: heurísticas + las que detecte el LLM, deduplicadas.

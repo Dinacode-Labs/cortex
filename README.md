@@ -91,6 +91,12 @@ OPENROUTER_API_KEY=sk-or-...
 OPENROUTER_MODEL=deepseek/deepseek-v4-pro
 ```
 
+Workflow de captura orquestado con Mastra (clasificar → persistir, pasos observables):
+
+```bash
+pnpm workflow:capture "Migramos a generación asíncrona con colas" "Acme Portal"
+```
+
 ## Comandos
 
 | Comando | Qué hace |
