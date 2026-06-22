@@ -126,7 +126,7 @@ app.get("/search", async (c) => {
         .map(
           (h) =>
             `<a class="card" href="/entry/${esc(h.entry.id)}">
-              <div class="card-head">${badge(h.score.toFixed(2), "#6e4cff")} ${typeBadge(h.entry.type)} ${statusBadge(h.entry.status)}</div>
+              <div class="card-head">${badge(h.score.toFixed(2), "#0099ff")} ${typeBadge(h.entry.type)} ${statusBadge(h.entry.status)}</div>
               <h3>${esc(h.entry.title)}</h3>
               <p>${esc(h.entry.summary ?? h.entry.content)}</p>
             </a>`,
@@ -252,7 +252,7 @@ app.get("/ask", async (c) => {
     );
     const sources = hits.length
       ? `<div class="panel"><h2>Fuentes consultadas</h2>${hits
-          .map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#6e4cff")} <a href="/entry/${esc(h.entry.id)}">${esc(h.entry.title)}</a></div>`)
+          .map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#0099ff")} <a href="/entry/${esc(h.entry.id)}">${esc(h.entry.title)}</a></div>`)
           .join("")}</div>`
       : `<div class="empty">Sin contexto relevante.</div>`;
     answerHtml = answer
@@ -317,7 +317,7 @@ app.get("/pack", async (c) => {
     ${sec("Deuda técnica", pack.technicalDebt)}
     ${sec("Convenciones", pack.conventions)}
     ${pack.sensitiveModules.length ? `<div class="panel"><h2>Módulos sensibles</h2>${pack.sensitiveModules.map((m) => badge(m, "#bc4c00")).join(" ")}</div>` : ""}
-    ${pack.relevantToArea.length ? `<div class="panel"><h2>Relevante para "${esc(area ?? "")}"</h2>${pack.relevantToArea.map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#6e4cff")} ${esc(h.entry.title)}</div>`).join("")}</div>` : ""}
+    ${pack.relevantToArea.length ? `<div class="panel"><h2>Relevante para "${esc(area ?? "")}"</h2>${pack.relevantToArea.map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#0099ff")} ${esc(h.entry.title)}</div>`).join("")}</div>` : ""}
   `;
   return c.html(layout(`Context Pack: ${pack.project}`, body));
 });
@@ -338,7 +338,7 @@ app.get("/code", async (c) => {
       ? hits
           .map((h) => {
             const body = h.content.startsWith("// ") ? h.content.slice(h.content.indexOf("\n") + 1) : h.content;
-            return `<div class="panel"><div class="card-head">${badge(h.score.toFixed(2), "#6e4cff")} <b>${esc(h.path)}</b> <span class="sub">:${h.startLine}-${h.endLine} · ${esc(h.language ?? "")}</span></div><pre class="content-block" style="overflow:auto"><code>${esc(body)}</code></pre></div>`;
+            return `<div class="panel"><div class="card-head">${badge(h.score.toFixed(2), "#0099ff")} <b>${esc(h.path)}</b> <span class="sub">:${h.startLine}-${h.endLine} · ${esc(h.language ?? "")}</span></div><pre class="content-block" style="overflow:auto"><code>${esc(body)}</code></pre></div>`;
           })
           .join("")
       : `<div class="empty">Sin resultados. ¿Has indexado el repo? (pnpm --filter @cortex/core index-code)</div>`;
@@ -427,17 +427,17 @@ app.get("/graph", async (c) => {
         </label>
         <button type="submit">Ver</button>
       </form>
-      <div id="legend" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+      <div id="legend" style="margin-top:10px;font-size:12px;color:var(--color-text-muted)"></div>
     </div>
-    <div id="net" style="height:72vh;background:#0d1117;border:1px solid var(--line);border-radius:10px"></div>
+    <div id="net" style="height:72vh;background:var(--brand-ink);border:1px solid var(--color-border);border-radius:10px"></div>
     <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
     <script>
       const COLORS = {
         client:"#cf222e", project:"#8250df", service:"#0969da", integration:"#1f883d",
         vendor:"#bf3989", technology:"#9a6700", module:"#bc4c00", person:"#57606a",
-        decision:"#0a7ea4", incident:"#d1242f", repository:"#6e4cff",
+        decision:"#0a7ea4", incident:"#d1242f", repository:"#0099ff",
       };
-      const entryColor = "#30363d";
+      const entryColor = "#33415e";
       function colorFor(group){
         if(group && group.startsWith("entry:")) return entryColor;
         return COLORS[group] || "#768390";
@@ -460,7 +460,7 @@ app.get("/graph", async (c) => {
         const edges = g.edges.map(e => ({
           from:e.from, to:e.to, label: e.kind==="relation"? e.label : undefined,
           arrows: e.kind==="relation"?"to":undefined,
-          color:{color: e.kind==="relation"?"#6e4cff88":"#ffffff14"},
+          color:{color: e.kind==="relation"?"#0099ff88":"#ffffff14"},
           font:{color:"#8b949e", size:9, strokeWidth:0},
           dashes: e.kind==="mention",
         }));
