@@ -64,7 +64,7 @@ Lanza la UI de demo:
 pnpm web                  # http://localhost:8080
 ```
 
-Para conectar Claude Code al MCP, ver [`config/claude-code/README.md`](./config/claude-code/README.md).
+Para conectar agentes (Claude Code / Codex / OpenCode) al MCP y a las skills, ver [`config/README.md`](./config/README.md).
 Para recorrer la demo, ver [`docs/demo-script.md`](./docs/demo-script.md).
 
 ## Embeddings y calidad de búsqueda
