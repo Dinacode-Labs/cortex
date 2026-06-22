@@ -109,3 +109,34 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   aislado del resto del repo que usa zod v3 (MCP SDK). No se cruzan schemas.
 - **Revisar cuando:** fijemos proveedor/modelo definitivo (coste/calidad/latencia;
   DeepSeek razona y añade latencia).
+
+## ADR-0009 · Búsqueda híbrida (vector + FTS + RRF) y rerank LLM
+
+- **Estado:** aceptada (demo).
+- **Contexto:** la búsqueda era solo vectorial densa. El léxico gana con IDs,
+  nombres propios y jerga (frecuentes en consultoría). Mercado: híbrido + rerank
+  es el estándar (Glean, Onyx, RAGFlow…). Ver competitive-landscape.md.
+- **Decisión:** `searchContext` usa `hybridSearch` = candidatos vectoriales
+  (pgvector) + léxicos (**FTS de Postgres**, columna `content_tsv` generada, config
+  'spanish', índice GIN) fusionados con **Reciprocal Rank Fusion (RRF)**. Rerank de
+  2ª etapa **opcional vía LLM** (qwen3.6), inyectado con `setReranker` desde los
+  entrypoints; desactivable con `CORTEX_RERANK=off`.
+- **Hallazgo:** el **reranker dedicado de nan** (`/v1/rerank`, Qwen3-Reranker-8B)
+  dio resultados **poco fiables** (rankeó "receta de tortilla" por encima de docs
+  de pagos). No se usa; rerank por LLM en su lugar.
+- **Revisar cuando:** dispongamos de un reranker fiable (Cohere/Voyage) o mejore el
+  de nan; evaluar `pg_search`/ParadeDB (BM25 real) frente a `ts_rank`.
+
+## ADR-0010 · Lint del conocimiento (curado, patrón "LLM Wiki")
+
+- **Estado:** aceptada (demo).
+- **Contexto:** los loops del §12 estaban dispersos. El patrón "LLM Wiki" de
+  Karpathy formaliza un paso **lint** (salud del conocimiento) que casi nadie
+  implementa — diferenciador. Ver competitive-landscape.md.
+- **Decisión:** `lintProject(project)` reporta por proyecto: contradicciones (del
+  grafo), posibles duplicados (similitud vectorial), entidades huérfanas, baja
+  confianza, histórico/obsoleto y **huecos** (áreas con incidencias pero sin
+  decisiones documentadas). CLI (`pnpm --filter @cortex/core lint`), página web
+  `/lint`.
+- **Revisar cuando:** queramos que el lint **actúe** (no solo reporte): proponer
+  fusiones, abrir tareas para los huecos, marcar obsoletos.

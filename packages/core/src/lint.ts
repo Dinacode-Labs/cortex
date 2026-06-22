@@ -1,0 +1,124 @@
+import { getSql, type Sql } from "@cortex/database";
+import { canonicalize } from "./text.js";
+import type { Row } from "./map.js";
+
+/**
+ * Lint del conocimiento (patrón "LLM Wiki" de Karpathy + loops §12): health-check
+ * por proyecto que reporta señales de calidad para curar la memoria.
+ */
+
+export interface LintReport {
+  project: string;
+  totalEntries: number;
+  contradictions: { a: string; b: string }[];
+  duplicates: { a: string; b: string; score: number }[];
+  orphanEntities: { name: string; type: string }[];
+  lowConfidence: number;
+  staleHistorical: number;
+  gaps: { area: string; type: string; incidents: number }[];
+}
+
+async function projectId(sql: Sql, project: string): Promise<string | null> {
+  const rows = (await sql`
+    SELECT id FROM entities WHERE type='project' AND canonical_name=${canonicalize(project)} LIMIT 1
+  `) as unknown as Row[];
+  return rows[0] ? (rows[0].id as string) : null;
+}
+
+export async function lintProject(project: string): Promise<LintReport> {
+  const sql = getSql();
+  const pid = await projectId(sql, project);
+  if (!pid) throw new Error(`Proyecto no encontrado: "${project}".`);
+
+  const totalEntries = Number(
+    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid}`) as unknown as Row[])[0]!.n,
+  );
+
+  // Contradicciones: relaciones 'contradicts' con algún extremo en el proyecto.
+  const contraRows = (await sql`
+    SELECT COALESCE(es.name, ces.title, '?') AS a, COALESCE(et.name, cet.title, '?') AS b
+    FROM relations r
+    LEFT JOIN entities es ON es.id=r.source_id
+    LEFT JOIN context_entries ces ON ces.id=r.source_id
+    LEFT JOIN entities et ON et.id=r.target_id
+    LEFT JOIN context_entries cet ON cet.id=r.target_id
+    WHERE r.relation_type='contradicts'
+      AND (ces.project_id=${pid} OR cet.project_id=${pid}
+           OR es.id IN (SELECT cee.entity_id FROM context_entry_entities cee JOIN context_entries c ON c.id=cee.context_entry_id WHERE c.project_id=${pid})
+           OR et.id IN (SELECT cee.entity_id FROM context_entry_entities cee JOIN context_entries c ON c.id=cee.context_entry_id WHERE c.project_id=${pid}))
+    LIMIT 50
+  `) as unknown as Row[];
+
+  // Duplicados casi idénticos por similitud vectorial (self-join sobre embeddings).
+  const dupRows = (await sql`
+    SELECT ca.title AS a, cb.title AS b, (1 - (a.vector <=> b.vector)) AS score
+    FROM embeddings a
+    JOIN embeddings b ON a.context_entry_id < b.context_entry_id
+      AND a.embedding_model = b.embedding_model
+    JOIN context_entries ca ON ca.id=a.context_entry_id AND ca.project_id=${pid}
+    JOIN context_entries cb ON cb.id=b.context_entry_id AND cb.project_id=${pid}
+    WHERE (a.vector <=> b.vector) < 0.12
+    ORDER BY score DESC
+    LIMIT 25
+  `) as unknown as Row[];
+
+  // Entidades huérfanas: 1 sola entrada y sin relaciones.
+  const orphanRows = (await sql`
+    SELECT en.name, en.type
+    FROM entities en
+    JOIN context_entry_entities cee ON cee.entity_id=en.id
+    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid}
+    WHERE en.type<>'project'
+      AND NOT EXISTS (SELECT 1 FROM relations r WHERE r.source_id=en.id OR r.target_id=en.id)
+    GROUP BY en.id, en.name, en.type
+    HAVING count(DISTINCT cee.context_entry_id)=1
+    LIMIT 40
+  `) as unknown as Row[];
+
+  const lowConfidence = Number(
+    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND confidence='low'`) as unknown as Row[])[0]!.n,
+  );
+  const staleHistorical = Number(
+    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND (validity='historical' OR metadata->>'state'='Histórico')`) as unknown as Row[])[0]!.n,
+  );
+
+  // Huecos: áreas (módulo/servicio) con incidencias pero sin decisiones documentadas.
+  const gapRows = (await sql`
+    SELECT en.name, en.type, count(*) FILTER (WHERE ce.type='incident') AS incidents
+    FROM entities en
+    JOIN context_entry_entities cee ON cee.entity_id=en.id
+    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid}
+    WHERE en.type IN ('module','service')
+    GROUP BY en.id, en.name, en.type
+    HAVING count(*) FILTER (WHERE ce.type='incident') >= 2
+       AND count(*) FILTER (WHERE ce.type='decision') = 0
+    ORDER BY incidents DESC
+    LIMIT 15
+  `) as unknown as Row[];
+
+  return {
+    project,
+    totalEntries,
+    contradictions: contraRows.map((r) => ({ a: r.a, b: r.b })),
+    duplicates: dupRows.map((r) => ({ a: r.a, b: r.b, score: Number(r.score) })),
+    orphanEntities: orphanRows.map((r) => ({ name: r.name, type: r.type })),
+    lowConfidence,
+    staleHistorical,
+    gaps: gapRows.map((r) => ({ area: r.name, type: r.type, incidents: Number(r.incidents) })),
+  };
+}
+
+/** Render del informe a Markdown (para CLI/MCP). */
+export function renderLintReport(r: LintReport): string {
+  const L: string[] = [`# Lint — ${r.project}`, `_${r.totalEntries} entradas_`, ""];
+  L.push(`## ⚠️ Contradicciones (${r.contradictions.length})`);
+  L.push(...(r.contradictions.length ? r.contradictions.map((c) => `- ${c.a}  ⟷  ${c.b}`) : ["- (ninguna)"]));
+  L.push("", `## 🔁 Posibles duplicados (${r.duplicates.length})`);
+  L.push(...(r.duplicates.length ? r.duplicates.map((d) => `- (${d.score.toFixed(2)}) ${d.a}  ≈  ${d.b}`) : ["- (ninguno)"]));
+  L.push("", `## 🕳️ Huecos: áreas con incidencias sin decisiones (${r.gaps.length})`);
+  L.push(...(r.gaps.length ? r.gaps.map((g) => `- ${g.area} (${g.type}): ${g.incidents} incidencias, 0 decisiones`) : ["- (ninguno)"]));
+  L.push("", `## 🧩 Entidades huérfanas (${r.orphanEntities.length})`);
+  L.push(...(r.orphanEntities.length ? r.orphanEntities.slice(0, 20).map((e) => `- ${e.type}: ${e.name}`) : ["- (ninguna)"]));
+  L.push("", `## 📉 Otros`, `- Baja confianza: ${r.lowConfidence}`, `- Histórico/obsoleto: ${r.staleHistorical}`);
+  return L.join("\n");
+}
