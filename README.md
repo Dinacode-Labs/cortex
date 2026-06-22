@@ -1,29 +1,31 @@
 # Dinacode Cortex
 
-**Memoria corporativa de contexto** para proyectos software de una consultora.
-Captura conocimiento disperso (decisiones, restricciones, incidencias, convenciones,
-PRs, conversaciones, código…), lo estructura en una capa **híbrida — documental +
-vectorial + grafo + bi-temporal —** y lo expone a personas y agentes de IA (Claude
-Code, Codex, OpenCode) mediante un **MCP corporativo**, para reducir la pérdida de
-contexto al cambiar de tarea, módulo, proyecto o persona.
+**Memoria corporativa de contexto** — **producto de uso interno de Dinacode** para
+sus proyectos software. Captura conocimiento disperso (decisiones, restricciones,
+incidencias, convenciones, PRs, conversaciones, docs, código…), lo estructura en una
+capa **híbrida — documental + vectorial + grafo + bi-temporal —** y lo expone a
+personas y agentes de IA (Claude Code, Codex, OpenCode) mediante un **MCP
+corporativo**, para reducir la pérdida de contexto al cambiar de tarea, módulo,
+proyecto o persona.
 
 - Plan fundacional: [`dinacode-cortex-contexto-y-plan-demo.md`](./dinacode-cortex-contexto-y-plan-demo.md)
 - Decisiones técnicas (ADR): [`docs/decisions.md`](./docs/decisions.md)
 - Panorama competitivo y huecos: [`docs/research/competitive-landscape.md`](./docs/research/competitive-landscape.md)
 - Guion de demo: [`docs/demo-script.md`](./docs/demo-script.md)
 
-> **Estado: funcional, probado sobre un proyecto real.** PoC ingerido del proyecto
-> *LevelUp Pasión*: ~415 entradas (Plane + Google Chat + GitHub) + ~1.700 chunks de
-> código, con grafo de ~590 entidades / ~1.100 relaciones y validez temporal.
-> Todo funciona sin LLM (cae a heurísticas); con LLM mejora clasificación, grafo y
-> respuestas en prosa.
+> **Estado: producto interno funcional, probado sobre proyectos reales.** Las
+> capturas son del proyecto **CE Portal**: ~190 docs de Notion + ~8.200 chunks de
+> código (`ceportal-app` Angular + `ceportal-backend` Java) → grafo de ~540 entidades
+> / ~1.070 relaciones. Todo funciona sin LLM (cae a heurísticas); con LLM (Agents de
+> Mastra) mejora clasificación, grafo y respuestas en prosa.
 
 ![Dashboard](./docs/screenshot-dashboard.png)
 ![Preguntar al agente de recuperación](./docs/screenshot-ask.png)
 ![Grafo de conocimiento](./docs/screenshot-graph-entities.png)
 ![Lint del conocimiento](./docs/screenshot-lint.png)
 ![Búsqueda de código](./docs/screenshot-code.png)
-![Context pack point-in-time (bi-temporal)](./docs/screenshot-pack-pointintime.png)
+![Context pack](./docs/screenshot-pack-pointintime.png)
+![Observabilidad de coste de IA](./docs/screenshot-usage.png)
 
 ## Capacidades
 
