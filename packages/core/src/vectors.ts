@@ -51,8 +51,88 @@ export async function storeEmbeddingsBatch(
 
 export interface SearchHit {
   entry: ContextEntry;
-  /** Similitud coseno en [0,1] (1 = idéntico). */
+  /** Relevancia en [0,1]. En híbrido es RRF normalizado; en vectorial, coseno. */
   score: number;
+}
+
+/**
+ * Búsqueda HÍBRIDA: combina candidatos vectoriales (pgvector) y léxicos (FTS de
+ * Postgres, config 'spanish') y los fusiona con Reciprocal Rank Fusion (RRF).
+ * El léxico aporta precisión con IDs, nombres propios y jerga; el vector, sentido.
+ */
+export async function hybridSearch(
+  sql: Sql,
+  provider: EmbeddingProvider,
+  args: {
+    queryText: string;
+    projectId?: string | null;
+    type?: ContextEntryType;
+    limit: number;
+    excludeId?: string;
+    includeArchived?: boolean;
+  },
+): Promise<SearchHit[]> {
+  const pool = Math.max(args.limit * 4, 40);
+
+  // Filtros comunes (se aplican a ambas ramas; tabla siempre aliasada `ce`).
+  let filters = sql``;
+  if (args.projectId) filters = sql`${filters} AND ce.project_id = ${args.projectId}`;
+  if (args.type) filters = sql`${filters} AND ce.type = ${args.type}`;
+  if (args.excludeId) filters = sql`${filters} AND ce.id <> ${args.excludeId}`;
+  if (!args.includeArchived) filters = sql`${filters} AND ce.status NOT IN ('rejected', 'obsolete')`;
+
+  // Rama vectorial.
+  const vectors = await provider.embed([args.queryText]);
+  const lit = toVectorLiteral(vectors[0]!);
+  const vecRows = (await sql`
+    SELECT ce.id, (e.vector <=> ${lit}::vector) AS distance
+    FROM embeddings e
+    JOIN context_entries ce ON ce.id = e.context_entry_id
+    WHERE e.embedding_model = ${provider.model} AND e.embedding_version = ${provider.version}
+    ${filters}
+    ORDER BY distance ASC
+    LIMIT ${pool}
+  `) as unknown as Row[];
+
+  // Rama léxica (FTS).
+  const ftsRows = (await sql`
+    SELECT ce.id, ts_rank(ce.content_tsv, plainto_tsquery('spanish', ${args.queryText})) AS rank
+    FROM context_entries ce
+    WHERE ce.content_tsv @@ plainto_tsquery('spanish', ${args.queryText})
+    ${filters}
+    ORDER BY rank DESC
+    LIMIT ${pool}
+  `) as unknown as Row[];
+
+  // Reciprocal Rank Fusion.
+  const K = 60;
+  const acc = new Map<string, { rrf: number; cosine?: number }>();
+  vecRows.forEach((r, i) => {
+    const cur = acc.get(r.id) ?? { rrf: 0 };
+    cur.rrf += 1 / (K + i + 1);
+    cur.cosine = 1 - Number(r.distance);
+    acc.set(r.id, cur);
+  });
+  ftsRows.forEach((r, i) => {
+    const cur = acc.get(r.id) ?? { rrf: 0 };
+    cur.rrf += 1 / (K + i + 1);
+    acc.set(r.id, cur);
+  });
+
+  const ranked = [...acc.entries()].sort((a, b) => b[1].rrf - a[1].rrf).slice(0, args.limit);
+  if (ranked.length === 0) return [];
+  const maxRrf = ranked[0]![1].rrf || 1;
+
+  const ids = ranked.map(([id]) => id);
+  const rows = (await sql`SELECT * FROM context_entries WHERE id IN ${sql(ids)}`) as unknown as Row[];
+  const byId = new Map(rows.map((r) => [r.id as string, r]));
+
+  return ranked
+    .filter(([id]) => byId.has(id))
+    .map(([id, s]) => ({
+      entry: rowToContextEntry(byId.get(id)!),
+      score: s.cosine ?? s.rrf / maxRrf,
+    }));
 }
 
 /**

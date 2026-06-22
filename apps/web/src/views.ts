@@ -140,6 +140,7 @@ export function layout(title: string, body: string): string {
       <a href="/">Inicio</a>
       <a href="/ask">Preguntar</a>
       <a href="/graph">Grafo</a>
+      <a href="/lint">Lint</a>
       <a href="/?capture=1">Capturar</a>
     </nav>
   </header>

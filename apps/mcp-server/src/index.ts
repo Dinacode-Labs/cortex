@@ -13,9 +13,10 @@ import {
   saveContext,
   searchContext,
   setClassifier,
+  setReranker,
   validateEntry,
 } from "@cortex/core";
-import { classifyEntry, isLlmEnabled, synthesizeContextAnswer } from "@cortex/agents";
+import { classifyEntry, isLlmEnabled, rerankLLM, synthesizeContextAnswer } from "@cortex/agents";
 import { z } from "zod";
 
 /**
@@ -29,8 +30,12 @@ import { z } from "zod";
 
 loadEnv();
 
-// Capa de inteligencia (Mastra/LLM) opcional: si hay LLM, enriquece la captura.
-if (isLlmEnabled()) setClassifier(classifyEntry);
+// Capa de inteligencia (Mastra/LLM) opcional: si hay LLM, enriquece la captura
+// y reordena el retrieval (salvo CORTEX_RERANK=off).
+if (isLlmEnabled()) {
+  setClassifier(classifyEntry);
+  if (process.env.CORTEX_RERANK !== "off") setReranker(rerankLLM);
+}
 
 const server = new McpServer({ name: "cortex", version: "0.0.0" });
 

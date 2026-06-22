@@ -21,7 +21,7 @@ import {
   polarityTags,
   summarize,
 } from "./text.js";
-import { storeEmbedding, vectorSearch, type SearchHit } from "./vectors.js";
+import { hybridSearch, storeEmbedding, vectorSearch, type SearchHit } from "./vectors.js";
 
 export type { SearchHit } from "./vectors.js";
 
@@ -46,6 +46,16 @@ let classifier: Classifier | null = null;
  */
 export function setClassifier(fn: Classifier | null): void {
   classifier = fn;
+}
+
+/** Reranker opcional de 2ª etapa (p.ej. LLM). Reordena los hits por relevancia. */
+export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]>;
+
+let reranker: Reranker | null = null;
+
+/** Registra (o desregistra con null) un reranker. Lo cablean los entrypoints. */
+export function setReranker(fn: Reranker | null): void {
+  reranker = fn;
 }
 
 // --- save_project_context ----------------------------------------------------
@@ -225,18 +235,24 @@ async function detectImprovements(
 
 // --- search_project_context --------------------------------------------------
 
-/** Búsqueda semántica de contexto. §15.6. */
+/** Búsqueda híbrida (vector + FTS + RRF) con rerank opcional. §15.6. */
 export async function searchContext(input: SearchContextInput): Promise<SearchHit[]> {
   const parsed = searchContextInput.parse(input);
   const sql = getSql();
   const provider = getEmbeddingProvider();
   const projectId = parsed.project ? await findProjectId(sql, parsed.project) : null;
-  return vectorSearch(sql, provider, {
+
+  // Si hay reranker, sobre-recuperamos para que reordene un pool mayor.
+  const overFetch = reranker ? Math.min(parsed.limit * 3, 30) : parsed.limit;
+  const hits = await hybridSearch(sql, provider, {
     queryText: parsed.query,
     projectId,
     type: parsed.type,
-    limit: parsed.limit,
+    limit: overFetch,
   });
+  if (!reranker) return hits;
+  const reranked = await reranker(parsed.query, hits).catch(() => hits);
+  return reranked.slice(0, parsed.limit);
 }
 
 // --- list_project_decisions --------------------------------------------------

@@ -10,14 +10,16 @@ import {
   getContextPack,
   getEntryDetail,
   getProjectGraph,
+  lintProject,
   listEntries,
   listProjects,
   saveContext,
   searchContext,
   setClassifier,
+  setReranker,
   validateEntry,
 } from "@cortex/core";
-import { classifyEntry, isLlmEnabled, synthesizeContextAnswer } from "@cortex/agents";
+import { classifyEntry, isLlmEnabled, rerankLLM, synthesizeContextAnswer } from "@cortex/agents";
 import { badge, confidenceBadge, entryCard, esc, layout, mdLite, statusBadge, typeBadge } from "./views.js";
 
 /**
@@ -27,7 +29,10 @@ import { badge, confidenceBadge, entryCard, esc, layout, mdLite, statusBadge, ty
  */
 
 loadEnv();
-if (isLlmEnabled()) setClassifier(classifyEntry);
+if (isLlmEnabled()) {
+  setClassifier(classifyEntry);
+  if (process.env.CORTEX_RERANK !== "off") setReranker(rerankLLM);
+}
 const app = new Hono();
 
 // --- Dashboard ---------------------------------------------------------------
@@ -303,6 +308,46 @@ app.get("/pack", async (c) => {
     ${pack.relevantToArea.length ? `<div class="panel"><h2>Relevante para "${esc(area ?? "")}"</h2>${pack.relevantToArea.map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#6e4cff")} ${esc(h.entry.title)}</div>`).join("")}</div>` : ""}
   `;
   return c.html(layout(`Context Pack: ${pack.project}`, body));
+});
+
+// --- Lint (curado / salud del conocimiento) ----------------------------------
+app.get("/lint", async (c) => {
+  const projects = await listProjects();
+  const project = c.req.query("project") || projects[0]?.entity.name || "";
+  const projectOptions = projects
+    .map((p) => `<option value="${esc(p.entity.name)}" ${project === p.entity.name ? "selected" : ""}>${esc(p.entity.name)} (${p.entryCount})</option>`)
+    .join("");
+
+  let report = "";
+  if (project) {
+    try {
+      const r = await lintProject(project);
+      const card = (title: string, color: string, items: string[]) =>
+        `<div class="panel"><h2>${esc(title)} <span class="badge" style="background:${color}1a;color:${color};border:1px solid ${color}55">${items.length}</span></h2>${items.length ? `<ul style="margin:0;padding-left:18px">${items.map((i) => `<li>${i}</li>`).join("")}</ul>` : '<span class="sub">Nada que reportar.</span>'}</div>`;
+      report = [
+        card("⚠️ Contradicciones", "#cf222e", r.contradictions.map((x) => `${esc(x.a)} <b>⟷</b> ${esc(x.b)}`)),
+        card("🕳️ Huecos: incidencias sin decisiones", "#bc4c00", r.gaps.map((g) => `<b>${esc(g.area)}</b> <span class="sub">(${esc(g.type)})</span> — ${g.incidents} incidencias, 0 decisiones`)),
+        card("🔁 Posibles duplicados", "#9a6700", r.duplicates.map((d) => `(${d.score.toFixed(2)}) ${esc(d.a)} <b>≈</b> ${esc(d.b)}`)),
+        card("🧩 Entidades huérfanas", "#57606a", r.orphanEntities.map((e) => `${esc(e.type)}: ${esc(e.name)}`)),
+        `<div class="panel"><h2>📉 Otros</h2><div class="sub">Baja confianza: <b>${r.lowConfidence}</b> · Histórico/obsoleto: <b>${r.staleHistorical}</b> · Total entradas: <b>${r.totalEntries}</b></div></div>`,
+      ].join("");
+    } catch {
+      report = `<div class="empty">Proyecto no encontrado.</div>`;
+    }
+  }
+
+  const body = `
+    <p><a class="back" href="/">← Inicio</a></p>
+    <h1>Lint del conocimiento</h1>
+    <p class="sub">Salud de la memoria del proyecto: contradicciones, huecos, duplicados, entidades huérfanas (loops §12 / patrón LLM Wiki).</p>
+    <div class="panel">
+      <form class="row" method="get" action="/lint">
+        <select name="project">${projectOptions}</select>
+        <button type="submit">Analizar</button>
+      </form>
+    </div>
+    ${report}`;
+  return c.html(layout("Lint", body));
 });
 
 // --- Grafo de conocimiento ---------------------------------------------------
