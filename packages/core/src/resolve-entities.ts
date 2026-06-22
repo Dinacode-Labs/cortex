@@ -3,7 +3,7 @@ import type { Row } from "./map.js";
 
 /**
  * Loop de resolución de entidades (§12.4): fusiona variantes de una misma entidad
- * (p.ej. "Pasión"/"Pasion"/"pasion.net") en una canónica, re-apuntando enlaces
+ * (p.ej. "Acme"/"Acme Corp"/"acme.com") en una canónica, re-apuntando enlaces
  * (context_entry_entities) y relaciones, y deduplicando. Solo BD, sin LLM.
  *
  * Agrupa por nombre normalizado (sin acentos/puntuación, minúsculas) entre todos
