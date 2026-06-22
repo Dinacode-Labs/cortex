@@ -64,27 +64,33 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
   const cfg = getLlmConfig();
   if (!cfg) throw new Error("LLM no habilitado (LLM_PROVIDER / API key).");
 
-  const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${cfg.apiKey}`,
-      "content-type": "application/json",
-      "x-title": "Dinacode Cortex",
-    },
-    body: JSON.stringify({
-      model: cfg.model,
-      messages,
-      ...(opts.jsonObject ? { response_format: { type: "json_object" } } : {}),
-      max_tokens: opts.maxTokens ?? 1024,
-      temperature: opts.temperature ?? 0.2,
-    }),
-    signal: opts.signal,
+  const body = JSON.stringify({
+    model: cfg.model,
+    messages,
+    ...(opts.jsonObject ? { response_format: { type: "json_object" } } : {}),
+    max_tokens: opts.maxTokens ?? 1024,
+    temperature: opts.temperature ?? 0.2,
   });
+  const url = `${cfg.baseURL.replace(/\/$/, "")}/chat/completions`;
+  const headers = {
+    authorization: `Bearer ${cfg.apiKey}`,
+    "content-type": "application/json",
+    "x-title": "Dinacode Cortex",
+  };
 
-  if (!res.ok) {
+  // Reintentos exponenciales en 429/5xx (nan: 60 rpm, 3 en paralelo).
+  let res: Response | undefined;
+  const max = 6;
+  for (let attempt = 0; attempt < max; attempt++) {
+    res = await fetch(url, { method: "POST", headers, body, signal: opts.signal });
+    if (res.ok) break;
+    if ((res.status === 429 || res.status >= 500) && attempt < max - 1) {
+      await new Promise((r) => setTimeout(r, Math.min(15000, 800 * 2 ** attempt)));
+      continue;
+    }
     throw new Error(`LLM ${cfg.provider} ${res.status}: ${await res.text()}`);
   }
-  const json = (await res.json()) as {
+  const json = (await res!.json()) as {
     choices?: { message?: { content?: string } }[];
   };
   return json.choices?.[0]?.message?.content ?? "";
