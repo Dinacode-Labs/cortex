@@ -13,7 +13,8 @@
     "resolve-entities": "tsx src/resolve-entities.ts",
     "lint": "tsx src/lint-run.ts",
     "index-code": "tsx src/index-code.ts",
-    "temporal": "tsx src/temporal-run.ts"
+    "temporal": "tsx src/temporal-run.ts",
+    "connect-github": "tsx src/connect-github.ts"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",
