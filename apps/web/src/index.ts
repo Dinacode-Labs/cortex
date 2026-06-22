@@ -9,6 +9,7 @@ import {
 import {
   getContextPack,
   getEntryDetail,
+  getProjectGraph,
   listEntries,
   listProjects,
   saveContext,
@@ -302,6 +303,92 @@ app.get("/pack", async (c) => {
     ${pack.relevantToArea.length ? `<div class="panel"><h2>Relevante para "${esc(area ?? "")}"</h2>${pack.relevantToArea.map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#6e4cff")} ${esc(h.entry.title)}</div>`).join("")}</div>` : ""}
   `;
   return c.html(layout(`Context Pack: ${pack.project}`, body));
+});
+
+// --- Grafo de conocimiento ---------------------------------------------------
+app.get("/api/graph", async (c) => {
+  const project = c.req.query("project") ?? "";
+  const includeEntries = c.req.query("entries") !== "0";
+  const graph = await getProjectGraph(project, { includeEntries });
+  return c.json(graph);
+});
+
+app.get("/graph", async (c) => {
+  const projects = await listProjects();
+  const project = c.req.query("project") || projects[0]?.entity.name || "";
+  const includeEntries = c.req.query("entries") !== "0";
+  const projectOptions = projects
+    .map((p) => `<option value="${esc(p.entity.name)}" ${project === p.entity.name ? "selected" : ""}>${esc(p.entity.name)} (${p.entryCount})</option>`)
+    .join("");
+
+  const body = `
+    <p><a class="back" href="/">← Inicio</a></p>
+    <h1>Grafo de conocimiento</h1>
+    <p class="sub">Entidades (círculos por tipo) y entradas, unidas por relaciones y menciones. Arrastra, haz zoom, clic en una entrada para abrirla.</p>
+    <div class="panel">
+      <form class="row" method="get" action="/graph">
+        <select name="project">${projectOptions}</select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:14px">
+          <input type="checkbox" name="entries" value="1" ${includeEntries ? "checked" : ""}> incluir entradas
+        </label>
+        <button type="submit">Ver</button>
+      </form>
+      <div id="legend" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div id="net" style="height:72vh;background:#0d1117;border:1px solid var(--line);border-radius:10px"></div>
+    <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+    <script>
+      const COLORS = {
+        client:"#cf222e", project:"#8250df", service:"#0969da", integration:"#1f883d",
+        vendor:"#bf3989", technology:"#9a6700", module:"#bc4c00", person:"#57606a",
+        decision:"#0a7ea4", incident:"#d1242f", repository:"#6e4cff",
+      };
+      const entryColor = "#30363d";
+      function colorFor(group){
+        if(group && group.startsWith("entry:")) return entryColor;
+        return COLORS[group] || "#768390";
+      }
+      (async () => {
+        const params = new URLSearchParams(location.search);
+        const project = ${JSON.stringify(project)};
+        const entries = ${includeEntries ? "1" : "0"};
+        const res = await fetch("/api/graph?project="+encodeURIComponent(project)+"&entries="+entries);
+        const g = await res.json();
+        const deg = {};
+        g.edges.forEach(e => { deg[e.from]=(deg[e.from]||0)+1; deg[e.to]=(deg[e.to]||0)+1; });
+        const nodes = g.nodes.map(n => ({
+          id:n.id, label:n.label, shape: n.kind==="entry"?"box":"dot",
+          size: 8 + Math.min(22, (deg[n.id]||0)*2),
+          color:{background:colorFor(n.group), border:"#ffffff22"},
+          font:{color:"#c9d1d9", size: n.kind==="entry"?11:13},
+          _kind:n.kind, _group:n.group,
+        }));
+        const edges = g.edges.map(e => ({
+          from:e.from, to:e.to, label: e.kind==="relation"? e.label : undefined,
+          arrows: e.kind==="relation"?"to":undefined,
+          color:{color: e.kind==="relation"?"#6e4cff88":"#ffffff14"},
+          font:{color:"#8b949e", size:9, strokeWidth:0},
+          dashes: e.kind==="mention",
+        }));
+        const data={nodes:new vis.DataSet(nodes), edges:new vis.DataSet(edges)};
+        const net=new vis.Network(document.getElementById("net"), data, {
+          physics:{barnesHut:{gravitationalConstant:-8000, springLength:120, springConstant:0.03}, stabilization:{iterations:200}},
+          interaction:{hover:true, tooltipDelay:120},
+          nodes:{borderWidth:1},
+        });
+        net.on("click", p => {
+          if(!p.nodes.length) return;
+          const n = data.nodes.get(p.nodes[0]);
+          if(n && n._kind==="entry") window.location = "/entry/"+n.id;
+        });
+        const types=[...new Set(g.nodes.map(n=>n._group||n.group).filter(x=>x&&!x.startsWith("entry:")))];
+        document.getElementById("legend").innerHTML =
+          "Nodos: "+g.nodes.length+" · Aristas: "+g.edges.length+" &nbsp; | &nbsp; " +
+          types.map(t=>'<span style="color:'+colorFor(t)+'">●</span> '+t).join(" &nbsp; ") +
+          ' &nbsp; <span style="color:'+entryColor+'">▦</span> entrada';
+      })();
+    </script>`;
+  return c.html(layout("Grafo", body));
 });
 
 const port = Number(process.env.WEB_PORT ?? 8080);

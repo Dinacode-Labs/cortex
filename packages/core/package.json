@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "seed": "tsx src/seed.ts",
-    "ingest": "tsx src/ingest.ts"
+    "ingest": "tsx src/ingest.ts",
+    "resolve-entities": "tsx src/resolve-entities.ts"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",

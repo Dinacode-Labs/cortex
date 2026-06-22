@@ -87,6 +87,98 @@ export async function getEntryDetail(id: string): Promise<EntryDetail | null> {
   };
 }
 
+export interface GraphNode {
+  id: string;
+  label: string;
+  group: string;
+  kind: "entity" | "entry";
+}
+export interface GraphEdge {
+  from: string;
+  to: string;
+  label?: string;
+  kind: "relation" | "mention";
+}
+export interface ProjectGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+/**
+ * Grafo de conocimiento de un proyecto para visualización: entidades + (opcional)
+ * entradas como nodos; relaciones y menciones (entrada→entidad) como aristas.
+ */
+export async function getProjectGraph(
+  project: string,
+  opts: { includeEntries?: boolean; maxEntries?: number } = {},
+): Promise<ProjectGraph> {
+  const sql = getSql();
+  const projectId = await findProjectId(sql, project);
+  if (!projectId) return { nodes: [], edges: [] };
+  const includeEntries = opts.includeEntries ?? true;
+  const maxEntries = opts.maxEntries ?? 500;
+
+  // Entidades del proyecto (enlazadas a sus entradas), excluyendo el propio proyecto.
+  const entityRows = (await sql`
+    SELECT DISTINCT en.id, en.name, en.type
+    FROM entities en
+    JOIN context_entry_entities cee ON cee.entity_id = en.id
+    JOIN context_entries ce ON ce.id = cee.context_entry_id
+    WHERE ce.project_id = ${projectId} AND en.id <> ${projectId}
+  `) as unknown as Row[];
+
+  const nodeIds = new Set<string>();
+  const nodes: GraphNode[] = [];
+  for (const r of entityRows) {
+    nodeIds.add(r.id);
+    nodes.push({ id: r.id, label: r.name, group: r.type, kind: "entity" });
+  }
+
+  if (includeEntries) {
+    const entryRows = (await sql`
+      SELECT ce.id, ce.title, ce.type
+      FROM context_entries ce
+      WHERE ce.project_id = ${projectId}
+      ORDER BY ce.created_at DESC
+      LIMIT ${maxEntries}
+    `) as unknown as Row[];
+    for (const r of entryRows) {
+      nodeIds.add(r.id);
+      const title = (r.title as string) ?? "";
+      nodes.push({ id: r.id, label: title.length > 48 ? `${title.slice(0, 45)}…` : title, group: `entry:${r.type}`, kind: "entry" });
+    }
+  }
+
+  const edges: GraphEdge[] = [];
+  // Relaciones (entidad↔entidad, entrada→entidad) con ambos extremos en el grafo.
+  const relRows = (await sql`
+    SELECT source_id, target_id, relation_type
+    FROM relations
+    WHERE relation_type <> 'belongs_to'
+  `) as unknown as Row[];
+  for (const r of relRows) {
+    if (nodeIds.has(r.source_id) && nodeIds.has(r.target_id)) {
+      edges.push({ from: r.source_id, to: r.target_id, label: r.relation_type, kind: "relation" });
+    }
+  }
+  // Menciones entrada→entidad (si se incluyen entradas).
+  if (includeEntries) {
+    const linkRows = (await sql`
+      SELECT cee.context_entry_id, cee.entity_id
+      FROM context_entry_entities cee
+      JOIN context_entries ce ON ce.id = cee.context_entry_id
+      WHERE ce.project_id = ${projectId} AND cee.entity_id <> ${projectId}
+    `) as unknown as Row[];
+    for (const r of linkRows) {
+      if (nodeIds.has(r.context_entry_id) && nodeIds.has(r.entity_id)) {
+        edges.push({ from: r.context_entry_id, to: r.entity_id, kind: "mention" });
+      }
+    }
+  }
+
+  return { nodes, edges };
+}
+
 async function findProjectId(sql: Sql, project: string): Promise<string | null> {
   const canonical = canonicalize(project);
   const rows = (await sql`
