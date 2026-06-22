@@ -78,14 +78,24 @@ export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Pro
     "x-title": "Dinacode Cortex",
   };
 
-  // Reintentos exponenciales en 429/5xx (nan: 60 rpm, 3 en paralelo).
+  // Reintentos exponenciales en 429/5xx y en errores de red (nan: 60 rpm, 3 en
+  // paralelo; bajo carga sostenida fetch puede lanzar "fetch failed").
   let res: Response | undefined;
-  const max = 6;
+  const max = 7;
   for (let attempt = 0; attempt < max; attempt++) {
-    res = await fetch(url, { method: "POST", headers, body, signal: opts.signal });
+    const backoff = () => new Promise((r) => setTimeout(r, Math.min(20000, 800 * 2 ** attempt)));
+    try {
+      res = await fetch(url, { method: "POST", headers, body, signal: opts.signal });
+    } catch (e) {
+      if (attempt < max - 1) {
+        await backoff();
+        continue;
+      }
+      throw new Error(`LLM ${cfg.provider} red: ${(e as Error).message}`);
+    }
     if (res.ok) break;
     if ((res.status === 429 || res.status >= 500) && attempt < max - 1) {
-      await new Promise((r) => setTimeout(r, Math.min(15000, 800 * 2 ** attempt)));
+      await backoff();
       continue;
     }
     throw new Error(`LLM ${cfg.provider} ${res.status}: ${await res.text()}`);
