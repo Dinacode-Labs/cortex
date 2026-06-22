@@ -1,4 +1,4 @@
-import type { ContextEntry, Entity } from "@cortex/shared";
+import type { ContextEntry, Entity, Source } from "@cortex/shared";
 
 /** Fila cruda devuelta por postgres.js (columnas en snake_case). */
 export type Row = Record<string, any>;
@@ -34,5 +34,17 @@ export function rowToEntity(row: Row): Entity {
     metadata: row.metadata ?? {},
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function rowToSource(row: Row): Source {
+  return {
+    id: row.id,
+    sourceType: row.source_type,
+    externalId: row.external_id ?? null,
+    url: row.url ?? null,
+    rawContent: row.raw_content ?? null,
+    metadata: row.metadata ?? {},
+    createdAt: row.created_at,
   };
 }
