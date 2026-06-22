@@ -1,10 +1,9 @@
-import { chat, getLlmConfig } from "./openrouter.js";
+import { getAgent, runAgent } from "./mastra.js";
 
 /**
  * Agente de recuperación (§7): sintetiza una respuesta en prosa fundamentada en
- * el contexto recuperado de Cortex. Usa el cliente LLM directo (provider-agnóstico:
- * nan/OpenRouter). La orquestación con Mastra vive en el workflow de captura
- * (workflows.ts).
+ * el contexto recuperado de Cortex. Implementado como Agent de Mastra (rol
+ * "retriever", ver mastra.ts).
  */
 
 export interface ContextSnippet {
@@ -13,17 +12,12 @@ export interface ContextSnippet {
   type: string;
 }
 
-const SYSTEM =
-  "Eres el agente de recuperación de Dinacode Cortex. Respondes preguntas de " +
-  "developers sobre proyectos software basándote ÚNICAMENTE en el contexto " +
-  "recuperado. Eres conciso, en español, y si el contexto no basta lo dices.";
-
 /** Sintetiza una respuesta a partir de fragmentos de contexto. null si no hay LLM. */
 export async function synthesizeContextAnswer(
   question: string,
   snippets: ContextSnippet[],
 ): Promise<string | null> {
-  if (!getLlmConfig() || snippets.length === 0) return null;
+  if (!getAgent("retriever") || snippets.length === 0) return null;
 
   const context = snippets
     .map((s, i) => `${i + 1}. [${s.type}] ${s.title}: ${s.summary}`)
@@ -37,13 +31,7 @@ Responde a la pregunta basándote únicamente en el contexto anterior. Resalta r
 decisiones vigentes y restricciones si son relevantes. Si falta información, indícalo.`;
 
   try {
-    return await chat(
-      [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: prompt },
-      ],
-      { maxTokens: 900 },
-    );
+    return await runAgent("retriever", prompt, { maxOutputTokens: 900 });
   } catch (e) {
     console.error("[agents] synthesizeContextAnswer falló:", (e as Error).message);
     return null;

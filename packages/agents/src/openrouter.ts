@@ -1,12 +1,12 @@
 import { getEnv, loadEnv } from "@cortex/shared";
 
 /**
- * Acceso a LLM por endpoint OpenAI-compatible (/v1/chat/completions). Soporta
- * varios proveedores vía LLM_PROVIDER:
+ * Configuración de LLM por endpoint OpenAI-compatible. Soporta varios proveedores
+ * vía LLM_PROVIDER:
  *   - "nan"        -> servidor nan.builders (modelos free; OpenAI-compatible)
  *   - "openrouter" -> OpenRouter (DeepSeek, etc.)
- * Para extracción estructurada usamos modo json_object (ver classify.ts).
- * Ver ADR-0006/0008 en docs/decisions.md.
+ * Las llamadas al LLM las hacen los Agents de Mastra (ver mastra.ts); aquí solo
+ * vive la resolución de credenciales/modelo. Ver ADR-0006/0008/0015.
  */
 
 export interface LlmConfig {
@@ -45,63 +45,4 @@ export function getLlmConfig(): LlmConfig | null {
 
 export function isLlmEnabled(): boolean {
   return getLlmConfig() !== null;
-}
-
-export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
-
-interface ChatOptions {
-  jsonObject?: boolean;
-  maxTokens?: number;
-  temperature?: number;
-  signal?: AbortSignal;
-}
-
-/** Llamada a chat/completions. Devuelve el texto del primer choice. */
-export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<string> {
-  const cfg = getLlmConfig();
-  if (!cfg) throw new Error("LLM no habilitado (LLM_PROVIDER / API key).");
-
-  const body = JSON.stringify({
-    model: cfg.model,
-    messages,
-    ...(opts.jsonObject ? { response_format: { type: "json_object" } } : {}),
-    max_tokens: opts.maxTokens ?? 1024,
-    temperature: opts.temperature ?? 0.2,
-  });
-  const url = `${cfg.baseURL.replace(/\/$/, "")}/chat/completions`;
-  const headers = {
-    authorization: `Bearer ${cfg.apiKey}`,
-    "content-type": "application/json",
-    "x-title": "Dinacode Cortex",
-  };
-
-  // Reintentos exponenciales en 429/5xx y en errores de red (nan: 60 rpm, 3 en
-  // paralelo; bajo carga sostenida fetch puede lanzar "fetch failed").
-  let res: Response | undefined;
-  const max = 7;
-  for (let attempt = 0; attempt < max; attempt++) {
-    const backoff = () => new Promise((r) => setTimeout(r, Math.min(20000, 800 * 2 ** attempt)));
-    try {
-      res = await fetch(url, { method: "POST", headers, body, signal: opts.signal });
-    } catch (e) {
-      if (attempt < max - 1) {
-        await backoff();
-        continue;
-      }
-      throw new Error(`LLM ${cfg.provider} red: ${(e as Error).message}`);
-    }
-    if (res.ok) break;
-    if ((res.status === 429 || res.status >= 500) && attempt < max - 1) {
-      await backoff();
-      continue;
-    }
-    throw new Error(`LLM ${cfg.provider} ${res.status}: ${await res.text()}`);
-  }
-  const json = (await res!.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  return json.choices?.[0]?.message?.content ?? "";
 }

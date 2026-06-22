@@ -1,11 +1,12 @@
 import { contextEntryType, entityType } from "@cortex/shared";
 import type { ContextEntryType, EntityType } from "@cortex/shared";
-import { chat } from "./openrouter.js";
+import { runAgent } from "./mastra.js";
 
 /**
  * Agente de clasificación / ingesta (§7). Dado un texto libre de conocimiento,
  * propone tipo, título, resumen y entidades mencionadas. Mejora las heurísticas
- * locales de @cortex/core cuando hay LLM disponible.
+ * locales de @cortex/core cuando hay LLM disponible. Implementado como Agent de
+ * Mastra (rol "classifier", ver mastra.ts).
  */
 
 export interface ClassificationResult {
@@ -17,9 +18,6 @@ export interface ClassificationResult {
 
 const TYPES = contextEntryType.options;
 const ENTITY_TYPES = entityType.options;
-
-const SYSTEM = `Eres el agente de ingesta de Dinacode Cortex, una memoria de contexto de proyectos software.
-Clasificas piezas de conocimiento y extraes entidades. Respondes SIEMPRE en español y SOLO con JSON válido.`;
 
 function userPrompt(content: string): string {
   return `Analiza esta pieza de conocimiento de un proyecto y devuelve un objeto JSON con:
@@ -57,13 +55,7 @@ export async function classifyEntry(content: string): Promise<ClassificationResu
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await chat(
-        [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: userPrompt(content) },
-        ],
-        { jsonObject: true, maxTokens: 2000 },
-      );
+      const raw = await runAgent("classifier", userPrompt(content), { maxOutputTokens: 2000 });
       const text = extractJson(raw).trim();
       if (!text) throw new Error("respuesta vacía del modelo");
       const parsed = JSON.parse(text) as {

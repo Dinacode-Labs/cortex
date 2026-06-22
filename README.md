@@ -62,9 +62,9 @@ Claude Code / Codex / OpenCode
                        │   ▲                búsqueda híbrida, context-pack, lint,
                        │   │ setClassifier/  código, bi-temporal, loops de mejora
                        │   │ setReranker
-                       │   └── packages/agents (@cortex/agents) ── capa LLM:
-                       │           clasificación, extracción de grafo, rerank,
-                       │           síntesis; workflow de captura (Mastra)
+                       │   └── packages/agents (@cortex/agents) ── Agents de Mastra
+                       │           (un Agent por rol: classifier, graph, reranker,
+                       │           retriever) + workflow de captura
                        ├── packages/embeddings  ── proveedor enchufable
                        │        (local | nan | openai | voyage)
                        └── packages/database     ── Postgres + pgvector + FTS

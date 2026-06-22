@@ -12,6 +12,7 @@
     "enrich": "tsx src/enrich-run.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai-compatible": "^2.0.51",
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/shared": "workspace:*",
