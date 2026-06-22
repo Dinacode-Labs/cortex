@@ -18,6 +18,7 @@ Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisi
 ![Preguntar al agente de recuperación](./docs/screenshot-ask.png)
 ![Grafo de conocimiento](./docs/screenshot-graph-entities.png)
 ![Lint del conocimiento](./docs/screenshot-lint.png)
+![Búsqueda de código](./docs/screenshot-code.png)
 ![Context pack](./docs/screenshot-context-pack.png)
 
 ## Arquitectura (demo)
@@ -108,6 +109,7 @@ pnpm workflow:capture "Migramos a generación asíncrona con colas" "Acme Portal
 | `pnpm db:seed` | Carga datos de demo (idempotente) |
 | `pnpm --filter @cortex/core run ingest "<Proyecto>" <items.json>` | Ingesta masiva (2 fases + embeddings por lotes) |
 | `pnpm --filter @cortex/core run lint "<Proyecto>"` | Lint del conocimiento (contradicciones, huecos, duplicados…) |
+| `pnpm --filter @cortex/core run index-code "<Proyecto>" <ruta-repo>` | Indexa el código de un repo local (chunks + embeddings) |
 | `pnpm mcp` | Arranca el servidor MCP (stdio) |
 | `pnpm web` | Arranca la UI web de demo |
 | `pnpm typecheck` | Comprueba tipos en todos los paquetes |

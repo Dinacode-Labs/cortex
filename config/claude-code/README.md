@@ -38,6 +38,8 @@ con 5 tools.
   y sintetiza una respuesta fundamentada (requiere LLM; si no, devuelve la búsqueda).
 - `lint_project_context` — salud del conocimiento: contradicciones, duplicados,
   entidades huérfanas, huecos (áreas con incidencias sin decisiones).
+- `search_project_code` — búsqueda híbrida sobre el código indexado del proyecto
+  (devuelve ruta:líneas + fragmento). Requiere indexar antes (`index-code`).
 
 ## Prompts de demo
 
