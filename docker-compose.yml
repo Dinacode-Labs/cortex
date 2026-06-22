@@ -1,0 +1,27 @@
+# Infraestructura local de Dinacode Cortex.
+# Por ahora solo Postgres con la extensión pgvector (almacenamiento documental +
+# vectorial en una sola base, según la hipótesis de la demo). Un grafo dedicado
+# (Neo4j/Memgraph) o una vector DB dedicada (Qdrant) son alternativas a evaluar
+# en fases posteriores; ver docs/decisions.md.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cortex-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cortex
+      POSTGRES_PASSWORD: cortex
+      POSTGRES_DB: cortex
+    ports:
+      - "5433:5432"
+    volumes:
+      - cortex-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cortex -d cortex"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cortex-pgdata:
