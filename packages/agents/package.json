@@ -1,0 +1,19 @@
+{
+  "name": "@cortex/agents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cortex/shared": "workspace:*",
+    "@mastra/core": "^1.45.0",
+    "@openrouter/ai-sdk-provider": "^2.9.1",
+    "ai": "^6.0.208",
+    "zod": "^4.4.3"
+  }
+}

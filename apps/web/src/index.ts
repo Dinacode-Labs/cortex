@@ -13,8 +13,10 @@ import {
   listProjects,
   saveContext,
   searchContext,
+  setClassifier,
   validateEntry,
 } from "@cortex/core";
+import { classifyEntry, isLlmEnabled } from "@cortex/agents";
 import { badge, confidenceBadge, entryCard, esc, layout, statusBadge, typeBadge } from "./views.js";
 
 /**
@@ -24,6 +26,7 @@ import { badge, confidenceBadge, entryCard, esc, layout, statusBadge, typeBadge 
  */
 
 loadEnv();
+if (isLlmEnabled()) setClassifier(classifyEntry);
 const app = new Hono();
 
 // --- Dashboard ---------------------------------------------------------------

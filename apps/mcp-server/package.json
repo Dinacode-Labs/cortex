@@ -11,6 +11,7 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
+    "@cortex/agents": "workspace:*",
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/shared": "workspace:*",

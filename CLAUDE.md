@@ -29,6 +29,7 @@ packages/
   database/    # esquema SQL + migraciones + cliente Postgres
   embeddings/  # proveedor de embeddings enchufable (local | openai | voyage)
   core/        # operaciones de dominio: save/search/context-pack + loops de mejora
+  agents/      # capa LLM: clasificación (OpenRouter/DeepSeek) + síntesis (Mastra)
 apps/
   mcp-server/  # servidor MCP (stdio) con las 5 tools corporativas
   web/         # UI web de demo (Hono, render en servidor)
@@ -37,8 +38,11 @@ docs/
   demo-script.md
 ```
 
-`@cortex/core` es determinista (sin LLM); Mastra se superpondrá como capa de
-inteligencia. Tanto el MCP como la UI son consumidores de `@cortex/core`.
+`@cortex/core` es determinista (sin LLM). La capa de inteligencia (`@cortex/agents`,
+Mastra + LLM por OpenRouter) se inyecta con `setClassifier()` desde los entrypoints
+cuando hay LLM (`LLM_PROVIDER=openrouter`). Tanto el MCP como la UI consumen `core`.
+Nota: `agents` usa zod v4 (lo exige Mastra), aislado del zod v3 del resto del repo;
+no cruzar schemas entre ambos.
 
 ## Comandos
 

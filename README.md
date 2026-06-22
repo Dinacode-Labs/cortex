@@ -8,10 +8,11 @@ relacional) y lo expone a personas y agentes de IA mediante un **MCP corporativo
 Documento fundacional y plan: [`dinacode-cortex-contexto-y-plan-demo.md`](./dinacode-cortex-contexto-y-plan-demo.md).
 Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisions.md).
 
-> Estado: **demo funcional en construcción**. Lo implementado hasta ahora cubre
-> captura, almacenamiento híbrido, búsqueda semántica, context packs, loops de
-> mejora (duplicados/contradicciones), el servidor MCP y una UI web de demo.
-> Pendiente: agentes Mastra (capa de inteligencia con LLM).
+> Estado: **demo funcional**. Cubre captura, almacenamiento híbrido, búsqueda
+> semántica, context packs, loops de mejora (duplicados/contradicciones), servidor
+> MCP, UI web y una **capa de agentes (Mastra + LLM vía OpenRouter)** que enriquece
+> la captura y sintetiza respuestas de retrieval. Todo funciona sin LLM (cae a
+> heurísticas); con LLM mejora la clasificación y habilita respuestas en prosa.
 
 ![Dashboard](./docs/screenshot-dashboard.png)
 ![Context pack](./docs/screenshot-context-pack.png)
@@ -22,21 +23,24 @@ Decisiones técnicas (hipótesis a validar): [`docs/decisions.md`](./docs/decisi
 Claude Code / Codex / ChatGPT
         │  (MCP)
         ▼
-  @cortex/mcp-server   apps/mcp-server  ─┐   — 5 tools corporativas
+  @cortex/mcp-server   apps/mcp-server  ─┐   — 6 tools corporativas
   @cortex/web          apps/web         ─┤   — UI web de demo (Hono, SSR)
         │                                │
         ▼                                ▼
   @cortex/core               packages/core     — operaciones de dominio
-        │                                         (clasificar, entidades,
-        │                                          embeddings, loops de mejora)
+        │   ▲                                     (clasificar, entidades,
+        │   │ setClassifier()                      embeddings, loops de mejora)
+        │   └── @cortex/agents packages/agents  — capa LLM: Mastra (síntesis) +
+        │                                          clasificación (OpenRouter/DeepSeek)
         ├── @cortex/embeddings packages/embeddings — proveedor enchufable
         │                                            (local | openai | voyage)
         └── @cortex/database   packages/database   — Postgres + pgvector
   @cortex/shared             packages/shared   — modelo de dominio (zod)
 ```
 
-La capa **Mastra** (agentes/workflows) se superpondrá sobre `@cortex/core` como
-capa de inteligencia; por eso el core es determinista y funciona sin claves LLM.
+`@cortex/core` es **determinista** y funciona sin claves. La capa de inteligencia
+(`@cortex/agents`, Mastra + LLM) se inyecta opcionalmente con `setClassifier()`
+desde los entrypoints cuando hay LLM. Precedencia: input explícito > LLM > heurística.
 
 ## Puesta en marcha
 
@@ -72,6 +76,19 @@ OPENAI_API_KEY=...
 ```
 
 Tras cambiar de proveedor, re-siembra (`pnpm db:seed`) para regenerar embeddings.
+
+## Capa LLM (opcional)
+
+Sin LLM, la captura usa heurísticas locales. Para activar la capa de agentes
+(clasificación enriquecida + respuestas sintetizadas vía la tool MCP
+`ask_project_context`):
+
+```bash
+# en .env
+LLM_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-...
+OPENROUTER_MODEL=deepseek/deepseek-v4-pro
+```
 
 ## Comandos
 
