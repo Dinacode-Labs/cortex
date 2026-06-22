@@ -4,6 +4,7 @@ import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
 import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
 import { canonicalize } from "./text.js";
 import type { Row } from "./map.js";
+import "./usage.js"; // registra el sink de uso de embeddings (observabilidad de coste)
 
 /** Indexación y búsqueda de código por proyecto/cliente (search_project_code). */
 
