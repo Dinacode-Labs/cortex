@@ -208,8 +208,15 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   del MCP y el formato de skill/comando. Instalación **manual documentada** para
   **Claude Code, Codex y OpenCode**. Skills/comandos se activan por symlink desde
   `config/` a `~/.claude/` (global) o `.claude/` (proyecto).
+- **Registry PR-able:** `config/toolbelt.json` es la fuente única del toolbelt de
+  Dinacode (MCPs + skills + comandos). Se amplía/mejora **por PR** y se reparte con
+  `cortex sync`. Cortex reparte **configuración, nunca credenciales** (cada entrada
+  documenta su `auth`). Skills propias **vendorizadas** en `config/skills/`
+  (excluyendo secretos); MCPs **declarados** por comando/URL (uvx/npx/http, sin copiar).
 - **Instalador:** `cortex sync` (`scripts/cortex-sync.ts`, `pnpm cortex:sync`) —
-  idempotente, dry-run por defecto, `--apply` para escribir. Detecta Claude Code /
-  Codex / OpenCode y registra MCP + skill + comando en cada uno. OpenCode best-effort.
+  data-driven desde el manifiesto, idempotente, dry-run por defecto, `--apply`,
+  `--doctor` (estado de auth por tool), `--agents`. **Preserva** lo ya configurado
+  (no machaca auth existente) y **omite** MCPs sin su env. Detecta Claude/Codex/OpenCode.
+  Skills por symlink → `git pull` actualiza; re-`--apply` re-registra. OpenCode best-effort.
 - **Revisar cuando:** añadamos prompts/políticas corporativas, un `--remove`, o
   separemos el harness a un repo propio (`dinacode-ai-config`).

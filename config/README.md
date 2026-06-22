@@ -30,18 +30,35 @@ pnpm db:migrate
 Copia `.env.example` a `.env` (LLM/embeddings). El comando del MCP usa
 `pnpm -C <ruta-al-repo-cortex> --filter @cortex/mcp-server start`.
 
+## Registry (`config/toolbelt.json`) — PR-able
+
+`config/toolbelt.json` es la **fuente única** del toolbelt de Dinacode: qué MCPs y
+skills debe tener un dev. **Añade/mejora una skill o MCP con un PR** a este repo;
+con `cortex sync` (tras `git pull`) se reparte/actualiza. Cortex reparte
+**configuración, nunca credenciales**: cada entrada documenta en `auth` qué debe
+configurar el dev por su cuenta. Las skills propias se vendorizan en
+`config/skills/`; los MCPs se declaran por comando/URL (uvx/npx/http) — no se copian.
+
 ## Instalación con `cortex sync` (recomendado)
 
-Instalador idempotente que detecta qué agentes tienes (Claude Code / Codex /
-OpenCode) y registra en cada uno el MCP `cortex` + la skill + el comando.
+Instalador idempotente que lee el registry e instala/actualiza en los agentes
+detectados (Claude Code / Codex / OpenCode):
 
 ```bash
-pnpm cortex:sync                 # dry-run: muestra el plan, no escribe nada
+pnpm cortex:sync                 # dry-run: muestra el plan, no escribe
 pnpm cortex:sync --apply         # aplica en todos los agentes detectados
-pnpm cortex:sync --apply --agents claude,codex   # solo algunos
+pnpm cortex:sync --apply --agents claude,codex
+pnpm cortex:sync --doctor        # estado de auth por tool (qué falta configurar)
 ```
-Reversible/idempotente (vuelve a ejecutarlo para actualizar). OpenCode es
-best-effort: si no puede editar `opencode.json`, imprime el snippet para pegarlo.
+
+- **Preserva** lo ya configurado (no machaca un MCP con auth existente; solo añade lo que falta).
+- Un MCP que **requiere env** (p.ej. `plane`: `PLANE_API_KEY`…) se **omite** si no
+  está exportado → `--doctor` te dice qué falta; expórtalo y re-ejecuta.
+- **Actualizar**: las skills van por **symlink** → un `git pull` ya las actualiza;
+  re-ejecuta `--apply` para re-registrar MCPs/comandos nuevos.
+- OpenCode es best-effort (si no puede editar `opencode.json`, lo indica).
+- Skills (SKILL.md) son nativas en Claude; en Codex/OpenCode se usan vía MCP +
+  comandos/prompts.
 
 ## Instalación por agente (manual, alternativa)
 
@@ -93,7 +110,13 @@ Capturar tras una tarea (skill `cortex-capture` / `/cortex-save`):
 > Guarda en Cortex (LevelUp Pasión) la decisión: "Se cachean las respuestas del ERP
 > con Redis para evitar timeouts en facturación."
 
+## Skills vendorizadas
+`config/skills/` contiene copias curadas para distribución interna de Dinacode
+(cortex-capture es propia; plane-api/google-chat/bkt/expect son herramientas de uso
+interno). Se excluyen secretos: la auth de cada skill vive en keyring/env/config del
+dev, nunca en el repo.
+
 ## A futuro
-- `cortex sync` ya cubre MCP + skills + comandos. Ampliar a **prompts/políticas
-  corporativas** (§13) y a un comando de **desinstalación** (`--remove`).
+- Ampliar el registry con **prompts/políticas corporativas** (§13) y un
+  **`--remove`** (desinstalar).
 - Empaquetar `cortex sync` como bin `cortex` (hoy `pnpm cortex:sync`).
