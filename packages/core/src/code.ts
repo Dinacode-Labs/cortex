@@ -1,0 +1,247 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, extname, basename } from "node:path";
+import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
+import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
+import { canonicalize } from "./text.js";
+import type { Row } from "./map.js";
+
+/** Indexación y búsqueda de código por proyecto/cliente (search_project_code). */
+
+const IGNORE_DIRS = new Set([
+  "node_modules", ".git", "dist", "build", ".next", ".turbo", "coverage",
+  ".cache", "vendor", "__pycache__", ".venv", "out", ".vercel", ".expect",
+  ".idea", ".vscode", "tmp",
+]);
+
+const LANG: Record<string, string> = {
+  ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
+  mjs: "javascript", cjs: "javascript", vue: "vue", php: "php", py: "python",
+  go: "go", rb: "ruby", java: "java", kt: "kotlin", rs: "rust", sql: "sql",
+  sh: "shell", graphql: "graphql", gql: "graphql", prisma: "prisma",
+  css: "css", scss: "scss", md: "markdown", yml: "yaml", yaml: "yaml",
+};
+
+const MAX_FILE_BYTES = 200_000;
+const CHUNK_LINES = 60;
+const OVERLAP = 10;
+
+function ignoredFile(name: string): boolean {
+  return (
+    name.endsWith(".d.ts") ||
+    name.endsWith(".min.js") ||
+    name === "pnpm-lock.yaml" ||
+    name === "package-lock.json" ||
+    name === "yarn.lock"
+  );
+}
+
+export interface CodeFile {
+  absPath: string;
+  relPath: string;
+  language: string;
+}
+
+/** Recorre un repo y devuelve los ficheros de código indexables. */
+export function walkRepo(root: string): CodeFile[] {
+  const out: CodeFile[] = [];
+  const visit = (dir: string) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) {
+        if (!e.name.startsWith(".") && !IGNORE_DIRS.has(e.name)) visit(full);
+        continue;
+      }
+      if (!e.isFile() || ignoredFile(e.name)) continue;
+      const ext = extname(e.name).slice(1).toLowerCase();
+      const language = LANG[ext];
+      if (!language) continue;
+      try {
+        if (statSync(full).size > MAX_FILE_BYTES) continue;
+      } catch {
+        continue;
+      }
+      out.push({ absPath: full, relPath: relative(root, full), language });
+    }
+  };
+  visit(root);
+  return out;
+}
+
+export interface CodeChunk {
+  relPath: string;
+  language: string;
+  startLine: number;
+  endLine: number;
+  content: string;
+}
+
+/** Trocea un fichero en ventanas de líneas con solape; antepone la ruta. */
+export function chunkFile(file: CodeFile): CodeChunk[] {
+  let text: string;
+  try {
+    text = readFileSync(file.absPath, "utf8");
+  } catch {
+    return [];
+  }
+  const lines = text.split(/\r?\n/);
+  const chunks: CodeChunk[] = [];
+  const step = CHUNK_LINES - OVERLAP;
+  for (let i = 0; i < lines.length; i += step) {
+    const slice = lines.slice(i, i + CHUNK_LINES);
+    const body = slice.join("\n");
+    if (body.trim().length < 10) continue;
+    const startLine = i + 1;
+    const endLine = Math.min(i + CHUNK_LINES, lines.length);
+    chunks.push({
+      relPath: file.relPath,
+      language: file.language,
+      startLine,
+      endLine,
+      content: `// ${file.relPath} (líneas ${startLine}-${endLine})\n${body}`,
+    });
+    if (i + CHUNK_LINES >= lines.length) break;
+  }
+  return chunks;
+}
+
+async function findProjectId(sql: Sql, project: string): Promise<string | null> {
+  const rows = (await sql`
+    SELECT id FROM entities WHERE type='project' AND canonical_name=${canonicalize(project)} LIMIT 1
+  `) as unknown as Row[];
+  return rows[0] ? (rows[0].id as string) : null;
+}
+
+export interface CodeHit {
+  path: string;
+  startLine: number;
+  endLine: number;
+  language: string | null;
+  content: string;
+  score: number;
+}
+
+/** Búsqueda híbrida (vector + FTS) sobre el código indexado de un proyecto. */
+export async function searchProjectCode(
+  query: string,
+  project: string,
+  limit = 8,
+): Promise<CodeHit[]> {
+  const sql = getSql();
+  const provider = getEmbeddingProvider();
+  const projectId = await findProjectId(sql, project);
+  if (!projectId) return [];
+
+  const pool = Math.max(limit * 4, 32);
+  const vectors = await provider.embed([query]);
+  const lit = toVectorLiteral(vectors[0]!);
+
+  const vecRows = (await sql`
+    SELECT id, (embedding <=> ${lit}::vector) AS distance
+    FROM code_chunks
+    WHERE project_id = ${projectId} AND embedding_model = ${provider.model}
+    ORDER BY distance ASC LIMIT ${pool}
+  `) as unknown as Row[];
+
+  const ftsRows = (await sql`
+    SELECT id, ts_rank(content_tsv, plainto_tsquery('simple', ${query})) AS rank
+    FROM code_chunks
+    WHERE project_id = ${projectId} AND content_tsv @@ plainto_tsquery('simple', ${query})
+    ORDER BY rank DESC LIMIT ${pool}
+  `) as unknown as Row[];
+
+  const K = 60;
+  const acc = new Map<string, { rrf: number; cosine?: number }>();
+  vecRows.forEach((r, i) => {
+    const cur = acc.get(r.id) ?? { rrf: 0 };
+    cur.rrf += 1 / (K + i + 1);
+    cur.cosine = 1 - Number(r.distance);
+    acc.set(r.id, cur);
+  });
+  ftsRows.forEach((r, i) => {
+    const cur = acc.get(r.id) ?? { rrf: 0 };
+    cur.rrf += 1 / (K + i + 1);
+    acc.set(r.id, cur);
+  });
+
+  const ranked = [...acc.entries()].sort((a, b) => b[1].rrf - a[1].rrf).slice(0, limit);
+  if (ranked.length === 0) return [];
+  const ids = ranked.map(([id]) => id);
+  const rows = (await sql`SELECT * FROM code_chunks WHERE id IN ${sql(ids)}`) as unknown as Row[];
+  const byId = new Map(rows.map((r) => [r.id as string, r]));
+
+  return ranked
+    .filter(([id]) => byId.has(id))
+    .map(([id, s]) => {
+      const r = byId.get(id)!;
+      return {
+        path: r.path as string,
+        startLine: Number(r.start_line),
+        endLine: Number(r.end_line),
+        language: (r.language as string) ?? null,
+        content: r.content as string,
+        score: s.cosine ?? s.rrf,
+      };
+    });
+}
+
+export function renderCodeHits(hits: CodeHit[]): string {
+  if (hits.length === 0) return "Sin resultados de código.";
+  return hits
+    .map(
+      (h) =>
+        `### ${h.path}:${h.startLine}-${h.endLine} (${(h.score).toFixed(2)})\n\`\`\`${h.language ?? ""}\n${stripHeader(h.content)}\n\`\`\``,
+    )
+    .join("\n\n");
+}
+
+function stripHeader(content: string): string {
+  // quita la línea de cabecera "// path (líneas ...)" para mostrar el código limpio
+  const nl = content.indexOf("\n");
+  return nl > 0 && content.startsWith("// ") ? content.slice(nl + 1) : content;
+}
+
+/** Indexa (o reindexa) un repo local en un proyecto. Devuelve nº de chunks. */
+export async function indexRepo(
+  project: string,
+  repoPath: string,
+  opts: { repoName?: string; batchSize?: number; maxChunks?: number; onProgress?: (done: number, total: number) => void } = {},
+): Promise<{ files: number; chunks: number; skippedOverCap: number }> {
+  const sql = getSql();
+  const provider = getEmbeddingProvider();
+  const projectId = await findProjectId(sql, project);
+  if (!projectId) throw new Error(`Proyecto no encontrado: "${project}".`);
+  const repoName = opts.repoName ?? basename(repoPath.replace(/\/$/, ""));
+  const batchSize = opts.batchSize ?? 32;
+  const maxChunks = opts.maxChunks ?? 8000;
+
+  const files = walkRepo(repoPath);
+  let all: CodeChunk[] = [];
+  for (const f of files) all.push(...chunkFile(f));
+  const skippedOverCap = Math.max(0, all.length - maxChunks);
+  if (skippedOverCap > 0) all = all.slice(0, maxChunks);
+
+  // Limpia el código previo de este repo en el proyecto (reindexado idempotente).
+  await sql`DELETE FROM code_chunks WHERE project_id = ${projectId} AND repo = ${repoName}`;
+
+  for (let i = 0; i < all.length; i += batchSize) {
+    const batch = all.slice(i, i + batchSize);
+    const vecs = await provider.embed(batch.map((c) => c.content));
+    for (let j = 0; j < batch.length; j++) {
+      const c = batch[j]!;
+      await sql`
+        INSERT INTO code_chunks (project_id, repo, path, language, start_line, end_line, content, embedding_model, dim, embedding)
+        VALUES (${projectId}, ${repoName}, ${c.relPath}, ${c.language}, ${c.startLine}, ${c.endLine},
+                ${c.content}, ${provider.model}, ${provider.dim}, ${toVectorLiteral(vecs[j]!)}::vector)
+      `;
+    }
+    opts.onProgress?.(Math.min(i + batchSize, all.length), all.length);
+  }
+
+  return { files: files.length, chunks: all.length, skippedOverCap };
+}

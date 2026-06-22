@@ -140,3 +140,22 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   `/lint`.
 - **Revisar cuando:** queramos que el lint **actúe** (no solo reporte): proponer
   fusiones, abrir tareas para los huecos, marcar obsoletos.
+
+## ADR-0011 · Indexación de código por proyecto/cliente
+
+- **Estado:** aceptada (demo).
+- **Contexto:** el mayor hueco vertical (competitive-landscape.md): todos los
+  líderes de código indexan el repo; nosotros solo teníamos contexto de proyecto.
+  Para una consultora, el código de cada cliente debe vivir junto a su contexto.
+- **Decisión:** tabla `code_chunks` (separada de context_entries) con chunks por
+  ventanas de líneas (60/solape 10), embedding (pgvector) + FTS ('simple'),
+  scoped por `project_id`. Walker que respeta ignores (node_modules, dist, .next,
+  *.d.ts, lockfiles…) y cap de fichero/total. Búsqueda híbrida (vector+FTS+RRF)
+  `searchProjectCode`. Reindexado idempotente por (proyecto, repo).
+- **Consumo:** tool MCP `search_project_code`, página web `/code`, CLI
+  `index-code`.
+- **Limitaciones:** chunking por líneas (no sintáctico/Tree-sitter); los ficheros
+  generados (p.ej. `api-schema*.ts`) dominan algo el ranking. A futuro: excluir
+  generados, chunking sintáctico, code-graph/LSP (Serena), sync incremental
+  (Merkle), y permitir indexar repos remotos (clonado).
+- **Revisar cuando:** abordemos code-graph/símbolos o sync incremental.

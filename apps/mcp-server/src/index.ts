@@ -7,9 +7,11 @@ import {
   getContextPack,
   lintProject,
   listDecisions,
+  renderCodeHits,
   renderContextPack,
   renderDecisions,
   renderLintReport,
+  searchProjectCode,
   renderSaveResult,
   renderSearchHits,
   saveContext,
@@ -181,6 +183,30 @@ server.registerTool(
       return text(renderSearchHits(hits));
     } catch (e) {
       return errorText(`Error al responder: ${(e as Error).message}`);
+    }
+  },
+);
+
+server.registerTool(
+  "search_project_code",
+  {
+    title: "Buscar en el código del proyecto",
+    description:
+      "Búsqueda semántica + léxica (híbrida) sobre el código indexado de un " +
+      "proyecto/cliente. Devuelve fragmentos con ruta y rango de líneas. Útil para " +
+      "localizar dónde se implementa algo antes de tocarlo.",
+    inputSchema: {
+      query: z.string().describe("Qué buscar (lenguaje natural o identificador)"),
+      project: z.string().describe("Nombre del proyecto"),
+      limit: z.number().int().positive().max(20).optional(),
+    },
+  },
+  async ({ query, project, limit }) => {
+    try {
+      const hits = await searchProjectCode(query, project, limit ?? 8);
+      return text(renderCodeHits(hits));
+    } catch (e) {
+      return errorText(`Error al buscar código: ${(e as Error).message}`);
     }
   },
 );

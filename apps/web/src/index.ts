@@ -13,6 +13,7 @@ import {
   lintProject,
   listEntries,
   listProjects,
+  searchProjectCode,
   saveContext,
   searchContext,
   setClassifier,
@@ -308,6 +309,43 @@ app.get("/pack", async (c) => {
     ${pack.relevantToArea.length ? `<div class="panel"><h2>Relevante para "${esc(area ?? "")}"</h2>${pack.relevantToArea.map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#6e4cff")} ${esc(h.entry.title)}</div>`).join("")}</div>` : ""}
   `;
   return c.html(layout(`Context Pack: ${pack.project}`, body));
+});
+
+// --- Búsqueda de código ------------------------------------------------------
+app.get("/code", async (c) => {
+  const q = c.req.query("q") ?? "";
+  const projects = await listProjects();
+  const project = c.req.query("project") || projects[0]?.entity.name || "";
+  const projectOptions = projects
+    .map((p) => `<option value="${esc(p.entity.name)}" ${project === p.entity.name ? "selected" : ""}>${esc(p.entity.name)}</option>`)
+    .join("");
+
+  let results = "";
+  if (q && project) {
+    const hits = await searchProjectCode(q, project, 10);
+    results = hits.length
+      ? hits
+          .map((h) => {
+            const body = h.content.startsWith("// ") ? h.content.slice(h.content.indexOf("\n") + 1) : h.content;
+            return `<div class="panel"><div class="card-head">${badge(h.score.toFixed(2), "#6e4cff")} <b>${esc(h.path)}</b> <span class="sub">:${h.startLine}-${h.endLine} · ${esc(h.language ?? "")}</span></div><pre class="content-block" style="overflow:auto"><code>${esc(body)}</code></pre></div>`;
+          })
+          .join("")
+      : `<div class="empty">Sin resultados. ¿Has indexado el repo? (pnpm --filter @cortex/core index-code)</div>`;
+  }
+
+  const body = `
+    <p><a class="back" href="/">← Inicio</a></p>
+    <h1>Búsqueda de código</h1>
+    <p class="sub">Búsqueda híbrida (semántica + léxica) sobre el código indexado del proyecto.</p>
+    <div class="panel">
+      <form class="row" method="get" action="/code">
+        <input type="text" name="q" placeholder="p.ej. dónde se verifica el teléfono del usuario" value="${esc(q)}" required>
+        <select name="project">${projectOptions}</select>
+        <button type="submit">Buscar</button>
+      </form>
+    </div>
+    ${q ? `<h2 style="font-size:16px">"${esc(q)}"</h2>${results}` : ""}`;
+  return c.html(layout("Código", body));
 });
 
 // --- Lint (curado / salud del conocimiento) ----------------------------------
