@@ -6,7 +6,7 @@
       "command": "pnpm",
       "args": ["-C", "{REPO}", "--filter", "@cortex/mcp-server", "start"],
       "auth": "ninguna (usa el .env del repo: DB + LLM/embeddings)",
-      "agents": ["claude", "codex", "opencode"]
+      "agents": ["claude", "codex", "opencode", "hermes"]
     },
     "plane": {
       "transport": "stdio",
@@ -14,26 +14,26 @@
       "args": ["plane-mcp-server", "stdio"],
       "env": ["PLANE_API_KEY", "PLANE_WORKSPACE_SLUG", "PLANE_BASE_URL"],
       "auth": "PAT de Plane + workspace slug (exporta PLANE_API_KEY/PLANE_WORKSPACE_SLUG/PLANE_BASE_URL antes de sync)",
-      "agents": ["claude", "codex", "opencode"]
+      "agents": ["claude", "codex", "opencode", "hermes"]
     },
     "atlassian": {
       "transport": "http",
       "url": "https://mcp.atlassian.com/v1/mcp",
       "auth": "OAuth de Atlassian en el primer uso (no requiere env) — cubre Jira + Confluence",
-      "agents": ["claude", "opencode"]
+      "agents": ["claude", "opencode", "hermes"]
     },
     "notion": {
       "transport": "http",
       "url": "https://mcp.notion.com/mcp",
       "auth": "OAuth de Notion en el primer uso (no requiere env)",
-      "agents": ["claude", "opencode"]
+      "agents": ["claude", "opencode", "hermes"]
     },
     "chrome-devtools": {
       "transport": "stdio",
       "command": "npx",
       "args": ["-y", "chrome-devtools-mcp@latest", "--isolated", "--headless"],
       "auth": "ninguna",
-      "agents": ["claude", "codex", "opencode"]
+      "agents": ["claude", "codex", "opencode", "hermes"]
     }
   },
   "skills": [

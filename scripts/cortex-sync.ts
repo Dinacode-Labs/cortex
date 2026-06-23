@@ -18,6 +18,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { parse as yamlParse, stringify as yamlStringify } from "yaml";
 
 const REPO = resolve(import.meta.dirname, "..");
 const HOME = homedir();
@@ -44,7 +45,7 @@ const DOCTOR = argv.includes("--doctor");
 const agentsArg = argv.find((a) => a.startsWith("--agents="))?.split("=")[1]
   ?? (argv.includes("--agents") ? argv[argv.indexOf("--agents") + 1] : undefined);
 
-const AGENT_BIN: Record<string, string> = { claude: "claude", codex: "codex", opencode: "opencode" };
+const AGENT_BIN: Record<string, string> = { claude: "claude", codex: "codex", opencode: "opencode", hermes: "hermes" };
 const resolveArgs = (a: string[] = []) => a.map((x) => x.replace("{REPO}", REPO));
 const envPairs = (keys: string[] = []) => keys.filter((k) => process.env[k]).map((k) => [k, process.env[k]!] as const);
 
@@ -104,6 +105,25 @@ function mcpOpenCode(name: string, d: McpDef) {
   writeFileSync(cfg, JSON.stringify(obj, null, 2) + "\n");
 }
 
+function mcpHermes(name: string, d: McpDef) {
+  // Hermes Agent (Nous Research) lee mcp_servers de ~/.hermes/config.yaml (YAML).
+  const cfg = join(HOME, ".hermes/config.yaml");
+  let obj: Record<string, any> = {};
+  if (existsSync(cfg)) {
+    try { obj = (yamlParse(readFileSync(cfg, "utf8")) as Record<string, any>) ?? {}; }
+    catch { plan(`${name}: ~/.hermes/config.yaml no parseable — configúralo a mano`); return; }
+  }
+  obj.mcp_servers ??= {};
+  if (obj.mcp_servers[name]) { plan(`${name} ya presente — preservado`); return; }
+  plan(`(hermes) añadir mcp_servers.${name} a ~/.hermes/config.yaml`);
+  if (!APPLY) return;
+  obj.mcp_servers[name] = d.transport === "http"
+    ? { url: d.url, enabled: true }
+    : { command: d.command, args: resolveArgs(d.args), enabled: true, ...(envPairs(d.env).length ? { env: Object.fromEntries(envPairs(d.env)) } : {}) };
+  mkdirSync(join(HOME, ".hermes"), { recursive: true });
+  writeFileSync(cfg, yamlStringify(obj));
+}
+
 // --- doctor ------------------------------------------------------------------
 function doctor() {
   console.log("cortex doctor — estado de auth por tool (no instala nada)\n");
@@ -138,6 +158,7 @@ for (const agent of requested) {
     if (agent === "claude") mcpClaude(name, d);
     else if (agent === "codex") mcpCodex(name, d);
     else if (agent === "opencode") mcpOpenCode(name, d);
+    else if (agent === "hermes") mcpHermes(name, d);
   }
 
   // Skills: SKILL.md es nativo en Claude; otros agentes usan MCP + comandos.
@@ -148,13 +169,14 @@ for (const agent of requested) {
     }
   }
 
-  // Comandos / prompts.
+  // Comandos / prompts (los agentes que tienen carpeta de comandos).
   const cmdDest: Record<string, string> = {
     claude: join(HOME, ".claude/commands"),
     codex: join(HOME, ".codex/prompts"),
     opencode: join(HOME, ".config/opencode/command"),
   };
-  for (const c of TOOLBELT.commands) symlink(join(REPO, "config/commands", c.file), join(cmdDest[agent]!, c.file));
+  const dest = cmdDest[agent];
+  if (dest) for (const c of TOOLBELT.commands) symlink(join(REPO, "config/commands", c.file), join(dest, c.file));
 }
 
 console.log(`\n${APPLY ? "Aplicado" : "Plan listo"}. Auth por tool: \`pnpm cortex:sync --doctor\`. ${APPLY ? "" : "Re-ejecuta con --apply para escribir."}`);

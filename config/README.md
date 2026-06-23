@@ -3,7 +3,8 @@
 Bundle **versionado** para que cualquier developer conecte sus agentes de IA a
 Cortex (consultar y capturar contexto). Es el *registry de config IA* del §13 del
 plan. De momento la instalación es **manual** (abajo); el objetivo es un instalador
-único **`cortex sync`** compatible con **Claude Code, Codex y OpenCode**.
+único **`cortex sync`** compatible con **Claude Code, Codex, OpenCode y Hermes**
+(Hermes Agent de Nous Research).
 
 > Las herramientas viven como tools MCP (`mcp__cortex__*`), así que **funcionan en
 > cualquier agente con soporte MCP**. Lo único específico de cada agente es *cómo se
@@ -42,7 +43,7 @@ configurar el dev por su cuenta. Las skills propias se vendorizan en
 ## Instalación con `cortex sync` (recomendado)
 
 Instalador idempotente que lee el registry e instala/actualiza en los agentes
-detectados (Claude Code / Codex / OpenCode):
+detectados (Claude Code / Codex / OpenCode / Hermes):
 
 ```bash
 pnpm cortex:sync                 # dry-run: muestra el plan, no escribe
@@ -87,6 +88,20 @@ Comprueba con `/mcp` (debe aparecer `cortex` con sus tools).
   local que ejecute el mismo comando `pnpm -C <ruta> --filter @cortex/mcp-server start`.
 - Captura: registra `commands/cortex-save.md` como comando/prompt; la skill como
   instrucción de agente. *(Revisar el esquema exacto en la doc de OpenCode.)*
+
+### Hermes (Nous Research)
+- MCP: en `~/.hermes/config.yaml` (lo gestiona `cortex sync`, preservando lo demás):
+  ```yaml
+  mcp_servers:
+    cortex:
+      command: pnpm
+      args: ["-C", "<ruta-al-repo>", "--filter", "@cortex/mcp-server", "start"]
+      enabled: true
+  ```
+  Alternativa CLI: `hermes mcp add` (+ `hermes mcp test cortex`, `/reload-mcp`).
+  Para un Hermes **remoto/hosted** usa transporte HTTP (`url:`) apuntando a un Cortex
+  desplegado (ver despliegue). Las skills de Hermes siguen el estándar agentskills.io
+  (las tools de Cortex ya llegan por el MCP).
 
 > En este repo, skill y comando ya están activos vía symlinks en `.claude/`.
 
