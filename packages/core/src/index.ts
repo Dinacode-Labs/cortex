@@ -9,6 +9,7 @@ export { recordUsage, getUsageSummary, getRecentTraces, type UsageRecord, type U
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
 export { resolveProjectFromCwd } from "./project-config.js";
+export { isNearDuplicate } from "./dedup.js";
 export {
   classifyType,
   extractEntities,
