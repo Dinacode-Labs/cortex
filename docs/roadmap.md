@@ -88,6 +88,36 @@ disler observability) + fricción: [`research/hooks-integration.md`](./research/
 - **Depende de:** transporte HTTP del MCP (para `SessionStart`, donde el MCP aún no está
   conectado).
 
+## Backfill de conversaciones de agente → Cortex (depuradas)
+
+Comando para **revisar todas las sesiones de un agente en un proyecto y subir el
+conocimiento a Cortex**, depurando (no volcar el transcript crudo). **Complementa a los
+hooks**: los hooks capturan en tiempo real (hacia delante); esto hace **backfill
+retroactivo** del historial y sirve para plataformas donde el hook es incómodo.
+
+- **Fuentes (verificado):** las sesiones se guardan por plataforma —
+  Claude Code `~/.claude/projects/<ruta-saneada>/*.jsonl` (1 carpeta por proyecto),
+  Codex `~/.codex/sessions`, OpenCode `~/.local/share/opencode`, Hermes `~/.hermes`.
+  Un **lector por plataforma** mapea proyecto → sus sesiones. (Aviso: son grandes —
+  cortex ≈ 23 MB en 2 sesiones — de ahí la depuración obligatoria.)
+- **Comando:** `cortex ingest-sessions <proyecto> [--platform claude|codex|...] [--since]`
+  (conector `connect-sessions`). Incremental: registrar sesiones ya ingeridas para no
+  duplicar.
+- **Pipeline de depuración (lo importante):** leer transcript → segmentar por sesión →
+  **destilar con LLM a conocimiento TIPADO** (decisiones, restricciones, incidencias,
+  convenciones, how-tos, gotchas) descartando ruido (tool calls, volcados de ficheros,
+  narración verbosa, caminos abandonados) → **dedup contra lo ya existente** (reusar el
+  near-dup/lint) → guardar con proveniencia (source=`agent_session`, plataforma, id de
+  sesión, fecha, **confianza**; §5.5). NO ingerir el transcript crudo.
+- **Cautelas:** **secretos/PII** en transcripts (claves pegadas, `.env`) → **scrub
+  antes** de enviar al LLM y de guardar; **coste** (chunking + resumen jerárquico; solo
+  el proyecto pedido); **dedup vs hooks** (si el hook ya capturó, no duplicar);
+  privacidad (las sesiones son logs de trabajo personales — uso interno).
+- **Pendiente de dominio:** sourceType `agent_session` (hoy existe `claude_code`).
+- **Cómo lo hacen otros:** claude-mem/mem0 ya "comprimen sesiones" (ver
+  [`research/hooks-integration.md`](./research/hooks-integration.md)); esto es la versión
+  **batch + multi-plataforma** que alimenta a Cortex con el mismo `save_project_context`.
+
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
   (docker-compose). Deploy real a server, lo último (de momento no hay server).
