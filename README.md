@@ -4,7 +4,7 @@
 sus proyectos software. Captura conocimiento disperso (decisiones, restricciones,
 incidencias, convenciones, PRs, conversaciones, docs, código…), lo estructura en una
 capa **híbrida — documental + vectorial + grafo + bi-temporal —** y lo expone a
-personas y agentes de IA (Claude Code, Codex, OpenCode) mediante un **MCP
+personas y agentes de IA (Claude Code, Codex, OpenCode, Hermes) mediante un **MCP
 corporativo**, para reducir la pérdida de contexto al cambiar de tarea, módulo,
 proyecto o persona.
 
@@ -46,7 +46,7 @@ proyecto o persona.
   búsqueda híbrida sobre el código.
 - **Multi-fuente** — ingesta desde Plane, Google Chat, GitHub y repos de código,
   unificadas en un mismo grafo.
-- **MCP corporativo** — 8 tools neutras consumibles por Claude Code / Codex / OpenCode.
+- **MCP corporativo** — 8 tools neutras consumibles por Claude Code / Codex / OpenCode / Hermes.
 - **Observabilidad de IA** — coste/tokens por operación, agente y modelo (LLM +
   embeddings) **+ AI tracing de Mastra** (árbol de spans por llamada), en `/usage`.
 - **Harness distribuible** — `cortex sync` instala el MCP + skills + comandos del
@@ -55,7 +55,7 @@ proyecto o persona.
 ## Arquitectura
 
 ```
-Claude Code / Codex / OpenCode
+Claude Code / Codex / OpenCode / Hermes
         │  (MCP, 8 tools)
         ▼
   apps/mcp-server  (@cortex/mcp-server)      apps/web  (@cortex/web, Hono SSR)
@@ -104,7 +104,7 @@ en tus agentes con un comando. Fuente única y **PR-able**: [`config/toolbelt.js
 
 ```bash
 pnpm cortex:sync              # dry-run: muestra el plan
-pnpm cortex:sync --apply      # instala/actualiza en Claude Code / Codex / OpenCode
+pnpm cortex:sync --apply      # instala/actualiza en Claude Code / Codex / OpenCode / Hermes
 pnpm cortex:sync --doctor     # qué auth falta configurar por tool
 ```
 

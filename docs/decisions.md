@@ -216,7 +216,8 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Instalador:** `cortex sync` (`scripts/cortex-sync.ts`, `pnpm cortex:sync`) —
   data-driven desde el manifiesto, idempotente, dry-run por defecto, `--apply`,
   `--doctor` (estado de auth por tool), `--agents`. **Preserva** lo ya configurado
-  (no machaca auth existente) y **omite** MCPs sin su env. Detecta Claude/Codex/OpenCode.
+  (no machaca auth existente) y **omite** MCPs sin su env. Detecta Claude/Codex/OpenCode/Hermes (Hermes: escribe mcp_servers en
+  ~/.hermes/config.yaml en YAML, preservando lo existente).
   Skills por symlink → `git pull` actualiza; re-`--apply` re-registra. OpenCode best-effort.
 - **Revisar cuando:** añadamos prompts/políticas corporativas, un `--remove`, o
   separemos el harness a un repo propio (`dinacode-ai-config`).
