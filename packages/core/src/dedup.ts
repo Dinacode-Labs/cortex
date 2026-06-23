@@ -1,28 +1,55 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
-import { vectorSearch } from "./vectors.js";
+import { storeEmbedding, vectorSearch } from "./vectors.js";
 import type { Row } from "./map.js";
 
 /**
- * Reconciliación de escritura (estilo mem0 ADD/NOOP): ¿el texto ya está cubierto por
- * conocimiento existente del proyecto? Se usa para NO capturar near-duplicates (evita
- * el "context rot" / distractores; ver research/memory-capture-policy.md). Umbral por
- * similitud coseno (score = 1 - distancia), configurable con CORTEX_DEDUP_THRESHOLD.
+ * Reconciliación de escritura (estilo mem0: ADD / UPDATE / NOOP). Antes de guardar
+ * conocimiento auto-capturado, se busca lo más similar ya existente en el proyecto y se
+ * decide: añadir (nuevo), fusionar (refina algo existente) o nada (redundante). Evita el
+ * "context rot" / distractores (ver research/memory-capture-policy.md).
+ *
+ * Umbrales calibrados con qwen3-embedding (exacto ~0.99, paráfrasis ~0.84, distinto
+ * ~0.67): por encima de UPDATE se reconcilia; por encima de NOOP es casi idéntico.
  */
-// Calibrado con qwen3-embedding: exacto ~0.99, paráfrasis del mismo concepto ~0.84,
-// conocimiento distinto-pero-relacionado ~0.67. 0.82 caza re-capturas (exacto+paráfrasis)
-// sin descartar conocimiento genuinamente nuevo.
-const DEFAULT_THRESHOLD = Number(process.env.CORTEX_DEDUP_THRESHOLD ?? "0.82");
+export const UPDATE_THRESHOLD = Number(process.env.CORTEX_DEDUP_THRESHOLD ?? "0.82");
+export const NOOP_THRESHOLD = Number(process.env.CORTEX_DEDUP_NOOP ?? "0.95");
 
-export async function isNearDuplicate(project: string, text: string, threshold = DEFAULT_THRESHOLD): Promise<boolean> {
-  const sql = getSql();
-  const rows = (await sql`SELECT id FROM entities WHERE type = 'project' AND name = ${project} LIMIT 1`) as unknown as Row[];
-  const projectId = (rows[0]?.id as string) ?? null;
-  if (!projectId) return false; // proyecto nuevo: nada con que duplicar
+export interface NearestEntry {
+  id: string;
+  title: string;
+  content: string;
+  score: number;
+  sourceType: string;
+}
+
+async function findProjectId(project: string): Promise<string | null> {
+  const rows = (await getSql()`SELECT id FROM entities WHERE type = 'project' AND name = ${project} LIMIT 1`) as unknown as Row[];
+  return (rows[0]?.id as string) ?? null;
+}
+
+/** Entrada más similar del proyecto al texto dado (o null). */
+export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
+  const pid = await findProjectId(project);
+  if (!pid) return null;
   try {
-    const hits = await vectorSearch(sql, getEmbeddingProvider(), { queryText: text, projectId, limit: 1 });
-    return hits.length > 0 && hits[0]!.score >= threshold;
+    const hits = await vectorSearch(getSql(), getEmbeddingProvider(), { queryText: text, projectId: pid, limit: 1 });
+    const h = hits[0];
+    if (!h) return null;
+    return { id: h.entry.id, title: h.entry.title, content: h.entry.content, score: h.score, sourceType: h.entry.sourceType };
   } catch {
-    return false; // ante fallo de embedding, no bloquear la captura
+    return null;
   }
+}
+
+export async function isNearDuplicate(project: string, text: string, threshold = UPDATE_THRESHOLD): Promise<boolean> {
+  const n = await findNearest(project, text);
+  return n !== null && n.score >= threshold;
+}
+
+/** UPDATE: reemplaza el contenido de una entrada (resultado del merge) y re-embebe. */
+export async function updateEntryContent(entryId: string, content: string): Promise<void> {
+  const sql = getSql();
+  await sql`UPDATE context_entries SET content = ${content}, updated_at = now() WHERE id = ${entryId}`;
+  await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
 }

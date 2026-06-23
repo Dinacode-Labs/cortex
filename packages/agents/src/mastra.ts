@@ -19,7 +19,7 @@ import { CortexTraceExporter } from "./trace-exporter.js";
  * json_object es rápido y válido — ver ADR-0006/0015). El retriever usa texto libre.
  */
 
-export type AgentRole = "classifier" | "graph" | "reranker" | "retriever" | "distiller";
+export type AgentRole = "classifier" | "graph" | "reranker" | "retriever" | "distiller" | "merger";
 
 const INSTRUCTIONS: Record<AgentRole, string> = {
   classifier:
@@ -42,6 +42,11 @@ const INSTRUCTIONS: Record<AgentRole, string> = {
     "convenciones, deuda técnica, riesgos, how-tos). Descartas el ruido (llamadas a " +
     "herramientas, volcados de ficheros, narración, saludos, intentos abandonados) y " +
     "NUNCA incluyes secretos. Respondes SIEMPRE en español y SOLO con JSON válido.",
+  merger:
+    "Eres el agente de consolidación de Dinacode Cortex. Fusionas dos piezas de " +
+    "conocimiento sobre lo mismo en UNA sola, conservando todo lo relevante de ambas, " +
+    "sin redundancia, concisa y en español. Devuelves SOLO el texto consolidado (sin " +
+    "preámbulos), con un título corto en la primera línea.",
 };
 
 const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller"]);
@@ -85,7 +90,7 @@ function build(): Mastra | null {
   // nuestro exporter (ADR-0016 parte B). Los agentes se sirven desde aquí para
   // que `generate()` emita spans.
   return new Mastra({
-    agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever"), distiller: mk("distiller") },
+    agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever"), distiller: mk("distiller"), merger: mk("merger") },
     observability: new Observability({
       configs: { default: { serviceName: "cortex", exporters: [new CortexTraceExporter()] } },
     }),

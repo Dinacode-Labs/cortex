@@ -103,14 +103,15 @@ Bucle automático sin invocación manual. Análisis + fricción:
 > Codex/OpenCode/Hermes construidos según sus contratos documentados; runtime no
 > probado localmente (esos agentes no tienen sesión aquí), como el MCP de Hermes.
 
-- **Gate de la auto-captura (importante, investigado):** capturar **toda** sesión en
-  crudo es un anti-patrón (context rot, distractores, ruido) — ver
-  [`research/memory-capture-policy.md`](./research/memory-capture-policy.md). Evolucionar
-  el hook de "destila y guarda todo" a **"propón con reconciliación"**: dedup
-  **contra lo existente** al guardar (ADD/UPDATE/DELETE/NOOP estilo mem0, reusando el
-  near-dup del lint), **gate de relevancia** (saltar triviales), **confianza baja** para
-  lo auto-capturado (es inferencia), y opción **propose→review→commit**. Ya tenemos los
-  primitivos: §5.5 (proveniencia/confianza/vigencia), bi-temporal, lint near-dup.
+- **Gate de la auto-captura — hecho.** No se captura en crudo ni se duplica (anti-patrón:
+  context rot/distractores; ver [`research/memory-capture-policy.md`](./research/memory-capture-policy.md)).
+  `ingestSessionFile` (hook + backfill) hace **reconciliación estilo mem0 ADD/UPDATE/NOOP**
+  (`core/dedup.ts`): por cada unidad destilada busca la más similar del proyecto y
+  **ADD** (nueva, `confidence: low`), **UPDATE** (fusiona con el agente `merger` si
+  refina una entrada auto-capturada, 0.82–0.95) o **NOOP** (casi idéntico ≥0.95, o
+  conocimiento curado → no se toca). Verificado. **Pendiente:** DELETE/invalidación al
+  contradecir (reusar bi-temporal), `propose→review` para escrituras duraderas, y
+  extender el gate a los demás conectores (no solo sesiones).
 - **Pendiente:** **auto-captura** en Codex/OpenCode/Hermes (Claude tiene `transcript_path`
   + SessionEnd limpios; los demás no exponen transcript / no tienen session-end → se
   cubren con el **backfill batch** `connect-sessions` por plataforma). `UserPromptSubmit`

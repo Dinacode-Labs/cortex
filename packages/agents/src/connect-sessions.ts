@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { closeSql, getSql } from "@cortex/database";
-import { isNearDuplicate, saveContext } from "@cortex/core";
+import { findNearest, saveContext, updateEntryContent, UPDATE_THRESHOLD, NOOP_THRESHOLD } from "@cortex/core";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextEntryType } from "@cortex/shared";
 import { runAgent, shutdownObservability } from "./mastra.js";
@@ -136,11 +136,20 @@ async function alreadyIngested(project: string, sessionId: string): Promise<bool
 
 /** Ingiere UNA sesión (transcript .jsonl): condensa → scrub → destila → guarda.
  * Reutilizable por el CLI (backfill) y por el hook de auto-captura (SessionEnd). */
-export async function ingestSessionFile(project: string, file: string, platform = "claude"): Promise<{ saved: number; skipped: boolean; noop: number }> {
+/** Fusiona conocimiento existente + nuevo en una entrada consolidada (UPDATE estilo mem0). */
+async function mergeKnowledge(existing: string, incoming: string): Promise<string> {
+  const prompt = `Entrada existente:\n"""\n${existing}\n"""\n\nNueva información sobre lo mismo:\n"""\n${incoming}\n"""\n\nFúndelas en UNA entrada consolidada.`;
+  const merged = (await runAgent("merger", prompt, { maxOutputTokens: 700 })).trim();
+  return merged || existing;
+}
+
+export interface IngestResult { saved: number; updated: number; noop: number; skipped: boolean }
+
+export async function ingestSessionFile(project: string, file: string, platform = "claude"): Promise<IngestResult> {
   const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
-  if (await alreadyIngested(project, sessionId)) return { saved: 0, skipped: true, noop: 0 };
+  if (await alreadyIngested(project, sessionId)) return { saved: 0, updated: 0, noop: 0, skipped: true };
   const condensed = condenseSession(file);
-  if (condensed.length < 200) return { saved: 0, skipped: false, noop: 0 };
+  if (condensed.length < 200) return { saved: 0, updated: 0, noop: 0, skipped: false };
   const items: Item[] = [];
   const seen = new Set<string>();
   for (const w of windows(condensed)) {
@@ -152,12 +161,23 @@ export async function ingestSessionFile(project: string, file: string, platform 
     }
   }
   let saved = 0;
+  let updated = 0;
   let noop = 0;
   for (const it of items) {
     const text = scrub(`${it.title}\n\n${it.content}`);
-    // Reconciliación: si ya existe conocimiento muy similar en el proyecto → NOOP (no
-    // ensuciar la memoria con near-duplicates). Auto-captura = confianza baja (inferencia).
-    if (await isNearDuplicate(project, text)) { noop++; continue; }
+    const near = await findNearest(project, text);
+    // Reconciliación estilo mem0: NOOP (casi idéntico o conocimiento curado), UPDATE
+    // (refina una entrada auto-capturada similar) o ADD (nuevo).
+    if (near && near.score >= UPDATE_THRESHOLD) {
+      if (near.score >= NOOP_THRESHOLD || near.sourceType !== "agent_session") { noop++; continue; }
+      try {
+        await updateEntryContent(near.id, scrub(await mergeKnowledge(near.content, text)));
+        updated++;
+      } catch (e) {
+        console.error(`  ✗ merge "${it.title}": ${(e as Error).message}`);
+      }
+      continue;
+    }
     try {
       await saveContext(
         { content: text, project, title: it.title, type: it.type as ContextEntryType, confidence: "low", sourceType: "agent_session", sourceReference: sessionId, createdBy: "session-backfill", metadata: { platform, sessionId } },
@@ -168,7 +188,7 @@ export async function ingestSessionFile(project: string, file: string, platform 
       console.error(`  ✗ guardando "${it.title}": ${(e as Error).message}`);
     }
   }
-  return { saved, skipped: false, noop };
+  return { saved, updated, noop, skipped: false };
 }
 
 async function main(): Promise<void> {
@@ -199,16 +219,18 @@ async function main(): Promise<void> {
   console.log(`${files.length} sesiones en ${folder}. Destilando → "${project}"...`);
 
   let savedTotal = 0;
+  let updatedTotal = 0;
   let noopTotal = 0;
   let skipped = 0;
   for (const file of files) {
     const r = await ingestSessionFile(project, file, platform);
     if (r.skipped) { skipped++; continue; }
     savedTotal += r.saved;
+    updatedTotal += r.updated;
     noopTotal += r.noop;
-    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: ${r.saved} entradas (${r.noop} ya cubiertas)`);
+    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ${r.noop} ya cubiertas`);
   }
-  console.log(`Backfill completado: ${savedTotal} entradas nuevas, ${noopTotal} near-dups omitidos, ${skipped} sesiones ya ingeridas.`);
+  console.log(`Backfill: +${savedTotal} nuevas, ~${updatedTotal} fusionadas (UPDATE), ${noopTotal} NOOP, ${skipped} sesiones ya ingeridas.`);
 }
 
 // CLI directo (no al importar `ingestSessionFile` desde el hook).
