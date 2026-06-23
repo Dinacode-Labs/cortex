@@ -5,7 +5,7 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "./operations.js";
 import { relate } from "./entities.js";
 import { storeEmbeddingsBatch } from "./vectors.js";
-import { extractFileText, SUPPORTED_DOC_EXTS } from "./extract.js";
+import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
 import type { Row } from "./map.js";
 
 /**
@@ -114,7 +114,7 @@ async function main(): Promise<void> {
     for (const f of files.slice(0, 4)) {
       const p = parsePage(f);
       const folder = attachmentDir(f);
-      const att = folder ? readdirSync(folder).filter((n) => SUPPORTED_DOC_EXTS.has(extname(n).slice(1).toLowerCase())) : [];
+      const att = folder ? readdirSync(folder).filter((n) => SUPPORTED_EXTS.has(extname(n).slice(1).toLowerCase())) : [];
       console.log(`\n--- ${p.title} [ref=${p.ref} body=${p.bodyLen}] adjuntos: ${att.join(", ") || "-"}`);
     }
     return;
@@ -150,7 +150,7 @@ async function main(): Promise<void> {
         const folder = attachmentDir(file);
         if (folder) {
           for (const name of readdirSync(folder)) {
-            if (!SUPPORTED_DOC_EXTS.has(extname(name).slice(1).toLowerCase())) continue;
+            if (!SUPPORTED_EXTS.has(extname(name).slice(1).toLowerCase())) continue;
             const aref = `${pg.ref}/${name}`.slice(0, 180);
             if (await existingId(sql, proj, aref)) continue; // ya ingerido
             const ex = await extractFileText(join(folder, name));

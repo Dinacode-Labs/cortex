@@ -25,13 +25,15 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
 - **Pendiente:** `.pptx` (officeparser), OCR para PDF escaneado (Unstructured/Docling
   self-host o tesseract), trocear documentos muy largos (hoy cap por entrada).
 
-### 2. Captura de imágenes (capturas, diagramas)
-- **Qué:** describir/transcribir imágenes (`.png/.jpg`) y diagramas (`.drawio`) →
-  texto indexable (caption + OCR del texto embebido), enlazado a su entrada.
-- **Cómo:** modelo de **visión** (confirmar el disponible en nan; si no, OCR local
-  tipo tesseract como fallback). Para `.drawio` (XML) se puede extraer el texto de
-  nodos sin visión.
-- **Cuidado:** muchas imágenes son ruido (iconos); filtrar por tamaño/relevancia.
+### 2. Captura de imágenes y diagramas — **hecho (v1)**
+- **Implementado en `extract.ts`:** imágenes (`.png/.jpg/.jpeg/.webp/.gif`) → **caption
+  con el modelo de visión** del proveedor (verificado: **qwen3.6 y gemma4 de nan ven
+  imágenes**; el 403 era el User-Agent de Cloudflare). `.drawio` → texto de nodos/aristas
+  del XML (maneja diagramas comprimidos con inflate), sin visión. Los conectores
+  (notion, docs) los recogen solos vía `SUPPORTED_EXTS` y los enlazan a su página.
+  Filtro de ruido: imágenes < 8 KB se omiten; el VLM marca `IRRELEVANTE` los iconos.
+- **Pendiente:** dedup por content-hash (no captionar imágenes repetidas), OCR como
+  fallback para texto denso, cascada coste (clasificar antes de llamar al VLM).
 
 ### 3. Vídeo / audio (transcripción) — **viable ya**
 - **Qué:** transcribir `.mp4`/audio (reuniones, demos) y extraer **conocimiento tipado**
