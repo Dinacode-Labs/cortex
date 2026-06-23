@@ -150,6 +150,64 @@ function syncClaudeHooks() {
   }
 }
 
+const HOOK_CTX = `pnpm -C ${REPO} --filter @cortex/core run hook:context`;
+
+/** Codex: hook SessionStart (mismo formato additionalContext que Claude) en config.toml. */
+function syncCodexHooks() {
+  const toml = join(HOME, ".codex/config.toml");
+  if (existsSync(toml) && readFileSync(toml, "utf8").includes("hook:context")) { plan("hook SessionStart (cortex) ya presente en config.toml"); return; }
+  plan(`(codex) hook SessionStart → cortex hook:context`);
+  if (!APPLY) return;
+  const block = `\n[[hooks.SessionStart]]\n\n[[hooks.SessionStart.hooks]]\ntype = "command"\ncommand = "${HOOK_CTX}"\n`;
+  mkdirSync(join(HOME, ".codex"), { recursive: true });
+  writeFileSync(toml, (existsSync(toml) ? readFileSync(toml, "utf8") : "") + block);
+}
+
+/** Hermes: hook pre_llm_call (inyecta {"context":...}) en ~/.hermes/config.yaml. */
+function syncHermesHooks() {
+  const cfg = join(HOME, ".hermes/config.yaml");
+  let obj: Record<string, any> = {};
+  if (existsSync(cfg)) {
+    try { obj = (yamlParse(readFileSync(cfg, "utf8")) as Record<string, any>) ?? {}; } catch { plan("hooks: ~/.hermes/config.yaml no parseable — a mano"); return; }
+  }
+  obj.hooks ??= {};
+  const arr = (obj.hooks.pre_llm_call ??= []) as { command?: string }[];
+  if (arr.some((h) => typeof h.command === "string" && h.command.includes("hook:context"))) { plan("(hermes) hook pre_llm_call (cortex) ya presente"); return; }
+  plan(`(hermes) hook pre_llm_call → cortex hook:context (formato hermes)`);
+  if (!APPLY) return;
+  arr.push({ command: `${HOOK_CTX} -- --format hermes` } as never);
+  mkdirSync(join(HOME, ".hermes"), { recursive: true });
+  writeFileSync(cfg, yamlStringify(obj));
+}
+
+/** OpenCode: plugin TS que al crear sesión inyecta el context-pack (shell-out al script). */
+function syncOpenCodeHooks() {
+  const dir = join(HOME, ".config/opencode/plugin");
+  const file = join(dir, "cortex.js");
+  plan(`(opencode) plugin cortex.js → inyecta context-pack en session.created`);
+  if (!APPLY) return;
+  const plugin = `// Generado por 'cortex sync'. Inyecta el context-pack de Cortex al crear sesión.
+export const CortexPlugin = async ({ $, directory }) => {
+  let pending = null;
+  return {
+    event: async ({ event }) => {
+      try {
+        if (event.type === "session.created") {
+          const r = await $\`${HOOK_CTX} -- --format text --cwd \${directory}\`.quiet().nothrow();
+          if (r.exitCode === 0) { const t = r.stdout.toString().trim(); if (t) pending = t; }
+        }
+      } catch {}
+    },
+    "chat.message": async (_input, output) => {
+      if (pending) { output.parts.push({ type: "text", text: pending }); pending = null; }
+    },
+  };
+};
+`;
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(file, plugin);
+}
+
 // --- doctor ------------------------------------------------------------------
 function doctor() {
   console.log("cortex doctor — estado de auth por tool (no instala nada)\n");
@@ -205,6 +263,11 @@ for (const agent of requested) {
   };
   const dest = cmdDest[agent];
   if (dest) for (const c of TOOLBELT.commands) symlink(join(REPO, "config/commands", c.file), join(dest, c.file));
+
+  // Hooks: inyección de context-pack (todos) + auto-captura (Claude). Adaptador por agente.
+  if (agent === "codex") syncCodexHooks();
+  else if (agent === "opencode") syncOpenCodeHooks();
+  else if (agent === "hermes") syncHermesHooks();
 }
 
 console.log(`\n${APPLY ? "Aplicado" : "Plan listo"}. Auth por tool: \`pnpm cortex:sync --doctor\`. ${APPLY ? "" : "Re-ejecuta con --apply para escribir."}`);

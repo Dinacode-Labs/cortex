@@ -22,14 +22,21 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+function argOf(name: string): string | undefined {
+  const i = process.argv.indexOf(name);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
 async function main(): Promise<void> {
+  // Formato de salida por agente: claude/codex (additionalContext) | hermes ({context}) | text.
+  const format = (argOf("--format") || "claude").toLowerCase();
   let input: { cwd?: string; hook_event_name?: string } = {};
   try {
     input = JSON.parse((await readStdin()) || "{}");
   } catch {
-    /* sin stdin */
+    /* sin stdin (p.ej. OpenCode pasa --cwd) */
   }
-  const cwd = input.cwd || process.cwd();
+  const cwd = argOf("--cwd") || input.cwd || process.cwd();
   const project = resolveProjectFromCwd(cwd);
   if (!project) return; // repo no apuntado a Cortex (sin .cortex.json)
 
@@ -42,9 +49,14 @@ async function main(): Promise<void> {
   if (!pack.trim()) return;
 
   const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${project}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${pack}`;
-  process.stdout.write(
-    JSON.stringify({ hookSpecificOutput: { hookEventName: input.hook_event_name || "SessionStart", additionalContext } }),
-  );
+
+  if (format === "hermes") {
+    process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call
+  } else if (format === "text") {
+    process.stdout.write(additionalContext); // OpenCode plugin lee stdout
+  } else {
+    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: input.hook_event_name || "SessionStart", additionalContext } })); // Claude / Codex
+  }
 }
 
 main()
