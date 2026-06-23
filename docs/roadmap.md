@@ -126,11 +126,23 @@ retroactivo** del historial y sirve para plataformas donde el hook es incómodo.
   [`research/hooks-integration.md`](./research/hooks-integration.md)); esto es la versión
   **batch + multi-plataforma** que alimenta a Cortex con el mismo `save_project_context`.
 
-## Procesos periódicos / scheduler — **no montado aún**
+## Procesos periódicos / scheduler
 
-Hoy **todo es manual** (CLIs): `enrich`, `resolve-entities`, `temporal`, `lint`,
-`connect-github`/`-sessions`/ingesta. No hay cron ni scheduler; las "loops de mejora"
-(§12) existen como comandos pero no se ejecutan solas. Hay que diseñarlo.
+**Decisión (usuario):** el **sync de fuentes NO se automatiza** — lo dispara el
+developer (tiene el contexto/criterio del origen). El **mantenimiento sí** (ocurre 100%
+en server) → automatizado.
+
+> **Implementado:** `maintain` (`@cortex/agents`) — pipeline único e idempotente
+> enrich(only-missing) → resolve-entities → temporal → lint, con **advisory lock** (no
+> solapa) y por-proyecto o global. Worker programado `maintain:worker` (node-cron,
+> `CORTEX_MAINTAIN_CRON`, def 3:00 diario). Verificado (captó entradas nuevas, lint por
+> proyecto, lock OK).
+> **Para "en marcha" en server:** correr `maintain:worker` como servicio (o cron del
+> sistema llamando a `maintain`) — se cablea en el **docker-compose al desplegar** (hoy
+> el compose solo tiene Postgres; el servicio worker necesita la imagen de la app).
+
+Loops cubiertos: enrich, resolve, temporal, lint. **Pendiente:** dedup explícito como
+paso, observabilidad de ejecuciones (tabla `jobs`), y el servicio en compose (deploy).
 
 **Qué debería correr periódico (dos familias):**
 1. **Sync de fuentes** (ingesta de lo nuevo): GitHub/Plane/Chat/sesiones/(multimodal).

@@ -21,7 +21,12 @@ function norm(s: string): string {
     .replace(/[^a-z0-9]+/g, "");
 }
 
-async function run(): Promise<void> {
+export interface ResolveResult {
+  groups: number;
+  merged: number;
+}
+
+export async function resolveEntities(): Promise<ResolveResult> {
   const sql = getSql();
 
   const entities = (await sql`SELECT id, name, type FROM entities WHERE type <> 'project'`) as unknown as Row[];
@@ -84,12 +89,16 @@ async function run(): Promise<void> {
       AND a.target_id = b.target_id AND a.relation_type = b.relation_type
   `;
 
-  console.log(`Resolución de entidades: ${groupsMerged} grupos, ${merged} variantes fusionadas.`);
+  return { groups: groupsMerged, merged };
 }
 
-run()
-  .catch((e) => {
-    console.error("Error en resolución de entidades:", e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+// CLI: solo si se ejecuta directamente (no al importar la función).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  resolveEntities()
+    .then((r) => console.log(`Resolución de entidades: ${r.groups} grupos, ${r.merged} variantes fusionadas.`))
+    .catch((e) => {
+      console.error("Error en resolución de entidades:", e);
+      process.exitCode = 1;
+    })
+    .finally(() => closeSql());
+}
