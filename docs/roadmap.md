@@ -103,6 +103,14 @@ Bucle automático sin invocación manual. Análisis + fricción:
 > Codex/OpenCode/Hermes construidos según sus contratos documentados; runtime no
 > probado localmente (esos agentes no tienen sesión aquí), como el MCP de Hermes.
 
+- **Gate de la auto-captura (importante, investigado):** capturar **toda** sesión en
+  crudo es un anti-patrón (context rot, distractores, ruido) — ver
+  [`research/memory-capture-policy.md`](./research/memory-capture-policy.md). Evolucionar
+  el hook de "destila y guarda todo" a **"propón con reconciliación"**: dedup
+  **contra lo existente** al guardar (ADD/UPDATE/DELETE/NOOP estilo mem0, reusando el
+  near-dup del lint), **gate de relevancia** (saltar triviales), **confianza baja** para
+  lo auto-capturado (es inferencia), y opción **propose→review→commit**. Ya tenemos los
+  primitivos: §5.5 (proveniencia/confianza/vigencia), bi-temporal, lint near-dup.
 - **Pendiente:** **auto-captura** en Codex/OpenCode/Hermes (Claude tiene `transcript_path`
   + SessionEnd limpios; los demás no exponen transcript / no tienen session-end → se
   cubren con el **backfill batch** `connect-sessions` por plataforma). `UserPromptSubmit`
