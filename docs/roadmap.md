@@ -9,6 +9,12 @@ Hoy los conectores solo capturan **texto** (`.md`, tickets, chat, código). El e
 de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
 `.png/.jpg`, 3 `.drawio` y 2 `.mp4`** que se ignoraron. Hay conocimiento valioso ahí.
 
+> Investigación de cómo lo hacen otros + capacidades reales de nan:
+> [`research/multimodal-ingestion.md`](./research/multimodal-ingestion.md).
+> **nan tiene `whisper`** (transcripción ✅) y posible visión vía `mimo-v2.5`/`gemma4`
+> (a confirmar). **Principio:** OCR/caption/transcript son **inferencias, no hechos**
+> (confianza + proveniencia, §5.5); extraer **conocimiento tipado**, no volcar texto crudo.
+
 ### 1. Captura de documentos (Word / PDF / Excel / PPT)
 - **Qué:** extraer texto (y estructura básica) de `.docx`, `.pdf`, `.xlsx`, `.pptx` y
   ingerirlos como entradas (sourceType `document`/`notion_doc`), enlazados a su
@@ -26,24 +32,29 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
   nodos sin visión.
 - **Cuidado:** muchas imágenes son ruido (iconos); filtrar por tamaño/relevancia.
 
-### 3. Vídeo / audio (transcripción)
-- **Qué:** transcribir `.mp4`/audio (reuniones, demos) e ingerir el transcript
-  (con timestamps si es posible) como entrada del proyecto.
-- **Cómo:** modelo de **transcripción de nan** (whisper-like; confirmar nombre/endpoint).
-  Pipeline: extraer audio (ffmpeg) → transcribir → resumir/trocear → embeber.
-  Reutilizable: ya existe la skill `watch-video-mp4` (frames + Whisper) como referencia.
+### 3. Vídeo / audio (transcripción) — **viable ya**
+- **Qué:** transcribir `.mp4`/audio (reuniones, demos) y extraer **conocimiento tipado**
+  (decisiones/action items/incidencias + resumen + temas) con timestamps, no el
+  transcript crudo.
+- **Cómo (confirmado):** **nan `whisper`** vía `/v1/audio/transcriptions` (contrato
+  OpenAI, multipart). Pipeline: ffmpeg (`-vn -ac 1 -ar 16000`) → chunkear (~25 MB/25 min
+  límite) → transcribir (`verbose_json`) → LLM de `@cortex/agents` estructura. Interfaz
+  `TranscriptionProvider` con fallback `whisper.cpp`. Diarización aparcada (frágil).
+  Ref: skill `watch-video-mp4`.
 
-### 4. Grabación de reuniones — **decisión pendiente**
-¿Cortex ofrece una herramienta para **grabar** reuniones, o el usuario aporta la
-grabación y Cortex solo la **transcribe+ingiere**?
-- **Opción A (recomendada, MVP):** el usuario provee la grabación (Meet/Teams/Zoom)
-  y Cortex la transcribe e ingiere (punto 3). Menos intrusivo, sin permisos de
-  audio/calendario, sin mantener un grabador.
-- **Opción B:** una skill/herramienta propia de grabación (bot que entra a la
-  reunión, o captura local). Más valor "llave en mano" pero mucha más superficie
-  (permisos, plataformas, legal/consentimiento). Probablemente fuera de alcance: es
-  cosa del usuario proveer la grabación.
-- **A decidir con el usuario.**
+### 4. Grabación de reuniones — **recomendación: NO construir (investigado)**
+La investigación de mercado lo deja claro: el valor de Cortex es el **conocimiento**, no
+poseer el pipeline de grabación.
+- **Recomendado:** **el usuario aporta la grabación/transcript** y Cortex transcribe+
+  ingiere (punto 3). Se entrega en días, sin coste por hora, sin superficie legal, y
+  sirve también para reuniones presenciales. Mantener la captura **enchufable**.
+- **Si más adelante se quiere automatizar:** **Recall.ai** (bot-as-a-service, una
+  integración para Zoom/Meet/Teams, ~$0.65/h) o captura local estilo Granola — no
+  construir bots propios.
+- **Legal:** grabar = datos personales (GDPR); **España exige consentimiento de todas
+  las partes**. Un bot que auto-entra lo hace obligatorio; "el usuario sube" traslada el
+  consentimiento a quien dirigió la reunión. Anunciar/registrar consentimiento en
+  llamadas con cliente.
 
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
