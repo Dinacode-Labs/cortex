@@ -124,6 +124,32 @@ function mcpHermes(name: string, d: McpDef) {
   writeFileSync(cfg, yamlStringify(obj));
 }
 
+// --- hooks de Claude Code (auto-inyección de contexto + auto-captura) --------
+function syncClaudeHooks() {
+  const file = join(HOME, ".claude/settings.json");
+  let obj: Record<string, any> = {};
+  if (existsSync(file)) {
+    try { obj = JSON.parse(readFileSync(file, "utf8")); } catch { plan("hooks: ~/.claude/settings.json no parseable — configúralo a mano"); return; }
+  }
+  obj.hooks ??= {};
+  const defs = [
+    { event: "SessionStart", marker: "hook:context", cmd: `pnpm -C ${REPO} --filter @cortex/core run hook:context` },
+    { event: "SessionEnd", marker: "hook:capture", cmd: `pnpm -C ${REPO} --filter @cortex/agents run hook:capture` },
+  ];
+  let changed = false;
+  for (const d of defs) {
+    const arr = (obj.hooks[d.event] ??= []) as { hooks?: { command?: string }[] }[];
+    const present = arr.some((g) => (g.hooks ?? []).some((h) => typeof h.command === "string" && h.command.includes(d.marker)));
+    if (present) { plan(`hook ${d.event} (cortex) ya presente — preservado`); continue; }
+    plan(`hook ${d.event} → cortex ${d.marker}`);
+    if (APPLY) { arr.push({ hooks: [{ type: "command", command: d.cmd }] } as never); changed = true; }
+  }
+  if (APPLY && changed) {
+    mkdirSync(join(HOME, ".claude"), { recursive: true });
+    writeFileSync(file, JSON.stringify(obj, null, 2) + "\n");
+  }
+}
+
 // --- doctor ------------------------------------------------------------------
 function doctor() {
   console.log("cortex doctor — estado de auth por tool (no instala nada)\n");
@@ -167,6 +193,8 @@ for (const agent of requested) {
       const src = join(REPO, "config/skills", s.name);
       if (existsSync(src)) symlink(src, join(HOME, ".claude/skills", s.name));
     }
+    // Hooks: auto-inyección de context-pack (SessionStart) + auto-captura (SessionEnd).
+    syncClaudeHooks();
   }
 
   // Comandos / prompts (los agentes que tienen carpeta de comandos).

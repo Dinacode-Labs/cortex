@@ -134,6 +134,38 @@ async function alreadyIngested(project: string, sessionId: string): Promise<bool
   return rows.length > 0;
 }
 
+/** Ingiere UNA sesión (transcript .jsonl): condensa → scrub → destila → guarda.
+ * Reutilizable por el CLI (backfill) y por el hook de auto-captura (SessionEnd). */
+export async function ingestSessionFile(project: string, file: string, platform = "claude"): Promise<{ saved: number; skipped: boolean }> {
+  const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
+  if (await alreadyIngested(project, sessionId)) return { saved: 0, skipped: true };
+  const condensed = condenseSession(file);
+  if (condensed.length < 200) return { saved: 0, skipped: false };
+  const items: Item[] = [];
+  const seen = new Set<string>();
+  for (const w of windows(condensed)) {
+    for (const it of await distill(project, w)) {
+      const key = it.title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      if (key.length < 3 || seen.has(key)) continue;
+      seen.add(key);
+      items.push(it);
+    }
+  }
+  let saved = 0;
+  for (const it of items) {
+    try {
+      await saveContext(
+        { content: scrub(`${it.title}\n\n${it.content}`), project, title: it.title, type: it.type as ContextEntryType, sourceType: "agent_session", sourceReference: sessionId, createdBy: "session-backfill", metadata: { platform, sessionId } },
+        { useClassifier: false, detectImprovements: false, skipEmbedding: false },
+      );
+      saved++;
+    } catch (e) {
+      console.error(`  ✗ guardando "${it.title}": ${(e as Error).message}`);
+    }
+  }
+  return { saved, skipped: false };
+}
+
 async function main(): Promise<void> {
   const project = process.argv[2];
   const repoPath = process.argv[3];
@@ -164,55 +196,24 @@ async function main(): Promise<void> {
   let savedTotal = 0;
   let skipped = 0;
   for (const file of files) {
-    const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
-    if (await alreadyIngested(project, sessionId)) { skipped++; continue; }
-    const condensed = condenseSession(file);
-    if (condensed.length < 200) continue;
-    const wins = windows(condensed);
-    const items: Item[] = [];
-    const seen = new Set<string>();
-    for (const w of wins) {
-      for (const it of await distill(project, w)) {
-        const key = it.title.toLowerCase().replace(/[^a-z0-9]+/g, "");
-        if (key.length < 3 || seen.has(key)) continue;
-        seen.add(key);
-        items.push(it);
-      }
-    }
-    let saved = 0;
-    for (const it of items) {
-      try {
-        await saveContext(
-          {
-            content: scrub(`${it.title}\n\n${it.content}`),
-            project,
-            title: it.title,
-            type: it.type as ContextEntryType,
-            sourceType: "agent_session",
-            sourceReference: sessionId,
-            createdBy: "session-backfill",
-            metadata: { platform, sessionId },
-          },
-          { useClassifier: false, detectImprovements: false, skipEmbedding: false },
-        );
-        saved++;
-      } catch (e) {
-        console.error(`  ✗ guardando "${it.title}": ${(e as Error).message}`);
-      }
-    }
-    savedTotal += saved;
-    console.log(`  ${sessionId.slice(0, 8)}…: ${wins.length} ventanas → ${saved} entradas`);
+    const r = await ingestSessionFile(project, file, platform);
+    if (r.skipped) { skipped++; continue; }
+    savedTotal += r.saved;
+    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: ${r.saved} entradas`);
   }
   console.log(`Backfill completado: ${savedTotal} entradas de ${files.length - skipped} sesiones (${skipped} ya ingeridas).`);
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en connect-sessions:", e);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await shutdownObservability();
-    await closeSql();
-    process.exit(process.exitCode ?? 0);
-  });
+// CLI directo (no al importar `ingestSessionFile` desde el hook).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main()
+    .catch((e) => {
+      console.error("Error en connect-sessions:", e);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await shutdownObservability();
+      await closeSql();
+      process.exit(process.exitCode ?? 0);
+    });
+}

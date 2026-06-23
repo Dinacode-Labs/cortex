@@ -105,6 +105,15 @@ Comprueba con `/mcp` (debe aparecer `cortex` con sus tools).
 
 > En este repo, skill y comando ya están activos vía symlinks en `.claude/`.
 
+## Hooks (bucle automático, Claude Code)
+`cortex sync` también instala en `~/.claude/settings.json` dos hooks que **automatizan**
+el bucle (el repo se apunta a un proyecto con un `.cortex.json` → `{"project":"…"}`):
+- **SessionStart** → inyecta el **context-pack** del proyecto (`hook:context`).
+- **SessionEnd** → **auto-captura** la sesión destilándola en Cortex (`hook:capture`).
+
+Preserva los hooks existentes. Otros agentes (Codex/OpenCode/Hermes) usan los mismos
+scripts vía sus propios adaptadores (pendiente). Ver `docs/research/hooks-integration.md`.
+
 ## Tools MCP expuestas
 - `save_project_context` — guardar conocimiento (clasifica, resume, detecta duplicados/contradicciones).
 - `search_project_context` — búsqueda híbrida (vector + léxico + rerank).

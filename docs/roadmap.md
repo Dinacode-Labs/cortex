@@ -74,23 +74,26 @@ distribución de config de IA (global y **por proyecto**) en un único sistema.
 - **Migración:** importar lo de ai-manager al modelo de Cortex y deprecar el repo.
 - **Responsable:** **Alejandro.** (Aquí solo queda indicado.)
 
-## Hooks del agente (automatizar el bucle, multi-agente)
+## Hooks del agente (automatizar el bucle) — **v1 hecho (Claude Code)**
 
-Aprovechar los **hooks** de los agentes para que el bucle de Cortex sea **automático**:
-inyectar el context-pack al arrancar/por prompt (`SessionStart`/`UserPromptSubmit` →
-`additionalContext`) y auto-capturar la sesión al terminar (`Stop`/`SessionEnd` →
-`save_project_context`). Análisis completo + cómo lo hacen otros (claude-mem, mem0,
-disler observability) + fricción: [`research/hooks-integration.md`](./research/hooks-integration.md).
+Bucle automático sin invocación manual. Análisis + fricción:
+[`research/hooks-integration.md`](./research/hooks-integration.md).
 
-- **Hallazgo:** los hooks ya **no son solo de Claude** — Codex, OpenCode (plugins TS) y
-  Hermes también tienen ciclo de vida; la fricción es de **forma** (formato/eventos/
-  payload), no de ausencia.
-- **Estrategia:** **MCP = baseline portable**; hooks como **mejora progresiva** con
-  **adaptadores finos por agente** (shell Claude/Codex/Hermes, plugin TS OpenCode) que
-  llaman a las mismas tools de Cortex. Distribuirlos vía `cortex sync` (sección `hooks`
-  en el toolbelt). No construir features exclusivas de hooks (rompe la promesa multi-agente).
-- **Depende de:** transporte HTTP del MCP (para `SessionStart`, donde el MCP aún no está
-  conectado).
+> **Implementado (Claude Code):**
+> - **SessionStart → inyección de contexto** (`@cortex/core hook:context`): resuelve el
+>   proyecto del repo (`.cortex.json`: `{"project":"…"}`) y emite el context-pack como
+>   `additionalContext`. Va directo a la BD (el MCP aún no está conectado en SessionStart).
+> - **SessionEnd → auto-captura** (`@cortex/agents hook:capture`): destila la sesión
+>   actual (reutiliza `connect-sessions`/`distiller`) y la guarda en Cortex. Silencioso,
+>   idempotente.
+> - **Distribución:** `cortex sync` los instala/actualiza en `~/.claude/settings.json`
+>   (preserva lo existente). Verificado: inyección OK, captura idempotente.
+
+- **Hallazgo:** los hooks ya **no son solo de Claude** (Codex, OpenCode plugins TS,
+  Hermes también) — la fricción es de **forma**, no de ausencia.
+- **Pendiente:** adaptadores para **Codex / OpenCode / Hermes** (mismo `.cortex.json` +
+  los mismos scripts); `UserPromptSubmit` (RAG por prompt) opcional; bin `cortex` para
+  no arrancar pnpm/tsx en cada hook (latencia).
 
 ## Backfill de conversaciones de agente → Cortex (depuradas) — **v1 hecho (Claude)**
 

@@ -17,7 +17,8 @@
     "temporal": "tsx src/temporal-run.ts",
     "connect-github": "tsx src/connect-github.ts",
     "connect-notion-export": "tsx src/connect-notion-export.ts",
-    "connect-docs": "tsx src/connect-docs.ts"
+    "connect-docs": "tsx src/connect-docs.ts",
+    "hook:context": "tsx src/hook-context.ts"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",
