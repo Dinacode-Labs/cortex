@@ -1,10 +1,15 @@
-import { readFileSync, statSync } from "node:fs";
-import { extname } from "node:path";
+import { readFileSync, statSync, unlinkSync } from "node:fs";
+import { extname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { inflateRawSync } from "node:zlib";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { extractText, getDocumentProxy } from "unpdf";
 import { getEnv, loadEnv } from "@cortex/shared";
+
+const execFileAsync = promisify(execFile);
 
 /**
  * Capa de extracción de ficheros REUTILIZABLE por todos los conectores (la idea
@@ -18,8 +23,13 @@ import { getEnv, loadEnv } from "@cortex/shared";
 const DOC_EXTS = ["docx", "pdf", "xlsx"];
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
 const DRAWIO_EXTS = ["drawio", "xml"];
+const AUDIO_EXTS = ["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga"];
+const VIDEO_EXTS = ["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"];
+// Formatos que el endpoint whisper acepta directamente; el resto (opus de WhatsApp,
+// amr, vídeo…) se transcodifican con ffmpeg a mp3 mono 16 kHz antes de transcribir.
+const WHISPER_OK = new Set(["mp3", "m4a", "wav", "ogg", "oga", "flac", "mpga", "webm", "mp4", "mpeg"]);
 export const SUPPORTED_DOC_EXTS = new Set(DOC_EXTS);
-export const SUPPORTED_EXTS = new Set([...DOC_EXTS, ...IMAGE_EXTS, ...DRAWIO_EXTS]);
+export const SUPPORTED_EXTS = new Set([...DOC_EXTS, ...IMAGE_EXTS, ...DRAWIO_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS]);
 
 // Por debajo de esto, una imagen suele ser ruido (iconos, separadores) → no se captiona.
 const MIN_IMAGE_BYTES = Number(process.env.CORTEX_IMAGE_MIN_BYTES ?? "8000");
@@ -78,6 +88,60 @@ async function captionImage(path: string, ext: string): Promise<string | null> {
   return null;
 }
 
+let tmpCounter = 0;
+const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // límite del endpoint whisper; chunking pendiente
+
+/** Transcribe audio/vídeo con whisper. Vídeo y formatos no soportados (opus de
+ * WhatsApp, amr…) se transcodifican con ffmpeg a mp3 mono 16 kHz antes de enviar. */
+async function transcribe(path: string, ext: string): Promise<string | null> {
+  const cfg = visionConfig();
+  if (!cfg) return null;
+  const model = getEnv("NAN_WHISPER_MODEL", "whisper");
+  let audioPath = path;
+  let temp: string | null = null;
+  if (VIDEO_EXTS.includes(ext) || !WHISPER_OK.has(ext)) {
+    temp = join(tmpdir(), `cortex-audio-${process.pid}-${Date.now()}-${tmpCounter++}.mp3`);
+    try {
+      await execFileAsync("ffmpeg", ["-i", path, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", "-y", temp], { maxBuffer: 1 << 26 });
+      audioPath = temp;
+    } catch {
+      return null; // ffmpeg no disponible o fichero ilegible
+    }
+  }
+  try {
+    const buf = readFileSync(audioPath);
+    if (buf.length > MAX_AUDIO_BYTES) return null; // demasiado largo (chunking: roadmap)
+    const headers = { authorization: `Bearer ${cfg.key}`, "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const fd = new FormData(); // se reconstruye en cada intento (el body se consume)
+        fd.append("file", new Blob([buf]), "audio.mp3");
+        fd.append("model", model);
+        fd.append("response_format", "json");
+        const res = await fetch(`${cfg.base.replace(/\/$/, "")}/audio/transcriptions`, { method: "POST", headers, body: fd });
+        if (res.ok) {
+          const ct = res.headers.get("content-type") ?? "";
+          const text = ct.includes("json") ? ((await res.json()) as { text?: string }).text ?? "" : await res.text();
+          return text.trim() || null;
+        }
+        if (res.status !== 429 && res.status < 500) return null;
+      } catch {
+        /* red */
+      }
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    }
+    return null;
+  } finally {
+    if (temp) {
+      try {
+        unlinkSync(temp);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
 /** Extrae texto de los labels de un .drawio (XML de mxGraph; maneja diagramas comprimidos). */
 function extractDrawio(path: string): string {
   const raw = readFileSync(path, "utf8");
@@ -127,6 +191,10 @@ export async function extractFileText(path: string): Promise<ExtractedFile | nul
       if (statSync(path).size < MIN_IMAGE_BYTES) return null; // icono/ruido
       const caption = await captionImage(path, ext);
       return caption ? { text: caption, format: ext } : null;
+    }
+    if (AUDIO_EXTS.includes(ext) || VIDEO_EXTS.includes(ext)) {
+      const t = await transcribe(path, ext);
+      return t ? { text: t, format: ext } : null;
     }
   } catch {
     /* ignore */

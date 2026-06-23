@@ -35,15 +35,16 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
 - **Pendiente:** dedup por content-hash (no captionar imágenes repetidas), OCR como
   fallback para texto denso, cascada coste (clasificar antes de llamar al VLM).
 
-### 3. Vídeo / audio (transcripción) — **viable ya**
-- **Qué:** transcribir `.mp4`/audio (reuniones, demos) y extraer **conocimiento tipado**
-  (decisiones/action items/incidencias + resumen + temas) con timestamps, no el
-  transcript crudo.
-- **Cómo (confirmado):** **nan `whisper`** vía `/v1/audio/transcriptions` (contrato
-  OpenAI, multipart). Pipeline: ffmpeg (`-vn -ac 1 -ar 16000`) → chunkear (~25 MB/25 min
-  límite) → transcribir (`verbose_json`) → LLM de `@cortex/agents` estructura. Interfaz
-  `TranscriptionProvider` con fallback `whisper.cpp`. Diarización aparcada (frágil).
-  Ref: skill `watch-video-mp4`.
+### 3. Vídeo / audio (transcripción) — **hecho (v1)**
+- **Implementado en `extract.ts`:** audio (`.opus` de WhatsApp, mp3, m4a, ogg, wav,
+  flac, amr…) y vídeo (mp4, mov, mkv, webm…) → **transcripción con `whisper` de nan**
+  (`/v1/audio/transcriptions`, multipart). Vídeo y formatos no soportados se
+  **transcodifican con ffmpeg** a mp3 mono 16 kHz antes. Los conectores los recogen y
+  enlazan a su página. Verificado: mp4 de CE Portal (grabación de un bug) → transcripción
+  correcta.
+- **Pendiente:** **chunking** para audios > ~24 MB / largos (hoy se omiten); diarización
+  (quién dijo qué); destilar el transcript a conocimiento tipado (no volcar crudo) —
+  el `distiller` ya existe (connect-sessions), se puede reutilizar para reuniones.
 
 ### 4. Grabación de reuniones — **recomendación: NO construir (investigado)**
 La investigación de mercado lo deja claro: el valor de Cortex es el **conocimiento**, no
