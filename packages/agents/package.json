@@ -12,7 +12,8 @@
     "enrich": "tsx src/enrich-run.ts",
     "connect-sessions": "tsx src/connect-sessions.ts",
     "maintain": "tsx src/maintain.ts",
-    "maintain:worker": "tsx src/maintain-worker.ts"
+    "maintain:worker": "tsx src/maintain-worker.ts",
+    "hook:capture": "tsx src/hook-capture.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.51",
