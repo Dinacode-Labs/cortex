@@ -126,6 +126,38 @@ retroactivo** del historial y sirve para plataformas donde el hook es incómodo.
   [`research/hooks-integration.md`](./research/hooks-integration.md)); esto es la versión
   **batch + multi-plataforma** que alimenta a Cortex con el mismo `save_project_context`.
 
+## Procesos periódicos / scheduler — **no montado aún**
+
+Hoy **todo es manual** (CLIs): `enrich`, `resolve-entities`, `temporal`, `lint`,
+`connect-github`/`-sessions`/ingesta. No hay cron ni scheduler; las "loops de mejora"
+(§12) existen como comandos pero no se ejecutan solas. Hay que diseñarlo.
+
+**Qué debería correr periódico (dos familias):**
+1. **Sync de fuentes** (ingesta de lo nuevo): GitHub/Plane/Chat/sesiones/(multimodal).
+   Frecuencia: diaria/horaria por proyecto.
+2. **Mantenimiento/mejora** (§12), tras ingesta o nocturno: `enrich` (only-missing),
+   `resolve-entities`, `temporal` (invalidación), `lint` (salud), dedup.
+
+**Opciones de diseño:**
+- **A. Cron + CLIs (MVP, recomendado para empezar):** contenedor `worker` en el
+  docker-compose con cron que ejecuta los comandos en horarios. Cero código nuevo
+  (reusa los CLIs, ya idempotentes). Encaja con el **despliegue**.
+- **B. Scheduler in-app:** worker Node (node-cron) + tabla `jobs` (estado, locking,
+  última ejecución, errores) → reintentos + observabilidad (encaja con `ai_traces`/
+  `/usage`) + posible UI de jobs.
+- **C. Por eventos/incremental:** tras cada `save`/ingesta, encolar `enrich` del nuevo
+  + debounce de `resolve`/`temporal`. Más reactivo, más complejo.
+
+**Transversal:** idempotencia (ya la tenemos), **locking** (no solapar enriquecimientos),
+incrementalidad (`enrich` only-missing ya existe; resolve/temporal son full pero baratos),
+registrar ejecuciones, por-proyecto.
+
+**Deliverable concreto sugerido:** un comando único `cortex maintain <proyecto>` que
+encadene enrich(only-missing) → resolve-entities → temporal → lint (lo que hoy hago a
+mano), y que el cron invoque. **Recomendación:** empezar con **A** al desplegar y
+evolucionar a **B** cuando queramos reintentos/observabilidad. **Depende del despliegue**
+(no hay server aún).
+
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
   (docker-compose). Deploy real a server, lo último (de momento no hay server).
