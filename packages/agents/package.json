@@ -9,7 +9,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "demo:capture": "tsx src/demo-capture.ts",
-    "enrich": "tsx src/enrich-run.ts"
+    "enrich": "tsx src/enrich-run.ts",
+    "connect-sessions": "tsx src/connect-sessions.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.51",

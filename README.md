@@ -139,6 +139,9 @@ pnpm --filter @cortex/core run ingest "<Proyecto>" <items.json>
 pnpm --filter @cortex/core run connect-github "<Proyecto>" <owner/repo>
 # Código: indexa un repo local (excluye generados; chunking + embeddings)
 pnpm --filter @cortex/core run index-code "<Proyecto>" <ruta-repo>
+# Sesiones de agente: destila las conversaciones (Claude Code) de un proyecto a
+# conocimiento tipado (depurado, sin secretos). v1: Claude.
+pnpm --filter @cortex/agents run connect-sessions "<Proyecto>" <ruta-repo> [claude]
 ```
 Plane y Google Chat se ingieren con las skills `plane-api` / `google-chat` + el
 `ingest`. Tras ingerir, enriquecer el grafo (capa agents) y resolver entidades.
