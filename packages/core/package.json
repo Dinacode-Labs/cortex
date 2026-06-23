@@ -16,11 +16,15 @@
     "index-code": "tsx src/index-code.ts",
     "temporal": "tsx src/temporal-run.ts",
     "connect-github": "tsx src/connect-github.ts",
-    "connect-notion-export": "tsx src/connect-notion-export.ts"
+    "connect-notion-export": "tsx src/connect-notion-export.ts",
+    "connect-docs": "tsx src/connect-docs.ts"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",
     "@cortex/embeddings": "workspace:*",
-    "@cortex/shared": "workspace:*"
+    "@cortex/shared": "workspace:*",
+    "mammoth": "^1.12.0",
+    "unpdf": "^1.6.2",
+    "xlsx": "^0.18.5"
   }
 }

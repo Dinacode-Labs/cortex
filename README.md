@@ -137,6 +137,8 @@ Toolbelt actual: MCP `cortex`, `plane`, `atlassian` (Jira+Confluence), `notion`,
 pnpm --filter @cortex/core run ingest "<Proyecto>" <items.json>
 # GitHub: PRs/issues de un repo (vía gh)
 pnpm --filter @cortex/core run connect-github "<Proyecto>" <owner/repo>
+# Documentos: Word/PDF/Excel de un directorio → texto indexable (PDF escaneado se omite)
+pnpm --filter @cortex/core run connect-docs "<Proyecto>" <ruta-dir>
 # Código: indexa un repo local (excluye generados; chunking + embeddings)
 pnpm --filter @cortex/core run index-code "<Proyecto>" <ruta-repo>
 # Sesiones de agente: destila las conversaciones (Claude Code) de un proyecto a

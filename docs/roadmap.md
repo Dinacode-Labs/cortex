@@ -15,14 +15,15 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
 > (a confirmar). **Principio:** OCR/caption/transcript son **inferencias, no hechos**
 > (confianza + proveniencia, §5.5); extraer **conocimiento tipado**, no volcar texto crudo.
 
-### 1. Captura de documentos (Word / PDF / Excel / PPT)
-- **Qué:** extraer texto (y estructura básica) de `.docx`, `.pdf`, `.xlsx`, `.pptx` y
-  ingerirlos como entradas (sourceType `document`/`notion_doc`), enlazados a su
-  proyecto y a la página/origen.
-- **Cómo:** parser por tipo (p.ej. `mammoth` docx → texto/markdown, `pdfjs`/`pdf-parse`
-  para PDF, `xlsx` para hojas). Trocear documentos largos (como el código) y embeber.
-- **Por qué faltaba:** `connect-notion-export` solo procesa `.md`. Ampliar ese
-  conector (o un `ingest-files <dir>` genérico) para barrer estos formatos.
+### 1. Captura de documentos (Word / PDF / Excel) — **hecho (v1)**
+- **Implementado:** `connect-docs <Proyecto> <dir>` (`@cortex/core`) recorre un
+  directorio y extrae texto de `.docx` (mammoth), `.pdf` (unpdf) y `.xlsx` (SheetJS),
+  ingiriendo cada uno como `sourceType: document` (2 fases, embeddings por lotes); el
+  grafo lo añade `maintain`/`enrich`. PDF escaneado (sin capa de texto) se omite.
+  Verificado: 23 documentos de CE Portal (contratos, certificados, registros de
+  mantenimiento…), 0 secretos.
+- **Pendiente:** `.pptx` (officeparser), OCR para PDF escaneado (Unstructured/Docling
+  self-host o tesseract), trocear documentos muy largos (hoy cap por entrada).
 
 ### 2. Captura de imágenes (capturas, diagramas)
 - **Qué:** describir/transcribir imágenes (`.png/.jpg`) y diagramas (`.drawio`) →
