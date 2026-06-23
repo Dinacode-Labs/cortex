@@ -56,6 +56,20 @@ poseer el pipeline de grabación.
   consentimiento a quien dirigió la reunión. Anunciar/registrar consentimiento en
   llamadas con cliente.
 
+## Consolidar `ai-manager` dentro de Cortex (→ Alejandro)
+
+`git@github.com:Dinacode-Labs/ai-manager.git` es hoy donde Dinacode **comparte las
+configs de Claude por proyecto**. Esto **solapa directamente** con el harness de Cortex
+(`config/toolbelt.json` + `cortex sync`, que ya reparte MCPs/skills/comandos a
+Claude/Codex/OpenCode/Hermes). La idea: **Cortex se encarga de TODO** — unificar la
+distribución de config de IA (global y **por proyecto**) en un único sistema.
+
+- **Qué falta:** soportar config **por-proyecto** en el registry (hoy el toolbelt es
+  global); que `cortex sync` instale también la config específica del proyecto (CLAUDE.md,
+  permisos, hooks, MCPs/skills del proyecto) — lo que hoy vive en ai-manager.
+- **Migración:** importar lo de ai-manager al modelo de Cortex y deprecar el repo.
+- **Responsable:** **Alejandro.** (Aquí solo queda indicado.)
+
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
   (docker-compose). Deploy real a server, lo último (de momento no hay server).
