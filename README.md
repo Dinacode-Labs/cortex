@@ -10,6 +10,7 @@ proyecto o persona.
 
 - Plan fundacional: [`dinacode-cortex-contexto-y-plan-demo.md`](./dinacode-cortex-contexto-y-plan-demo.md)
 - Decisiones técnicas (ADR): [`docs/decisions.md`](./docs/decisions.md)
+- Roadmap (pendientes): [`docs/roadmap.md`](./docs/roadmap.md)
 - Panorama competitivo y huecos: [`docs/research/competitive-landscape.md`](./docs/research/competitive-landscape.md)
 - Guion de demo: [`docs/demo-script.md`](./docs/demo-script.md)
 
