@@ -19,7 +19,7 @@ import { CortexTraceExporter } from "./trace-exporter.js";
  * json_object es rápido y válido — ver ADR-0006/0015). El retriever usa texto libre.
  */
 
-export type AgentRole = "classifier" | "graph" | "reranker" | "retriever";
+export type AgentRole = "classifier" | "graph" | "reranker" | "retriever" | "distiller";
 
 const INSTRUCTIONS: Record<AgentRole, string> = {
   classifier:
@@ -35,9 +35,16 @@ const INSTRUCTIONS: Record<AgentRole, string> = {
     "Eres el agente de recuperación de Dinacode Cortex. Respondes preguntas de " +
     "developers sobre proyectos software basándote ÚNICAMENTE en el contexto " +
     "recuperado. Eres conciso, en español, y si el contexto no basta lo dices.",
+  distiller:
+    "Eres el agente de destilación de Dinacode Cortex. De transcripts de sesiones de " +
+    "agentes de IA trabajando en un proyecto, extraes SOLO el conocimiento DURADERO y " +
+    "reutilizable (decisiones técnicas, restricciones, incidencias y su resolución, " +
+    "convenciones, deuda técnica, riesgos, how-tos). Descartas el ruido (llamadas a " +
+    "herramientas, volcados de ficheros, narración, saludos, intentos abandonados) y " +
+    "NUNCA incluyes secretos. Respondes SIEMPRE en español y SOLO con JSON válido.",
 };
 
-const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker"]);
+const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller"]);
 
 /** fetch que fuerza response_format json_object en cada request OpenAI-compatible. */
 const jsonFetch: typeof fetch = async (url, init) => {
@@ -78,7 +85,7 @@ function build(): Mastra | null {
   // nuestro exporter (ADR-0016 parte B). Los agentes se sirven desde aquí para
   // que `generate()` emita spans.
   return new Mastra({
-    agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever") },
+    agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever"), distiller: mk("distiller") },
     observability: new Observability({
       configs: { default: { serviceName: "cortex", exporters: [new CortexTraceExporter()] } },
     }),

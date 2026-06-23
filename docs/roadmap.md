@@ -88,12 +88,20 @@ disler observability) + fricción: [`research/hooks-integration.md`](./research/
 - **Depende de:** transporte HTTP del MCP (para `SessionStart`, donde el MCP aún no está
   conectado).
 
-## Backfill de conversaciones de agente → Cortex (depuradas)
+## Backfill de conversaciones de agente → Cortex (depuradas) — **v1 hecho (Claude)**
 
 Comando para **revisar todas las sesiones de un agente en un proyecto y subir el
 conocimiento a Cortex**, depurando (no volcar el transcript crudo). **Complementa a los
 hooks**: los hooks capturan en tiempo real (hacia delante); esto hace **backfill
 retroactivo** del historial y sirve para plataformas donde el hook es incómodo.
+
+> **Implementado (v1, Claude Code):** `connect-sessions <Proyecto> <ruta-repo>`
+> (`@cortex/agents`). Lee `~/.claude/projects/<ruta>/*.jsonl`, condensa el diálogo
+> (descarta tool calls/thinking/volcados), **borra secretos** (scrub), **destila con el
+> agente `distiller` de Mastra** a entradas tipadas, e ingiere (sourceType
+> `agent_session`, proveniencia por sesión, incremental). Verificado dogfooding sobre
+> las sesiones de Cortex (0 secretos colados). **Pendiente:** Codex/OpenCode/Hermes,
+> dedup contra lo ya existente (hoy solo intra-run), ventanas completas en sesiones largas.
 
 - **Fuentes (verificado):** las sesiones se guardan por plataforma —
   Claude Code `~/.claude/projects/<ruta-saneada>/*.jsonl` (1 carpeta por proyecto),
