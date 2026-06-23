@@ -4,7 +4,7 @@ import { closeSql, getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "./operations.js";
 import { storeEmbeddingsBatch } from "./vectors.js";
-import { extractFileText, SUPPORTED_DOC_EXTS } from "./extract.js";
+import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
 
 /**
  * Conector GENÉRICO de documentos: recorre un directorio suelto e ingiere los ficheros
@@ -28,7 +28,7 @@ function walk(dir: string): string[] {
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) out.push(...walk(p));
-    else if (SUPPORTED_DOC_EXTS.has(extname(name).slice(1).toLowerCase())) out.push(p);
+    else if (SUPPORTED_EXTS.has(extname(name).slice(1).toLowerCase())) out.push(p);
   }
   return out;
 }
