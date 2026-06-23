@@ -155,6 +155,17 @@ pnpm --filter @cortex/core run resolve-entities           # fusiona variantes de
 pnpm --filter @cortex/core run temporal                   # invalida hechos no vigentes
 ```
 
+### Mantenimiento periódico (server)
+
+Pipeline único que encadena enrich(only-missing) → resolve-entities → temporal →
+lint, idempotente y con lock (no solapa). Pensado para el server (el **sync de
+fuentes es manual**, lo dispara el developer; esto es solo mantenimiento):
+
+```bash
+pnpm --filter @cortex/agents run maintain ["<Proyecto>"]   # una pasada (todos si se omite)
+pnpm --filter @cortex/agents run maintain:worker           # worker programado (CORTEX_MAINTAIN_CRON, def "0 3 * * *")
+```
+
 ## Proveedores (embeddings y LLM)
 
 Configurables en `.env`. Por defecto **sin claves** (`local`), con caída a heurísticas.
