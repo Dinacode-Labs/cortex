@@ -1,32 +1,25 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
-import mammoth from "mammoth";
-import * as XLSX from "xlsx";
-import { extractText, getDocumentProxy } from "unpdf";
 import { closeSql, getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "./operations.js";
 import { storeEmbeddingsBatch } from "./vectors.js";
+import { extractFileText, SUPPORTED_DOC_EXTS } from "./extract.js";
 
 /**
- * Conector de documentos ofimáticos (Word/PDF/Excel) → Cortex. Recorre un directorio,
- * extrae el TEXTO de cada documento (Markdown cuando se puede) y lo ingiere como entrada
- * (sourceType `document`) en 2 fases (BD → embeddings por lotes). El grafo lo añade
- * luego `maintain`/`enrich`. PDFs escaneados (sin capa de texto) se omiten — OCR es
- * roadmap (ver research/multimodal-ingestion.md).
+ * Conector GENÉRICO de documentos: recorre un directorio suelto e ingiere los ficheros
+ * ofimáticos (vía la capa `extract`). Para fuentes con estructura (Notion, etc.) usa el
+ * conector específico, que enlaza cada adjunto a su página. Esto es el "subir una
+ * carpeta de ficheros" sin contexto de origen.
  *
  * Uso: tsx src/connect-docs.ts "<Proyecto>" <ruta-dir>
- * Env: CORTEX_DOCS_MIN_CHARS (def 40), CORTEX_EMBED_BATCH, CORTEX_INGEST_CONCURRENCY.
  */
 
-const EXTS = new Set(["docx", "pdf", "xlsx"]);
 const MIN_CHARS = Number(process.env.CORTEX_DOCS_MIN_CHARS ?? "40");
 const MAX_CONTENT = 8000;
 const EMBED_BATCH = Number(process.env.CORTEX_EMBED_BATCH ?? "32");
 const CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "6");
 const HEX32 = /\s+[0-9a-f]{32}$/i;
-
-interface Doc { title: string; content: string; ref: string; format: string }
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -35,32 +28,12 @@ function walk(dir: string): string[] {
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) out.push(...walk(p));
-    else if (EXTS.has(extname(name).slice(1).toLowerCase())) out.push(p);
+    else if (SUPPORTED_DOC_EXTS.has(extname(name).slice(1).toLowerCase())) out.push(p);
   }
   return out;
 }
 
-async function extract(file: string, ext: string): Promise<string> {
-  const buf = readFileSync(file);
-  if (ext === "docx") {
-    const { value } = await mammoth.extractRawText({ buffer: buf });
-    return value;
-  }
-  if (ext === "pdf") {
-    const pdf = await getDocumentProxy(new Uint8Array(buf));
-    const { text } = await extractText(pdf, { mergePages: true });
-    return Array.isArray(text) ? text.join("\n") : text;
-  }
-  if (ext === "xlsx") {
-    const wb = XLSX.read(buf, { type: "buffer" });
-    return wb.SheetNames.map((n) => `## ${n}\n${XLSX.utils.sheet_to_csv(wb.Sheets[n]!)}`).join("\n\n");
-  }
-  return "";
-}
-
-function clean(s: string): string {
-  return s.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-}
+interface Doc { title: string; content: string; ref: string; format: string }
 
 async function main(): Promise<void> {
   const project = process.argv[2];
@@ -72,26 +45,18 @@ async function main(): Promise<void> {
   }
   const root = resolve(dir);
   const files = walk(root);
-  console.log(`${files.length} documentos (docx/pdf/xlsx) en ${root}. Extrayendo...`);
+  console.log(`${files.length} documentos en ${root}. Extrayendo...`);
 
   const docs: Doc[] = [];
-  let scanned = 0;
-  let errs = 0;
+  let skipped = 0;
   for (const file of files) {
-    const ext = extname(file).slice(1).toLowerCase();
-    try {
-      const body = clean(await extract(file, ext));
-      if (body.length < MIN_CHARS) { scanned++; continue; } // vacío / PDF escaneado
-      const title = basename(file, extname(file)).replace(HEX32, "").trim().slice(0, 200);
-      docs.push({ title, content: `${title}\n\n${body}`.slice(0, MAX_CONTENT), ref: relative(root, file).slice(0, 200), format: ext });
-    } catch (e) {
-      errs++;
-      console.error(`  ✗ ${basename(file)}: ${(e as Error).message}`);
-    }
+    const ex = await extractFileText(file);
+    if (!ex || ex.text.length < MIN_CHARS) { skipped++; continue; }
+    const title = basename(file, extname(file)).replace(HEX32, "").trim().slice(0, 200);
+    docs.push({ title, content: `${title}\n\n${ex.text}`.slice(0, MAX_CONTENT), ref: relative(root, file).slice(0, 200), format: ex.format });
   }
-  console.log(`${docs.length} con texto (${scanned} vacíos/escaneados omitidos, ${errs} errores). Ingestando en "${project}"...`);
+  console.log(`${docs.length} con texto (${skipped} vacíos/escaneados/no soportados). Ingestando en "${project}"...`);
 
-  // Fase 1: persistir sin embedding.
   const toEmbed: { contextEntryId: string; text: string }[] = [];
   let cursor = 0;
   let done = 0;
@@ -100,15 +65,7 @@ async function main(): Promise<void> {
       const d = docs[cursor++]!;
       try {
         const { entry } = await saveContext(
-          {
-            content: d.content,
-            project,
-            title: d.title,
-            sourceType: "document",
-            sourceReference: d.ref,
-            createdBy: "docs",
-            metadata: { format: d.format, file: d.ref },
-          },
+          { content: d.content, project, title: d.title, sourceType: "document", sourceReference: d.ref, createdBy: "docs", metadata: { format: d.format, file: d.ref } },
           { useClassifier: false, detectImprovements: false, skipEmbedding: true },
         );
         toEmbed.push({ contextEntryId: entry.id, text: `${entry.title}\n\n${entry.content}` });
