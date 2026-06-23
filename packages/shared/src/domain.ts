@@ -97,6 +97,7 @@ export const sourceType = z.enum([
   "meeting_transcript",
   "codex",
   "agent_session",
+  "document",
 ]);
 export type SourceType = z.infer<typeof sourceType>;
 
