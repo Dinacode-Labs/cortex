@@ -91,9 +91,22 @@ Bucle automático sin invocación manual. Análisis + fricción:
 
 - **Hallazgo:** los hooks ya **no son solo de Claude** (Codex, OpenCode plugins TS,
   Hermes también) — la fricción es de **forma**, no de ausencia.
-- **Pendiente:** adaptadores para **Codex / OpenCode / Hermes** (mismo `.cortex.json` +
-  los mismos scripts); `UserPromptSubmit` (RAG por prompt) opcional; bin `cortex` para
-  no arrancar pnpm/tsx en cada hook (latencia).
+
+> **Adaptadores de inyección de contexto — hechos (los 4 agentes), distribuidos por `cortex sync`:**
+> - **Codex**: `[[hooks.SessionStart]]` en `config.toml` → `hook:context` (mismo
+>   `additionalContext` que Claude, contrato idéntico).
+> - **OpenCode**: plugin TS generado (`~/.config/opencode/plugin/cortex.js`) que en
+>   `session.created` hace shell-out a `hook:context --format text` e inyecta en `chat.message`.
+> - **Hermes**: `pre_llm_call` en `~/.hermes/config.yaml` → `hook:context --format hermes`
+>   (salida `{"context":…}`).
+> - `hook:context` es multi-formato (`--format claude|hermes|text`, `--cwd`).
+> Codex/OpenCode/Hermes construidos según sus contratos documentados; runtime no
+> probado localmente (esos agentes no tienen sesión aquí), como el MCP de Hermes.
+
+- **Pendiente:** **auto-captura** en Codex/OpenCode/Hermes (Claude tiene `transcript_path`
+  + SessionEnd limpios; los demás no exponen transcript / no tienen session-end → se
+  cubren con el **backfill batch** `connect-sessions` por plataforma). `UserPromptSubmit`
+  (RAG por prompt). Bin `cortex` para no arrancar pnpm/tsx en cada hook (latencia).
 
 ## Backfill de conversaciones de agente → Cortex (depuradas) — **v1 hecho (Claude)**
 
