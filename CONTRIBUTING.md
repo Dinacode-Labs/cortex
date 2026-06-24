@@ -55,10 +55,15 @@ Si una operación de core necesita LLM, define el hook en core y enchúfalo en a
 - **Trazabilidad (§5.5):** cada unidad de conocimiento conserva fuente, fecha, autor,
   confianza, estado y vigencia. No conviertas inferencias en hechos (confianza baja para lo auto).
 - **zod aislado:** `agents` usa **zod v4** (lo exige Mastra); el resto **zod v3**. No cruces schemas.
-- **Calidad:** `pnpm typecheck` y `pnpm test` (Vitest) deben pasar. Los tests viven en
-  `tests/` (unitarios de lógica pura/determinista: auth/permisos, vínculo/slug, parsers de
-  sesiones, schemas). Añade tests con tu PR cuando toques lógica testeable; para lo que
-  necesita BD/LLM, verifica a mano y deja constancia.
+- **Calidad:** `pnpm typecheck` y `pnpm test` (Vitest) deben pasar. Tests en `tests/`:
+  - **Unit** (`pnpm test`): lógica pura/determinista (auth/permisos, vínculo/slug,
+    parsers de sesiones, schemas). Sin BD ni red.
+  - **Integración** (`pnpm test:integration`, en `tests/integration/`): contra Postgres
+    real (BD `cortex_test`, embeddings `local`, LLM `none`). Requiere `pnpm db:up`; el
+    globalSetup crea+migra la BD de test. Cubre persistencia/búsqueda, jerarquía/herencia,
+    permisos/cascada, captura por lotes y auth (OTP/token/ticket).
+
+  Añade tests con tu PR cuando toques lógica testeable.
 
 ## Flujo de PR
 
