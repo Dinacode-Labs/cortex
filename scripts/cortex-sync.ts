@@ -15,7 +15,7 @@
  * actualiza; re-ejecuta con --apply para re-registrar MCPs/comandos.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { parse as yamlParse, stringify as yamlStringify } from "yaml";
@@ -208,6 +208,28 @@ export const CortexPlugin = async ({ $, directory }) => {
   writeFileSync(file, plugin);
 }
 
+// --- CLI `cortex` en el PATH (shim, mac + Linux) -----------------------------
+function installCortexShim() {
+  const dir = join(HOME, ".local/bin");
+  const file = join(dir, "cortex");
+  const tsx = join(REPO, "node_modules/.bin/tsx");
+  const entry = join(REPO, "apps/cli/src/index.ts");
+  const shim = `#!/usr/bin/env sh\n# Generado por 'cortex sync' — CLI de Dinacode Cortex.\nexec "${tsx}" "${entry}" "$@"\n`;
+  if (existsSync(file) && readFileSync(file, "utf8").includes(entry)) {
+    plan("cli `cortex` ya instalado en ~/.local/bin");
+  } else {
+    plan(`cli \`cortex\` → ${file}`);
+    if (APPLY) {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(file, shim);
+      chmodSync(file, 0o755);
+    }
+  }
+  if (!(process.env.PATH ?? "").split(":").includes(dir)) {
+    plan('⚠ ~/.local/bin no está en tu PATH → añade:  export PATH="$HOME/.local/bin:$PATH"');
+  }
+}
+
 // --- doctor ------------------------------------------------------------------
 function doctor() {
   console.log("cortex doctor — estado de auth por tool (no instala nada)\n");
@@ -269,5 +291,9 @@ for (const agent of requested) {
   else if (agent === "opencode") syncOpenCodeHooks();
   else if (agent === "hermes") syncHermesHooks();
 }
+
+// CLI `cortex` en el PATH (una vez, no por agente).
+console.log("\n[cli]");
+installCortexShim();
 
 console.log(`\n${APPLY ? "Aplicado" : "Plan listo"}. Auth por tool: \`pnpm cortex:sync --doctor\`. ${APPLY ? "" : "Re-ejecuta con --apply para escribir."}`);

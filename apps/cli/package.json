@@ -1,0 +1,19 @@
+{
+  "name": "@cortex/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cortex": "src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@cortex/agents": "workspace:*",
+    "@cortex/core": "workspace:*",
+    "@cortex/database": "workspace:*",
+    "@cortex/shared": "workspace:*"
+  }
+}

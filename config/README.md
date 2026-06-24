@@ -60,6 +60,10 @@ pnpm cortex:sync --doctor        # estado de auth por tool (qué falta configura
 - OpenCode es best-effort (si no puede editar `opencode.json`, lo indica).
 - Skills (SKILL.md) son nativas en Claude; en Codex/OpenCode se usan vía MCP +
   comandos/prompts.
+- **Instala el CLI `cortex`**: `cortex sync --apply` deja un shim en `~/.local/bin/cortex`
+  (mac + Linux). Tras el bootstrap (`git clone` → `pnpm install` → `pnpm cortex:sync --apply`)
+  tienes el comando global: `cortex link`, `cortex maintain`, `cortex connect-notion`…
+  (avisa si `~/.local/bin` no está en tu PATH).
 
 ## Instalación por agente (manual, alternativa)
 
