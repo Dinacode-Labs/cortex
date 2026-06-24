@@ -117,8 +117,18 @@ scripts vía sus propios adaptadores. Ver `docs/research/hooks-integration.md`.
 ### Cortex es **opt-in por repo** (privacidad)
 Los hooks están instalados a nivel de usuario, pero **solo actúan donde hay un
 `.cortex.json`**. Sin él → **no se inyecta ni se captura nada** (tu proyecto personal
-queda fuera por defecto). El `.cortex.json` más cercano manda (no se hereda más allá):
-- `{ "project": "Mi Proyecto" }` — apunta el repo (vale también en subdirectorios).
+queda fuera por defecto). **No edites el `.cortex.json` a mano**: usa el comando
+```bash
+pnpm cortex:link <slug>              # vincular a un proyecto existente de Cortex
+pnpm cortex:link --create "<Nombre>" # crear el proyecto en Cortex y vincular
+pnpm cortex:link --ignore            # opt-out: este repo NO usa Cortex
+pnpm cortex:link                     # ver vínculo actual + proyectos disponibles
+```
+El **slug** lo asigna Cortex al crear el proyecto (clave estable, independiente de git).
+Vincular ≠ crear: un slug que no exista en Cortex se **rechaza** (no se auto-crea).
+El `.cortex.json` más cercano manda (no se hereda más allá):
+- `{ "slug": "ce-portal" }` — puntero al proyecto (vale también en subdirectorios).
+- `{ "project": "Mi Proyecto" }` — legacy (por nombre); preferir `slug`.
 - `{ "ignore": true }` — **opt-out explícito**: este repo NO usa Cortex. Úsalo para un
   proyecto personal **anidado** dentro de un árbol que sí tiene `.cortex.json` arriba.
 

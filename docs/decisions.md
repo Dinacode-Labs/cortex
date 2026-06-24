@@ -268,3 +268,29 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   presupuestos/alertas, una página de traza individual, o un bridge OTel/Langfuse
   (la config lo soporta). Pendiente menor: silenciar el warning de in-memory store de
   Mastra (no usamos su storage).
+
+## Vinculación de proyectos: slug + gate server-side (vincular ≠ crear)
+
+- **Decisión:** un repo se vincula a un proyecto de Cortex con un `.cortex.json`
+  **`{ "slug": "..." }`**. El **slug** es la clave de vínculo: único por proyecto,
+  estable, **independiente de git**, asignado por Cortex al crear el proyecto.
+- **Por qué slug y no git:** git no es fiable como identidad — un repo puede ser
+  **monorepo** (un remote, varios proyectos lógicos), una **carpeta con varios git**
+  dentro (varios remotes), o estar **sin clonar / con solo uno abierto** (no hay remote
+  local). El slug es explícito y resuelve los tres casos (un `.cortex.json` por carpeta
+  vinculada).
+- **Gate inverso (vincular ≠ crear):** los hooks resuelven el slug → proyecto vía
+  `resolveLinkedProject` que **NO crea**. Si el slug no existe en Cortex (o hay opt-out
+  `{ "ignore": true }`, o no hay `.cortex.json`), **no fluye nada**. Hay que crear+vincular
+  deliberadamente. Comando `cortex link` (`packages/core/src/link.ts`): `--create` crea
+  el proyecto en Cortex y escribe el `.cortex.json`; `<slug>` vincula a uno existente;
+  `--ignore` opt-out. Usa `INIT_CWD` (pnpm cambia el cwd al paquete).
+- **Migración 0008:** `entities.slug` (único parcial donde `type='project'`) + backfill
+  de los existentes (slugify del nombre).
+- **Permisos/compartición:** el proyecto pasa a ser entidad gestionada (slug + dueño +
+  miembros). El gate (resolver slug → ¿existe? ¿permiso?) es el punto natural para RBAC,
+  pero **auth/membership es un diseño aparte** (necesita modelo de usuarios). Base lista.
+- **Revisar cuando:** lleguen los permisos (gate por usuario), o queramos que el
+  **save del MCP y los conectores** también exijan slug+permiso (hoy el gate cubre los
+  hooks, que es el camino ambiente/automático y de mayor riesgo; el save por MCP/
+  conector sigue siendo deliberado y aún puede auto-crear por nombre).

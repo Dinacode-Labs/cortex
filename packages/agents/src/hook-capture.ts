@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { closeSql } from "@cortex/database";
-import { resolveProjectFromCwd } from "@cortex/core";
+import { resolveLinkedProject } from "@cortex/core";
 import { ingestSessionFile } from "./connect-sessions.js";
 import { shutdownObservability } from "./mastra.js";
 
@@ -30,11 +30,12 @@ async function main(): Promise<void> {
   }
   const cwd = input.cwd || process.cwd();
   const transcript = input.transcript_path;
-  const project = resolveProjectFromCwd(cwd);
-  if (!project || !transcript || !existsSync(transcript)) return; // repo no apuntado / sin transcript
+  if (!transcript || !existsSync(transcript)) return;
+  const proj = await resolveLinkedProject(cwd);
+  if (!proj) return; // sin vínculo válido (no .cortex.json, opt-out, o slug no creado en Cortex)
 
-  const r = await ingestSessionFile(project, transcript, "claude");
-  if (r.saved || r.updated || r.superseded || r.noop) console.error(`[cortex hook] "${project}": +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas`);
+  const r = await ingestSessionFile(proj.name, transcript, "claude");
+  if (r.saved || r.updated || r.superseded || r.noop) console.error(`[cortex hook] "${proj.name}": +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas`);
 }
 
 main()
