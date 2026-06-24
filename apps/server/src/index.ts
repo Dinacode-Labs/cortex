@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { Hono, type Context } from "hono";
 import { closeSql } from "@cortex/database";
@@ -32,6 +34,19 @@ if (isLlmEnabled()) wireReconciler(); // reconciliación LLM (ADD/UPDATE/SUPERSE
 const app = new Hono();
 
 app.get("/health", (c) => c.json({ ok: true, service: "cortex-server" }));
+
+// Instalador (curl -fsSL <servidor>/install.sh | sh). Inyecta la URL del servidor.
+const INSTALL_SH = resolve(import.meta.dirname, "../../../scripts/install.sh");
+app.get("/install.sh", (c) => {
+  let sh: string;
+  try {
+    sh = readFileSync(INSTALL_SH, "utf8");
+  } catch {
+    return c.text("# install.sh no disponible", 500);
+  }
+  const publicUrl = process.env.CORTEX_PUBLIC_URL || new URL(c.req.url).origin;
+  return c.body(sh.replaceAll("__CORTEX_SERVER_URL__", publicUrl), 200, { "content-type": "text/x-shellscript; charset=utf-8" });
+});
 
 // --- Auth (email + OTP) ------------------------------------------------------
 app.post("/auth/request", async (c) => {
