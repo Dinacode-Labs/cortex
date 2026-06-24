@@ -1,7 +1,7 @@
 import { closeSql } from "@cortex/database";
 import { getContextPack } from "./operations.js";
 import { renderContextPack } from "./render.js";
-import { resolveProjectFromCwd } from "./project-config.js";
+import { resolveLinkedProject } from "./projects.js";
 
 /**
  * Hook de INYECCIÓN DE CONTEXTO (SessionStart de Claude Code, y equivalentes). Lee el
@@ -37,18 +37,18 @@ async function main(): Promise<void> {
     /* sin stdin (p.ej. OpenCode pasa --cwd) */
   }
   const cwd = argOf("--cwd") || input.cwd || process.cwd();
-  const project = resolveProjectFromCwd(cwd);
-  if (!project) return; // repo no apuntado a Cortex (sin .cortex.json)
+  const proj = await resolveLinkedProject(cwd);
+  if (!proj) return; // sin vínculo válido (no hay .cortex.json, opt-out, o slug no creado en Cortex)
 
   let pack = "";
   try {
-    pack = renderContextPack(await getContextPack(project)).slice(0, MAX_CTX);
+    pack = renderContextPack(await getContextPack(proj.name)).slice(0, MAX_CTX);
   } catch {
     return;
   }
   if (!pack.trim()) return;
 
-  const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${project}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${pack}`;
+  const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${proj.name}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${pack}`;
 
   if (format === "hermes") {
     process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call

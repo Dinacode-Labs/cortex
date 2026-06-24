@@ -18,7 +18,8 @@
     "connect-github": "tsx src/connect-github.ts",
     "connect-notion-export": "tsx src/connect-notion-export.ts",
     "connect-docs": "tsx src/connect-docs.ts",
-    "hook:context": "tsx src/hook-context.ts"
+    "hook:context": "tsx src/hook-context.ts",
+    "link": "tsx src/link.ts"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",

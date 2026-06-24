@@ -8,7 +8,8 @@ export { storeEmbeddingsBatch } from "./vectors.js";
 export { recordUsage, getUsageSummary, getRecentTraces, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./usage.js";
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
-export { resolveProjectFromCwd } from "./project-config.js";
+export { resolveProjectFromCwd, readCortexLink, slugify, type CortexLink } from "./project-config.js";
+export { findProjectBySlug, findProjectByName, createProject, resolveLinkedProject, type ProjectRef } from "./projects.js";
 export {
   isNearDuplicate,
   findNearest,
