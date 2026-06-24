@@ -1,5 +1,6 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
+import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { closeSql } from "@cortex/database";
 import {
   type ContextEntryStatus,
@@ -21,6 +22,11 @@ import {
   setClassifier,
   setReranker,
   validateEntry,
+  validateToken,
+  canAccessProject,
+  findProjectByName,
+  type AuthUser,
+  type ProjectRef,
 } from "@cortex/core";
 import { classifyEntry, isLlmEnabled, rerankLLM, synthesizeContextAnswer } from "@cortex/agents";
 import { badge, confidenceBadge, entryCard, esc, layout, mdLite, statusBadge, typeBadge } from "./views.js";
@@ -36,20 +42,82 @@ if (isLlmEnabled()) {
   setClassifier(classifyEntry);
   if (process.env.CORTEX_RERANK !== "off") setReranker(rerankLLM);
 }
-const app = new Hono();
+const app = new Hono<{ Variables: { user: AuthUser | null } }>();
+
+const WEB_COOKIE_TTL = 60 * 60 * 24 * 30; // 30 días
+
+function loginPage(msg = ""): string {
+  return layout(
+    "Iniciar sesión",
+    `<div class="empty" style="max-width:560px;margin:48px auto;text-align:center">
+       <h1>Dinacode Cortex</h1>
+       <p>Necesitas iniciar sesión para ver el contexto.</p>
+       ${msg ? `<p style="color:#c0392b">${esc(msg)}</p>` : ""}
+       <p style="margin-top:16px">Desde tu terminal:</p>
+       <pre style="text-align:left;display:inline-block">cortex auth login   # una vez por equipo (email + OTP)
+cortex ui           # abre esta UI ya autenticada</pre>
+     </div>`,
+  );
+}
+
+/** Proyectos visibles para el usuario (admin → todos), en el shape de listProjects. */
+async function accessibleProjects(email: string | null): Promise<Awaited<ReturnType<typeof listProjects>>> {
+  const all = await listProjects();
+  const out: typeof all = [];
+  for (const p of all) if (await canAccessProject({ id: p.entity.id } as ProjectRef, email)) out.push(p);
+  return out;
+}
+
+/** ¿El usuario puede ver ese proyecto (por nombre)? true si no se especifica o no existe. */
+async function guardProject(email: string | null, name: string | undefined | null): Promise<boolean> {
+  if (!name) return true;
+  const p = await findProjectByName(name);
+  return !p ? true : canAccessProject(p, email);
+}
+
+const deniedPage = (user: AuthUser | null): string =>
+  layout("Sin acceso", `<p><a class="back" href="/">← Inicio</a></p><div class="empty">No tienes acceso a este proyecto (privado). Pide al admin que te añada.</div>`, user);
+
+// Handshake CLI → cookie de sesión (cortex ui abre /auth/cli?token=…). Exento del gate.
+app.get("/auth/cli", async (c) => {
+  const token = c.req.query("token") ?? "";
+  const user = token ? await validateToken(token) : null;
+  if (!user) return c.html(loginPage("Token inválido o caducado. Ejecuta `cortex auth login`."), 401);
+  setCookie(c, "cortex_session", token, { httpOnly: true, sameSite: "Lax", path: "/", maxAge: WEB_COOKIE_TTL });
+  return c.redirect("/");
+});
+app.get("/logout", (c) => {
+  deleteCookie(c, "cortex_session", { path: "/" });
+  return c.html(loginPage("Sesión cerrada."));
+});
+
+// Gate: el resto de rutas requieren sesión. Resuelve el usuario desde la cookie.
+app.use("*", async (c, next) => {
+  const token = getCookie(c, "cortex_session");
+  const user = token ? await validateToken(token) : null;
+  c.set("user", user);
+  if (!user) return c.html(loginPage(), 401);
+  await next();
+});
 
 // --- Dashboard ---------------------------------------------------------------
 app.get("/", async (c) => {
   const project = c.req.query("project");
   const type = c.req.query("type");
   const showCapture = c.req.query("capture") === "1";
+  const email = c.get("user")?.email ?? null;
 
-  const projects = await listProjects();
-  const entries = await listEntries({
+  if (project && !(await guardProject(email, project))) return c.html(deniedPage(c.get("user")), 403);
+  const projects = await accessibleProjects(email);
+  let entries = await listEntries({
     project: project || undefined,
     type: (type as never) || undefined,
     limit: 60,
   });
+  if (!project) {
+    const ok = new Set(projects.map((p) => p.entity.id));
+    entries = entries.filter((e) => e.projectId && ok.has(e.projectId)); // no filtrar entre proyectos sin acceso
+  }
 
   const projectPills = [
     `<a class="pill ${!project ? "active" : ""}" href="/">Todos</a>`,
@@ -114,13 +182,14 @@ app.get("/", async (c) => {
 
     ${entries.length ? `<div class="grid">${entries.map(entryCard).join("")}</div>` : `<div class="empty">No hay entradas con estos filtros.</div>`}
   `;
-  return c.html(layout("Inicio", body));
+  return c.html(layout("Inicio", body, c.get("user")));
 });
 
 // --- Búsqueda ----------------------------------------------------------------
 app.get("/search", async (c) => {
   const q = c.req.query("q") ?? "";
   const project = c.req.query("project");
+  if (!(await guardProject(c.get("user")?.email ?? null, project))) return c.html(deniedPage(c.get("user")), 403);
   const hits = q ? await searchContext({ query: q, project: project || undefined, limit: 15 }) : [];
 
   const results = hits.length
@@ -141,7 +210,7 @@ app.get("/search", async (c) => {
     <h1>Resultados para "${esc(q)}"</h1>
     <p class="sub">${hits.length} resultados${project ? ` · proyecto ${esc(project)}` : ""} · ordenados por similitud</p>
     ${results}`;
-  return c.html(layout(`Búsqueda: ${q}`, body));
+  return c.html(layout(`Búsqueda: ${q}`, body, c.get("user")));
 });
 
 // --- Detalle de entrada ------------------------------------------------------
@@ -149,6 +218,7 @@ app.get("/entry/:id", async (c) => {
   const detail = await getEntryDetail(c.req.param("id"));
   if (!detail) return c.html(layout("No encontrado", `<p><a class="back" href="/">← Inicio</a></p><div class="empty">Entrada no encontrada.</div>`), 404);
   const { entry, source, entities, projectName } = detail;
+  if (!(await guardProject(c.get("user")?.email ?? null, projectName))) return c.html(deniedPage(c.get("user")), 403);
 
   const entityTags = entities.length
     ? `<div class="tags">${entities.map((e) => `<a href="/search?q=${encodeURIComponent(e.name)}">#${esc(e.name)} <small>(${esc(e.type)})</small></a>`).join("")}</div>`
@@ -200,7 +270,7 @@ app.get("/entry/:id", async (c) => {
       ${validateForm("rejected", "✖ Rechazar")}
       ${validateForm("obsolete", "🗄 Marcar obsoleta")}
     </div>`;
-  return c.html(layout(entry.title, body));
+  return c.html(layout(entry.title, body, c.get("user")));
 });
 
 app.post("/entry/:id/validate", async (c) => {
@@ -236,14 +306,15 @@ app.post("/save", async (c) => {
     ${warnHtml || '<p class="sub">Sin señales del loop de mejora.</p>'}
     <p style="margin-top:16px"><a href="/entry/${esc(entry.id)}"><button>Ver entrada</button></a>
     <a href="/?capture=1"><button class="secondary">Capturar otra</button></a></p>`;
-  return c.html(layout("Guardado", body));
+  return c.html(layout("Guardado", body, c.get("user")));
 });
 
 // --- Preguntar (agente de recuperación) --------------------------------------
 app.get("/ask", async (c) => {
   const q = c.req.query("q") ?? "";
   const project = c.req.query("project") || undefined;
-  const projects = await listProjects();
+  if (!(await guardProject(c.get("user")?.email ?? null, project))) return c.html(deniedPage(c.get("user")), 403);
+  const projects = await accessibleProjects(c.get("user")?.email ?? null);
 
   let answerHtml = "";
   if (q) {
@@ -279,12 +350,13 @@ app.get("/ask", async (c) => {
       </form>
     </div>
     ${q ? `<h2 style="font-size:17px">${esc(q)}</h2>${answerHtml}` : ""}`;
-  return c.html(layout("Preguntar", body));
+  return c.html(layout("Preguntar", body, c.get("user")));
 });
 
 // --- Context pack ------------------------------------------------------------
 app.get("/pack", async (c) => {
   const project = c.req.query("project") ?? "";
+  if (!(await guardProject(c.get("user")?.email ?? null, project))) return c.html(deniedPage(c.get("user")), 403);
   const area = c.req.query("area") || undefined;
   const asOfStr = c.req.query("asof");
   const asOf = asOfStr ? new Date(asOfStr) : undefined;
@@ -321,14 +393,15 @@ app.get("/pack", async (c) => {
     ${pack.sensitiveModules.length ? `<div class="panel"><h2>Módulos sensibles</h2>${pack.sensitiveModules.map((m) => badge(m, "#bc4c00")).join(" ")}</div>` : ""}
     ${pack.relevantToArea.length ? `<div class="panel"><h2>Relevante para "${esc(area ?? "")}"</h2>${pack.relevantToArea.map((h) => `<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#0099ff")} ${esc(h.entry.title)}</div>`).join("")}</div>` : ""}
   `;
-  return c.html(layout(`Context Pack: ${pack.project}`, body));
+  return c.html(layout(`Context Pack: ${pack.project}`, body, c.get("user")));
 });
 
 // --- Búsqueda de código ------------------------------------------------------
 app.get("/code", async (c) => {
   const q = c.req.query("q") ?? "";
-  const projects = await listProjects();
+  const projects = await accessibleProjects(c.get("user")?.email ?? null);
   const project = c.req.query("project") || projects[0]?.entity.name || "";
+  if (!(await guardProject(c.get("user")?.email ?? null, project))) return c.html(deniedPage(c.get("user")), 403);
   const projectOptions = projects
     .map((p) => `<option value="${esc(p.entity.name)}" ${project === p.entity.name ? "selected" : ""}>${esc(p.entity.name)}</option>`)
     .join("");
@@ -358,13 +431,14 @@ app.get("/code", async (c) => {
       </form>
     </div>
     ${q ? `<h2 style="font-size:16px">"${esc(q)}"</h2>${results}` : ""}`;
-  return c.html(layout("Código", body));
+  return c.html(layout("Código", body, c.get("user")));
 });
 
 // --- Lint (curado / salud del conocimiento) ----------------------------------
 app.get("/lint", async (c) => {
-  const projects = await listProjects();
+  const projects = await accessibleProjects(c.get("user")?.email ?? null);
   const project = c.req.query("project") || projects[0]?.entity.name || "";
+  if (!(await guardProject(c.get("user")?.email ?? null, project))) return c.html(deniedPage(c.get("user")), 403);
   const projectOptions = projects
     .map((p) => `<option value="${esc(p.entity.name)}" ${project === p.entity.name ? "selected" : ""}>${esc(p.entity.name)} (${p.entryCount})</option>`)
     .join("");
@@ -398,7 +472,7 @@ app.get("/lint", async (c) => {
       </form>
     </div>
     ${report}`;
-  return c.html(layout("Lint", body));
+  return c.html(layout("Lint", body, c.get("user")));
 });
 
 // --- Coste / uso de IA -------------------------------------------------------
@@ -461,20 +535,22 @@ app.get("/usage", async (c) => {
     <div class="panel"><h2>Últimas llamadas</h2>${table(`<tr><th ${th}>Fecha</th><th ${th}>Operación</th><th ${th}>Modelo</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, recentRows)}</div>
     <h2 style="margin-top:28px">Trazas recientes <span class="sub">· AI tracing de Mastra (árbol de spans)</span></h2>
     ${tracesHtml}`;
-  return c.html(layout("Coste IA", body));
+  return c.html(layout("Coste IA", body, c.get("user")));
 });
 
 // --- Grafo de conocimiento ---------------------------------------------------
 app.get("/api/graph", async (c) => {
   const project = c.req.query("project") ?? "";
+  if (!(await guardProject(c.get("user")?.email ?? null, project))) return c.json({ error: "sin acceso" }, 403);
   const includeEntries = c.req.query("entries") !== "0";
   const graph = await getProjectGraph(project, { includeEntries });
   return c.json(graph);
 });
 
 app.get("/graph", async (c) => {
-  const projects = await listProjects();
+  const projects = await accessibleProjects(c.get("user")?.email ?? null);
   const project = c.req.query("project") || projects[0]?.entity.name || "";
+  if (!(await guardProject(c.get("user")?.email ?? null, project))) return c.html(deniedPage(c.get("user")), 403);
   const includeEntries = c.req.query("entries") !== "0";
   const projectOptions = projects
     .map((p) => `<option value="${esc(p.entity.name)}" ${project === p.entity.name ? "selected" : ""}>${esc(p.entity.name)} (${p.entryCount})</option>`)
@@ -547,7 +623,7 @@ app.get("/graph", async (c) => {
           ' &nbsp; <span style="color:'+entryColor+'">▦</span> entrada';
       })();
     </script>`;
-  return c.html(layout("Grafo", body));
+  return c.html(layout("Grafo", body, c.get("user")));
 });
 
 const port = Number(process.env.WEB_PORT ?? 8080);

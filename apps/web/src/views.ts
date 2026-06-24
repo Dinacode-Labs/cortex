@@ -95,7 +95,7 @@ export function entryCard(entry: ContextEntry): string {
     </a>`;
 }
 
-export function layout(title: string, body: string): string {
+export function layout(title: string, body: string, user?: { email: string; admin: boolean } | null): string {
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -221,6 +221,7 @@ export function layout(title: string, body: string): string {
       <a href="/lint">Lint</a>
       <a href="/usage">Coste IA</a>
       <a href="/?capture=1">Capturar</a>
+      ${user ? `<span style="margin-left:12px;color:var(--color-text-muted)">${esc(user.email)}${user.admin ? ' <span class="pill" style="padding:1px 6px">admin</span>' : ""}</span> <a href="/logout">Salir</a>` : ""}
     </nav>
   </header>
   <main>${body}</main>

@@ -171,7 +171,12 @@ una vez por equipo. Es la base de **atribución** (`created_by` = email) y permi
 ```bash
 cortex server             # arranca la API (CORTEX_SERVER_PORT, def 8787)
 cortex auth login|status|logout
+cortex ui                 # abre la UI web YA autenticada (sin OTP; usa el token de la CLI)
 ```
+
+La **UI web** requiere sesión: `cortex ui` hace el handshake (`/auth/cli?token=…`) y deja
+una **cookie httpOnly**. Cada quien ve solo los proyectos a los que tiene acceso (admin ve
+todos); los privados ajenos quedan ocultos y bloqueados también por URL directa.
 
 Envío de OTP por **Brevo** (`BREVO_API_KEY`); **sin clave, modo dev**: el código se loguea
 (no envía email). Tokens y OTP se guardan **hasheados**.
@@ -271,6 +276,7 @@ de embeddings hay que reindexar (las dimensiones cambian).
 | `pnpm mcp` | Servidor MCP (stdio) |
 | `cortex` (o `pnpm cortex <cmd>`) | CLI unificado: `auth`, `server`, `link`, `sync`, `maintain`, `connect-*` |
 | `cortex auth login\|status\|logout` | Login email + OTP contra el servidor |
+| `cortex ui` | Abre la UI web ya autenticada (handshake con el token de la CLI) |
 | `cortex server` (`pnpm --filter @cortex/server start`) | API HTTP + auth (puerto 8787) |
 | `cortex link [--create "<N>"] [--parent <slug>] [--private\|--ignore]` | Vincular/crear el proyecto de esta carpeta |
 | `pnpm cortex:sync [--apply\|--doctor]` | Instala el toolbelt (MCP + skills + comandos + hooks + CLI) en tus agentes |
