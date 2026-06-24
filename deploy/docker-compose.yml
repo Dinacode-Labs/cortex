@@ -2,7 +2,9 @@
 # MCP HTTP + worker de mantenimiento. Una sola imagen, un comando por servicio.
 #   cp deploy/.env.example deploy/.env   # y edítalo (secretos, dominio, proveedores)
 #   docker compose -f deploy/docker-compose.yml up -d --build
-name: cortex
+# Proyecto AISLADO del compose de dev (que se llama "cortex"): así su volumen
+# (cortex-deploy_cortex-pgdata) NUNCA colisiona con el de dev ni lo borra un `down -v`.
+name: cortex-deploy
 
 x-cortex: &cortex
   build:

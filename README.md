@@ -32,7 +32,8 @@ Luego, en cualquier repo de trabajo:
 
 ```bash
 cortex link --create "Mi Proyecto"   # crea el proyecto y vincula esta carpeta (.cortex.json)
-cortex ui                            # abre la UI web ya autenticada
+cortex link <slug>                   # vincula a un proyecto que YA existe (si tienes acceso)
+cortex ui                            # abre la UI web ya autenticada (listado de proyectos)
 cortex --help                        # todos los comandos
 ```
 
@@ -43,8 +44,13 @@ MCP de Cortex + skills del ecosistema (Plane, Jira, Notion, Teams…).
 
 - **Opt-in por repo:** sin `.cortex.json` no se inyecta ni captura nada. `cortex link --ignore`
   desactiva un repo concreto (p.ej. uno personal anidado).
-- **Permisos:** los proyectos son **públicos** por defecto; `--private` los restringe a
-  ti + miembros; `--parent <slug>` los cuelga de un cliente (heredan contexto y permisos).
+- **Vincular a algo existente:** el slug es la identidad. Si haces `--create` y el slug ya
+  existe, **no se crea un duplicado**: te vinculas (si tienes acceso) o, si es privado, se
+  te avisa para **pedir acceso al admin** (sin crear nada).
+- **Permisos:** los proyectos son **públicos** por defecto; `--private` los restringe a su
+  dueño + miembros; `--parent <slug>` los cuelga de un cliente (heredan contexto y permisos).
+  En la UI (`cortex ui` → **Proyectos**) ves los proyectos a los que tienes acceso; el
+  **admin** los ve todos y **añade/quita** miembros de los privados.
 - Solo necesitas que el **servidor de Cortex esté en marcha** (lo opera tu equipo de infra).
 
 ## Capacidades

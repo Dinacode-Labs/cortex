@@ -9,7 +9,7 @@ export { recordUsage, getUsageSummary, getRecentTraces, type UsageRecord, type U
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
 export { resolveProjectFromCwd, readCortexLink, slugify, type CortexLink } from "./project-config.js";
-export { findProjectBySlug, findProjectByName, createProject, resolveLinkedProject, canAccessProject, listAccessibleProjects, addProjectMember, isProjectMember, type ProjectRef } from "./projects.js";
+export { findProjectBySlug, findProjectByName, createProject, resolveLinkedProject, canAccessProject, listAccessibleProjects, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, type ProjectRef } from "./projects.js";
 export {
   isNearDuplicate,
   findNearest,
@@ -26,7 +26,7 @@ export {
   type ReconcileResult,
 } from "./dedup.js";
 export { autoCurate, type CurationResult } from "./curate.js";
-export { requestOtp, verifyOtp, validateToken, revokeToken, createUiTicket, redeemUiTicket, isAdmin, isAllowedEmail, type AuthUser } from "./auth.js";
+export { requestOtp, verifyOtp, validateToken, revokeToken, createUiTicket, redeemUiTicket, isAdmin, isAllowedEmail, listAdmins, type AuthUser } from "./auth.js";
 export { sendOtpEmail } from "./email.js";
 export { apiGet, apiPost, apiBase, isAuthenticated, type ApiResult } from "./api-client.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture.js";
