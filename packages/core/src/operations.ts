@@ -312,12 +312,14 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
     throw new Error(`Proyecto no encontrado: "${project}".`);
   }
 
+  // Herencia: el pack incluye el conocimiento del proyecto + el de sus ancestros (padre).
+  const ids = await projectIdsWithAncestors(sql, projectId);
   const [decisions, constraints, risks, technicalDebt, conventions] = await Promise.all([
-    entriesByType(sql, projectId, "decision", asOf),
-    entriesByType(sql, projectId, "constraint", asOf),
-    entriesByType(sql, projectId, "risk", asOf),
-    entriesByType(sql, projectId, "technical_debt", asOf),
-    entriesByType(sql, projectId, "convention", asOf),
+    entriesByType(sql, ids, "decision", asOf),
+    entriesByType(sql, ids, "constraint", asOf),
+    entriesByType(sql, ids, "risk", asOf),
+    entriesByType(sql, ids, "technical_debt", asOf),
+    entriesByType(sql, ids, "convention", asOf),
   ]);
 
   const moduleRows = (await sql`
@@ -383,9 +385,22 @@ async function findProjectId(sql: Sql, project: string): Promise<string | null> 
   return rows[0] ? (rows[0].id as string) : null;
 }
 
+/** IDs del proyecto + todos sus ancestros (jerarquía padre). Para herencia de contexto. */
+async function projectIdsWithAncestors(sql: Sql, projectId: string): Promise<string[]> {
+  const rows = (await sql`
+    WITH RECURSIVE chain AS (
+      SELECT id, parent_id FROM entities WHERE id = ${projectId}
+      UNION ALL
+      SELECT e.id, e.parent_id FROM entities e JOIN chain c ON e.id = c.parent_id
+    )
+    SELECT id FROM chain
+  `) as unknown as Row[];
+  return rows.map((r) => r.id as string);
+}
+
 async function entriesByType(
   sql: Sql,
-  projectId: string,
+  projectIds: string[],
   type: ContextEntryType,
   asOf?: Date,
   limit = 20,
@@ -395,7 +410,7 @@ async function entriesByType(
     : sql`AND valid_to IS NULL`;
   const rows = (await sql`
     SELECT * FROM context_entries
-    WHERE project_id = ${projectId} AND type = ${type}
+    WHERE project_id = ANY(${projectIds}) AND type = ${type}
       AND status NOT IN ('rejected', 'obsolete')
       ${temporal}
     ORDER BY created_at DESC

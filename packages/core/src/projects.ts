@@ -11,6 +11,7 @@ export interface ProjectRef {
   slug: string | null;
   visibility: "public" | "private";
   ownerEmail: string | null;
+  parentId: string | null;
 }
 
 function toRef(r: Row | undefined): ProjectRef | null {
@@ -21,30 +22,41 @@ function toRef(r: Row | undefined): ProjectRef | null {
     slug: (r.slug as string) ?? null,
     visibility: ((r.visibility as string) ?? "public") === "private" ? "private" : "public",
     ownerEmail: (r.owner_email as string) ?? null,
+    parentId: (r.parent_id as string) ?? null,
   };
 }
 
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {
-  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email FROM entities WHERE type = 'project' AND slug = ${slug} LIMIT 1`) as unknown as Row[];
+  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND slug = ${slug} LIMIT 1`) as unknown as Row[];
   return toRef(rows[0]);
 }
 
 export async function findProjectByName(name: string): Promise<ProjectRef | null> {
-  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email FROM entities WHERE type = 'project' AND name = ${name} LIMIT 1`) as unknown as Row[];
+  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND name = ${name} LIMIT 1`) as unknown as Row[];
   return toRef(rows[0]);
 }
 
-/** Crea (o recupera) un proyecto. Por defecto PÚBLICO; `visibility:'private'` lo restringe. */
-export async function createProject(name: string, opts?: { visibility?: "public" | "private"; ownerEmail?: string | null }): Promise<ProjectRef> {
+/** Crea (o recupera) un proyecto. Público por defecto; `private` lo restringe; `parentSlug`
+ * lo cuelga de un padre (cliente) → hereda contexto y permisos. */
+export async function createProject(
+  name: string,
+  opts?: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
+): Promise<ProjectRef> {
   const sql = getSql();
+  let parentId: string | null = null;
+  if (opts?.parentSlug) {
+    const parent = await findProjectBySlug(opts.parentSlug);
+    if (!parent) throw new Error(`Proyecto padre "${opts.parentSlug}" no encontrado.`);
+    parentId = parent.id;
+  }
   const ent = await resolveEntity(sql, name, "project");
-  const cur = (await sql`SELECT slug, visibility, owner_email FROM entities WHERE id = ${ent.id}`) as unknown as Row[];
+  const cur = (await sql`SELECT slug, visibility, owner_email, parent_id FROM entities WHERE id = ${ent.id}`) as unknown as Row[];
   if (cur[0]?.slug) return toRef({ ...cur[0], id: ent.id, name: ent.name })!; // ya existía
   let slug = slugify(name);
   for (let n = 2; await findProjectBySlug(slug); n++) slug = `${slugify(name)}-${n}`;
   const visibility = opts?.visibility ?? "public";
-  await sql`UPDATE entities SET slug = ${slug}, visibility = ${visibility}, owner_email = ${opts?.ownerEmail ?? null} WHERE id = ${ent.id}`;
-  return { id: ent.id, name: ent.name, slug, visibility, ownerEmail: opts?.ownerEmail ?? null };
+  await sql`UPDATE entities SET slug = ${slug}, visibility = ${visibility}, owner_email = ${opts?.ownerEmail ?? null}, parent_id = ${parentId} WHERE id = ${ent.id}`;
+  return { id: ent.id, name: ent.name, slug, visibility, ownerEmail: opts?.ownerEmail ?? null, parentId };
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
@@ -52,18 +64,34 @@ export async function isProjectMember(projectId: string, email: string): Promise
   return r.length > 0;
 }
 
-/** ¿Puede `email` acceder al proyecto? Público → cualquiera; privado → dueño, miembro o admin. */
+/**
+ * ¿Puede `email` acceder al proyecto? Cascada por la jerarquía: si el proyecto O algún
+ * ANCESTRO es privado → restringido; concede acceso ser admin, o dueño/miembro del
+ * proyecto o de cualquier ancestro (membresía del padre "Boluda" abre los subproyectos).
+ */
 export async function canAccessProject(project: ProjectRef, email: string | null): Promise<boolean> {
-  if (project.visibility !== "private") return true;
+  const chain = (await getSql()`
+    WITH RECURSIVE c AS (
+      SELECT id, visibility, owner_email, parent_id FROM entities WHERE id = ${project.id}
+      UNION ALL
+      SELECT e.id, e.visibility, e.owner_email, e.parent_id FROM entities e JOIN c ON e.id = c.parent_id
+    )
+    SELECT id, visibility, owner_email FROM c
+  `) as unknown as Row[];
+  if (!chain.some((r) => (r.visibility as string) === "private")) return true; // todo público
   if (!email) return false;
   if (isAdmin(email)) return true;
-  if (project.ownerEmail && project.ownerEmail.toLowerCase() === email.toLowerCase()) return true;
-  return isProjectMember(project.id, email);
+  const e = email.toLowerCase();
+  for (const r of chain) {
+    if (((r.owner_email as string) ?? "").toLowerCase() === e) return true;
+    if (await isProjectMember(r.id as string, e)) return true;
+  }
+  return false;
 }
 
 /** Proyectos visibles para `email`: admin → todos; resto → públicos + privados propios/compartidos. */
 export async function listAccessibleProjects(email: string | null): Promise<ProjectRef[]> {
-  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email FROM entities WHERE type = 'project' ORDER BY name`) as unknown as Row[];
+  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' ORDER BY name`) as unknown as Row[];
   const refs = rows.map(toRef).filter((r): r is ProjectRef => r !== null);
   if (isAdmin(email)) return refs;
   const out: ProjectRef[] = [];

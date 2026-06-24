@@ -61,8 +61,15 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    const p = await createProject(name, { visibility, ownerEmail: owner });
-    writeLink({ slug: p.slug }, `Proyecto "${p.name}" (${p.visibility}${owner ? `, dueño ${owner}` : ""}) creado y vinculado · slug: ${p.slug}.`);
+    const pi = args.indexOf("--parent");
+    const parentSlug = pi >= 0 ? args[pi + 1] : null;
+    try {
+      const p = await createProject(name, { visibility, ownerEmail: owner, parentSlug });
+      writeLink({ slug: p.slug }, `Proyecto "${p.name}" (${p.visibility}${parentSlug ? `, bajo ${parentSlug}` : ""}${owner ? `, dueño ${owner}` : ""}) creado y vinculado · slug: ${p.slug}.`);
+    } catch (e) {
+      console.error(`✗ ${(e as Error).message}`);
+      process.exitCode = 1;
+    }
     return;
   }
 
