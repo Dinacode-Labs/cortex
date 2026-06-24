@@ -1,24 +1,22 @@
 import { readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
-import { closeSql, getSql } from "@cortex/database";
-import { getEmbeddingProvider } from "@cortex/embeddings";
-import { saveContext } from "./operations.js";
-import { storeEmbeddingsBatch } from "./vectors.js";
+import { loadEnv } from "@cortex/shared";
+loadEnv();
+import { apiPost } from "./api-client.js";
+import type { BatchItem } from "./capture.js";
 import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
 
 /**
- * Conector GENÉRICO de documentos: recorre un directorio suelto e ingiere los ficheros
- * ofimáticos (vía la capa `extract`). Para fuentes con estructura (Notion, etc.) usa el
- * conector específico, que enlaza cada adjunto a su página. Esto es el "subir una
- * carpeta de ficheros" sin contexto de origen.
+ * Conector GENÉRICO de documentos: recorre un directorio e ingiere los ficheros (vía la
+ * capa `extract` multimodal). Escribe a través de la API autenticada (`POST /capture/batch`):
+ * atribución (created_by=email) + permisos + embedding por lotes server-side. Requiere
+ * `cortex auth login` y el servidor en marcha.
  *
- * Uso: tsx src/connect-docs.ts "<Proyecto>" <ruta-dir>
+ * Uso: tsx src/connect-docs.ts "<slug>" <ruta-dir>
  */
-
 const MIN_CHARS = Number(process.env.CORTEX_DOCS_MIN_CHARS ?? "40");
 const MAX_CONTENT = 8000;
-const EMBED_BATCH = Number(process.env.CORTEX_EMBED_BATCH ?? "32");
-const CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "6");
+const CHUNK = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
 const HEX32 = /\s+[0-9a-f]{32}$/i;
 
 function walk(dir: string): string[] {
@@ -33,13 +31,11 @@ function walk(dir: string): string[] {
   return out;
 }
 
-interface Doc { title: string; content: string; ref: string; format: string }
-
 async function main(): Promise<void> {
-  const project = process.argv[2];
+  const slug = process.argv[2];
   const dir = process.argv[3];
-  if (!project || !dir) {
-    console.error('Uso: tsx src/connect-docs.ts "<Proyecto>" <ruta-dir>');
+  if (!slug || !dir) {
+    console.error('Uso: tsx src/connect-docs.ts "<slug>" <ruta-dir>');
     process.exitCode = 1;
     return;
   }
@@ -47,47 +43,32 @@ async function main(): Promise<void> {
   const files = walk(root);
   console.log(`${files.length} documentos en ${root}. Extrayendo...`);
 
-  const docs: Doc[] = [];
+  const items: BatchItem[] = [];
   let skipped = 0;
   for (const file of files) {
     const ex = await extractFileText(file);
     if (!ex || ex.text.length < MIN_CHARS) { skipped++; continue; }
     const title = basename(file, extname(file)).replace(HEX32, "").trim().slice(0, 200);
-    docs.push({ title, content: `${title}\n\n${ex.text}`.slice(0, MAX_CONTENT), ref: relative(root, file).slice(0, 200), format: ex.format });
+    const ref = relative(root, file).slice(0, 200);
+    items.push({ content: `${title}\n\n${ex.text}`.slice(0, MAX_CONTENT), title, sourceType: "document", sourceReference: ref, metadata: { format: ex.format, file: ref } });
   }
-  console.log(`${docs.length} con texto (${skipped} vacíos/escaneados/no soportados). Ingestando en "${project}"...`);
+  console.log(`${items.length} con texto (${skipped} vacíos/escaneados/no soportados). Subiendo a "${slug}" vía API...`);
 
-  const toEmbed: { contextEntryId: string; text: string }[] = [];
-  let cursor = 0;
-  let done = 0;
-  async function worker(): Promise<void> {
-    while (cursor < docs.length) {
-      const d = docs[cursor++]!;
-      try {
-        const { entry } = await saveContext(
-          { content: d.content, project, title: d.title, sourceType: "document", sourceReference: d.ref, createdBy: "docs", metadata: { format: d.format, file: d.ref } },
-          { useClassifier: false, detectImprovements: false, skipEmbedding: true },
-        );
-        toEmbed.push({ contextEntryId: entry.id, text: `${entry.title}\n\n${entry.content}` });
-      } catch (e) {
-        console.error(`  ✗ ${d.ref}: ${(e as Error).message}`);
-      }
-      if (++done % 20 === 0 || done === docs.length) console.log(`  fase 1: ${done}/${docs.length}`);
+  let added = 0;
+  let existing = 0;
+  for (let i = 0; i < items.length; i += CHUNK) {
+    const r = await apiPost<{ results?: { action: string }[]; error?: string }>("/capture/batch", { slug, items: items.slice(i, i + CHUNK) });
+    if (!r.ok) {
+      console.error(`✗ Captura fallida (${r.status}): ${r.data.error ?? "¿cortex auth login / servidor en marcha?"}`);
+      process.exit(1);
     }
+    for (const x of r.data.results ?? []) x.action === "added" ? added++ : existing++;
+    console.log(`  ${Math.min(i + CHUNK, items.length)}/${items.length}`);
   }
-  await Promise.all(Array.from({ length: CONCURRENCY }, () => worker()));
-
-  console.log(`Fase 2: embeddings por lotes de ${EMBED_BATCH}...`);
-  await storeEmbeddingsBatch(getSql(), getEmbeddingProvider(), toEmbed, {
-    batchSize: EMBED_BATCH,
-    onProgress: (n) => console.log(`  fase 2: ${n}/${toEmbed.length}`),
-  });
-  console.log(`Ingesta de documentos completada: ${toEmbed.length} entradas.`);
+  console.log(`Conector docs: ${added} nuevos, ${existing} ya existían.`);
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en connect-docs:", e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+main().catch((e) => {
+  console.error("Error en connect-docs:", e);
+  process.exit(1);
+});

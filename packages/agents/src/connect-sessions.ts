@@ -223,11 +223,11 @@ export async function ingestSessionFile(project: string, file: string, platform 
 }
 
 async function main(): Promise<void> {
-  const project = process.argv[2];
+  const slug = process.argv[2];
   const repoPath = process.argv[3];
   const platform = (process.argv[4] ?? "claude").toLowerCase();
-  if (!project || !repoPath) {
-    console.error('Uso: tsx src/connect-sessions.ts "<Proyecto>" <ruta-repo> [claude]');
+  if (!slug || !repoPath) {
+    console.error('Uso: tsx src/connect-sessions.ts "<slug>" <ruta-repo> [claude]');
     process.exitCode = 1;
     return;
   }
@@ -247,23 +247,21 @@ async function main(): Promise<void> {
   files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
   const limit = process.env.CORTEX_SESSIONS_LIMIT ? Number(process.env.CORTEX_SESSIONS_LIMIT) : undefined;
   if (limit) files = files.slice(0, limit);
-  console.log(`${files.length} sesiones en ${folder}. Destilando → "${project}"...`);
+  console.log(`${files.length} sesiones en ${folder}. Destilando → "${slug}" (vía API)...`);
 
   let savedTotal = 0;
   let updatedTotal = 0;
   let supersededTotal = 0;
-  let noopTotal = 0;
-  let skipped = 0;
+  let failedTotal = 0;
   for (const file of files) {
-    const r = await ingestSessionFile(project, file, platform);
-    if (r.skipped) { skipped++; continue; }
+    const r = await captureSessionViaApi(slug, file, platform); // distila local + POST /capture (autenticado)
     savedTotal += r.saved;
     updatedTotal += r.updated;
     supersededTotal += r.superseded;
-    noopTotal += r.noop;
-    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas`);
+    failedTotal += r.failed;
+    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas${r.failed ? `, ${r.failed} fallos` : ""}`);
   }
-  console.log(`Backfill: +${savedTotal} nuevas, ~${updatedTotal} UPDATE, ⊘${supersededTotal} SUPERSEDE, ${noopTotal} NOOP, ${skipped} sesiones ya ingeridas.`);
+  console.log(`Backfill: +${savedTotal} nuevas, ~${updatedTotal} UPDATE, ⊘${supersededTotal} SUPERSEDE${failedTotal ? `, ${failedTotal} fallos (¿cortex auth login / servidor?)` : ""}.`);
 }
 
 // CLI directo (no al importar `ingestSessionFile` desde el hook).
