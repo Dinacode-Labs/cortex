@@ -153,10 +153,16 @@ Bucle automático sin invocación manual. Análisis + fricción:
   deduplicados, 0 imágenes tocadas.
 - **Pendiente:** `/review` opcional NO bloqueante (curado a mano), solo si hace falta;
   merge LLM (no solo dedup) en el pase de maintain.
-- **Pendiente:** **auto-captura** en Codex/OpenCode/Hermes (Claude tiene `transcript_path`
-  + SessionEnd limpios; los demás no exponen transcript / no tienen session-end → se
-  cubren con el **backfill batch** `connect-sessions` por plataforma). `UserPromptSubmit`
-  (RAG por prompt). Bin `cortex` para no arrancar pnpm/tsx en cada hook (latencia).
+- **Auto-captura del resto — hecho (backfill).** Claude tiene captura en tiempo real
+  (SessionEnd + transcript); Codex/OpenCode/Hermes no exponen un session-end con
+  transcript completo, así que se cubren con **backfill batch** desde su store:
+  `cortex connect-sessions "<slug>" <repo> codex|opencode|hermes`. Lectores en
+  `session-readers.ts` (Codex `~/.codex/sessions/*.jsonl`; OpenCode
+  `~/.local/share/opencode/storage` join session→message→part; Hermes `~/.hermes/state.db`
+  SQLite vía `node:sqlite`), pipeline compartido `captureCondensedViaApi` (destila + POST
+  autenticado). Codex/OpenCode verificados con stores sintéticos; Hermes degrada bien sin
+  db (lógica no probada con datos reales). Pendiente: programarlo (cron) y probar Hermes real.
+- **Pendiente:** `UserPromptSubmit` (RAG por prompt) opcional.
 
 ## Backfill de conversaciones de agente → Cortex (depuradas) — **v1 hecho (Claude)**
 

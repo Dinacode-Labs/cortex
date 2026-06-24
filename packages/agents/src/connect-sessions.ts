@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { closeSql, getSql } from "@cortex/database";
 import { apiPost, saveWithReconciliation } from "@cortex/core";
 import { wireReconciler } from "./reconcile.js";
+import { readSessions } from "./session-readers.js";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextEntryType } from "@cortex/shared";
 import { runAgent, shutdownObservability } from "./mastra.js";
@@ -140,13 +141,11 @@ wireReconciler();
 
 export interface ApiCaptureResult { saved: number; updated: number; superseded: number; noop: number; failed: number }
 
-/** Como ingestSessionFile pero vía la API autenticada (`POST /capture`): distila en local
- * y POSTea cada unidad con el token del dev → atribución (created_by=email) + permisos en
- * el servidor. Lo usa el hook de auto-captura. */
-export async function captureSessionViaApi(slug: string, file: string, platform = "claude"): Promise<ApiCaptureResult> {
-  const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
+/** Pipeline compartido: dado el transcript YA CONDENSADO de una sesión (de cualquier
+ * agente), distila en local y POSTea cada unidad por la API autenticada (`POST /capture`)
+ * → atribución (created_by=email) + permisos en el servidor. */
+export async function captureCondensedViaApi(slug: string, condensed: string, sessionId: string, platform: string): Promise<ApiCaptureResult> {
   const res: ApiCaptureResult = { saved: 0, updated: 0, superseded: 0, noop: 0, failed: 0 };
-  const condensed = condenseSession(file);
   if (condensed.length < 200) return res;
   const items: Item[] = [];
   const seen = new Set<string>();
@@ -165,7 +164,7 @@ export async function captureSessionViaApi(slug: string, file: string, platform 
       content: scrub(`${it.title}\n\n${it.content}`),
       type: it.type,
       sourceType: "agent_session",
-      sourceReference: sessionId,
+      sourceReference: `${platform}:${sessionId}`,
       confidence: "low",
       metadata: { platform, sessionId },
     });
@@ -180,6 +179,12 @@ export async function captureSessionViaApi(slug: string, file: string, platform 
     else res.noop++;
   }
   return res;
+}
+
+/** Auto-captura del hook (Claude): lee el transcript .jsonl, lo condensa y lo captura. */
+export async function captureSessionViaApi(slug: string, file: string, platform = "claude"): Promise<ApiCaptureResult> {
+  const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
+  return captureCondensedViaApi(slug, condenseSession(file), sessionId, platform);
 }
 
 export interface IngestResult { saved: number; updated: number; superseded: number; noop: number; skipped: boolean }
@@ -227,39 +232,48 @@ async function main(): Promise<void> {
   const repoPath = process.argv[3];
   const platform = (process.argv[4] ?? "claude").toLowerCase();
   if (!slug || !repoPath) {
-    console.error('Uso: tsx src/connect-sessions.ts "<slug>" <ruta-repo> [claude]');
+    console.error('Uso: tsx src/connect-sessions.ts "<slug>" <ruta-repo> [claude|codex|opencode|hermes]');
     process.exitCode = 1;
     return;
   }
-  if (platform !== "claude") {
-    console.error(`Plataforma "${platform}" aún no soportada (v1: claude).`);
+  if (!["claude", "codex", "opencode", "hermes"].includes(platform)) {
+    console.error(`Plataforma "${platform}" no soportada (claude|codex|opencode|hermes).`);
     process.exitCode = 1;
     return;
   }
 
-  const folder = join(homedir(), ".claude/projects", repoPath.replace(/[^a-zA-Z0-9]/g, "-"));
-  if (!existsSync(folder)) {
-    console.error(`No hay sesiones de Claude para ${repoPath} (${folder} no existe).`);
-    process.exitCode = 1;
-    return;
-  }
-  let files = readdirSync(folder).filter((f) => f.endsWith(".jsonl")).map((f) => join(folder, f));
-  files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
   const limit = process.env.CORTEX_SESSIONS_LIMIT ? Number(process.env.CORTEX_SESSIONS_LIMIT) : undefined;
-  if (limit) files = files.slice(0, limit);
-  console.log(`${files.length} sesiones en ${folder}. Destilando → "${slug}" (vía API)...`);
+
+  // Cada sesión → { sessionId, condensed }. Claude lee transcripts .jsonl; el resto, su store.
+  let sessions: { sessionId: string; condensed: string }[];
+  if (platform === "claude") {
+    const folder = join(homedir(), ".claude/projects", repoPath.replace(/[^a-zA-Z0-9]/g, "-"));
+    if (!existsSync(folder)) {
+      console.error(`No hay sesiones de Claude para ${repoPath} (${folder} no existe).`);
+      process.exitCode = 1;
+      return;
+    }
+    let files = readdirSync(folder).filter((f) => f.endsWith(".jsonl")).map((f) => join(folder, f));
+    files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    if (limit) files = files.slice(0, limit);
+    sessions = files.map((f) => ({ sessionId: f.split("/").pop()!.replace(/\.jsonl$/, ""), condensed: condenseSession(f) }));
+  } else {
+    sessions = await readSessions(platform, repoPath);
+    if (limit) sessions = sessions.slice(0, limit);
+  }
+  console.log(`${sessions.length} sesiones (${platform}) para ${repoPath}. Destilando → "${slug}" (vía API)...`);
 
   let savedTotal = 0;
   let updatedTotal = 0;
   let supersededTotal = 0;
   let failedTotal = 0;
-  for (const file of files) {
-    const r = await captureSessionViaApi(slug, file, platform); // distila local + POST /capture (autenticado)
+  for (const s of sessions) {
+    const r = await captureCondensedViaApi(slug, s.condensed, s.sessionId, platform);
     savedTotal += r.saved;
     updatedTotal += r.updated;
     supersededTotal += r.superseded;
     failedTotal += r.failed;
-    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas${r.failed ? `, ${r.failed} fallos` : ""}`);
+    console.log(`  ${s.sessionId.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas${r.failed ? `, ${r.failed} fallos` : ""}`);
   }
   console.log(`Backfill: +${savedTotal} nuevas, ~${updatedTotal} UPDATE, ⊘${supersededTotal} SUPERSEDE${failedTotal ? `, ${failedTotal} fallos (¿cortex auth login / servidor?)` : ""}.`);
 }
