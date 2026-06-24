@@ -2,7 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { closeSql, getSql } from "@cortex/database";
-import { saveWithReconciliation, setReconciler } from "@cortex/core";
+import { apiPost, saveWithReconciliation } from "@cortex/core";
+import { wireReconciler } from "./reconcile.js";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextEntryType } from "@cortex/shared";
 import { runAgent, shutdownObservability } from "./mastra.js";
@@ -134,29 +135,52 @@ async function alreadyIngested(project: string, sessionId: string): Promise<bool
   return rows.length > 0;
 }
 
-/** Fusiona conocimiento existente + nuevo en una entrada consolidada (UPDATE estilo mem0). */
-async function mergeKnowledge(existing: string, incoming: string): Promise<string> {
-  const prompt = `Entrada existente:\n"""\n${existing}\n"""\n\nNueva información sobre lo mismo:\n"""\n${incoming}\n"""\n\nFúndelas en UNA entrada consolidada.`;
-  const merged = (await runAgent("merger", prompt, { maxOutputTokens: 700 })).trim();
-  return merged || existing;
-}
+// Inyecta el reconciliador LLM en core (saveWithReconciliation → ADD/UPDATE/SUPERSEDE/NOOP).
+wireReconciler();
 
-/** Decide la relación entre lo existente y lo nuevo: noop / update / supersede (contradice). */
-async function reconcile(existing: string, incoming: string): Promise<"noop" | "update" | "supersede"> {
-  const prompt = `EXISTENTE:\n"""\n${existing}\n"""\n\nNUEVA:\n"""\n${incoming}\n"""\n\n¿Relación de la NUEVA respecto a la EXISTENTE?`;
-  try {
-    const raw = await runAgent("reconciler", prompt, { maxOutputTokens: 60 });
-    const m = raw.match(/noop|update|supersede/i);
-    return (m ? m[0].toLowerCase() : "update") as "noop" | "update" | "supersede";
-  } catch {
-    return "update"; // ante duda, fusionar (no invalidar a la ligera)
+export interface ApiCaptureResult { saved: number; updated: number; superseded: number; noop: number; failed: number }
+
+/** Como ingestSessionFile pero vía la API autenticada (`POST /capture`): distila en local
+ * y POSTea cada unidad con el token del dev → atribución (created_by=email) + permisos en
+ * el servidor. Lo usa el hook de auto-captura. */
+export async function captureSessionViaApi(slug: string, file: string, platform = "claude"): Promise<ApiCaptureResult> {
+  const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
+  const res: ApiCaptureResult = { saved: 0, updated: 0, superseded: 0, noop: 0, failed: 0 };
+  const condensed = condenseSession(file);
+  if (condensed.length < 200) return res;
+  const items: Item[] = [];
+  const seen = new Set<string>();
+  for (const w of windows(condensed)) {
+    for (const it of await distill(slug, w)) {
+      const key = it.title.toLowerCase().replace(/[^a-z0-9]+/g, "");
+      if (key.length < 3 || seen.has(key)) continue;
+      seen.add(key);
+      items.push(it);
+    }
   }
+  for (const it of items) {
+    const r = await apiPost<{ action?: string }>("/capture", {
+      slug,
+      title: it.title,
+      content: scrub(`${it.title}\n\n${it.content}`),
+      type: it.type,
+      sourceType: "agent_session",
+      sourceReference: sessionId,
+      confidence: "low",
+      metadata: { platform, sessionId },
+    });
+    if (!r.ok) {
+      res.failed++;
+      continue;
+    }
+    const a = r.data.action;
+    if (a === "add") res.saved++;
+    else if (a === "update") res.updated++;
+    else if (a === "supersede" || a === "contradict") res.superseded++;
+    else res.noop++;
+  }
+  return res;
 }
-
-// Inyecta el reconciliador LLM en core: con esto saveWithReconciliation puede
-// fusionar/superseder (no solo dedup). Los conectores que corren sin agents usan la
-// versión determinista (solo NOOP de near-idénticos).
-setReconciler({ decide: reconcile, merge: mergeKnowledge });
 
 export interface IngestResult { saved: number; updated: number; superseded: number; noop: number; skipped: boolean }
 

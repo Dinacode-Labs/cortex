@@ -19,6 +19,13 @@ decisiones técnicas firmes viven en [`decisions.md`](./decisions.md).
   usuario + permisos exigen que **Cortex sea un servicio con API HTTP** autenticada →
   se acopla a *transporte HTTP del MCP* + *despliegue real*. Atribución, permisos y auth
   **llegan juntos con el servidor**. Necesita además un servicio de envío de email (OTP).
+- **Hecho:** servidor HTTP (apps/server) + auth email/OTP + endpoints autenticados
+  `/context-pack`, `/capture`, `/projects`. Los **hooks** ya pasan por la API (cliente
+  `core/api-client`): hook:context→GET /context-pack, hook:capture→distila local y POST
+  /capture con atribución (created_by=email) + permisos. **Requiere el servidor en marcha**
+  (`cortex server`); si no, los hooks degradan en silencio. **Pendiente:** migrar los
+  conectores batch (docs/notion/github/backfill) — necesitan un `POST /capture/batch` (para
+  conservar el embedding por lotes) y `/relate` (enlaces de adjuntos).
 
 ## Ingesta multimodal (captura más allá del texto)
 
