@@ -341,6 +341,9 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Por qué Web-standard y no Node req/res:** encaja con Hono (`c.req.raw`) sin puentes;
   y mantiene el MCP en `apps/mcp-server` (zod v3 aislado), sin mezclarlo con apps/server.
 - **Verificado:** sin token → 401; initialize → session-id + serverInfo; tools/list → 8 tools.
-- **Revisar cuando:** queramos pasar la identidad del Bearer a las tools (atribución/
-  permisos por usuario también en el MCP), persistencia de sesiones multi-nodo
+- **Identidad del Bearer en las tools — hecho:** el HTTP construye el server con el
+  usuario (`buildMcpServer(user)`); las tools atribuyen (`created_by`=email) y aplican
+  permisos (acceso al proyecto), igual que hooks/conectores. La sesión queda ligada al
+  usuario (otro token no reutiliza su session-id). Verificado: privado ajeno→denegado, save→created_by=email.
+- **Revisar cuando:** persistencia de sesiones multi-nodo
   (eventStore), o montarlo tras el mismo dominio que la API.
