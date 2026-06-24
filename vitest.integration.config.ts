@@ -8,10 +8,12 @@ const cortexAlias = Object.fromEntries(
 );
 
 /**
- * Vitest a nivel de workspace. Los tests viven en `tests/` e importan las APIs públicas
- * (@cortex/*) o módulos sueltos. El plugin resuelve los imports NodeNext con extensión
- * `.js` a sus fuentes `.ts` (el repo usa ESM NodeNext + tsx, no hay build).
+ * Tests de INTEGRACIÓN: contra una BD Postgres real (cortex_test), con embeddings `local`
+ * y LLM `none` (herméticos, sin red). Requiere el Postgres de dev (`pnpm db:up`); el
+ * globalSetup crea+migra la BD de test. Ejecútalos con `pnpm test:integration`.
  */
+const TEST_DB = process.env.CORTEX_TEST_DATABASE_URL || "postgres://cortex:cortex@localhost:5433/cortex_test";
+
 export default defineConfig({
   plugins: [
     {
@@ -28,7 +30,17 @@ export default defineConfig({
   ],
   resolve: { alias: cortexAlias },
   test: {
-    include: ["tests/*.test.ts"], // unit (raíz de tests/); la integración va en su propio config
+    include: ["tests/integration/**/*.test.ts"],
     environment: "node",
+    globalSetup: ["tests/integration/global-setup.ts"],
+    fileParallelism: false, // comparten una BD; secuencial para evitar carreras
+    testTimeout: 30_000,
+    env: {
+      DATABASE_URL: TEST_DB,
+      EMBEDDINGS_PROVIDER: "local",
+      LLM_PROVIDER: "none",
+      CORTEX_AUTH_DOMAIN: "dinacode.com",
+      CORTEX_ADMIN_EMAIL: "admin@dinacode.com",
+    },
   },
 });
