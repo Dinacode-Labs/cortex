@@ -112,8 +112,15 @@ Bucle automático sin invocación manual. Análisis + fricción:
   contradicción → ADD la nueva como vigente + **invalida la vieja** bi-temporalmente,
   §5.5 invalidar≠borrar; si la vieja es **curada**, no se toca: se marca `contradicts`
   para revisión) o **NOOP** (casi idéntico ≥0.95). Verificado: el `reconciler` clasifica
-  contradicción→supersede, refinamiento→update, idéntico→noop. **Pendiente:**
-  `propose→review` para escrituras duraderas; extender el gate a los demás conectores.
+  contradicción→supersede, refinamiento→update, idéntico→noop.
+- **Auto-curación (sin humano) — hecho.** Nada de review humano bloqueante (mataría la
+  agilidad): la captura escribe ya, con confianza baja. `maintain` ejecuta `autoCurate`
+  (`core/curate.ts`): **promueve** a confianza media lo auto-capturado que se
+  **corroboró** (se reforzó/fusionó tras crearse → recurrió en otra sesión) y **decae**
+  (`obsolete`, sale de búsqueda) lo viejo nunca corroborado (> `CORTEX_DECAY_DAYS`, def.
+  120). La calidad sube sola con el tiempo, la captura sigue 100% ágil.
+- **Pendiente:** extender la reconciliación a los demás conectores (hoy solo sesiones);
+  `/review` opcional NO bloqueante (curado a mano), solo si hace falta.
 - **Pendiente:** **auto-captura** en Codex/OpenCode/Hermes (Claude tiene `transcript_path`
   + SessionEnd limpios; los demás no exponen transcript / no tienen session-end → se
   cubren con el **backfill batch** `connect-sessions` por plataforma). `UserPromptSubmit`
