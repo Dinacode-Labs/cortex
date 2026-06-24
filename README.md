@@ -168,7 +168,7 @@ argumento es el **slug** del proyecto (de `cortex link`):
 cortex connect-github   "<slug>" <owner/repo>     # PRs/issues (vía gh)
 cortex connect-docs     "<slug>" <ruta-dir>       # carpeta multimodal (docs/imágenes/audio/vídeo)
 cortex connect-notion   "<slug>" <ruta-export>    # export de Notion (páginas + adjuntos, enlazados)
-cortex connect-sessions "<slug>" <ruta-repo>      # backfill de sesiones de agente (destiladas)
+cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes]  # backfill de sesiones
 ```
 
 La **indexación de código** (`index-code`) y el `lint`/`resolve`/`temporal` sueltos son
