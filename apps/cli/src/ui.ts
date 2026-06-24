@@ -4,36 +4,62 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 
 /**
- * `cortex ui` — abre la UI web de Cortex YA AUTENTICADA, usando el token de la CLI
- * (~/.cortex/credentials). Así el OTP solo se usa para instalar/autenticar la CLI; la UI
- * se abre con un handshake (/auth/cli?token=…) que deja una cookie de sesión.
+ * `cortex ui` — abre la UI web YA AUTENTICADA. Pide al servidor un **ticket de un solo
+ * uso** (autenticado con el token de la CLI) y abre /auth/cli?ticket=… La web lo canjea
+ * por una sesión propia. Así el token de larga vida del CLI nunca viaja en la URL.
  */
 const CREDS = join(homedir(), ".cortex", "credentials");
 const WEB = process.env.CORTEX_WEB_URL || "http://localhost:8080";
 
-function token(): string | null {
+interface Creds {
+  server: string;
+  token: string;
+}
+
+function creds(): Creds | null {
   if (!existsSync(CREDS)) return null;
   try {
-    return (JSON.parse(readFileSync(CREDS, "utf8")) as { token?: string }).token ?? null;
+    return JSON.parse(readFileSync(CREDS, "utf8")) as Creds;
   } catch {
     return null;
   }
 }
 
-const t = token();
-if (!t) {
-  console.error("No autenticado. Ejecuta primero: cortex auth login");
-  process.exit(1);
+async function main(): Promise<void> {
+  const c = creds();
+  if (!c?.token) {
+    console.error("No autenticado. Ejecuta primero: cortex auth login");
+    process.exit(1);
+  }
+  const server = process.env.CORTEX_SERVER_URL || c.server;
+  let ticket: string;
+  try {
+    const res = await fetch(`${server}/auth/ui-ticket`, { method: "POST", headers: { authorization: `Bearer ${c.token}` } });
+    const data = (await res.json().catch(() => ({}))) as { ticket?: string; error?: string };
+    if (!res.ok || !data.ticket) {
+      console.error(`No se pudo abrir sesión en la UI: ${data.error ?? "servidor " + res.status}. ¿cortex auth login / servidor en marcha?`);
+      process.exit(1);
+    }
+    ticket = data.ticket;
+  } catch (e) {
+    console.error(`No se pudo contactar con el servidor (${server}): ${(e as Error).message}`);
+    process.exit(1);
+  }
+
+  const url = `${WEB}/auth/cli?ticket=${encodeURIComponent(ticket)}`;
+  const opener = platform() === "darwin" ? "open" : platform() === "win32" ? "cmd" : "xdg-open";
+  const args = platform() === "win32" ? ["/c", "start", "", url] : [url];
+  try {
+    const child = spawn(opener, args, { detached: true, stdio: "ignore" });
+    child.on("error", () => console.log(`Ábrela manualmente:\n  ${url}`));
+    child.unref();
+    console.log(`Abriendo la UI de Cortex autenticada → ${WEB}`);
+  } catch {
+    console.log(`Ábrela manualmente:\n  ${url}`);
+  }
 }
 
-const url = `${WEB}/auth/cli?token=${encodeURIComponent(t)}`;
-const opener = platform() === "darwin" ? "open" : platform() === "win32" ? "cmd" : "xdg-open";
-const args = platform() === "win32" ? ["/c", "start", "", url] : [url];
-try {
-  const child = spawn(opener, args, { detached: true, stdio: "ignore" });
-  child.on("error", () => console.log(`Ábrela manualmente:\n  ${url}`));
-  child.unref();
-  console.log(`Abriendo la UI de Cortex autenticada → ${WEB}`);
-} catch {
-  console.log(`Ábrela manualmente:\n  ${url}`);
-}
+main().catch((e) => {
+  console.error(e instanceof Error ? e.message : e);
+  process.exit(1);
+});

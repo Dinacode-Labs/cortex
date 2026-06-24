@@ -26,7 +26,7 @@ export {
   type ReconcileResult,
 } from "./dedup.js";
 export { autoCurate, type CurationResult } from "./curate.js";
-export { requestOtp, verifyOtp, validateToken, revokeToken, isAdmin, isAllowedEmail, type AuthUser } from "./auth.js";
+export { requestOtp, verifyOtp, validateToken, revokeToken, createUiTicket, redeemUiTicket, isAdmin, isAllowedEmail, type AuthUser } from "./auth.js";
 export { sendOtpEmail } from "./email.js";
 export { apiGet, apiPost, apiBase, isAuthenticated, type ApiResult } from "./api-client.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture.js";

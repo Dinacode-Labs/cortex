@@ -7,6 +7,7 @@ import { loadEnv } from "@cortex/shared";
 import {
   canAccessProject,
   captureBatch,
+  createUiTicket,
   findProjectBySlug,
   getContextPack,
   listAccessibleProjects,
@@ -84,6 +85,13 @@ async function currentUser(c: Context): Promise<AuthUser | null> {
 app.get("/auth/me", async (c) => {
   const user = await currentUser(c);
   return user ? c.json({ user }) : c.json({ error: "No autenticado." }, 401);
+});
+
+// Ticket de un solo uso para abrir la UI (cortex ui). El token de CLI no viaja en la URL.
+app.post("/auth/ui-ticket", async (c) => {
+  const token = bearer(c);
+  const ticket = token ? await createUiTicket(token) : null;
+  return ticket ? c.json({ ticket }) : c.json({ error: "No autenticado." }, 401);
 });
 
 app.post("/auth/logout", async (c) => {

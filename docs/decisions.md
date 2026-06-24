@@ -315,3 +315,16 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Uso:** `cortex link --create "Boluda API" --parent boluda`.
 - **Revisar cuando:** queramos herencia también en `search`/`ask` (hoy solo en el pack),
   límites de profundidad, o mover contexto compartido a un tipo "client" del grafo.
+
+## Handshake `cortex ui`: ticket de un solo uso (no el token en la URL)
+
+- **Decisión:** `cortex ui` no abre el navegador con el token de larga vida en la URL
+  (quedaría en historial/logs/referer). En su lugar pide al servidor un **ticket de un
+  solo uso** corto (`POST /auth/ui-ticket`, autenticado con el token de CLI) y abre
+  `/auth/cli?ticket=…`. La web **canjea** el ticket (`redeemUiTicket`, UPDATE atómico
+  `used_at` → un solo uso) por una **sesión web NUEVA** (cookie httpOnly) distinta del
+  token de CLI. Así el token de CLI nunca llega al navegador.
+- **Migración 0012:** tabla `ui_tickets` (hash, user, expires_at, used_at). TTL corto
+  (`CORTEX_UI_TICKET_TTL_SEC`, def 90 s).
+- **Compat:** `/auth/cli?token=` se mantiene (legacy) pero `ticket` es lo preferido.
+- **Verificado:** cookie ≠ token CLI; reuso del ticket → 401; canje atómico (un solo uso).
