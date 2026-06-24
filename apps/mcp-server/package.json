@@ -8,14 +8,17 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "tsx src/index.ts"
+    "start": "tsx src/index.ts",
+    "start:http": "tsx src/http.ts"
   },
   "dependencies": {
     "@cortex/agents": "workspace:*",
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/shared": "workspace:*",
+    "@hono/node-server": "^2.0.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "hono": "^4.12.26",
     "zod": "^3.25.76"
   }
 }
