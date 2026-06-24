@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: cortex
+          POSTGRES_PASSWORD: cortex
+          POSTGRES_DB: cortex_test
+        ports:
+          - "5433:5432"
+        options: >-
+          --health-cmd "pg_isready -U cortex -d cortex_test"
+          --health-interval 5s --health-timeout 5s --health-retries 15
+
+    env:
+      # BD de test (el service expone 5432 en el 5433 del host); embeddings local / LLM none.
+      CORTEX_TEST_DATABASE_URL: postgres://cortex:cortex@localhost:5433/cortex_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4 # lee packageManager del package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Integration tests (Postgres real)
+        run: pnpm test:integration
