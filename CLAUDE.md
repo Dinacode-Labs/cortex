@@ -64,3 +64,17 @@ calidad real.
 - Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
 - Cada unidad de conocimiento conserva **fuente, fecha, autor, confianza, estado y
   vigencia** (principio de trazabilidad, §5.5). No conviertas inferencias en hechos.
+
+## Documentación: mantenerla viva (importante)
+
+La documentación es parte del trabajo, no un extra. Al cambiar comportamiento, **actualiza
+en el mismo PR** lo afectado: `README.md` (capacidades/arquitectura/comandos/estructura),
+`docs/decisions.md` (ADR: decisión = hipótesis a revisar, añade entrada en decisiones de
+calado), `docs/roadmap.md`, `CONTRIBUTING.md` y este `CLAUDE.md`.
+
+- **Mantén este `CLAUDE.md` actualizado** cuando cambie el stack, la estructura o las
+  convenciones, para que el siguiente agente no opere con información obsoleta.
+- **Pódalo de vez en cuando**: relee y **limpia** lo que haya quedado desfasado, duplicado
+  o irrelevante. Un CLAUDE.md corto y veraz vale más que uno largo y desactualizado.
+- Antes de afirmar que algo "funciona así", verifica que el fichero/función/flag citado
+  sigue existiendo (el código manda sobre la doc).
