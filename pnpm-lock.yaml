@@ -51,9 +51,15 @@ importers:
       '@cortex/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@hono/node-server':
+        specifier: ^2.0.5
+        version: 2.0.5(hono@4.12.26)
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
+      hono:
+        specifier: ^4.12.26
+        version: 4.12.26
       zod:
         specifier: ^3.25.76
         version: 3.25.76

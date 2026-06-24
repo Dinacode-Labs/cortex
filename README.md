@@ -101,6 +101,7 @@ cp .env.example .env          # proveedores, Brevo (OTP), CORTEX_ADMIN_EMAIL, CO
 pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker, puerto host 5433) + esquema
 pnpm cortex server            # API HTTP + auth (8787) — sirve también /install.sh
 pnpm web                      # UI web (8080)
+pnpm cortex mcp-http          # MCP por HTTP autenticado (Streamable HTTP, 8788)
 pnpm --filter @cortex/agents run maintain:worker   # mantenimiento programado (cron)
 ```
 
@@ -122,6 +123,11 @@ pnpm --filter @cortex/agents run maintain:worker   # mantenimiento programado (c
   solo mantenimiento.
 
 ## Tools MCP (8)
+
+Dos transportes: **stdio** (local, por proceso — `pnpm mcp`) y **HTTP autenticado**
+(Streamable HTTP — `cortex mcp-http`, puerto 8788), que exige el mismo token Bearer que
+la API. Para conectar un agente al MCP por HTTP: `claude mcp add --transport http
+cortex <url>/mcp --header "Authorization: Bearer <token>"`.
 
 | Tool | Qué hace |
 | --- | --- |

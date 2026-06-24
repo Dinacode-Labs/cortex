@@ -328,3 +328,19 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   (`CORTEX_UI_TICKET_TTL_SEC`, def 90 s).
 - **Compat:** `/auth/cli?token=` se mantiene (legacy) pero `ticket` es lo preferido.
 - **Verificado:** cookie ≠ token CLI; reuso del ticket → 401; canje atómico (un solo uso).
+
+## Transporte HTTP del MCP (Streamable HTTP, autenticado)
+
+- **Decisión:** el MCP de Cortex deja de ser solo **stdio** (local). Se añade transporte
+  **HTTP** (Streamable HTTP, variante Web-standard del SDK: `WebStandardStreamableHTTPServerTransport`,
+  `handleRequest(Request)→Response`, integra directo con Hono). `apps/mcp-server`:
+  `index.ts` (stdio) y `http.ts` (HTTP) comparten `buildMcpServer()` (las 8 tools).
+- **Auth:** el endpoint `/mcp` exige el **mismo token Bearer** que la API
+  (`validateToken`); sin token → 401. Sesiones en memoria (un `McpServer` por sesión,
+  `mcp-session-id`); `initialize` crea la sesión. `CORTEX_MCP_AUTH=off` para desarrollo.
+- **Por qué Web-standard y no Node req/res:** encaja con Hono (`c.req.raw`) sin puentes;
+  y mantiene el MCP en `apps/mcp-server` (zod v3 aislado), sin mezclarlo con apps/server.
+- **Verificado:** sin token → 401; initialize → session-id + serverInfo; tools/list → 8 tools.
+- **Revisar cuando:** queramos pasar la identidad del Bearer a las tools (atribución/
+  permisos por usuario también en el MCP), persistencia de sesiones multi-nodo
+  (eventStore), o montarlo tras el mismo dominio que la API.

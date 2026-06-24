@@ -18,6 +18,7 @@ const COMMANDS: Record<string, Cmd> = {
   auth: { script: "apps/cli/src/auth.ts", help: "iniciar sesión por email + OTP (login/status/logout)" },
   ui: { script: "apps/cli/src/ui.ts", help: "abrir la UI web ya autenticada (sin OTP)" },
   server: { script: "apps/server/src/index.ts", help: "arrancar el servidor HTTP de Cortex (API + auth)" },
+  "mcp-http": { script: "apps/mcp-server/src/http.ts", help: "arrancar el MCP por HTTP autenticado (Streamable HTTP)" },
   link: { script: "packages/core/src/link.ts", help: "vincular/crear el proyecto de esta carpeta (escribe .cortex.json)" },
   sync: { script: "scripts/cortex-sync.ts", help: "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)" },
   maintain: { script: "packages/agents/src/maintain.ts", help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint" },
