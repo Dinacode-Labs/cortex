@@ -56,8 +56,10 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
   del XML (maneja diagramas comprimidos con inflate), sin visión. Los conectores
   (notion, docs) los recogen solos vía `SUPPORTED_EXTS` y los enlazan a su página.
   Filtro de ruido: imágenes < 8 KB se omiten; el VLM marca `IRRELEVANTE` los iconos.
-- **Pendiente:** dedup por content-hash (no captionar imágenes repetidas), OCR como
-  fallback para texto denso, cascada coste (clasificar antes de llamar al VLM).
+- **Dedup por content-hash — hecho:** `captionImage` cachea por sha256 del fichero
+  (en proceso) → no llama al VLM dos veces para la misma imagen (frecuente en exports).
+- **Pendiente:** OCR como fallback para texto denso, cascada de coste (clasificar antes
+  de llamar al VLM), persistir el cache de captions entre ejecuciones.
 
 ### 3. Vídeo / audio (transcripción) — **hecho (v1)**
 - **Implementado en `extract.ts`:** audio (`.opus` de WhatsApp, mp3, m4a, ogg, wav,
@@ -66,8 +68,10 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
   **transcodifican con ffmpeg** a mp3 mono 16 kHz antes. Los conectores los recogen y
   enlazan a su página. Verificado: mp4 de CE Portal (grabación de un bug) → transcripción
   correcta.
-- **Pendiente:** **chunking** para audios > ~24 MB / largos (hoy se omiten); diarización
-  (quién dijo qué); destilar el transcript a conocimiento tipado (no volcar crudo) —
+- **Chunking — hecho:** los audios largos (> límite de whisper, ~24 MB) se **trocean con
+  ffmpeg** (`-f segment`, segmentos mono 16 kHz de `CORTEX_AUDIO_SEGMENT_SEC`, def. 600 s)
+  y se transcriben por partes, uniendo el texto. Verificada la segmentación.
+- **Pendiente:** diarización (quién dijo qué); destilar el transcript a conocimiento tipado (no volcar crudo) —
   el `distiller` ya existe (connect-sessions), se puede reutilizar para reuniones.
 
 ### 4. Grabación de reuniones — **recomendación: NO construir (investigado)**
