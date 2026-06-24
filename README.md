@@ -14,11 +14,12 @@ proyecto o persona.
 - Panorama competitivo y huecos: [`docs/research/competitive-landscape.md`](./docs/research/competitive-landscape.md)
 - Guion de demo: [`docs/demo-script.md`](./docs/demo-script.md)
 
-> **Estado: producto interno funcional, probado sobre proyectos reales.** Las
-> capturas son del proyecto **CE Portal**: ~190 docs de Notion + ~8.200 chunks de
-> código (`ceportal-app` Angular + `ceportal-backend` Java) → grafo de ~540 entidades
-> / ~1.070 relaciones. Todo funciona sin LLM (cae a heurísticas); con LLM (Agents de
-> Mastra) mejora clasificación, grafo y respuestas en prosa.
+> **Estado: producto interno funcional, probado sobre proyectos reales.** Probado con
+> **CE Portal**: export de Notion (páginas + adjuntos **multimodales**: docs, imágenes,
+> diagramas y vídeo) + repos `ceportal-app` (Angular) y `ceportal-backend` (Java) →
+> grafo de cientos de entidades y relaciones. Todo funciona sin LLM (cae a heurísticas);
+> con LLM (Agents de Mastra) mejora clasificación, grafo, reconciliación y respuestas en
+> prosa. _(Las capturas son anteriores a la ingesta multimodal.)_
 
 ![Dashboard](./docs/screenshot-dashboard.png)
 ![Preguntar al agente de recuperación](./docs/screenshot-ask.png)
@@ -50,36 +51,51 @@ proyecto o persona.
 - **MCP corporativo** — 8 tools neutras consumibles por Claude Code / Codex / OpenCode / Hermes.
 - **Observabilidad de IA** — coste/tokens por operación, agente y modelo (LLM +
   embeddings) **+ AI tracing de Mastra** (árbol de spans por llamada), en `/usage`.
-- **Harness distribuible** — `cortex sync` instala el MCP + skills + comandos del
-  toolbelt de Dinacode en los agentes del dev.
+- **Bucle automático (hooks)** — al abrir sesión, **inyecta** el context-pack del
+  proyecto; al cerrarla, **auto-captura** la sesión destilada. Sin fricción, en los 4 agentes.
+- **Captura con reconciliación (estilo mem0)** — al guardar conocimiento auto-capturado:
+  **ADD / UPDATE (fusiona) / DELETE (invalida contradicciones) / NOOP (dedup)**, con
+  confianza baja; `maintain` auto-cura (promueve lo corroborado, decae lo muerto). Evita
+  el "context rot". Ver [`docs/research/memory-capture-policy.md`](./docs/research/memory-capture-policy.md).
+- **Ingesta multimodal** — capa `extract` única: Word/PDF/Excel, **diagramas .drawio**,
+  **imágenes** (caption por visión), **audio/vídeo** (transcripción whisper + ffmpeg).
+- **Proyectos: vínculo, permisos y jerarquía** — un repo se vincula por **slug**
+  (`.cortex.json`); proyectos **públicos por defecto** o **privados** (dueño/miembros),
+  **admin(s)** por env; **jerarquía padre/cliente** con herencia de contexto y permisos.
+- **Servidor HTTP + auth** — API (Hono) con **login email + OTP** (sin passwords, Brevo);
+  base de identidad/atribución y permisos.
+- **CLI `cortex`** y **harness distribuible** — un solo comando (`cortex link`, `auth`,
+  `sync`, `maintain`…); `cortex sync` instala MCP + skills + comandos + **hooks** del
+  toolbelt en los agentes del dev. Reparte **configuración, no credenciales**.
 
 ## Arquitectura
 
 ```
 Claude Code / Codex / OpenCode / Hermes
-        │  (MCP, 8 tools)
-        ▼
-  apps/mcp-server  (@cortex/mcp-server)      apps/web  (@cortex/web, Hono SSR)
-        │                                          │
-        └──────────────┬───────────────────────────┘
-                       ▼
+   │ (MCP, 8 tools)   │ (hooks: inyecta contexto / auto-captura)
+   ▼                  ▼
+ apps/mcp-server   apps/cli (cortex …)   apps/web (Hono SSR)   apps/server (API + auth OTP)
+        │               │                     │                      │
+        └───────────────┴──────────┬──────────┴──────────────────────┘
+                                    ▼
         packages/core  (@cortex/core)   ── operaciones de dominio: captura,
-                       │   ▲                búsqueda híbrida, context-pack, lint,
-                       │   │ setClassifier/  código, bi-temporal, loops de mejora
-                       │   │ setReranker
-                       │   └── packages/agents (@cortex/agents) ── Agents de Mastra
-                       │           (un Agent por rol: classifier, graph, reranker,
-                       │           retriever) + workflow de captura
-                       ├── packages/embeddings  ── proveedor enchufable
-                       │        (local | nan | openai | voyage)
-                       └── packages/database     ── Postgres + pgvector + FTS
+                       │   ▲                búsqueda híbrida, context-pack, lint, código,
+                       │   │ setClassifier/  bi-temporal, reconciliación, proyectos/slug/
+                       │   │ setReranker/    permisos/jerarquía, auth (OTP), extract multimodal
+                       │   │ setReconciler
+                       │   └── packages/agents (@cortex/agents) ── Agents de Mastra (un Agent
+                       │           por rol: classifier, graph, reranker, retriever, distiller,
+                       │           merger, reconciler) + maintain + hooks de captura
+                       ├── packages/embeddings  ── proveedor enchufable (local|nan|openai|voyage)
+                       └── packages/database     ── Postgres + pgvector + FTS + migraciones
         packages/shared  (@cortex/shared)  ── modelo de dominio (zod)
 ```
 
 `@cortex/core` es **determinista** y funciona sin claves. La capa de inteligencia
-(`@cortex/agents`, LLM + Mastra) se **inyecta** con `setClassifier()`/`setReranker()`
-desde los entrypoints cuando hay LLM. Precedencia en captura: **input explícito >
-LLM > heurística**. Ver [`docs/decisions.md`](./docs/decisions.md).
+(`@cortex/agents`, LLM + Mastra) se **inyecta** con `setClassifier()`/`setReranker()`/
+`setReconciler()` desde los entrypoints cuando hay LLM. Precedencia en captura: **input
+explícito > LLM > heurística**. Ver [`docs/decisions.md`](./docs/decisions.md) y, para
+contribuir, [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## Puesta en marcha
 
@@ -117,6 +133,60 @@ Toolbelt actual: MCP `cortex`, `plane`, `atlassian` (Jira+Confluence), `notion`,
 `chrome-devtools`; skills `cortex-capture`, `plane-api`, `google-chat`, `bkt`,
 `agent-teams` (MS Teams), `expect`; comando `/cortex-save`.
 
+`cortex sync --apply` también instala los **hooks** y un **CLI `cortex`** global (shim en
+`~/.local/bin`, mac+Linux). Tras el bootstrap (`pnpm install` → `pnpm cortex:sync --apply`):
+
+```bash
+cortex auth login                       # login email + OTP (una vez por equipo)
+cortex link --create "Mi Proyecto"      # crea el proyecto y vincula esta carpeta
+cortex maintain "Mi Proyecto"           # mantenimiento; cortex <cmd> --help para ver todo
+```
+
+## Vincular un proyecto (`cortex link`)
+
+Cortex es **opt-in por repo**: solo actúa donde hay un **`.cortex.json`** (`{ "slug": "…" }`).
+Sin él, ni se inyecta ni se captura nada (un repo personal queda fuera). El slug lo asigna
+Cortex al crear el proyecto (clave estable, **independiente de git** → vale para monorepos,
+carpetas con varios git, o repos no clonados). **Vincular ≠ crear**: un slug inexistente se
+rechaza (no se auto-crea).
+
+```bash
+cortex link --create "Boluda API" --parent boluda --private  # crear (privado, bajo "boluda")
+cortex link <slug>        # vincular a un proyecto existente
+cortex link --ignore      # opt-out: este repo NO usa Cortex (corta la herencia si está anidado)
+```
+
+**Permisos.** Proyectos **públicos por defecto** (cualquier usuario autenticado) o
+**privados** (dueño + miembros + admin). **Admin(s)** por env (`CORTEX_ADMIN_EMAIL`,
+coma-separado) ven todo y gestionan permisos. **Jerarquía**: un proyecto puede colgar de un
+**padre** (cliente "Boluda"): el context-pack del subproyecto **hereda** el del padre y los
+permisos **cascadean** (padre privado → subproyectos restringidos; miembro del padre → acceso).
+
+## Servidor y autenticación (email + OTP)
+
+`apps/server` (Hono) expone la API y el login **sin passwords**: el usuario **es su correo**
+(whitelist de dominios, `CORTEX_AUTH_DOMAIN`); el OTP solo se usa para **autenticar la CLI**
+una vez por equipo. Es la base de **atribución** (`created_by` = email) y permisos.
+
+```bash
+cortex server             # arranca la API (CORTEX_SERVER_PORT, def 8787)
+cortex auth login|status|logout
+```
+
+Envío de OTP por **Brevo** (`BREVO_API_KEY`); **sin clave, modo dev**: el código se loguea
+(no envía email). Tokens y OTP se guardan **hasheados**.
+
+## Bucle automático (hooks)
+
+Instalados por `cortex sync`, cierran el bucle "trabajas → Cortex recuerda/aprende":
+
+- **SessionStart** → inyecta el **context-pack** del proyecto vinculado (los 4 agentes;
+  Codex/OpenCode/Hermes vía sus adaptadores).
+- **SessionEnd** (Claude) → **auto-captura**: destila la sesión y la guarda con
+  reconciliación (ADD/UPDATE/DELETE/NOOP) y confianza baja.
+
+Análisis y fricción por plataforma: [`docs/research/hooks-integration.md`](./docs/research/hooks-integration.md).
+
 ## Tools MCP (8)
 
 | Tool | Qué hace |
@@ -137,8 +207,11 @@ Toolbelt actual: MCP `cortex`, `plane`, `atlassian` (Jira+Confluence), `notion`,
 pnpm --filter @cortex/core run ingest "<Proyecto>" <items.json>
 # GitHub: PRs/issues de un repo (vía gh)
 pnpm --filter @cortex/core run connect-github "<Proyecto>" <owner/repo>
-# Documentos: Word/PDF/Excel de un directorio → texto indexable (PDF escaneado se omite)
+# Documentos/multimodal: carpeta suelta → texto indexable (Word/PDF/Excel/.drawio,
+# imágenes con caption por visión, audio/vídeo transcritos). Requiere ffmpeg para A/V.
 pnpm --filter @cortex/core run connect-docs "<Proyecto>" <ruta-dir>
+# Notion: export (Markdown + adjuntos) → páginas + adjuntos parseados y enlazados
+pnpm --filter @cortex/core run connect-notion-export "<Proyecto>" <ruta-export>
 # Código: indexa un repo local (excluye generados; chunking + embeddings)
 pnpm --filter @cortex/core run index-code "<Proyecto>" <ruta-repo>
 # Sesiones de agente: destila las conversaciones (Claude Code) de un proyecto a
@@ -196,7 +269,11 @@ de embeddings hay que reindexar (las dimensiones cambian).
 | `pnpm db:seed` | Datos demo Acme (requiere `CORTEX_SEED_CONFIRM=1`) |
 | `pnpm web` | UI web (http://localhost:8080) |
 | `pnpm mcp` | Servidor MCP (stdio) |
-| `pnpm cortex:sync [--apply\|--doctor]` | Instala el toolbelt en tus agentes |
+| `cortex` (o `pnpm cortex <cmd>`) | CLI unificado: `auth`, `server`, `link`, `sync`, `maintain`, `connect-*` |
+| `cortex auth login\|status\|logout` | Login email + OTP contra el servidor |
+| `cortex server` (`pnpm --filter @cortex/server start`) | API HTTP + auth (puerto 8787) |
+| `cortex link [--create "<N>"] [--parent <slug>] [--private\|--ignore]` | Vincular/crear el proyecto de esta carpeta |
+| `pnpm cortex:sync [--apply\|--doctor]` | Instala el toolbelt (MCP + skills + comandos + hooks + CLI) en tus agentes |
 | `pnpm typecheck` | Comprueba tipos en todos los paquetes |
 | `pnpm --filter @cortex/core run ingest\|connect-github\|index-code\|lint\|lint-act\|resolve-entities\|temporal …` | Ingesta y mantenimiento (ver arriba) |
 | `pnpm --filter @cortex/agents run enrich "<Proyecto>"` | Enriquece el grafo (entidades + relaciones) |
@@ -205,9 +282,11 @@ de embeddings hay que reindexar (las dimensiones cambian).
 ## Estructura del repo
 
 ```
-apps/        mcp-server (MCP stdio) · web (UI Hono SSR)
+apps/        mcp-server (MCP stdio) · web (UI Hono SSR) · server (API + auth) · cli (cortex)
 packages/    core · agents · embeddings · database · shared
 config/      toolbelt.json (registry) · mcp · skills/ (vendored) · commands/
-scripts/     cortex-sync.ts (instalador del toolbelt)
-docs/        decisions.md · demo-script.md · research/ · capturas
+scripts/     cortex-sync.ts (instalador del toolbelt + hooks + CLI)
+docs/        decisions.md · roadmap.md · demo-script.md · research/ · capturas
 ```
+
+Cómo contribuir (PRs), dónde vive cada cosa y convenciones: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
