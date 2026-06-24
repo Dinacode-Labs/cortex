@@ -23,6 +23,7 @@ import {
   setReranker,
   validateEntry,
   validateToken,
+  redeemUiTicket,
   canAccessProject,
   findProjectByName,
   type AuthUser,
@@ -78,12 +79,20 @@ async function guardProject(email: string | null, name: string | undefined | nul
 const deniedPage = (user: AuthUser | null): string =>
   layout("Sin acceso", `<p><a class="back" href="/">← Inicio</a></p><div class="empty">No tienes acceso a este proyecto (privado). Pide al admin que te añada.</div>`, user);
 
-// Handshake CLI → cookie de sesión (cortex ui abre /auth/cli?token=…). Exento del gate.
+// Handshake CLI → cookie de sesión. `cortex ui` abre /auth/cli?ticket=… (un solo uso):
+// el ticket se canjea por una sesión web nueva (el token de CLI nunca viaja en la URL).
+// Se mantiene ?token= como compat, pero ticket es lo preferido. Exento del gate.
 app.get("/auth/cli", async (c) => {
-  const token = c.req.query("token") ?? "";
-  const user = token ? await validateToken(token) : null;
-  if (!user) return c.html(loginPage("Token inválido o caducado. Ejecuta `cortex auth login`."), 401);
-  setCookie(c, "cortex_session", token, { httpOnly: true, sameSite: "Lax", path: "/", maxAge: WEB_COOKIE_TTL });
+  const ticket = c.req.query("ticket");
+  const legacyToken = c.req.query("token");
+  let session: string | null = null;
+  if (ticket) {
+    session = (await redeemUiTicket(ticket))?.token ?? null;
+  } else if (legacyToken && (await validateToken(legacyToken))) {
+    session = legacyToken;
+  }
+  if (!session) return c.html(loginPage("Enlace inválido o caducado. Ejecuta `cortex ui` de nuevo."), 401);
+  setCookie(c, "cortex_session", session, { httpOnly: true, sameSite: "Lax", path: "/", maxAge: WEB_COOKIE_TTL });
   return c.redirect("/");
 });
 app.get("/logout", (c) => {

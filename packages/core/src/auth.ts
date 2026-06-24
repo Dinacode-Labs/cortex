@@ -108,3 +108,40 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
 export async function revokeToken(token: string): Promise<void> {
   await getSql()`DELETE FROM auth_tokens WHERE token_hash = ${sha(token)}`;
 }
+
+const TICKET_TTL_SEC = Number(process.env.CORTEX_UI_TICKET_TTL_SEC ?? "90");
+
+/** Emite un ticket de un solo uso (corto) para el handshake `cortex ui`. Requiere un
+ * token de CLI válido. El ticket NO es el token: la web lo canjea por una sesión propia. */
+export async function createUiTicket(cliToken: string): Promise<string | null> {
+  const user = await validateToken(cliToken);
+  if (!user) return null;
+  const ticket = randomBytes(24).toString("base64url");
+  await getSql()`
+    INSERT INTO ui_tickets (ticket_hash, user_id, expires_at)
+    VALUES (${sha(ticket)}, ${user.id}, now() + make_interval(secs => ${TICKET_TTL_SEC}))
+  `;
+  return ticket;
+}
+
+/** Canjea un ticket (atómico → un solo uso) por una NUEVA sesión web. null si inválido. */
+export async function redeemUiTicket(ticket: string): Promise<{ token: string; user: AuthUser } | null> {
+  if (!ticket) return null;
+  const sql = getSql();
+  const claim = (await sql`
+    UPDATE ui_tickets SET used_at = now()
+    WHERE ticket_hash = ${sha(ticket)} AND used_at IS NULL AND expires_at > now()
+    RETURNING user_id
+  `) as unknown as Row[];
+  if (!claim[0]) return null;
+  const userId = claim[0].user_id as string;
+  const urows = (await sql`SELECT email FROM users WHERE id = ${userId} LIMIT 1`) as unknown as Row[];
+  if (!urows[0]) return null;
+  const email = urows[0].email as string;
+  const token = randomBytes(32).toString("base64url"); // sesión web nueva (≠ token CLI)
+  await sql`
+    INSERT INTO auth_tokens (token_hash, user_id, expires_at)
+    VALUES (${sha(token)}, ${userId}, now() + make_interval(days => ${tokenTtlDays()}))
+  `;
+  return { token, user: { id: userId, email, admin: isAdmin(email) } };
+}
