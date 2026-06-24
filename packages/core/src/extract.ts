@@ -1,6 +1,7 @@
-import { readFileSync, statSync, unlinkSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync } from "node:fs";
 import { extname, join } from "node:path";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { inflateRawSync } from "node:zlib";
@@ -52,11 +53,18 @@ function visionConfig(): { key: string; base: string; model: string } | null {
   return null;
 }
 
+// Cache de captions por content-hash (durante el proceso): no llamamos al modelo de
+// visión dos veces para la misma imagen (frecuente en exports con imágenes repetidas).
+const captionCache = new Map<string, string | null>();
+
 async function captionImage(path: string, ext: string): Promise<string | null> {
   const cfg = visionConfig();
   if (!cfg) return null;
+  const bytes = readFileSync(path);
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  if (captionCache.has(hash)) return captionCache.get(hash)!; // imagen ya vista → reusar
   const mime = ext === "jpg" ? "jpeg" : ext;
-  const dataUrl = `data:image/${mime};base64,${readFileSync(path).toString("base64")}`;
+  const dataUrl = `data:image/${mime};base64,${bytes.toString("base64")}`;
   const body = JSON.stringify({
     model: cfg.model,
     max_tokens: 240,
@@ -70,6 +78,10 @@ async function captionImage(path: string, ext: string): Promise<string | null> {
       },
     ],
   });
+  const remember = (v: string | null): string | null => {
+    captionCache.set(hash, v);
+    return v;
+  };
   const headers = { authorization: `Bearer ${cfg.key}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
@@ -77,24 +89,56 @@ async function captionImage(path: string, ext: string): Promise<string | null> {
       if (res.ok) {
         const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
         const c = j.choices?.[0]?.message?.content?.trim() ?? "";
-        return c && !/^IRRELEVANTE/i.test(c) ? c : null;
+        return remember(c && !/^IRRELEVANTE/i.test(c) ? c : null);
       }
-      if (res.status !== 429 && res.status < 500) return null;
+      if (res.status !== 429 && res.status < 500) return remember(null);
     } catch {
       /* red */
     }
     await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
   }
-  return null;
+  return null; // fallo transitorio (no cacheamos: reintentable en otra pasada)
 }
 
 let tmpCounter = 0;
-const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // límite del endpoint whisper; chunking pendiente
+const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // límite del endpoint whisper
+const SEGMENT_SEC = Number(process.env.CORTEX_AUDIO_SEGMENT_SEC ?? "600"); // 10 min (mono 16k 64k ≈ 5 MB/chunk)
 
-/** Transcribe audio/vídeo con whisper. Vídeo y formatos no soportados (opus de
- * WhatsApp, amr…) se transcodifican con ffmpeg a mp3 mono 16 kHz antes de enviar. */
+interface VisionCfg {
+  key: string;
+  base: string;
+  model: string;
+}
+
+/** POST de un buffer de audio a whisper, con reintentos en 429/5xx. */
+async function postWhisper(buf: Buffer, cfg: VisionCfg, model: string): Promise<string | null> {
+  const headers = { authorization: `Bearer ${cfg.key}`, "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const fd = new FormData(); // se reconstruye en cada intento (el body se consume)
+      fd.append("file", new Blob([buf]), "audio.mp3");
+      fd.append("model", model);
+      fd.append("response_format", "json");
+      const res = await fetch(`${cfg.base.replace(/\/$/, "")}/audio/transcriptions`, { method: "POST", headers, body: fd });
+      if (res.ok) {
+        const ct = res.headers.get("content-type") ?? "";
+        const text = ct.includes("json") ? ((await res.json()) as { text?: string }).text ?? "" : await res.text();
+        return text.trim() || null;
+      }
+      if (res.status !== 429 && res.status < 500) return null;
+    } catch {
+      /* red */
+    }
+    await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+  }
+  return null;
+}
+
+/** Transcribe audio/vídeo con whisper. Vídeo y formatos no soportados (opus de WhatsApp,
+ * amr…) se transcodifican con ffmpeg a mp3 mono 16 kHz. Los audios largos (> límite de
+ * whisper) se TROCEAN con ffmpeg en segmentos y se transcriben por partes. */
 async function transcribe(path: string, ext: string): Promise<string | null> {
-  const cfg = visionConfig();
+  const cfg = visionConfig() as VisionCfg | null;
   if (!cfg) return null;
   const model = getEnv("NAN_WHISPER_MODEL", "whisper");
   let audioPath = path;
@@ -108,33 +152,40 @@ async function transcribe(path: string, ext: string): Promise<string | null> {
       return null; // ffmpeg no disponible o fichero ilegible
     }
   }
+  let segDir: string | null = null;
   try {
-    const buf = readFileSync(audioPath);
-    if (buf.length > MAX_AUDIO_BYTES) return null; // demasiado largo (chunking: roadmap)
-    const headers = { authorization: `Bearer ${cfg.key}`, "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        const fd = new FormData(); // se reconstruye en cada intento (el body se consume)
-        fd.append("file", new Blob([buf]), "audio.mp3");
-        fd.append("model", model);
-        fd.append("response_format", "json");
-        const res = await fetch(`${cfg.base.replace(/\/$/, "")}/audio/transcriptions`, { method: "POST", headers, body: fd });
-        if (res.ok) {
-          const ct = res.headers.get("content-type") ?? "";
-          const text = ct.includes("json") ? ((await res.json()) as { text?: string }).text ?? "" : await res.text();
-          return text.trim() || null;
-        }
-        if (res.status !== 429 && res.status < 500) return null;
-      } catch {
-        /* red */
-      }
-      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    if (statSync(audioPath).size <= MAX_AUDIO_BYTES) {
+      return await postWhisper(readFileSync(audioPath), cfg, model);
     }
-    return null;
+    // Largo: trocear en segmentos mono 16 kHz mp3 y transcribir cada uno.
+    segDir = mkdtempSync(join(tmpdir(), "cortex-seg-"));
+    try {
+      await execFileAsync(
+        "ffmpeg",
+        ["-i", audioPath, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", "-f", "segment", "-segment_time", String(SEGMENT_SEC), "-y", join(segDir, "seg%03d.mp3")],
+        { maxBuffer: 1 << 26 },
+      );
+    } catch {
+      return null;
+    }
+    const segs = readdirSync(segDir).filter((f) => f.endsWith(".mp3")).sort();
+    const parts: string[] = [];
+    for (const s of segs) {
+      const t = await postWhisper(readFileSync(join(segDir, s)), cfg, model);
+      if (t) parts.push(t);
+    }
+    return parts.join("\n").trim() || null;
   } finally {
     if (temp) {
       try {
         unlinkSync(temp);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (segDir) {
+      try {
+        rmSync(segDir, { recursive: true, force: true });
       } catch {
         /* ignore */
       }
