@@ -15,6 +15,8 @@ interface Cmd {
 }
 
 const COMMANDS: Record<string, Cmd> = {
+  auth: { script: "apps/cli/src/auth.ts", help: "iniciar sesión por email + OTP (login/status/logout)" },
+  server: { script: "apps/server/src/index.ts", help: "arrancar el servidor HTTP de Cortex (API + auth)" },
   link: { script: "packages/core/src/link.ts", help: "vincular/crear el proyecto de esta carpeta (escribe .cortex.json)" },
   sync: { script: "scripts/cortex-sync.ts", help: "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)" },
   maintain: { script: "packages/agents/src/maintain.ts", help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint" },

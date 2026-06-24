@@ -26,6 +26,8 @@ export {
   type ReconcileResult,
 } from "./dedup.js";
 export { autoCurate, type CurationResult } from "./curate.js";
+export { requestOtp, verifyOtp, validateToken, revokeToken, type AuthUser } from "./auth.js";
+export { sendOtpEmail } from "./email.js";
 export {
   classifyType,
   extractEntities,
