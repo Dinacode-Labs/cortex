@@ -26,6 +26,10 @@ import {
   redeemUiTicket,
   canAccessProject,
   findProjectByName,
+  listAccessibleProjects,
+  listProjectMembers,
+  addProjectMember,
+  removeProjectMember,
   type AuthUser,
   type ProjectRef,
 } from "@cortex/core";
@@ -107,6 +111,64 @@ app.use("*", async (c, next) => {
   c.set("user", user);
   if (!user) return c.html(loginPage(), 401);
   await next();
+});
+
+// --- Proyectos (listado por acceso + gestión de miembros del admin) ----------
+app.get("/projects", async (c) => {
+  const user = c.get("user")!;
+  const projects = await listAccessibleProjects(user.email); // admin → todos
+  const cards = await Promise.all(
+    projects.map(async (p) => {
+      const vis = p.visibility === "private" ? '<span class="pill" style="background:#fde">privado</span>' : '<span class="pill">público</span>';
+      const owner = p.ownerEmail ? ` · dueño <code>${esc(p.ownerEmail)}</code>` : "";
+      let members = "";
+      if (user.admin && p.visibility === "private" && p.slug) {
+        const list = await listProjectMembers(p.slug);
+        const chips = list
+          .map(
+            (m) =>
+              `<form method="post" action="/projects/${esc(p.slug!)}/members/remove" style="display:inline">
+                 <input type="hidden" name="email" value="${esc(m)}">
+                 <span class="pill">${esc(m)} <button type="submit" title="quitar" style="border:0;background:none;cursor:pointer;color:#c0392b">×</button></span>
+               </form>`,
+          )
+          .join(" ");
+        members = `<div style="margin-top:8px">
+          <form method="post" action="/projects/${esc(p.slug)}/members" class="row" style="margin-bottom:6px">
+            <input type="email" name="email" placeholder="añadir email…" required>
+            <button type="submit">Añadir miembro</button>
+          </form>
+          ${chips || '<span class="sub">Sin miembros (solo dueño y admins).</span>'}
+        </div>`;
+      }
+      return `<div class="panel">
+        <h2 style="margin-bottom:4px"><a href="/?project=${encodeURIComponent(p.name)}">${esc(p.name)}</a> ${vis}</h2>
+        <div class="sub"><code>${esc(p.slug ?? "")}</code>${owner}</div>
+        ${members}
+      </div>`;
+    }),
+  );
+  const body = `<p><a class="back" href="/">← Inicio</a></p>
+    <h1>Proyectos</h1>
+    <p class="sub">${user.admin ? "Eres admin: ves todos y gestionas el acceso a los privados." : "Proyectos a los que tienes acceso."}</p>
+    ${cards.join("") || '<div class="empty">No tienes acceso a ningún proyecto todavía.</div>'}`;
+  return c.html(layout("Proyectos", body, user));
+});
+
+app.post("/projects/:slug/members", async (c) => {
+  const user = c.get("user")!;
+  if (!user.admin) return c.html(layout("Sin permiso", `<div class="empty">Solo un admin gestiona miembros.</div>`, user), 403);
+  const email = String((await c.req.parseBody()).email ?? "").trim();
+  if (email) await addProjectMember(c.req.param("slug"), email);
+  return c.redirect("/projects");
+});
+
+app.post("/projects/:slug/members/remove", async (c) => {
+  const user = c.get("user")!;
+  if (!user.admin) return c.html(layout("Sin permiso", `<div class="empty">Solo un admin gestiona miembros.</div>`, user), 403);
+  const email = String((await c.req.parseBody()).email ?? "").trim();
+  if (email) await removeProjectMember(c.req.param("slug"), email);
+  return c.redirect("/projects");
 });
 
 // --- Dashboard ---------------------------------------------------------------

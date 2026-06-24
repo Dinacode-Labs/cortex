@@ -33,6 +33,11 @@ export function isAdmin(email: string | null | undefined): boolean {
   return !!email && adminEmails().includes(normEmail(email));
 }
 
+/** Lista de admins configurados (para "pide acceso a…"). */
+export function listAdmins(): string[] {
+  return adminEmails();
+}
+
 export interface AuthUser {
   id: string;
   email: string;

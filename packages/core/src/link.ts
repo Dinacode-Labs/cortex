@@ -5,7 +5,15 @@ import { loadEnv } from "@cortex/shared";
 loadEnv();
 import { closeSql, getSql } from "@cortex/database";
 import { canAccessProject, createProject, findProjectBySlug } from "./projects.js";
-import { readCortexLink } from "./project-config.js";
+import { readCortexLink, slugify } from "./project-config.js";
+import { listAdmins } from "./auth.js";
+import type { ProjectRef } from "./projects.js";
+
+/** Mensaje para solicitar acceso a un proyecto privado al que no llegas. */
+function askAccessMsg(p: ProjectRef): string {
+  const admins = listAdmins();
+  return `✗ El proyecto "${p.name}" (slug "${p.slug}") existe pero es privado y no tienes acceso.\n  Pídele acceso al admin${admins.length ? ` (${admins.join(", ")})` : ""} — no se ha creado nada.`;
+}
 import type { Row } from "./map.js";
 
 /** Email autenticado de la CLI (~/.cortex/credentials), o null. Es el dueño al crear. */
@@ -55,6 +63,17 @@ async function main(): Promise<void> {
       return;
     }
     const owner = credsEmail();
+    // Si el slug ya existe, NO se crea otro: o te vinculas (si tienes acceso) o pides permiso.
+    const existing = await findProjectBySlug(slugify(name));
+    if (existing) {
+      if (await canAccessProject(existing, owner)) {
+        writeLink({ slug: existing.slug }, `Ya existía "${existing.name}" (${existing.visibility}); vinculado · slug: ${existing.slug}.`);
+      } else {
+        console.error(askAccessMsg(existing));
+        process.exitCode = 1;
+      }
+      return;
+    }
     const visibility = args.includes("--private") ? "private" : "public";
     if (visibility === "private" && !owner) {
       console.error("✗ Para crear un proyecto privado necesitas identidad: ejecuta `cortex auth login` primero.");
@@ -82,7 +101,7 @@ async function main(): Promise<void> {
       return;
     }
     if (!(await canAccessProject(p, credsEmail()))) {
-      console.error(`✗ El proyecto "${p.name}" es privado y no tienes acceso. Pide al admin que te añada.`);
+      console.error(askAccessMsg(p));
       process.exitCode = 1;
       return;
     }

@@ -49,11 +49,14 @@ export async function createProject(
     if (!parent) throw new Error(`Proyecto padre "${opts.parentSlug}" no encontrado.`);
     parentId = parent.id;
   }
+  const slug = slugify(name);
+  // El slug es la IDENTIDAD: si ya existe, NO inventamos un slug-2 — devolvemos el
+  // existente para que el caller decida (acceso/solicitar permiso). Ver link.ts.
+  const bySlug = await findProjectBySlug(slug);
+  if (bySlug) return bySlug;
   const ent = await resolveEntity(sql, name, "project");
   const cur = (await sql`SELECT slug, visibility, owner_email, parent_id FROM entities WHERE id = ${ent.id}`) as unknown as Row[];
-  if (cur[0]?.slug) return toRef({ ...cur[0], id: ent.id, name: ent.name })!; // ya existía
-  let slug = slugify(name);
-  for (let n = 2; await findProjectBySlug(slug); n++) slug = `${slugify(name)}-${n}`;
+  if (cur[0]?.slug) return toRef({ ...cur[0], id: ent.id, name: ent.name })!; // ya existía (por nombre)
   const visibility = opts?.visibility ?? "public";
   await sql`UPDATE entities SET slug = ${slug}, visibility = ${visibility}, owner_email = ${opts?.ownerEmail ?? null}, parent_id = ${parentId} WHERE id = ${ent.id}`;
   return { id: ent.id, name: ent.name, slug, visibility, ownerEmail: opts?.ownerEmail ?? null, parentId };
@@ -104,6 +107,21 @@ export async function addProjectMember(slug: string, email: string): Promise<voi
   const p = await findProjectBySlug(slug);
   if (!p) throw new Error(`Proyecto "${slug}" no encontrado.`);
   await getSql()`INSERT INTO project_members (project_id, email) VALUES (${p.id}, ${email.toLowerCase()}) ON CONFLICT DO NOTHING`;
+}
+
+/** Quita un miembro de un proyecto (operación de admin). */
+export async function removeProjectMember(slug: string, email: string): Promise<void> {
+  const p = await findProjectBySlug(slug);
+  if (!p) throw new Error(`Proyecto "${slug}" no encontrado.`);
+  await getSql()`DELETE FROM project_members WHERE project_id = ${p.id} AND email = ${email.toLowerCase()}`;
+}
+
+/** Miembros (emails) de un proyecto. */
+export async function listProjectMembers(slug: string): Promise<string[]> {
+  const p = await findProjectBySlug(slug);
+  if (!p) return [];
+  const rows = (await getSql()`SELECT email FROM project_members WHERE project_id = ${p.id} ORDER BY email`) as unknown as Row[];
+  return rows.map((r) => r.email as string);
 }
 
 /**

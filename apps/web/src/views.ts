@@ -215,6 +215,7 @@ export function layout(title: string, body: string, user?: { email: string; admi
     <span class="brand"><span class="logo">${DINACODE_LOGO}</span><span class="tag">Cortex</span></span>
     <nav>
       <a href="/">Inicio</a>
+      <a href="/projects">Proyectos</a>
       <a href="/ask">Preguntar</a>
       <a href="/graph">Grafo</a>
       <a href="/code">Código</a>
