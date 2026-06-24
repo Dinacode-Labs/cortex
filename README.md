@@ -1,5 +1,7 @@
 # Dinacode Cortex
 
+[![CI](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml)
+
 **Memoria corporativa de contexto** — **producto interno de Dinacode**. Captura el
 conocimiento disperso de los proyectos (decisiones, restricciones, incidencias,
 convenciones, PRs, conversaciones, docs, código…), lo estructura en una capa **híbrida
