@@ -22,6 +22,21 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  apps/cli:
+    dependencies:
+      '@cortex/agents':
+        specifier: workspace:*
+        version: link:../../packages/agents
+      '@cortex/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@cortex/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@cortex/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+
   apps/mcp-server:
     dependencies:
       '@cortex/agents':
