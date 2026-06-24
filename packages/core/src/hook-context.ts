@@ -1,7 +1,5 @@
-import { closeSql } from "@cortex/database";
-import { getContextPack } from "./operations.js";
-import { renderContextPack } from "./render.js";
-import { resolveLinkedProject } from "./projects.js";
+import { apiGet } from "./api-client.js";
+import { readCortexLink } from "./project-config.js";
 
 /**
  * Hook de INYECCIÓN DE CONTEXTO (SessionStart de Claude Code, y equivalentes). Lee el
@@ -37,18 +35,14 @@ async function main(): Promise<void> {
     /* sin stdin (p.ej. OpenCode pasa --cwd) */
   }
   const cwd = argOf("--cwd") || input.cwd || process.cwd();
-  const proj = await resolveLinkedProject(cwd);
-  if (!proj) return; // sin vínculo válido (no hay .cortex.json, opt-out, o slug no creado en Cortex)
+  const link = readCortexLink(cwd);
+  if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
 
-  let pack = "";
-  try {
-    pack = renderContextPack(await getContextPack(proj.name)).slice(0, MAX_CTX);
-  } catch {
-    return;
-  }
-  if (!pack.trim()) return;
+  // Vía API autenticada (no toca la BD): respeta permisos y no expone proyectos sin acceso.
+  const res = await apiGet<{ project: string; text: string }>(`/context-pack?slug=${encodeURIComponent(link.slug)}`);
+  if (!res || !res.text.trim()) return; // sin sesión, sin servidor, sin acceso, o pack vacío
 
-  const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${proj.name}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${pack}`;
+  const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${res.project}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${res.text.slice(0, MAX_CTX)}`;
 
   if (format === "hermes") {
     process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call
@@ -63,7 +57,6 @@ main()
   .catch(() => {
     /* un hook nunca debe romper la sesión: silencioso */
   })
-  .finally(async () => {
-    await closeSql();
+  .finally(() => {
     process.exit(0);
   });

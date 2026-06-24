@@ -60,6 +60,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@cortex/agents':
+        specifier: workspace:*
+        version: link:../../packages/agents
       '@cortex/core':
         specifier: workspace:*
         version: link:../../packages/core

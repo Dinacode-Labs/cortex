@@ -28,6 +28,7 @@ export {
 export { autoCurate, type CurationResult } from "./curate.js";
 export { requestOtp, verifyOtp, validateToken, revokeToken, isAdmin, isAllowedEmail, type AuthUser } from "./auth.js";
 export { sendOtpEmail } from "./email.js";
+export { apiGet, apiPost, apiBase, isAuthenticated, type ApiResult } from "./api-client.js";
 export {
   classifyType,
   extractEntities,

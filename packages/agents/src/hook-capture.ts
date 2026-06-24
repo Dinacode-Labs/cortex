@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { closeSql } from "@cortex/database";
-import { resolveLinkedProject } from "@cortex/core";
-import { ingestSessionFile } from "./connect-sessions.js";
+import { readCortexLink } from "@cortex/core";
+import { captureSessionViaApi } from "./connect-sessions.js";
 import { shutdownObservability } from "./mastra.js";
 
 /**
@@ -31,11 +31,13 @@ async function main(): Promise<void> {
   const cwd = input.cwd || process.cwd();
   const transcript = input.transcript_path;
   if (!transcript || !existsSync(transcript)) return;
-  const proj = await resolveLinkedProject(cwd);
-  if (!proj) return; // sin vínculo válido (no .cortex.json, opt-out, o slug no creado en Cortex)
+  const link = readCortexLink(cwd);
+  if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
 
-  const r = await ingestSessionFile(proj.name, transcript, "claude");
-  if (r.saved || r.updated || r.superseded || r.noop) console.error(`[cortex hook] "${proj.name}": +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas`);
+  // Vía API autenticada: la escritura se atribuye al usuario (created_by=email) y respeta permisos.
+  const r = await captureSessionViaApi(link.slug, transcript, "claude");
+  if (r.saved || r.updated || r.superseded || r.failed)
+    console.error(`[cortex hook] "${link.slug}": +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas${r.failed ? `, ${r.failed} fallos (¿cortex auth login / servidor?)` : ""}`);
 }
 
 main()
