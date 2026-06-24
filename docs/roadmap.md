@@ -119,8 +119,16 @@ Bucle automático sin invocación manual. Análisis + fricción:
   **corroboró** (se reforzó/fusionó tras crearse → recurrió en otra sesión) y **decae**
   (`obsolete`, sale de búsqueda) lo viejo nunca corroborado (> `CORTEX_DECAY_DAYS`, def.
   120). La calidad sube sola con el tiempo, la captura sigue 100% ágil.
-- **Pendiente:** extender la reconciliación a los demás conectores (hoy solo sesiones);
-  `/review` opcional NO bloqueante (curado a mano), solo si hace falta.
+- **Reconciliación en conectores — hecho.** El primitivo `saveWithReconciliation`
+  (`core/dedup.ts`) unifica el gate; las **sesiones** lo usan con el reconciliador LLM
+  inyectado (`setReconciler`) → ADD/UPDATE/SUPERSEDE/NOOP. Los **conectores** (CLIs de
+  core, embeben por lotes, sin LLM) se reconcilian en `maintain` vía **`reconcileProject`**:
+  dedup de near-idénticos del mismo `source_type` **reusando los embeddings** ya
+  calculados (sin coste). **Excluye formatos imagen** (su embedding es un caption genérico
+  → agruparía imágenes distintas). Verificado en CE Portal: 11 near-dups de texto
+  deduplicados, 0 imágenes tocadas.
+- **Pendiente:** `/review` opcional NO bloqueante (curado a mano), solo si hace falta;
+  merge LLM (no solo dedup) en el pase de maintain.
 - **Pendiente:** **auto-captura** en Codex/OpenCode/Hermes (Claude tiene `transcript_path`
   + SessionEnd limpios; los demás no exponen transcript / no tienen session-end → se
   cubren con el **backfill batch** `connect-sessions` por plataforma). `UserPromptSubmit`

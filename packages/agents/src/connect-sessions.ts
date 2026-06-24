@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { closeSql, getSql } from "@cortex/database";
-import { findNearest, invalidateEntry, relate, saveContext, updateEntryContent, UPDATE_THRESHOLD, NOOP_THRESHOLD } from "@cortex/core";
+import { saveWithReconciliation, setReconciler } from "@cortex/core";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextEntryType } from "@cortex/shared";
 import { runAgent, shutdownObservability } from "./mastra.js";
@@ -134,8 +134,6 @@ async function alreadyIngested(project: string, sessionId: string): Promise<bool
   return rows.length > 0;
 }
 
-/** Ingiere UNA sesión (transcript .jsonl): condensa → scrub → destila → guarda.
- * Reutilizable por el CLI (backfill) y por el hook de auto-captura (SessionEnd). */
 /** Fusiona conocimiento existente + nuevo en una entrada consolidada (UPDATE estilo mem0). */
 async function mergeKnowledge(existing: string, incoming: string): Promise<string> {
   const prompt = `Entrada existente:\n"""\n${existing}\n"""\n\nNueva información sobre lo mismo:\n"""\n${incoming}\n"""\n\nFúndelas en UNA entrada consolidada.`;
@@ -155,8 +153,15 @@ async function reconcile(existing: string, incoming: string): Promise<"noop" | "
   }
 }
 
+// Inyecta el reconciliador LLM en core: con esto saveWithReconciliation puede
+// fusionar/superseder (no solo dedup). Los conectores que corren sin agents usan la
+// versión determinista (solo NOOP de near-idénticos).
+setReconciler({ decide: reconcile, merge: mergeKnowledge });
+
 export interface IngestResult { saved: number; updated: number; superseded: number; noop: number; skipped: boolean }
 
+/** Ingiere UNA sesión (transcript .jsonl): condensa → scrub → destila → reconcilia+guarda.
+ * Reutilizable por el CLI (backfill) y por el hook de auto-captura (SessionEnd). */
 export async function ingestSessionFile(project: string, file: string, platform = "claude"): Promise<IngestResult> {
   const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
   if (await alreadyIngested(project, sessionId)) return { saved: 0, updated: 0, superseded: 0, noop: 0, skipped: true };
@@ -176,42 +181,16 @@ export async function ingestSessionFile(project: string, file: string, platform 
   let updated = 0;
   let superseded = 0;
   let noop = 0;
-
-  const addEntry = (title: string, type: string, content: string) =>
-    saveContext(
-      { content, project, title, type: type as ContextEntryType, confidence: "low", sourceType: "agent_session", sourceReference: sessionId, createdBy: "session-backfill", metadata: { platform, sessionId } },
-      { useClassifier: false, detectImprovements: false, skipEmbedding: false },
-    );
-
   for (const it of items) {
-    const text = scrub(`${it.title}\n\n${it.content}`);
-    const near = await findNearest(project, text);
     try {
-      // Reconciliación estilo mem0: ADD / UPDATE / SUPERSEDE(=DELETE bi-temporal) / NOOP.
-      if (near && near.score >= UPDATE_THRESHOLD) {
-        if (near.score >= NOOP_THRESHOLD) { noop++; continue; } // casi idéntico
-        const decision = await reconcile(near.content, text);
-        if (decision === "noop") { noop++; continue; }
-        if (decision === "supersede") {
-          const { entry } = await addEntry(it.title, it.type, text); // la nueva pasa a ser vigente
-          saved++;
-          if (near.sourceType === "agent_session") {
-            await invalidateEntry(near.id, entry.id); // §5.5: invalidar, no borrar
-            superseded++;
-          } else {
-            // No invalidamos conocimiento curado en automático: solo lo marcamos en contradicción.
-            await relate(getSql(), { sourceId: entry.id, sourceType: "context_entry", targetId: near.id, targetType: "context_entry", relationType: "contradicts" });
-          }
-          continue;
-        }
-        // update: solo fusionamos entradas auto-capturadas (no tocamos lo curado)
-        if (near.sourceType !== "agent_session") { noop++; continue; }
-        await updateEntryContent(near.id, scrub(await mergeKnowledge(near.content, text)));
-        updated++;
-        continue;
-      }
-      await addEntry(it.title, it.type, text); // ADD: conocimiento nuevo
-      saved++;
+      const r = await saveWithReconciliation(
+        { content: scrub(`${it.title}\n\n${it.content}`), project, title: it.title, type: it.type as ContextEntryType, confidence: "low", sourceType: "agent_session", sourceReference: sessionId, createdBy: "session-backfill", metadata: { platform, sessionId } },
+        { useClassifier: false, detectImprovements: false, skipEmbedding: false },
+      );
+      if (r.action === "add") saved++;
+      else if (r.action === "update") updated++;
+      else if (r.action === "supersede" || r.action === "contradict") superseded++;
+      else noop++;
     } catch (e) {
       console.error(`  ✗ "${it.title}": ${(e as Error).message}`);
     }

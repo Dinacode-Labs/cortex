@@ -1,5 +1,5 @@
 import { closeSql, getSql } from "@cortex/database";
-import { applyTemporalInvalidation, autoCurate, lintProject, listProjects, resolveEntities } from "@cortex/core";
+import { applyTemporalInvalidation, autoCurate, lintProject, listProjects, reconcileProject, resolveEntities } from "@cortex/core";
 import { enrichProject } from "./enrich-project.js";
 import { shutdownObservability } from "./mastra.js";
 
@@ -28,6 +28,7 @@ export interface MaintenanceReport {
   superseded: number;
   promoted: number;
   decayed: number;
+  deduped: number;
 }
 
 export async function runMaintenance(only?: string): Promise<MaintenanceReport> {
@@ -39,7 +40,7 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
     locked = rows[0]?.locked === true;
     if (!locked) {
       console.log("[maintain] otro mantenimiento en curso (lock no adquirido) — saltando.");
-      return { ran: false, projects: [], enriched: {}, merged: 0, historical: 0, superseded: 0, promoted: 0, decayed: 0 };
+      return { ran: false, projects: [], enriched: {}, merged: 0, historical: 0, superseded: 0, promoted: 0, decayed: 0, deduped: 0 };
     }
 
     const projects = only ? [only] : (await listProjects()).map((p) => p.entity.name);
@@ -62,13 +63,22 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
     const c = await autoCurate();
     console.log(`  [curate] ${c.promoted} promovidas (corroboradas), ${c.decayed} decaídas (obsoletas)`);
 
+    // Reconciliación a posteriori: dedup de near-idénticos (incl. lo ingerido por
+    // conectores), reusando embeddings. Antes del lint para que reporte el estado limpio.
+    let deduped = 0;
+    for (const p of projects) {
+      const d = await reconcileProject(p);
+      deduped += d.deduped;
+      if (d.deduped) console.log(`  [reconcile] ${p}: ${d.deduped} near-idénticos deduplicados`);
+    }
+
     for (const p of projects) {
       const l = await lintProject(p);
       console.log(`  [lint] ${p}: ${l.contradictions.length} contradicciones · ${l.gaps.length} huecos · ${l.duplicates.length} dups · ${l.orphanEntities.length} huérfanas · ${l.lowConfidence} baja-conf`);
     }
 
     console.log("[maintain] completado.");
-    return { ran: true, projects, enriched, merged: res.merged, historical: t.historical, superseded: t.superseded, promoted: c.promoted, decayed: c.decayed };
+    return { ran: true, projects, enriched, merged: res.merged, historical: t.historical, superseded: t.superseded, promoted: c.promoted, decayed: c.decayed, deduped };
   } finally {
     if (locked) { try { await conn`SELECT pg_advisory_unlock(${LOCK_KEY})`; } catch { /* best-effort */ } }
     await conn.release();
