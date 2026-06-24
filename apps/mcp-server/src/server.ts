@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { loadEnv, saveContextInput, searchContextInput } from "@cortex/shared";
 import {
+  canAccessProject,
+  findProjectByName,
   getContextPack,
   lintProject,
   listDecisions,
@@ -16,14 +18,16 @@ import {
   setClassifier,
   setReranker,
   validateEntry,
+  type AuthUser,
 } from "@cortex/core";
 import { classifyEntry, isLlmEnabled, rerankLLM, synthesizeContextAnswer } from "@cortex/agents";
 import { z } from "zod";
 
 /**
  * Construcción del MCP de Cortex (las 8 tools), reutilizable por cualquier transporte
- * (stdio en `index.ts`, HTTP en `http.ts`). Las tools delegan en `@cortex/core`. La capa
- * de inteligencia (Mastra/LLM) se inyecta una vez si hay LLM.
+ * (stdio en `index.ts`, HTTP en `http.ts`). Si se pasa `user` (transporte HTTP
+ * autenticado), las tools **atribuyen** las escrituras (`created_by`=email) y **aplican
+ * permisos** (acceso al proyecto); sin `user` (stdio local) se comportan como antes.
  */
 loadEnv();
 if (isLlmEnabled()) {
@@ -34,8 +38,17 @@ if (isLlmEnabled()) {
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
 
-export function buildMcpServer(): McpServer {
+export function buildMcpServer(user?: AuthUser): McpServer {
   const server = new McpServer({ name: "cortex", version: "0.0.0" });
+
+  // Permiso de acceso al proyecto (solo si hay usuario autenticado). Devuelve mensaje de
+  // error si NO tiene acceso, o null si puede continuar.
+  const guard = async (project?: string): Promise<string | null> => {
+    if (!user || !project) return null;
+    const p = await findProjectByName(project);
+    if (p && !(await canAccessProject(p, user.email))) return `Sin acceso al proyecto "${project}".`;
+    return null;
+  };
 
   server.registerTool(
     "save_project_context",
@@ -50,7 +63,10 @@ export function buildMcpServer(): McpServer {
     },
     async (args) => {
       try {
-        return text(renderSaveResult(await saveContext(args)));
+        const denied = await guard(args.project);
+        if (denied) return errorText(denied);
+        const result = await saveContext(user ? { ...args, createdBy: user.email } : args);
+        return text(renderSaveResult(result));
       } catch (e) {
         return errorText(`Error al guardar contexto: ${(e as Error).message}`);
       }
@@ -68,6 +84,8 @@ export function buildMcpServer(): McpServer {
     },
     async (args) => {
       try {
+        const denied = await guard(args.project);
+        if (denied) return errorText(denied);
         return text(renderSearchHits(await searchContext(args)));
       } catch (e) {
         return errorText(`Error en la búsqueda: ${(e as Error).message}`);
@@ -92,6 +110,8 @@ export function buildMcpServer(): McpServer {
     },
     async ({ project, area, asOf }) => {
       try {
+        const denied = await guard(project);
+        if (denied) return errorText(denied);
         return text(renderContextPack(await getContextPack(project, area, asOf ? new Date(asOf) : undefined)));
       } catch (e) {
         return errorText(`Error al generar el context pack: ${(e as Error).message}`);
@@ -111,6 +131,8 @@ export function buildMcpServer(): McpServer {
     },
     async ({ project, limit }) => {
       try {
+        const denied = await guard(project);
+        if (denied) return errorText(denied);
         return text(renderDecisions(await listDecisions(project, limit ?? 20)));
       } catch (e) {
         return errorText(`Error al listar decisiones: ${(e as Error).message}`);
@@ -154,6 +176,8 @@ export function buildMcpServer(): McpServer {
     },
     async ({ question, project }) => {
       try {
+        const denied = await guard(project);
+        if (denied) return errorText(denied);
         const hits = await searchContext({ query: question, project, limit: 6 });
         const answer = await synthesizeContextAnswer(
           question,
@@ -182,6 +206,8 @@ export function buildMcpServer(): McpServer {
     },
     async ({ query, project, limit }) => {
       try {
+        const denied = await guard(project);
+        if (denied) return errorText(denied);
         return text(renderCodeHits(await searchProjectCode(query, project, limit ?? 8)));
       } catch (e) {
         return errorText(`Error al buscar código: ${(e as Error).message}`);
@@ -201,6 +227,8 @@ export function buildMcpServer(): McpServer {
     },
     async ({ project }) => {
       try {
+        const denied = await guard(project);
+        if (denied) return errorText(denied);
         return text(renderLintReport(await lintProject(project)));
       } catch (e) {
         return errorText(`Error en lint: ${(e as Error).message}`);
