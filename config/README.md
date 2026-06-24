@@ -112,7 +112,19 @@ el bucle (el repo se apunta a un proyecto con un `.cortex.json` → `{"project":
 - **SessionEnd** → **auto-captura** la sesión destilándola en Cortex (`hook:capture`).
 
 Preserva los hooks existentes. Otros agentes (Codex/OpenCode/Hermes) usan los mismos
-scripts vía sus propios adaptadores (pendiente). Ver `docs/research/hooks-integration.md`.
+scripts vía sus propios adaptadores. Ver `docs/research/hooks-integration.md`.
+
+### Cortex es **opt-in por repo** (privacidad)
+Los hooks están instalados a nivel de usuario, pero **solo actúan donde hay un
+`.cortex.json`**. Sin él → **no se inyecta ni se captura nada** (tu proyecto personal
+queda fuera por defecto). El `.cortex.json` más cercano manda (no se hereda más allá):
+- `{ "project": "Mi Proyecto" }` — apunta el repo (vale también en subdirectorios).
+- `{ "ignore": true }` — **opt-out explícito**: este repo NO usa Cortex. Úsalo para un
+  proyecto personal **anidado** dentro de un árbol que sí tiene `.cortex.json` arriba.
+
+> Control global: si no quieres ningún hook, no ejecutes `cortex sync` (o quita la
+> sección `hooks` de `~/.claude/settings.json`). La **captura** (SessionEnd) es lo que
+> envía contenido a Cortex; la **inyección** (SessionStart) solo lee.
 
 ## Tools MCP expuestas
 - `save_project_context` — guardar conocimiento (clasifica, resume, detecta duplicados/contradicciones).
