@@ -9,7 +9,7 @@ export { recordUsage, getUsageSummary, getRecentTraces, type UsageRecord, type U
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
 export { resolveProjectFromCwd } from "./project-config.js";
-export { isNearDuplicate, findNearest, updateEntryContent, UPDATE_THRESHOLD, NOOP_THRESHOLD, type NearestEntry } from "./dedup.js";
+export { isNearDuplicate, findNearest, updateEntryContent, invalidateEntry, UPDATE_THRESHOLD, NOOP_THRESHOLD, type NearestEntry } from "./dedup.js";
 export {
   classifyType,
   extractEntities,

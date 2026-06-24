@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   if (!project || !transcript || !existsSync(transcript)) return; // repo no apuntado / sin transcript
 
   const r = await ingestSessionFile(project, transcript, "claude");
-  if (r.saved || r.updated || r.noop) console.error(`[cortex hook] "${project}": +${r.saved} nuevas, ~${r.updated} fusionadas, ${r.noop} ya cubiertas`);
+  if (r.saved || r.updated || r.superseded || r.noop) console.error(`[cortex hook] "${project}": +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas`);
 }
 
 main()
