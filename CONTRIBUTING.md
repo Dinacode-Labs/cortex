@@ -55,8 +55,10 @@ Si una operación de core necesita LLM, define el hook en core y enchúfalo en a
 - **Trazabilidad (§5.5):** cada unidad de conocimiento conserva fuente, fecha, autor,
   confianza, estado y vigencia. No conviertas inferencias en hechos (confianza baja para lo auto).
 - **zod aislado:** `agents` usa **zod v4** (lo exige Mastra); el resto **zod v3**. No cruces schemas.
-- **Calidad:** `pnpm typecheck` debe pasar. No hay tests aún (bienvenidos); verifica a mano
-  el camino afectado y deja constancia en el PR.
+- **Calidad:** `pnpm typecheck` y `pnpm test` (Vitest) deben pasar. Los tests viven en
+  `tests/` (unitarios de lógica pura/determinista: auth/permisos, vínculo/slug, parsers de
+  sesiones, schemas). Añade tests con tu PR cuando toques lógica testeable; para lo que
+  necesita BD/LLM, verifica a mano y deja constancia.
 
 ## Flujo de PR
 
