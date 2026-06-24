@@ -54,7 +54,11 @@ solo intra-run (no contra la memoria existente); no hay **gate de relevancia** n
 4. **Gate de relevancia**: capturar solo si la sesión produjo conocimiento duradero
    (saltar triviales); marcar **confianza más baja** por ser inferencia de agente.
 5. **Proveniencia + vigencia** (§5.5) + **decay/flag** de lo obsoleto (bi-temporal).
-6. **propose → review → commit** (LLM-judge o humano) para escrituras duraderas.
+6. **propose → curación, NO review humano bloqueante** (mataría la agilidad de la
+   captura): lo auto-capturado escribe ya con confianza baja, y `maintain` lo **auto-cura**
+   sin humano — promueve lo corroborado (recurrió/se fusionó) y decae lo viejo nunca
+   corroborado. Una vista `/review` opcional puede servir para curado manual, pero nunca
+   bloquea captura ni búsqueda.
 
 ## Implicación para el roadmap
 El hook de auto-captura debe pasar de "destila y guarda todo" a **"propón con
