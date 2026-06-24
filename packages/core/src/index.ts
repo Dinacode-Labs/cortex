@@ -30,6 +30,7 @@ export { requestOtp, verifyOtp, validateToken, revokeToken, createUiTicket, rede
 export { sendOtpEmail } from "./email.js";
 export { apiGet, apiPost, apiBase, isAuthenticated, type ApiResult } from "./api-client.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture.js";
+export { extractFileText, SUPPORTED_EXTS, type ExtractedFile } from "./extract.js";
 export {
   classifyType,
   extractEntities,

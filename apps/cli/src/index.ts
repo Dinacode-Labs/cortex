@@ -26,6 +26,7 @@ const COMMANDS: Record<string, Cmd> = {
   "connect-docs": { script: "packages/core/src/connect-docs.ts", help: "ingerir una carpeta de documentos (Word/PDF/Excel/…)" },
   "connect-github": { script: "packages/core/src/connect-github.ts", help: "ingerir PRs/issues de un repo de GitHub" },
   "connect-sessions": { script: "packages/agents/src/connect-sessions.ts", help: "backfill de sesiones de un agente a un proyecto" },
+  "connect-meeting": { script: "packages/agents/src/connect-meeting.ts", help: "transcribir + destilar grabaciones de reunión a conocimiento tipado" },
 };
 
 function usage(): void {

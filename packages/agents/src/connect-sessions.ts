@@ -144,7 +144,7 @@ export interface ApiCaptureResult { saved: number; updated: number; superseded: 
 /** Pipeline compartido: dado el transcript YA CONDENSADO de una sesión (de cualquier
  * agente), distila en local y POSTea cada unidad por la API autenticada (`POST /capture`)
  * → atribución (created_by=email) + permisos en el servidor. */
-export async function captureCondensedViaApi(slug: string, condensed: string, sessionId: string, platform: string): Promise<ApiCaptureResult> {
+export async function captureCondensedViaApi(slug: string, condensed: string, sessionId: string, platform: string, sourceType = "agent_session"): Promise<ApiCaptureResult> {
   const res: ApiCaptureResult = { saved: 0, updated: 0, superseded: 0, noop: 0, failed: 0 };
   if (condensed.length < 200) return res;
   const items: Item[] = [];
@@ -163,7 +163,7 @@ export async function captureCondensedViaApi(slug: string, condensed: string, se
       title: it.title,
       content: scrub(`${it.title}\n\n${it.content}`),
       type: it.type,
-      sourceType: "agent_session",
+      sourceType,
       sourceReference: `${platform}:${sessionId}`,
       confidence: "low",
       metadata: { platform, sessionId },
