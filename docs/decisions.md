@@ -294,3 +294,24 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   **save del MCP y los conectores** también exijan slug+permiso (hoy el gate cubre los
   hooks, que es el camino ambiente/automático y de mayor riesgo; el save por MCP/
   conector sigue siendo deliberado y aún puede auto-crear por nombre).
+
+## Jerarquía de proyectos: padre/cliente con herencia y cascada
+
+- **Decisión:** un proyecto puede tener un **padre** (`entities.parent_id`). Caso típico:
+  un cliente "Boluda" con subproyectos `boluda-api`, `boluda-web`. Cada subproyecto es un
+  **proyecto real** (slug, vínculo `.cortex.json`, permisos y recuperación propios →
+  precisión), y el padre **agrupa y guarda el contexto compartido**.
+- **Herencia de contexto:** `getContextPack(sub)` incluye las entradas del subproyecto
+  **+ las de sus ancestros** (CTE recursiva sobre `parent_id`). Así "lo común de Boluda"
+  llega a cada subproyecto sin mezclar el contexto de los subproyectos entre sí (evita el
+  context-rot del modelo "todo en un proyecto").
+- **Cascada de permisos:** `canAccessProject` recorre la cadena de ancestros: si el
+  proyecto O algún ancestro es privado → restringido; concede acceso ser admin o
+  dueño/miembro del proyecto o de **cualquier ancestro** (ser miembro de "Boluda" abre
+  sus subproyectos).
+- **Por qué no "Boluda = 1 proyecto con subcarpetas":** perdería precisión de
+  recuperación (una sesión de `boluda-api` traería contexto de `boluda-web`), vínculo por
+  repo y permisos finos. Por qué no plano: lo común se silaría/duplicaría.
+- **Uso:** `cortex link --create "Boluda API" --parent boluda`.
+- **Revisar cuando:** queramos herencia también en `search`/`ask` (hoy solo en el pack),
+  límites de profundidad, o mover contexto compartido a un tipo "client" del grafo.
