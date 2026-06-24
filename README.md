@@ -47,10 +47,6 @@ MCP de Cortex + skills del ecosistema (Plane, Jira, Notion, Teams…).
   ti + miembros; `--parent <slug>` los cuelga de un cliente (heredan contexto y permisos).
 - Solo necesitas que el **servidor de Cortex esté en marcha** (lo opera tu equipo de infra).
 
-![Dashboard](./docs/screenshot-dashboard.png)
-![Preguntar al agente de recuperación](./docs/screenshot-ask.png)
-![Grafo de conocimiento](./docs/screenshot-graph-entities.png)
-
 ## Capacidades
 
 - **Bucle automático (hooks)** — inyección de contexto al abrir sesión + auto-captura al
