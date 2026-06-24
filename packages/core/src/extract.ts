@@ -53,6 +53,41 @@ function visionConfig(): { key: string; base: string; model: string } | null {
   return null;
 }
 
+interface VisionCfg {
+  key: string;
+  base: string;
+  model: string;
+}
+
+/** Llamada de visión (imagen → texto) genérica, con reintentos en 429/5xx. */
+async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cfg: VisionCfg): Promise<string | null> {
+  const body = JSON.stringify({
+    model: cfg.model,
+    max_tokens: maxTokens,
+    messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }],
+  });
+  const headers = { authorization: `Bearer ${cfg.key}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await fetch(`${cfg.base.replace(/\/$/, "")}/chat/completions`, { method: "POST", headers, body });
+      if (res.ok) {
+        const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        return j.choices?.[0]?.message?.content?.trim() || null;
+      }
+      if (res.status !== 429 && res.status < 500) return null;
+    } catch {
+      /* red */
+    }
+    await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
+  }
+  return null;
+}
+
+const CAPTION_PROMPT =
+  "Describe en español el contenido de esta imagen para indexarla en una memoria de proyecto software: qué muestra, textos/etiquetas/campos visibles, y si es un diagrama o captura, su propósito. Conciso (2-4 frases). Si es decorativa o un icono sin información, responde solo: IRRELEVANTE.";
+const OCR_PROMPT =
+  "Transcribe TODO el texto visible de esta página de documento, en orden de lectura y en su idioma original. Devuelve solo el texto (sin comentarios). Si no hay texto legible, responde solo: SIN_TEXTO.";
+
 // Cache de captions por content-hash (durante el proceso): no llamamos al modelo de
 // visión dos veces para la misma imagen (frecuente en exports con imágenes repetidas).
 const captionCache = new Map<string, string | null>();
@@ -64,40 +99,44 @@ async function captionImage(path: string, ext: string): Promise<string | null> {
   const hash = createHash("sha256").update(bytes).digest("hex");
   if (captionCache.has(hash)) return captionCache.get(hash)!; // imagen ya vista → reusar
   const mime = ext === "jpg" ? "jpeg" : ext;
-  const dataUrl = `data:image/${mime};base64,${bytes.toString("base64")}`;
-  const body = JSON.stringify({
-    model: cfg.model,
-    max_tokens: 240,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "Describe en español el contenido de esta imagen para indexarla en una memoria de proyecto software: qué muestra, textos/etiquetas/campos visibles, y si es un diagrama o captura, su propósito. Conciso (2-4 frases). Si es decorativa o un icono sin información, responde solo: IRRELEVANTE." },
-          { type: "image_url", image_url: { url: dataUrl } },
-        ],
-      },
-    ],
-  });
-  const remember = (v: string | null): string | null => {
-    captionCache.set(hash, v);
-    return v;
-  };
-  const headers = { authorization: `Bearer ${cfg.key}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      const res = await fetch(`${cfg.base.replace(/\/$/, "")}/chat/completions`, { method: "POST", headers, body });
-      if (res.ok) {
-        const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-        const c = j.choices?.[0]?.message?.content?.trim() ?? "";
-        return remember(c && !/^IRRELEVANTE/i.test(c) ? c : null);
-      }
-      if (res.status !== 429 && res.status < 500) return remember(null);
-    } catch {
-      /* red */
+  const c = await visionCall(`data:image/${mime};base64,${bytes.toString("base64")}`, CAPTION_PROMPT, 240, cfg);
+  const v = c && !/^IRRELEVANTE/i.test(c) ? c : null;
+  captionCache.set(hash, v);
+  return v;
+}
+
+/** OCR de una imagen (página renderizada) vía el modelo de visión. */
+async function ocrImage(path: string, cfg: VisionCfg): Promise<string | null> {
+  const t = await visionCall(`data:image/png;base64,${readFileSync(path).toString("base64")}`, OCR_PROMPT, 1500, cfg);
+  return t && !/^SIN_TEXTO/i.test(t) ? t : null;
+}
+
+const MAX_OCR_PAGES = Number(process.env.CORTEX_OCR_MAX_PAGES ?? "10");
+const OCR_MIN_TEXT = Number(process.env.CORTEX_OCR_MIN_TEXT ?? "120"); // < esto → PDF escaneado, OCR
+
+/** OCR de un PDF escaneado: renderiza páginas con pdftoppm (poppler) y las pasa por visión. */
+async function ocrPdf(path: string): Promise<string | null> {
+  const cfg = visionConfig();
+  if (!cfg) return null;
+  const dir = mkdtempSync(join(tmpdir(), "cortex-ocr-"));
+  try {
+    await execFileAsync("pdftoppm", ["-png", "-r", "150", "-l", String(MAX_OCR_PAGES), path, join(dir, "p")], { maxBuffer: 1 << 27 });
+    const pages = readdirSync(dir).filter((f) => f.endsWith(".png")).sort();
+    const parts: string[] = [];
+    for (const pg of pages) {
+      const t = await ocrImage(join(dir, pg), cfg);
+      if (t) parts.push(t);
     }
-    await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
+    return parts.join("\n\n").trim() || null;
+  } catch {
+    return null; // pdftoppm no disponible o fallo
+  } finally {
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* ignore */
+    }
   }
-  return null; // fallo transitorio (no cacheamos: reintentable en otra pasada)
 }
 
 let tmpCounter = 0;
@@ -229,7 +268,10 @@ export async function extractFileText(path: string): Promise<ExtractedFile | nul
     if (ext === "pdf") {
       const pdf = await getDocumentProxy(new Uint8Array(readFileSync(path)));
       const r = await extractText(pdf, { mergePages: true });
-      return clean(Array.isArray(r.text) ? r.text.join("\n") : r.text, ext);
+      const raw = Array.isArray(r.text) ? r.text.join("\n") : r.text;
+      if (raw.trim().length >= OCR_MIN_TEXT) return clean(raw, ext);
+      const ocr = await ocrPdf(path); // sin capa de texto (escaneado) → OCR por visión
+      return ocr ? clean(ocr, "pdf-ocr") : clean(raw, ext);
     }
     if (ext === "xlsx") {
       const wb = XLSX.read(readFileSync(path), { type: "buffer" });
