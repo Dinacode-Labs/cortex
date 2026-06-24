@@ -347,3 +347,18 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   usuario (otro token no reutiliza su session-id). Verificado: privado ajeno→denegado, save→created_by=email.
 - **Revisar cuando:** persistencia de sesiones multi-nodo
   (eventStore), o montarlo tras el mismo dominio que la API.
+
+## Despliegue: docker-compose (imagen única, un comando por servicio)
+
+- **Decisión:** stack desplegable en `deploy/docker-compose.yml`: Postgres (pgvector) +
+  `migrate` (aplica el esquema y sale; los demás esperan a `service_completed_successfully`)
+  + `server` (API/auth, 8787) + `web` (UI, 8080) + `mcp` (MCP HTTP, 8788) + `worker`
+  (mantenimiento programado). **Una sola imagen** (`Dockerfile`, node:22 + pnpm + tsx, sin
+  build) reutilizada por todos; el comando lo fija cada servicio.
+- **Config:** `deploy/.env` (no commiteado) — `DATABASE_URL` al servicio interno
+  `postgres`, `CORTEX_PUBLIC_URL`/dominio (el servidor inyecta esa URL en `/install.sh`),
+  auth (admin/dominio/Brevo) y proveedores.
+- **Verificado:** la imagen construye; BD limpia → migrate aplica 0001–0012; server
+  conecta y responde `/health`; `/install.sh` sirve con la URL pública.
+- **Revisar cuando:** se ponga tras proxy/HTTPS real (Traefik/Caddy/Coolify), se quiera
+  compilar en vez de tsx, o separar la imagen por servicio.
