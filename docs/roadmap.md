@@ -3,6 +3,23 @@
 Producto **interno** de Dinacode. Este fichero recoge lo que queda por hacer; las
 decisiones técnicas firmes viven en [`decisions.md`](./decisions.md).
 
+## Identidad, atribución y permisos (para "luego", necesita servidor)
+
+- **Necesidad:** registrar **quién** mete **qué** dato y **cuándo** (atribución/auditoría).
+  Media base ya hecha: cada entrada tiene `created_by` + `created_at` (§5.5); hoy
+  `created_by` es el origen (`session-backfill`, `notion`…). Con identidad real,
+  `created_by` = el **email autenticado** → atribución sin cambiar el modelo.
+- **Auth propuesta: email + OTP (sin passwords).** El usuario **es** su correo
+  (`@dinacode.com`). Flujo tipo `gh auth login`: `cortex auth login` → email → OTP →
+  token local (`~/.cortex/credentials`); cada save/captura viaja firmada por el email.
+- **Permisos/compartición:** sobre lo anterior — proyecto como entidad gestionada
+  (dueño + miembros, read/write/share). El **gate de slug** (`resolveLinkedProject`) es
+  el punto donde enchufar "resolver usuario → permiso sobre el proyecto".
+- **Dependencia dura:** hoy los hooks/CLI hablan **directo a Postgres**. Auth multi-
+  usuario + permisos exigen que **Cortex sea un servicio con API HTTP** autenticada →
+  se acopla a *transporte HTTP del MCP* + *despliegue real*. Atribución, permisos y auth
+  **llegan juntos con el servidor**. Necesita además un servicio de envío de email (OTP).
+
 ## Ingesta multimodal (captura más allá del texto)
 
 Hoy los conectores solo capturan **texto** (`.md`, tickets, chat, código). El export
