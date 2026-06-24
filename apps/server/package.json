@@ -1,0 +1,18 @@
+{
+  "name": "@cortex/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@cortex/core": "workspace:*",
+    "@cortex/database": "workspace:*",
+    "@cortex/shared": "workspace:*",
+    "@hono/node-server": "^2.0.5",
+    "hono": "^4.12.26"
+  }
+}
