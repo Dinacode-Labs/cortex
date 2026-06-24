@@ -1,11 +1,23 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { loadEnv } from "@cortex/shared";
 loadEnv();
 import { closeSql, getSql } from "@cortex/database";
-import { createProject, findProjectBySlug } from "./projects.js";
+import { canAccessProject, createProject, findProjectBySlug } from "./projects.js";
 import { readCortexLink } from "./project-config.js";
 import type { Row } from "./map.js";
+
+/** Email autenticado de la CLI (~/.cortex/credentials), o null. Es el dueño al crear. */
+function credsEmail(): string | null {
+  const f = join(homedir(), ".cortex", "credentials");
+  if (!existsSync(f)) return null;
+  try {
+    return (JSON.parse(readFileSync(f, "utf8")) as { email?: string }).email ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * `cortex link`: vincula la carpeta actual a un proyecto Cortex escribiendo `.cortex.json`.
@@ -38,12 +50,19 @@ async function main(): Promise<void> {
   if (args.includes("--create")) {
     const name = positional.join(" ").trim();
     if (!name) {
-      console.error('Uso: cortex:link --create "<Nombre del proyecto>"');
+      console.error('Uso: cortex:link --create "<Nombre del proyecto>" [--private]');
       process.exitCode = 1;
       return;
     }
-    const p = await createProject(name);
-    writeLink({ slug: p.slug }, `Proyecto "${p.name}" creado en Cortex (slug: ${p.slug}) y vinculado.`);
+    const owner = credsEmail();
+    const visibility = args.includes("--private") ? "private" : "public";
+    if (visibility === "private" && !owner) {
+      console.error("✗ Para crear un proyecto privado necesitas identidad: ejecuta `cortex auth login` primero.");
+      process.exitCode = 1;
+      return;
+    }
+    const p = await createProject(name, { visibility, ownerEmail: owner });
+    writeLink({ slug: p.slug }, `Proyecto "${p.name}" (${p.visibility}${owner ? `, dueño ${owner}` : ""}) creado y vinculado · slug: ${p.slug}.`);
     return;
   }
 
@@ -55,7 +74,12 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    writeLink({ slug: p.slug }, `Vinculado a "${p.name}" (slug: ${p.slug}).`);
+    if (!(await canAccessProject(p, credsEmail()))) {
+      console.error(`✗ El proyecto "${p.name}" es privado y no tienes acceso. Pide al admin que te añada.`);
+      process.exitCode = 1;
+      return;
+    }
+    writeLink({ slug: p.slug }, `Vinculado a "${p.name}" (${p.visibility}) · slug: ${p.slug}.`);
     return;
   }
 
