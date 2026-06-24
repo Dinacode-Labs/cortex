@@ -1,36 +1,29 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
-import { closeSql, getSql } from "@cortex/database";
-import { getEmbeddingProvider } from "@cortex/embeddings";
-import { saveContext } from "./operations.js";
-import { relate } from "./entities.js";
-import { storeEmbeddingsBatch } from "./vectors.js";
+import { loadEnv } from "@cortex/shared";
+loadEnv();
+import { apiPost } from "./api-client.js";
+import type { BatchItem } from "./capture.js";
 import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
-import type { Row } from "./map.js";
 
 /**
- * Conector de export de Notion (Markdown + ADJUNTOS). Notion exporta cada página como
- * `<Título> <id32hex>.md` y sus ficheros adjuntos en la carpeta hermana
- * `<Título> <id32hex>/`. Este conector es **consciente del contenido**: ingiere la
- * página (sourceType notion_doc) y **parsea + RAGea sus adjuntos** (docx/pdf/xlsx vía
- * la capa `extract`), creándolos como entradas `document` **enlazadas a la página**
- * (`belongs_to`). Idempotente/incremental (salta lo ya ingerido por sourceReference).
+ * Conector de export de Notion (Markdown + ADJUNTOS), **consciente del contenido**:
+ * ingiere la página (notion_doc) y parsea/RAGea sus adjuntos (vía la capa `extract`
+ * multimodal), enlazándolos a la página (`belongs_to`). Escribe a través de la API
+ * autenticada de Cortex (`POST /capture/batch` + `/relate`): atribución (created_by=email)
+ * + permisos + embedding por lotes server-side. Incremental por sourceReference.
  *
- * Uso: tsx src/connect-notion-export.ts "<Proyecto>" <ruta-export>
- * Env: CORTEX_INGEST_LLM=1; CORTEX_EMBED_BATCH; CORTEX_DRY=1.
+ * Uso: tsx src/connect-notion-export.ts "<slug>" <ruta-export>
+ * Requiere `cortex auth login` y el servidor en marcha. Env: CORTEX_DRY=1.
  */
-
-const USE_LLM = process.env.CORTEX_INGEST_LLM === "1";
-const PHASE1_CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "8");
-const EMBED_BATCH = Number(process.env.CORTEX_EMBED_BATCH ?? "32");
+const PHASE1_CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "4");
+const CHUNK = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
 const MIN_BODY = Number(process.env.CORTEX_NOTION_MIN_BODY ?? "40");
 const MAX_CONTENT = 8000;
 const HEX32 = /\b[0-9a-f]{32}\b/;
 
 interface ParsedPage { title: string; notionId?: string; status?: string; content: string; bodyLen: number; ref: string }
 
-/** Carpeta de adjuntos de una página. Notion la nombra como el título (a veces SIN el
- * hash del fichero .md). Probamos ambas formas y devolvemos la que exista. */
 function attachmentDir(file: string): string | null {
   const candidates = [file.replace(/\s+[0-9a-f]{32}\.md$/i, ""), file.slice(0, -3)];
   for (const c of candidates) {
@@ -89,26 +82,28 @@ function parsePage(file: string): ParsedPage {
   return { title: title.slice(0, 200), notionId: meta["id"], status, content, bodyLen: body.length, ref };
 }
 
-async function existingId(sql: ReturnType<typeof getSql>, project: string, ref: string): Promise<string | null> {
-  const rows = (await sql`
-    SELECT ce.id FROM context_entries ce JOIN entities p ON p.id = ce.project_id
-    WHERE p.name = ${project} AND ce.source_reference = ${ref} LIMIT 1
-  `) as unknown as Row[];
-  return (rows[0]?.id as string) ?? null;
+type AttItem = BatchItem & { parentRef: string };
+interface BatchResult { ref: string | null; id: string; action: string }
+
+async function postBatch(slug: string, items: BatchItem[]): Promise<BatchResult[]> {
+  const r = await apiPost<{ results?: BatchResult[]; error?: string }>("/capture/batch", { slug, items });
+  if (!r.ok) {
+    console.error(`✗ Captura fallida (${r.status}): ${r.data.error ?? "¿cortex auth login / servidor en marcha?"}`);
+    process.exit(1);
+  }
+  return r.data.results ?? [];
 }
 
 async function main(): Promise<void> {
-  const project = process.argv[2];
+  const slug = process.argv[2];
   const dir = process.argv[3];
-  if (!project || !dir) {
-    console.error('Uso: tsx src/connect-notion-export.ts "<Proyecto>" <ruta-export>');
+  if (!slug || !dir) {
+    console.error('Uso: tsx src/connect-notion-export.ts "<slug>" <ruta-export>');
     process.exitCode = 1;
     return;
   }
-  const proj = project; // narrowed a string (uso dentro del closure worker)
-  const sql = getSql();
   const files = walkMd(resolve(dir));
-  console.log(`Encontradas ${files.length} páginas .md. Ingestando en "${project}" (llm=${USE_LLM})...`);
+  console.log(`Encontradas ${files.length} páginas .md. Extrayendo para "${slug}"...`);
 
   if (process.env.CORTEX_DRY === "1") {
     for (const f of files.slice(0, 4)) {
@@ -120,59 +115,41 @@ async function main(): Promise<void> {
     return;
   }
 
-  const toEmbed: { contextEntryId: string; text: string }[] = [];
+  // Fase 1 (local): parsea páginas + extrae adjuntos (concurrencia limitada por el VLM/whisper).
+  const pageItems: BatchItem[] = [];
+  const attItems: AttItem[] = [];
   let cursor = 0;
-  let pagesNew = 0;
-  let pagesSkip = 0;
-  let attNew = 0;
   let failed = 0;
-
   async function worker(): Promise<void> {
     while (cursor < files.length) {
       const file = files[cursor++]!;
       const pg = parsePage(file);
       try {
-        // 1) Página (si tiene cuerpo). Incremental por ref.
-        let pageId = await existingId(sql, proj, pg.ref);
-        if (!pageId && pg.bodyLen >= MIN_BODY) {
-          const { entry } = await saveContext(
-            { content: pg.content, project: proj, title: pg.title, sourceType: "notion_doc", sourceReference: pg.ref, createdBy: "notion", metadata: { notionId: pg.notionId, status: pg.status } },
-            { useClassifier: USE_LLM, detectImprovements: false, skipEmbedding: true },
-          );
-          pageId = entry.id;
-          toEmbed.push({ contextEntryId: entry.id, text: `${entry.title}\n\n${entry.content}` });
-          pagesNew++;
-        } else if (pageId) {
-          pagesSkip++;
-        }
-
-        // 2) Adjuntos de la página (carpeta hermana). Parseados + enlazados a la página.
         const folder = attachmentDir(file);
+        const myAtts: AttItem[] = [];
         if (folder) {
           for (const name of readdirSync(folder)) {
             if (!SUPPORTED_EXTS.has(extname(name).slice(1).toLowerCase())) continue;
-            const aref = `${pg.ref}/${name}`.slice(0, 180);
-            if (await existingId(sql, proj, aref)) continue; // ya ingerido
             const ex = await extractFileText(join(folder, name));
             if (!ex || ex.text.length < MIN_BODY) continue;
-            // Si la página no tenía cuerpo, creamos un stub para colgar los adjuntos.
-            if (!pageId) {
-              const stub = await saveContext(
-                { content: pg.title, project: proj, title: pg.title, sourceType: "notion_doc", sourceReference: pg.ref, createdBy: "notion", metadata: { notionId: pg.notionId } },
-                { useClassifier: false, detectImprovements: false, skipEmbedding: true },
-              );
-              pageId = stub.entry.id;
-            }
             const title = name.replace(/\.[^.]+$/, "").replace(/\s+[0-9a-f]{32}$/i, "").slice(0, 200);
-            const { entry } = await saveContext(
-              { content: `${title}\n\n${ex.text}`.slice(0, MAX_CONTENT), project: proj, title, sourceType: "document", sourceReference: aref, createdBy: "notion", metadata: { format: ex.format, parentPage: pg.title, parentRef: pg.ref } },
-              { useClassifier: false, detectImprovements: false, skipEmbedding: true },
-            );
-            await relate(sql, { sourceId: entry.id, sourceType: "context_entry", targetId: pageId, targetType: "context_entry", relationType: "belongs_to" });
-            toEmbed.push({ contextEntryId: entry.id, text: `${title}\n\n${ex.text}` });
-            attNew++;
+            myAtts.push({
+              content: `${title}\n\n${ex.text}`.slice(0, MAX_CONTENT),
+              title,
+              sourceType: "document",
+              sourceReference: `${pg.ref}/${name}`.slice(0, 180),
+              parentRef: pg.ref,
+              metadata: { format: ex.format, parentPage: pg.title, parentRef: pg.ref },
+            });
           }
         }
+        // Página: con cuerpo, o stub si solo tiene adjuntos (para colgarlos).
+        if (pg.bodyLen >= MIN_BODY) {
+          pageItems.push({ content: pg.content, title: pg.title, sourceType: "notion_doc", sourceReference: pg.ref, metadata: { notionId: pg.notionId, status: pg.status } });
+        } else if (myAtts.length) {
+          pageItems.push({ content: pg.title, title: pg.title, sourceType: "notion_doc", sourceReference: pg.ref, metadata: { notionId: pg.notionId } });
+        }
+        attItems.push(...myAtts);
       } catch (e) {
         failed++;
         console.error(`  ✗ ${pg.ref}: ${(e as Error).message}`);
@@ -180,19 +157,30 @@ async function main(): Promise<void> {
     }
   }
   await Promise.all(Array.from({ length: PHASE1_CONCURRENCY }, () => worker()));
-  console.log(`Fase 1: ${pagesNew} páginas nuevas, ${pagesSkip} ya existían, ${attNew} adjuntos parseados+enlazados (${failed} fallos).`);
+  console.log(`Extraído: ${pageItems.length} páginas, ${attItems.length} adjuntos (${failed} fallos). Subiendo vía API...`);
 
-  console.log(`Fase 2: embeddings por lotes de ${EMBED_BATCH}...`);
-  await storeEmbeddingsBatch(getSql(), getEmbeddingProvider(), toEmbed, {
-    batchSize: EMBED_BATCH,
-    onProgress: (d) => console.log(`  fase 2: ${d}/${toEmbed.length}`),
-  });
-  console.log("Ingesta de Notion (páginas + adjuntos) completada.");
+  // Fase 2: subir páginas (ref→id), luego adjuntos, luego enlazar.
+  const pageId = new Map<string, string>();
+  for (let i = 0; i < pageItems.length; i += CHUNK) {
+    for (const x of await postBatch(slug, pageItems.slice(i, i + CHUNK))) if (x.ref) pageId.set(x.ref, x.id);
+  }
+  const toRelate: { attId: string; parentRef: string }[] = [];
+  for (let i = 0; i < attItems.length; i += CHUNK) {
+    const slice = attItems.slice(i, i + CHUNK);
+    const results = await postBatch(slug, slice.map(({ parentRef, ...rest }) => rest));
+    results.forEach((res, j) => { if (res.action === "added") toRelate.push({ attId: res.id, parentRef: slice[j]!.parentRef }); });
+  }
+  let related = 0;
+  for (const { attId, parentRef } of toRelate) {
+    const pid = pageId.get(parentRef);
+    if (!pid) continue;
+    const rr = await apiPost("/relate", { sourceId: attId, targetId: pid, relationType: "belongs_to" });
+    if (rr.ok) related++;
+  }
+  console.log(`Notion: ${pageId.size} páginas, ${toRelate.length} adjuntos nuevos (${related} enlazados a su página).`);
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en connect-notion-export:", e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+main().catch((e) => {
+  console.error("Error en connect-notion-export:", e);
+  process.exit(1);
+});

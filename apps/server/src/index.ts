@@ -4,9 +4,11 @@ import { closeSql } from "@cortex/database";
 import { loadEnv } from "@cortex/shared";
 import {
   canAccessProject,
+  captureBatch,
   findProjectBySlug,
   getContextPack,
   listAccessibleProjects,
+  relateEntries,
   renderContextPack,
   requestOtp,
   revokeToken,
@@ -14,6 +16,7 @@ import {
   validateToken,
   verifyOtp,
   type AuthUser,
+  type BatchItem,
 } from "@cortex/core";
 import { isLlmEnabled, wireReconciler } from "@cortex/agents";
 
@@ -127,6 +130,37 @@ app.post("/capture", async (c) => {
       { useClassifier: false, detectImprovements: false, skipEmbedding: false },
     );
     return c.json(r);
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 500);
+  }
+});
+
+/** Captura por LOTES (conectores): N items, embedding por lotes, atribución. */
+app.post("/capture/batch", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "No autenticado." }, 401);
+  const body = (await c.req.json().catch(() => ({}))) as { slug?: string; items?: BatchItem[] };
+  if (!body.slug || !Array.isArray(body.items)) return c.json({ error: "Faltan 'slug' y/o 'items'." }, 400);
+  const project = await findProjectBySlug(body.slug);
+  if (!project) return c.json({ error: "Proyecto no encontrado." }, 404);
+  if (!(await canAccessProject(project, user.email))) return c.json({ error: "Sin acceso." }, 403);
+  try {
+    const results = await captureBatch(project.name, body.items, user.email);
+    return c.json({ results });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 500);
+  }
+});
+
+/** Relación entre entradas (p.ej. adjunto belongs_to su página). Autenticado. */
+app.post("/relate", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "No autenticado." }, 401);
+  const b = (await c.req.json().catch(() => ({}))) as { sourceId?: string; targetId?: string; relationType?: string };
+  if (!b.sourceId || !b.targetId || !b.relationType) return c.json({ error: "Faltan sourceId/targetId/relationType." }, 400);
+  try {
+    await relateEntries(b.sourceId, b.targetId, b.relationType as never);
+    return c.json({ ok: true });
   } catch (e) {
     return c.json({ error: (e as Error).message }, 500);
   }

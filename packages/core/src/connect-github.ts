@@ -1,14 +1,16 @@
 import { execFileSync } from "node:child_process";
-import { closeSql } from "@cortex/database";
-import { saveContext } from "./operations.js";
+import { loadEnv } from "@cortex/shared";
+loadEnv();
+import { apiPost } from "./api-client.js";
+import type { BatchItem } from "./capture.js";
 
 /**
  * Conector GitHub: ingiere PRs e issues de un repo en un proyecto, vía el CLI `gh`
- * (usa su autenticación). Cada PR/issue se guarda como entrada de conocimiento;
- * el grafo (enrich) luego la conecta con las entidades del proyecto (p.ej. los
- * tickets PUBLI que cita un PR).
+ * (usa su autenticación). Escribe a través de la API autenticada de Cortex
+ * (`POST /capture/batch`): atribución (created_by=email) + permisos. Requiere
+ * `cortex auth login` y el servidor en marcha.
  *
- * Uso: tsx src/connect-github.ts "<Proyecto>" <owner/repo> [maxItems]
+ * Uso: tsx src/connect-github.ts "<slug>" <owner/repo> [maxItems]
  * Requiere `gh` en PATH y autenticado con acceso al repo.
  */
 
@@ -36,16 +38,16 @@ interface Issue {
 }
 
 async function main(): Promise<void> {
-  const project = process.argv[2];
+  const slug = process.argv[2];
   const repo = process.argv[3];
   const max = Number(process.argv[4] ?? "100");
-  if (!project || !repo) {
-    console.error('Uso: tsx src/connect-github.ts "<Proyecto>" <owner/repo> [maxItems]');
+  if (!slug || !repo) {
+    console.error('Uso: tsx src/connect-github.ts "<slug>" <owner/repo> [maxItems]');
     process.exitCode = 1;
     return;
   }
 
-  console.log(`Conectando GitHub ${repo} → "${project}"...`);
+  console.log(`Conectando GitHub ${repo} → "${slug}" (vía API)...`);
   const prs = JSON.parse(
     gh(["pr", "list", "-R", repo, "--state", "all", "--limit", String(max),
         "--json", "number,title,body,state,mergedAt,author,labels,url"]),
@@ -56,46 +58,44 @@ async function main(): Promise<void> {
   ) as Issue[];
   console.log(`  ${prs.length} PRs, ${issues.length} issues.`);
 
-  let done = 0;
+  const items: BatchItem[] = [];
   for (const pr of prs) {
     const labels = (pr.labels ?? []).map((l) => l.name);
     const header = `[GitHub PR #${pr.number} · ${pr.state}${pr.mergedAt ? " (merged)" : ""} · ${repo}]`;
-    const content = `${header}\n${pr.title}\n\n${(pr.body ?? "").slice(0, 4000)}`.trim();
-    await saveContext({
-      content,
-      project,
+    items.push({
+      content: `${header}\n${pr.title}\n\n${(pr.body ?? "").slice(0, 4000)}`.trim(),
       title: pr.title.slice(0, 120),
       type: "pr_summary",
       confidence: pr.mergedAt ? "high" : "medium",
       sourceType: "github_pr",
       sourceReference: `${repo}#${pr.number}`,
-      createdBy: "ingest:github",
       metadata: { source: "github", kind: "pr", number: pr.number, state: pr.state, url: pr.url, author: pr.author?.login, labels },
     });
-    done++;
   }
   for (const it of issues) {
     const labels = (it.labels ?? []).map((l) => l.name);
     const header = `[GitHub issue #${it.number} · ${it.state} · ${repo}]`;
-    const content = `${header}\n${it.title}\n\n${(it.body ?? "").slice(0, 4000)}`.trim();
-    await saveContext({
-      content,
-      project,
+    items.push({
+      content: `${header}\n${it.title}\n\n${(it.body ?? "").slice(0, 4000)}`.trim(),
       title: it.title.slice(0, 120),
       type: it.state.toLowerCase() === "closed" ? "ticket_resolution" : "incident",
       sourceType: "github_issue",
       sourceReference: `${repo}#${it.number}`,
-      createdBy: "ingest:github",
       metadata: { source: "github", kind: "issue", number: it.number, state: it.state, url: it.url, labels },
     });
-    done++;
   }
-  console.log(`Conector GitHub: ${done} items ingeridos.`);
+
+  const r = await apiPost<{ results?: { action: string }[]; error?: string }>("/capture/batch", { slug, items });
+  if (!r.ok) {
+    console.error(`✗ Captura fallida (${r.status}): ${r.data.error ?? "¿cortex auth login / servidor en marcha?"}`);
+    process.exitCode = 1;
+    return;
+  }
+  const added = (r.data.results ?? []).filter((x) => x.action === "added").length;
+  console.log(`Conector GitHub: ${added} nuevos, ${(r.data.results?.length ?? 0) - added} ya existían.`);
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en conector GitHub:", e?.message ?? e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+main().catch((e) => {
+  console.error("Error en conector GitHub:", e?.message ?? e);
+  process.exit(1);
+});
