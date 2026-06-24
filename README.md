@@ -162,6 +162,36 @@ cortex <url>/mcp --header "Authorization: Bearer <token>"`.
 | `search_project_code` | Búsqueda híbrida sobre el código indexado |
 | `lint_project_context` | Salud del conocimiento (contradicciones, duplicados, huecos…) |
 
+## Toolbelt: skills y MCPs que reparte `cortex sync`
+
+Además del MCP de Cortex, `cortex sync` instala un set de **capacidades compartidas del
+equipo** en tus agentes. Reparte **configuración, no credenciales**: cada tool necesita su
+propia auth (`cortex sync --doctor` dice qué falta). Registry **PR-able**:
+[`config/toolbelt.json`](./config/toolbelt.json) — para añadir/mejorar una skill, PR aquí.
+
+**Skills** (instrucciones + scripts que el agente usa):
+
+| Skill | Qué hace | Auth |
+| --- | --- | --- |
+| `cortex-capture` | Capturar conocimiento en Cortex (decisiones, incidencias, convenciones…) con baja fricción | — (usa el MCP `cortex`) |
+| `bkt` | CLI de Bitbucket (Data Center + Cloud): repos, PRs, ramas, issues, webhooks, pipelines | token Bitbucket (keyring) |
+| `plane-api` | Helpers REST de Plane (self-hosted) para lo que el MCP no cubre: adjuntos nativos, Markdown→HTML | `PLANE_API_KEY` |
+| `google-chat` | Google Chat: listar spaces, enviar/leer mensajes, gestionar DMs | OAuth Google |
+| `agent-teams` | Microsoft Teams: enviar mensajes, leer canales, reacciones | credenciales Teams |
+| `expect` | QA de front-end: testea/valida componentes React/`.tsx`/`.css` (expect-cli), busca bugs de UI | — (CLI local) |
+
+**MCPs** (servidores de tools que se registran en el agente):
+
+| MCP | Qué da | Auth |
+| --- | --- | --- |
+| `cortex` | Las 8 tools de memoria de arriba | token Cortex (en HTTP) |
+| `plane` | Gestión de proyectos Plane (tickets, ciclos, módulos, work items…) | `PLANE_API_KEY` |
+| `atlassian` | Jira + Confluence | OAuth Atlassian |
+| `notion` | Páginas y bases de Notion | token Notion |
+| `chrome-devtools` | Inspección/automatización de Chrome (depurar front-end) | — |
+
+**Comando**: `/cortex-save` (guardar contexto desde el chat del agente).
+
 ## Ingesta de fuentes (conectores)
 
 Se ejecutan con el CLI y escriben **por la API autenticada** (atribución + permisos +
