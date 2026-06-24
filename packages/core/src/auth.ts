@@ -8,30 +8,48 @@ import type { Row } from "./map.js";
  * `verifyOtp` lo valida y emite un token de sesión (Bearer); `validateToken` resuelve el
  * usuario de un token. Códigos y tokens se guardan HASHEADOS. El usuario ES su correo.
  */
-const OTP_TTL_MIN = Number(process.env.CORTEX_OTP_TTL_MIN ?? "10");
-const TOKEN_TTL_DAYS = Number(process.env.CORTEX_TOKEN_TTL_DAYS ?? "30");
-const AUTH_DOMAIN = process.env.CORTEX_AUTH_DOMAIN ?? "dinacode.com"; // "" = cualquiera
 const MAX_ATTEMPTS = 5;
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
 const normEmail = (e: string): string => e.trim().toLowerCase();
+const csv = (v: string | undefined): string[] => (v ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+// Config leída LAZY (no al cargar el módulo): robusta ante el orden de loadEnv/imports.
+const otpTtlMin = (): number => Number(process.env.CORTEX_OTP_TTL_MIN ?? "10");
+const tokenTtlDays = (): number => Number(process.env.CORTEX_TOKEN_TTL_DAYS ?? "30");
+/** Dominios permitidos (whitelist, coma-separado). Vacío = cualquiera. Sin registro: el primer login válido crea el usuario. */
+const authDomains = (): string[] => csv(process.env.CORTEX_AUTH_DOMAIN ?? "dinacode.com");
+/** Emails admin (coma-separado; puede haber varios). Gestionan permisos y ven todos los proyectos. */
+const adminEmails = (): string[] => csv(process.env.CORTEX_ADMIN_EMAIL);
+
+export function isAllowedEmail(emailRaw: string): boolean {
+  const email = normEmail(emailRaw);
+  const domains = authDomains();
+  return domains.length === 0 || domains.some((d) => email.endsWith(`@${d}`));
+}
+
+/** ¿Es admin? (config por env CORTEX_ADMIN_EMAIL, uno o varios). */
+export function isAdmin(email: string | null | undefined): boolean {
+  return !!email && adminEmails().includes(normEmail(email));
+}
 
 export interface AuthUser {
   id: string;
   email: string;
+  admin: boolean;
 }
 
 /** Genera un OTP para el email y lo envía (Brevo o dev-log). Invalida los previos. */
 export async function requestOtp(emailRaw: string): Promise<void> {
   const email = normEmail(emailRaw);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Email inválido.");
-  if (AUTH_DOMAIN && !email.endsWith(`@${AUTH_DOMAIN}`)) throw new Error(`Solo se permiten correos @${AUTH_DOMAIN}.`);
+  if (!isAllowedEmail(email)) throw new Error(`Dominio no permitido (solo: ${authDomains().join(", ") || "—"}).`);
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const sql = getSql();
   await sql`UPDATE otp_codes SET consumed_at = now() WHERE email = ${email} AND consumed_at IS NULL`;
   await sql`
     INSERT INTO otp_codes (email, code_hash, expires_at)
-    VALUES (${email}, ${sha(code)}, now() + make_interval(mins => ${OTP_TTL_MIN}))
+    VALUES (${email}, ${sha(code)}, now() + make_interval(mins => ${otpTtlMin()}))
   `;
   await sendOtpEmail(email, code);
 }
@@ -63,12 +81,12 @@ export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ to
     ON CONFLICT (email) DO UPDATE SET last_login_at = now()
     RETURNING id, email
   `) as unknown as Row[];
-  const user: AuthUser = { id: urows[0]!.id as string, email: urows[0]!.email as string };
+  const user: AuthUser = { id: urows[0]!.id as string, email: urows[0]!.email as string, admin: isAdmin(urows[0]!.email as string) };
 
   const token = randomBytes(32).toString("base64url");
   await sql`
     INSERT INTO auth_tokens (token_hash, user_id, expires_at)
-    VALUES (${sha(token)}, ${user.id}, now() + make_interval(days => ${TOKEN_TTL_DAYS}))
+    VALUES (${sha(token)}, ${user.id}, now() + make_interval(days => ${tokenTtlDays()}))
   `;
   return { token, user };
 }
@@ -83,7 +101,7 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
   `) as unknown as Row[];
   if (!rows[0]) return null;
   await sql`UPDATE auth_tokens SET last_used_at = now() WHERE token_hash = ${sha(token)}`;
-  return { id: rows[0].id as string, email: rows[0].email as string };
+  return { id: rows[0].id as string, email: rows[0].email as string, admin: isAdmin(rows[0].email as string) };
 }
 
 /** Revoca un token (logout). */
