@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { closeSql, getSql } from "@cortex/database";
-import { findNearest, saveContext, updateEntryContent, UPDATE_THRESHOLD, NOOP_THRESHOLD } from "@cortex/core";
+import { findNearest, invalidateEntry, relate, saveContext, updateEntryContent, UPDATE_THRESHOLD, NOOP_THRESHOLD } from "@cortex/core";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextEntryType } from "@cortex/shared";
 import { runAgent, shutdownObservability } from "./mastra.js";
@@ -143,13 +143,25 @@ async function mergeKnowledge(existing: string, incoming: string): Promise<strin
   return merged || existing;
 }
 
-export interface IngestResult { saved: number; updated: number; noop: number; skipped: boolean }
+/** Decide la relación entre lo existente y lo nuevo: noop / update / supersede (contradice). */
+async function reconcile(existing: string, incoming: string): Promise<"noop" | "update" | "supersede"> {
+  const prompt = `EXISTENTE:\n"""\n${existing}\n"""\n\nNUEVA:\n"""\n${incoming}\n"""\n\n¿Relación de la NUEVA respecto a la EXISTENTE?`;
+  try {
+    const raw = await runAgent("reconciler", prompt, { maxOutputTokens: 60 });
+    const m = raw.match(/noop|update|supersede/i);
+    return (m ? m[0].toLowerCase() : "update") as "noop" | "update" | "supersede";
+  } catch {
+    return "update"; // ante duda, fusionar (no invalidar a la ligera)
+  }
+}
+
+export interface IngestResult { saved: number; updated: number; superseded: number; noop: number; skipped: boolean }
 
 export async function ingestSessionFile(project: string, file: string, platform = "claude"): Promise<IngestResult> {
   const sessionId = file.split("/").pop()!.replace(/\.jsonl$/, "");
-  if (await alreadyIngested(project, sessionId)) return { saved: 0, updated: 0, noop: 0, skipped: true };
+  if (await alreadyIngested(project, sessionId)) return { saved: 0, updated: 0, superseded: 0, noop: 0, skipped: true };
   const condensed = condenseSession(file);
-  if (condensed.length < 200) return { saved: 0, updated: 0, noop: 0, skipped: false };
+  if (condensed.length < 200) return { saved: 0, updated: 0, superseded: 0, noop: 0, skipped: false };
   const items: Item[] = [];
   const seen = new Set<string>();
   for (const w of windows(condensed)) {
@@ -162,33 +174,49 @@ export async function ingestSessionFile(project: string, file: string, platform 
   }
   let saved = 0;
   let updated = 0;
+  let superseded = 0;
   let noop = 0;
+
+  const addEntry = (title: string, type: string, content: string) =>
+    saveContext(
+      { content, project, title, type: type as ContextEntryType, confidence: "low", sourceType: "agent_session", sourceReference: sessionId, createdBy: "session-backfill", metadata: { platform, sessionId } },
+      { useClassifier: false, detectImprovements: false, skipEmbedding: false },
+    );
+
   for (const it of items) {
     const text = scrub(`${it.title}\n\n${it.content}`);
     const near = await findNearest(project, text);
-    // Reconciliación estilo mem0: NOOP (casi idéntico o conocimiento curado), UPDATE
-    // (refina una entrada auto-capturada similar) o ADD (nuevo).
-    if (near && near.score >= UPDATE_THRESHOLD) {
-      if (near.score >= NOOP_THRESHOLD || near.sourceType !== "agent_session") { noop++; continue; }
-      try {
+    try {
+      // Reconciliación estilo mem0: ADD / UPDATE / SUPERSEDE(=DELETE bi-temporal) / NOOP.
+      if (near && near.score >= UPDATE_THRESHOLD) {
+        if (near.score >= NOOP_THRESHOLD) { noop++; continue; } // casi idéntico
+        const decision = await reconcile(near.content, text);
+        if (decision === "noop") { noop++; continue; }
+        if (decision === "supersede") {
+          const { entry } = await addEntry(it.title, it.type, text); // la nueva pasa a ser vigente
+          saved++;
+          if (near.sourceType === "agent_session") {
+            await invalidateEntry(near.id, entry.id); // §5.5: invalidar, no borrar
+            superseded++;
+          } else {
+            // No invalidamos conocimiento curado en automático: solo lo marcamos en contradicción.
+            await relate(getSql(), { sourceId: entry.id, sourceType: "context_entry", targetId: near.id, targetType: "context_entry", relationType: "contradicts" });
+          }
+          continue;
+        }
+        // update: solo fusionamos entradas auto-capturadas (no tocamos lo curado)
+        if (near.sourceType !== "agent_session") { noop++; continue; }
         await updateEntryContent(near.id, scrub(await mergeKnowledge(near.content, text)));
         updated++;
-      } catch (e) {
-        console.error(`  ✗ merge "${it.title}": ${(e as Error).message}`);
+        continue;
       }
-      continue;
-    }
-    try {
-      await saveContext(
-        { content: text, project, title: it.title, type: it.type as ContextEntryType, confidence: "low", sourceType: "agent_session", sourceReference: sessionId, createdBy: "session-backfill", metadata: { platform, sessionId } },
-        { useClassifier: false, detectImprovements: false, skipEmbedding: false },
-      );
+      await addEntry(it.title, it.type, text); // ADD: conocimiento nuevo
       saved++;
     } catch (e) {
-      console.error(`  ✗ guardando "${it.title}": ${(e as Error).message}`);
+      console.error(`  ✗ "${it.title}": ${(e as Error).message}`);
     }
   }
-  return { saved, updated, noop, skipped: false };
+  return { saved, updated, superseded, noop, skipped: false };
 }
 
 async function main(): Promise<void> {
@@ -220,6 +248,7 @@ async function main(): Promise<void> {
 
   let savedTotal = 0;
   let updatedTotal = 0;
+  let supersededTotal = 0;
   let noopTotal = 0;
   let skipped = 0;
   for (const file of files) {
@@ -227,10 +256,11 @@ async function main(): Promise<void> {
     if (r.skipped) { skipped++; continue; }
     savedTotal += r.saved;
     updatedTotal += r.updated;
+    supersededTotal += r.superseded;
     noopTotal += r.noop;
-    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ${r.noop} ya cubiertas`);
+    console.log(`  ${file.split("/").pop()!.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas`);
   }
-  console.log(`Backfill: +${savedTotal} nuevas, ~${updatedTotal} fusionadas (UPDATE), ${noopTotal} NOOP, ${skipped} sesiones ya ingeridas.`);
+  console.log(`Backfill: +${savedTotal} nuevas, ~${updatedTotal} UPDATE, ⊘${supersededTotal} SUPERSEDE, ${noopTotal} NOOP, ${skipped} sesiones ya ingeridas.`);
 }
 
 // CLI directo (no al importar `ingestSessionFile` desde el hook).

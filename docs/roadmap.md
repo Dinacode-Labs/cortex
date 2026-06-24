@@ -108,10 +108,12 @@ Bucle automático sin invocación manual. Análisis + fricción:
   `ingestSessionFile` (hook + backfill) hace **reconciliación estilo mem0 ADD/UPDATE/NOOP**
   (`core/dedup.ts`): por cada unidad destilada busca la más similar del proyecto y
   **ADD** (nueva, `confidence: low`), **UPDATE** (fusiona con el agente `merger` si
-  refina una entrada auto-capturada, 0.82–0.95) o **NOOP** (casi idéntico ≥0.95, o
-  conocimiento curado → no se toca). Verificado. **Pendiente:** DELETE/invalidación al
-  contradecir (reusar bi-temporal), `propose→review` para escrituras duraderas, y
-  extender el gate a los demás conectores (no solo sesiones).
+  refina, 0.82–0.95), **SUPERSEDE/DELETE** (si un juez LLM `reconciler` detecta
+  contradicción → ADD la nueva como vigente + **invalida la vieja** bi-temporalmente,
+  §5.5 invalidar≠borrar; si la vieja es **curada**, no se toca: se marca `contradicts`
+  para revisión) o **NOOP** (casi idéntico ≥0.95). Verificado: el `reconciler` clasifica
+  contradicción→supersede, refinamiento→update, idéntico→noop. **Pendiente:**
+  `propose→review` para escrituras duraderas; extender el gate a los demás conectores.
 - **Pendiente:** **auto-captura** en Codex/OpenCode/Hermes (Claude tiene `transcript_path`
   + SessionEnd limpios; los demás no exponen transcript / no tienen session-end → se
   cubren con el **backfill batch** `connect-sessions` por plataforma). `UserPromptSubmit`

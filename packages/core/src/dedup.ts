@@ -53,3 +53,13 @@ export async function updateEntryContent(entryId: string, content: string): Prom
   await sql`UPDATE context_entries SET content = ${content}, updated_at = now() WHERE id = ${entryId}`;
   await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
 }
+
+/** DELETE bi-temporal (§5.5: invalidar ≠ borrar): marca la entrada como histórica y
+ * superada por otra. Mismo patrón que la invalidación temporal. */
+export async function invalidateEntry(entryId: string, supersededById: string): Promise<void> {
+  await getSql()`
+    UPDATE context_entries
+    SET valid_to = now(), validity = 'historical', status = 'superseded', superseded_by = ${supersededById}
+    WHERE id = ${entryId} AND valid_to IS NULL
+  `;
+}
