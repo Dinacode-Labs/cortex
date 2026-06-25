@@ -250,6 +250,43 @@ mano), y que el cron invoque. **Recomendación:** empezar con **A** al desplegar
 evolucionar a **B** cuando queramos reintentos/observabilidad. **Depende del despliegue**
 (no hay server aún).
 
+## Índice navegable de contexto dentro de un proyecto (→ Alejandro, a estudiar)
+
+**Propuesta (Alejandro):** dentro de **un mismo proyecto con mucha información**,
+mantener un **índice con descripciones** de los archivos (o de conjuntos de archivos
+relacionados) que el agente tenga **siempre en contexto**, para encontrar la información
+más rápido sin escanear todo. Y cuando la info escala, **no un índice plano gigante sino
+un árbol de índices** (índice de índices, coarse → fino) para que el agente sepa "por
+dónde empezar". Nota: el árbol es **intra-proyecto** (estructurar mucha info de un solo
+proyecto), no la jerarquía padre→hijo entre proyectos.
+
+**Dónde encaja hoy:** Cortex no carga un índice gigante en contexto. Lo que va como
+contexto base es el **context pack** curado y pequeño (`get_project_context_pack`:
+decisiones, restricciones, convenciones, módulos sensibles…) y el resto se recupera
+**bajo demanda por búsqueda semántica** (`search_project_context` / `search_project_code`)
++ el **grafo de entidades y relaciones**. Es decir, hoy la respuesta a "mucha info en un
+proyecto" es **recuperación, no índice navegable siempre presente**.
+
+**Hay que estudiarlo bien antes de construir nada.** Tareas de research:
+- **¿Lo hace alguien?** Mirar si herramientas de memoria/contexto de agentes y de
+  indexado de repos (claude-mem, mem0, codebase index de Cursor/Windsurf, repomix,
+  `llms.txt`, "agentic search"…) montan un **índice jerárquico con descripciones siempre
+  en contexto**, o si han **convergido a embeddings + retrieval** — y, en ese caso, **por
+  qué**.
+- **Si no se hace, entender por qué no.** Hipótesis a validar: un índice siempre-en-memoria
+  **compite por el presupuesto de contexto** y **se desactualiza** (hay que mantenerlo en
+  cada cambio); el retrieval semántico evita ambas. Determinar si el índice navegable
+  **gana** en algún régimen concreto (proyectos enormes, navegación estructural, "saber
+  qué existe" frente a "encontrar lo relevante").
+- **Diseño a evaluar (solo si el research sale a favor):** una **capa de índices con
+  resúmenes por área/módulo** encima del grafo y del code-index, **generada y mantenida en
+  `maintain`** (no a mano), con **trazabilidad** (es inferencia, no hecho; §5.5) y **coste
+  acotado**. Decidir qué porción va "siempre en contexto" frente a navegable bajo demanda.
+
+**Salida esperada:** un `research/context-index.md` con conclusión razonada
+(construir / no construir / construir acotado) **antes de tocar código**.
+**Responsable:** Alejandro. (Aquí solo queda indicado.)
+
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
   (docker-compose). Deploy real a server, lo último (de momento no hay server).
