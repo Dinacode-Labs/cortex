@@ -1,15 +1,15 @@
-import { apiGet } from "@cortex/shared";
-import { readCortexLink } from "./project-config.js";
+import { apiGet, loadEnv } from "@cortex/shared";
+import { readCortexLink } from "@cortex/core";
 
 /**
  * Hook de INYECCIÓN DE CONTEXTO (SessionStart de Claude Code, y equivalentes). Lee el
  * JSON del hook por stdin (`cwd`), resuelve el proyecto (`.cortex.json`) y emite el
  * context-pack del proyecto como `additionalContext` para que el agente arranque
- * "sabiendo" el proyecto. No usa el MCP (en SessionStart aún no está conectado): va
- * directo a la BD. Si no hay proyecto/contexto, no emite nada. Ver
- * research/hooks-integration.md.
+ * "sabiendo" el proyecto. Consulta la API autenticada (permisos + atribución); no usa
+ * el MCP (en SessionStart aún no está conectado). Si no hay proyecto/contexto, no
+ * emite nada. Ver research/hooks-integration.md.
  *
- * Uso: el hook lo invoca con el JSON por stdin. Manual: echo '{"cwd":"/ruta"}' | tsx src/hook-context.ts
+ * Uso: el hook lo invoca con el JSON por stdin. Manual: echo '{"cwd":"/ruta"}' | cortex hook-context
  */
 
 const MAX_CTX = Number(process.env.CORTEX_HOOK_CTX_CHARS ?? "6000");
@@ -25,7 +25,7 @@ function argOf(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-async function main(): Promise<void> {
+export async function run(): Promise<void> {
   // Formato de salida por agente: claude/codex (additionalContext) | hermes ({context}) | text.
   const format = (argOf("--format") || "claude").toLowerCase();
   let input: { cwd?: string; hook_event_name?: string } = {};
@@ -53,10 +53,14 @@ async function main(): Promise<void> {
   }
 }
 
-main()
-  .catch(() => {
-    /* un hook nunca debe romper la sesión: silencioso */
-  })
-  .finally(() => {
-    process.exit(0);
-  });
+// Compat: los hooks instalados lo invocan directamente (script pnpm hook:context).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  loadEnv();
+  run()
+    .catch(() => {
+      /* un hook nunca debe romper la sesión: silencioso */
+    })
+    .finally(() => {
+      process.exit(0);
+    });
+}

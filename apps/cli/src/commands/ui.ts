@@ -7,7 +7,7 @@ import { getEnv, readCredentials } from "@cortex/shared";
  * uso** (autenticado con el token de la CLI) y abre /auth/cli?ticket=… La web lo canjea
  * por una sesión propia. Así el token de larga vida del CLI nunca viaja en la URL.
  */
-async function main(): Promise<void> {
+export async function run(): Promise<void> {
   const WEB = getEnv("CORTEX_WEB_URL", "http://localhost:8080");
   const c = readCredentials();
   if (!c?.token) {
@@ -41,8 +41,3 @@ async function main(): Promise<void> {
     console.log(`Ábrela manualmente:\n  ${url}`);
   }
 }
-
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
-});

@@ -36,6 +36,9 @@ importers:
       '@cortex/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@cortex/embeddings':
+        specifier: workspace:*
+        version: link:../../packages/embeddings
       '@cortex/shared':
         specifier: workspace:*
         version: link:../../packages/shared

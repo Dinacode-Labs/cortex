@@ -188,8 +188,8 @@ cortex connect-notion   "<slug>" <ruta-export>    # export de Notion (páginas +
 cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes]  # backfill de sesiones
 ```
 
-La **indexación de código** (`index-code`) y el `lint`/`resolve`/`temporal` sueltos son
-tareas de servidor (acceso directo a BD) — ver `pnpm --filter @cortex/core run …` y CONTRIBUTING.
+La **indexación de código** (`cortex index-code`) y `cortex lint` / `resolve-entities` /
+`temporal` sueltos son tareas de servidor (acceso directo a BD) — ver `cortex --help` y CONTRIBUTING.
 
 ## Operar el servidor (infra/admin)
 

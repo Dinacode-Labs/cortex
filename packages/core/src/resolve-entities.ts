@@ -1,4 +1,4 @@
-import { closeSql, getSql } from "@cortex/database";
+import { getSql } from "@cortex/database";
 import type { Row } from "./map.js";
 
 /**
@@ -9,8 +9,6 @@ import type { Row } from "./map.js";
  * Agrupa por nombre normalizado (sin acentos/puntuación, minúsculas) entre todos
  * los tipos salvo `project` (nunca se fusiona/borra un proyecto). La canónica es
  * la entidad con más enlaces (desempate: nombre más descriptivo).
- *
- * Uso: tsx src/resolve-entities.ts
  */
 
 function norm(s: string): string {
@@ -90,15 +88,4 @@ export async function resolveEntities(): Promise<ResolveResult> {
   `;
 
   return { groups: groupsMerged, merged };
-}
-
-// CLI: solo si se ejecuta directamente (no al importar la función).
-if (import.meta.url === `file://${process.argv[1]}`) {
-  resolveEntities()
-    .then((r) => console.log(`Resolución de entidades: ${r.groups} grupos, ${r.merged} variantes fusionadas.`))
-    .catch((e) => {
-      console.error("Error en resolución de entidades:", e);
-      process.exitCode = 1;
-    })
-    .finally(() => closeSql());
 }

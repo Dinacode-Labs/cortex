@@ -1,10 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
-import { loadEnv } from "@cortex/shared";
-loadEnv();
 import { apiPost } from "@cortex/shared";
-import type { BatchItem } from "./capture.js";
-import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
+import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
 
 /**
  * Conector de export de Notion (Markdown + ADJUNTOS), **consciente del contenido**:
@@ -13,7 +10,7 @@ import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
  * autenticada de Cortex (`POST /capture/batch` + `/relate`): atribución (created_by=email)
  * + permisos + embedding por lotes server-side. Incremental por sourceReference.
  *
- * Uso: tsx src/connect-notion-export.ts "<slug>" <ruta-export>
+ * Uso: cortex connect-notion "<slug>" <ruta-export>
  * Requiere `cortex auth login` y el servidor en marcha. Env: CORTEX_DRY=1.
  */
 const PHASE1_CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "4");
@@ -94,11 +91,11 @@ async function postBatch(slug: string, items: BatchItem[]): Promise<BatchResult[
   return r.data.results ?? [];
 }
 
-async function main(): Promise<void> {
-  const slug = process.argv[2];
-  const dir = process.argv[3];
+export async function run(args: string[]): Promise<void> {
+  const slug = args[0];
+  const dir = args[1];
   if (!slug || !dir) {
-    console.error('Uso: tsx src/connect-notion-export.ts "<slug>" <ruta-export>');
+    console.error('Uso: cortex connect-notion "<slug>" <ruta-export>');
     process.exitCode = 1;
     return;
   }
@@ -180,7 +177,4 @@ async function main(): Promise<void> {
   console.log(`Notion: ${pageId.size} páginas, ${toRelate.length} adjuntos nuevos (${related} enlazados a su página).`);
 }
 
-main().catch((e) => {
-  console.error("Error en connect-notion-export:", e);
-  process.exit(1);
-});
+

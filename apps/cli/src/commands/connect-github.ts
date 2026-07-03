@@ -1,8 +1,6 @@
 import { execFileSync } from "node:child_process";
-import { loadEnv } from "@cortex/shared";
-loadEnv();
 import { apiPost } from "@cortex/shared";
-import type { BatchItem } from "./capture.js";
+import type { BatchItem } from "@cortex/core";
 
 /**
  * Conector GitHub: ingiere PRs e issues de un repo en un proyecto, vía el CLI `gh`
@@ -10,7 +8,7 @@ import type { BatchItem } from "./capture.js";
  * (`POST /capture/batch`): atribución (created_by=email) + permisos. Requiere
  * `cortex auth login` y el servidor en marcha.
  *
- * Uso: tsx src/connect-github.ts "<slug>" <owner/repo> [maxItems]
+ * Uso: cortex connect-github "<slug>" <owner/repo> [maxItems]
  * Requiere `gh` en PATH y autenticado con acceso al repo.
  */
 
@@ -37,12 +35,12 @@ interface Issue {
   url: string;
 }
 
-async function main(): Promise<void> {
-  const slug = process.argv[2];
-  const repo = process.argv[3];
-  const max = Number(process.argv[4] ?? "100");
+export async function run(args: string[]): Promise<void> {
+  const slug = args[0];
+  const repo = args[1];
+  const max = Number(args[2] ?? "100");
   if (!slug || !repo) {
-    console.error('Uso: tsx src/connect-github.ts "<slug>" <owner/repo> [maxItems]');
+    console.error('Uso: cortex connect-github "<slug>" <owner/repo> [maxItems]');
     process.exitCode = 1;
     return;
   }
@@ -95,7 +93,4 @@ async function main(): Promise<void> {
   console.log(`Conector GitHub: ${added} nuevos, ${(r.data.results?.length ?? 0) - added} ya existían.`);
 }
 
-main().catch((e) => {
-  console.error("Error en conector GitHub:", e?.message ?? e);
-  process.exit(1);
-});
+

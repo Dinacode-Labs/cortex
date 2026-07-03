@@ -1,4 +1,3 @@
-import { closeSql } from "@cortex/database";
 import { lintProject } from "./lint.js";
 
 /**
@@ -8,8 +7,6 @@ import { lintProject } from "./lint.js";
  * en sistemas externos. La ejecución real (crear tareas en Plane) es una acción
  * con efectos secundarios sobre datos de producción y debe hacerse de forma
  * explícita y supervisada (ver README / skill plane-api).
- *
- * Uso: tsx src/lint-act.ts "<Proyecto>"
  */
 
 export interface LintAction {
@@ -44,34 +41,4 @@ export async function planLintActions(project: string): Promise<LintAction[]> {
     });
   }
   return actions;
-}
-
-async function main(): Promise<void> {
-  const project = process.argv[2];
-  if (!project) {
-    console.error('Uso: tsx src/lint-act.ts "<Proyecto>"');
-    process.exitCode = 1;
-    return;
-  }
-  const actions = await planLintActions(project);
-  console.log(`# Plan de acciones de Lint — ${project} (dry-run)\n`);
-  const tasks = actions.filter((a) => a.kind === "open_task");
-  const cons = actions.filter((a) => a.kind === "consolidate");
-  console.log(`## Abrir tarea en el gestor (${tasks.length})`);
-  for (const a of tasks) console.log(`- [ ] ${a.title}\n      ${a.detail}`);
-  console.log(`\n## Consolidar duplicados (${cons.length})`);
-  for (const a of cons) console.log(`- [ ] ${a.title}\n      ${a.detail}`);
-  console.log(
-    `\n(${actions.length} acciones propuestas. Dry-run: no se ha escrito nada. ` +
-      `Para crear las tareas en Plane, ejecútalo de forma supervisada con la skill plane-api.)`,
-  );
-}
-
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main()
-    .catch((e) => {
-      console.error("Error en lint-act:", e);
-      process.exitCode = 1;
-    })
-    .finally(() => closeSql());
 }
