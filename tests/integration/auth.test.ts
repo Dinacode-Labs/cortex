@@ -46,4 +46,18 @@ describe("auth email + OTP (BD real)", () => {
     await expect(verifyOtp(EMAIL, "000000")).rejects.toThrow();
     await expect(requestOtp("intruso@gmail.com")).rejects.toThrow(); // fuera de la whitelist
   });
+
+  it("rate limit: no más de CORTEX_OTP_RATE_MAX (def. 5) códigos por email en la ventana", async () => {
+    const email = `rate-${RID}@dinacode.com`;
+    for (let i = 0; i < 5; i++) await requestOtp(email); // 5 OK
+    await expect(requestOtp(email)).rejects.toThrow(/Demasiadas solicitudes/); // el 6º se corta
+  });
+
+  it("bloqueo por intentos: tras 5 códigos erróneos ni el correcto sirve", async () => {
+    const email = `lock-${RID}@dinacode.com`;
+    const code = await otpFor(email);
+    for (let i = 0; i < 5; i++) await expect(verifyOtp(email, "000000")).rejects.toThrow(/incorrecto/i);
+    // El código ya no es válido aunque sea el correcto (intentos agotados).
+    await expect(verifyOtp(email, code)).rejects.toThrow(/Demasiados intentos/);
+  });
 });

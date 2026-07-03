@@ -17,6 +17,8 @@ const csv = (v: string | undefined): string[] => (v ?? "").split(",").map((s) =>
 // Config leída LAZY (no al cargar el módulo): robusta ante el orden de loadEnv/imports.
 const otpTtlMin = (): number => Number(process.env.CORTEX_OTP_TTL_MIN ?? "10");
 const tokenTtlDays = (): number => Number(process.env.CORTEX_TOKEN_TTL_DAYS ?? "30");
+const otpRateMax = (): number => Number(process.env.CORTEX_OTP_RATE_MAX ?? "5");
+const otpRateWindowMin = (): number => Number(process.env.CORTEX_OTP_RATE_WINDOW_MIN ?? "15");
 /** Dominios permitidos (whitelist, coma-separado). Vacío = cualquiera. Sin registro: el primer login válido crea el usuario. */
 const authDomains = (): string[] => csv(process.env.CORTEX_AUTH_DOMAIN ?? "dinacode.com");
 /** Emails admin (coma-separado; puede haber varios). Gestionan permisos y ven todos los proyectos. */
@@ -49,8 +51,15 @@ export async function requestOtp(emailRaw: string): Promise<void> {
   const email = normEmail(emailRaw);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Email inválido.");
   if (!isAllowedEmail(email)) throw new Error(`Dominio no permitido (solo: ${authDomains().join(", ") || "—"}).`);
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const sql = getSql();
+  const recent = (await sql`
+    SELECT count(*)::int AS n FROM otp_codes
+    WHERE email = ${email} AND created_at > now() - make_interval(mins => ${otpRateWindowMin()})
+  `) as unknown as Row[];
+  if ((recent[0]?.n as number) >= otpRateMax()) {
+    throw new Error("Demasiadas solicitudes de código. Espera unos minutos y reinténtalo.");
+  }
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await sql`UPDATE otp_codes SET consumed_at = now() WHERE email = ${email} AND consumed_at IS NULL`;
   await sql`
     INSERT INTO otp_codes (email, code_hash, expires_at)
@@ -64,36 +73,41 @@ export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ to
   const email = normEmail(emailRaw);
   const code = codeRaw.trim();
   const sql = getSql();
-  const rows = (await sql`
-    SELECT * FROM otp_codes
-    WHERE email = ${email} AND consumed_at IS NULL AND expires_at > now()
-    ORDER BY created_at DESC LIMIT 1
-  `) as unknown as Row[];
-  const otp = rows[0];
-  if (!otp) throw new Error("Código expirado o inexistente. Pide uno nuevo.");
-  if ((otp.attempts as number) >= MAX_ATTEMPTS) {
-    await sql`UPDATE otp_codes SET consumed_at = now() WHERE id = ${otp.id}`;
-    throw new Error("Demasiados intentos. Pide un código nuevo.");
-  }
-  if (sha(code) !== otp.code_hash) {
-    await sql`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ${otp.id}`;
-    throw new Error("Código incorrecto.");
-  }
-  await sql`UPDATE otp_codes SET consumed_at = now() WHERE id = ${otp.id}`;
+  const result = await sql.begin(async (tx) => {
+    const rows = (await tx`
+      SELECT * FROM otp_codes
+      WHERE email = ${email} AND consumed_at IS NULL AND expires_at > now()
+      ORDER BY created_at DESC LIMIT 1
+      FOR UPDATE
+    `) as unknown as Row[];
+    const otp = rows[0];
+    if (!otp) return { ok: false as const, error: "Código expirado o inexistente. Pide uno nuevo." };
+    if ((otp.attempts as number) >= MAX_ATTEMPTS) {
+      await tx`UPDATE otp_codes SET consumed_at = now() WHERE id = ${otp.id}`;
+      return { ok: false as const, error: "Demasiados intentos. Pide un código nuevo." };
+    }
+    if (sha(code) !== otp.code_hash) {
+      await tx`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ${otp.id}`;
+      return { ok: false as const, error: "Código incorrecto." };
+    }
+    await tx`UPDATE otp_codes SET consumed_at = now() WHERE id = ${otp.id}`;
 
-  const urows = (await sql`
-    INSERT INTO users (email) VALUES (${email})
-    ON CONFLICT (email) DO UPDATE SET last_login_at = now()
-    RETURNING id, email
-  `) as unknown as Row[];
-  const user: AuthUser = { id: urows[0]!.id as string, email: urows[0]!.email as string, admin: isAdmin(urows[0]!.email as string) };
+    const urows = (await tx`
+      INSERT INTO users (email) VALUES (${email})
+      ON CONFLICT (email) DO UPDATE SET last_login_at = now()
+      RETURNING id, email
+    `) as unknown as Row[];
+    const user: AuthUser = { id: urows[0]!.id as string, email: urows[0]!.email as string, admin: isAdmin(urows[0]!.email as string) };
 
-  const token = randomBytes(32).toString("base64url");
-  await sql`
-    INSERT INTO auth_tokens (token_hash, user_id, expires_at)
-    VALUES (${sha(token)}, ${user.id}, now() + make_interval(days => ${tokenTtlDays()}))
-  `;
-  return { token, user };
+    const token = randomBytes(32).toString("base64url");
+    await tx`
+      INSERT INTO auth_tokens (token_hash, user_id, expires_at)
+      VALUES (${sha(token)}, ${user.id}, now() + make_interval(days => ${tokenTtlDays()}))
+    `;
+    return { ok: true as const, token, user };
+  });
+  if (!result.ok) throw new Error(result.error);
+  return { token: result.token, user: result.user };
 }
 
 /** Resuelve el usuario de un token (o null). Actualiza last_used_at. */
