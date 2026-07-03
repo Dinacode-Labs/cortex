@@ -28,7 +28,6 @@ export {
 export { autoCurate, type CurationResult } from "./curate.js";
 export { requestOtp, verifyOtp, validateToken, revokeToken, createUiTicket, redeemUiTicket, isAdmin, isAllowedEmail, listAdmins, type AuthUser } from "./auth.js";
 export { sendOtpEmail } from "./email.js";
-export { apiGet, apiPost, apiBase, isAuthenticated, type ApiResult } from "./api-client.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture.js";
 export { extractFileText, SUPPORTED_EXTS, type ExtractedFile } from "./extract.js";
 export {
