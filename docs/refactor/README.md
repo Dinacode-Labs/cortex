@@ -127,12 +127,14 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   `CORTEX_MCP_AUTH=off` y sweep de sesiones MCP (`backlog #30`). El helper `runServer`
   común se descartó: `shared` no puede depender de hono/database sin romper las reglas —
   tres entrypoints de ~15 líneas ganan a una dependencia mal puesta.
-- [ ] **C-2 · Split de `apps/web`** (L): `routes/` por recurso + `views/` migradas a
-  `html` de `hono/html` (autoescape; mata la clase del XSS y los ~90 `esc()`) **en una
-  sola pasada** para tocar cada handler una vez; CSS y `graph.js` a `public/` con
-  `serveStatic` (CDN de vis-network anotado en decisions.md); borrar el helper
-  `accessibleProjects` local (N+1); extraer `askProjectContext()` a agents (hoy duplicado
-  entre `/ask` y la tool MCP).
+- [x] **C-2 · Split de `apps/web`** (L, PR #12): `routes/` por recurso (11) +
+  `middleware/` (session, access) + `views/` con `html` de `hono/html` (autoescape;
+  `esc()` eliminado de los call-sites, 4 `raw()` auditados); CSS y `graph.js` a
+  `public/` con `serveStatic` (vis-network sigue en CDN, anotado en el ADR de UI);
+  `accessibleProjects` local (N+1) sustituido por `listAccessibleProjects` de core con
+  `entryCount` (query agregada única); `askProjectContext()` extraído a agents
+  (des-duplicado entre `/ask` y la tool MCP); `onError` global, `safeParse` de `type`
+  y cookie `secure` en producción; test de integración de autoescape (XSS real).
 - [ ] **C-3 · Gemelo ligero en `apps/server`** (S): `app.ts` + rutas; validar bodies con
   los schemas zod de `shared` (`safeParse` — fuera los `as never`); `onError` en vez de
   `catch {}` mudos.

@@ -402,6 +402,9 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   y una única isla de JS (el grafo). Una SPA obligaría a duplicar ~15 operaciones de
   core como API JSON, auth de navegador, build y segundo deploy — coste permanente sin
   beneficio presente.
+- **vis-network por CDN (unpkg), no vendorizado**: para una demo interna, anotar la
+  dependencia de red externa aquí es más barato y reversible que meter ~500KB al repo;
+  si la demo debe funcionar offline, vendorizarlo es un movimiento de un fichero.
 - **Umbrales para subir de nivel** (para que la decisión no se re-litigue por impulso):
   1. **htmx / parciales** cuando haga falta el primer refresco parcial real (validar
      entradas sin recarga, auto-refresh de `/usage`, búsqueda en vivo). `GET /api/graph`

@@ -90,6 +90,36 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     expect((await srv.request(`/context-pack?slug=${prvForeign.slug}`, { headers: auth })).status).toBe(403);
   });
 
+  it("web: autoescape real — contenido con <script> se muestra escapado en /entry/:id", async () => {
+    const web = createWebApp();
+    // Contenido malicioso: si el autoescape de hono/html no funcionara, esto sería XSS.
+    const payload = `Restricción de seguridad ${RID}: el contenido <script>alert(1)</script> debe verse escapado.`;
+    const saved = await web.request("/save", {
+      method: "POST",
+      headers: { cookie: `cortex_session=${token}`, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ content: payload, project: prvOwn.name }).toString(),
+    });
+    expect([200, 302]).toContain(saved.status);
+
+    const entry = (await listEntries({ project: prvOwn.name })).find((e) => e.content.includes("<script>"));
+    expect(entry).toBeDefined();
+
+    const page = await web.request(`/entry/${entry!.id}`, { headers: { cookie: `cortex_session=${token}` } });
+    expect(page.status).toBe(200);
+    const bodyHtml = await page.text();
+    expect(bodyHtml).toContain("&lt;script&gt;");
+    expect(bodyHtml).not.toContain("<script>alert");
+
+    // El mismo contenido pasa por entryCard (dashboard) y por la vista de búsqueda:
+    // cubre los sinks del árbol de vistas, no solo el detalle.
+    const dash = await web.request(`/?project=${encodeURIComponent(prvOwn.name)}`, { headers: { cookie: `cortex_session=${token}` } });
+    expect(dash.status).toBe(200);
+    expect(await dash.text()).not.toContain("<script>alert");
+    const search = await web.request(`/search?q=${encodeURIComponent(`Restricción de seguridad ${RID}`)}&project=${encodeURIComponent(prvOwn.name)}`, { headers: { cookie: `cortex_session=${token}` } });
+    expect(search.status).toBe(200);
+    expect(await search.text()).not.toContain("<script>alert");
+  });
+
   it("mcp http: POST /mcp sin Bearer → 401 (auth on por defecto)", async () => {
     const mcp = createMcpHttpApp();
     const res = await mcp.request("/mcp", {
