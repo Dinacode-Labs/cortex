@@ -79,17 +79,10 @@ async function logout(): Promise<void> {
   console.log("Sesión cerrada.");
 }
 
-async function main(): Promise<void> {
-  const sub = process.argv[2];
+export async function run(args: string[]): Promise<void> {
+  const sub = args[0];
   if (sub === "login") await login();
   else if (sub === "status" || sub === "whoami") await status();
   else if (sub === "logout") await logout();
   else console.log("Uso: cortex auth <login|status|logout>");
 }
-
-main()
-  .catch((e) => {
-    console.error(e instanceof Error ? e.message : e);
-    process.exit(1);
-  })
-  .finally(() => process.exit(process.exitCode ?? 0));
