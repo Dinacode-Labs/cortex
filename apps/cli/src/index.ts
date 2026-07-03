@@ -20,21 +20,6 @@ interface Cmd {
   managed?: boolean;
 }
 
-/** Scripts pendientes de migrar (agents + sync, fase B-1b/c): import por ruta + argv. */
-function legacy(script: string, help: string): Cmd {
-  return {
-    help,
-    managed: false,
-    load: async () => ({
-      run: async (args: string[]) => {
-        const p = resolve(REPO, script);
-        process.argv = [process.argv[0]!, p, ...args];
-        await import(p);
-      },
-    }),
-  };
-}
-
 /** Entrypoints de otras apps (arrancan un servidor al importarse). */
 function boot(script: string, help: string): Cmd {
   return { help, managed: false, load: async () => ({ run: async () => void (await import(resolve(REPO, script))) }) };
@@ -64,7 +49,7 @@ const COMMANDS: Record<string, Cmd> = {
   maintain: { help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
   "maintain-worker": { help: "worker de mantenimiento programado (cron)", managed: false, load: () => import("./commands/maintain-worker.js") },
   "demo-capture": { help: "demo del workflow de captura de Mastra", load: () => import("./commands/demo-capture.js") },
-  sync: legacy("scripts/cortex-sync.ts", "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)"),
+  sync: { help: "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)", load: () => import("./commands/sync.js") },
 };
 
 function usage(): void {

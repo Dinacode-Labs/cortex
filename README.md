@@ -247,7 +247,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth) · cli (cortex)
 packages/    core · agents · embeddings · database · shared
 config/      toolbelt.json (registry) · skills/ (vendored) · commands/
-scripts/     install.sh (instalador) · cortex-sync.ts (toolbelt + hooks + CLI)
+scripts/     install.sh (instalador remoto; lo sirve apps/server)
 docs/        decisions.md · roadmap.md · research/ · audit/ (jun 2026) · refactor/ (jul 2026)
 ```
 
