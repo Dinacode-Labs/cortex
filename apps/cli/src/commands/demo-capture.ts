@@ -1,20 +1,17 @@
-import { closeSql } from "@cortex/database";
-import { runCaptureWorkflow } from "./workflows.js";
-import { wireLlm } from "./wire.js";
+import { runCaptureWorkflow, wireLlm } from "@cortex/agents";
 
 /**
  * Demo ejecutable del workflow de captura de Mastra (§20.4 / §21.2).
- * Uso: pnpm --filter @cortex/agents demo:capture "<texto>" ["<proyecto>"]
+ * Uso: cortex demo-capture "<texto>" ["<proyecto>"]
  * Requiere LLM (LLM_PROVIDER=openrouter) y Postgres sembrado.
  */
 
-const content =
-  process.argv[2] ??
-  "Decidimos introducir una cola de mensajes con RabbitMQ para procesar las exportaciones de facturación de forma asíncrona y evitar timeouts.";
-const project = process.argv[3] ?? "Acme Portal";
-
-async function main() {
+export async function run(args: string[]): Promise<void> {
   wireLlm();
+  const content =
+    args[0] ??
+    "Decidimos introducir una cola de mensajes con RabbitMQ para procesar las exportaciones de facturación de forma asíncrona y evitar timeouts.";
+  const project = args[1] ?? "Acme Portal";
   console.log(`▶ captureContextWorkflow (Mastra)\n  proyecto: ${project}\n  texto: ${content}\n`);
   const out = await runCaptureWorkflow({ content, project, createdBy: "demo:capture" });
   console.log("Resultado del workflow:");
@@ -28,9 +25,4 @@ async function main() {
   }
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en el workflow:", e?.message ?? e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+

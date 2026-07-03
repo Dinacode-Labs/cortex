@@ -12,6 +12,10 @@
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/embeddings": "workspace:*",
-    "@cortex/shared": "workspace:*"
+    "@cortex/shared": "workspace:*",
+    "node-cron": "^4.5.0"
+  },
+  "devDependencies": {
+    "@types/node-cron": "^3.0.11"
   }
 }

@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { closeSql, getSql } from "@cortex/database";
 import { saveWithReconciliation } from "@cortex/core";
 import { apiPost } from "@cortex/shared";
-import { wireLlm } from "./wire.js";
 import { readSessions } from "./session-readers.js";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextEntryType } from "@cortex/shared";
@@ -225,21 +224,8 @@ export async function ingestSessionFile(project: string, file: string, platform 
   return { saved, updated, superseded, noop, skipped: false };
 }
 
-async function main(): Promise<void> {
-  wireLlm();
-  const slug = process.argv[2];
-  const repoPath = process.argv[3];
-  const platform = (process.argv[4] ?? "claude").toLowerCase();
-  if (!slug || !repoPath) {
-    console.error('Uso: tsx src/connect-sessions.ts "<slug>" <ruta-repo> [claude|codex|opencode|hermes]');
-    process.exitCode = 1;
-    return;
-  }
-  if (!["claude", "codex", "opencode", "hermes"].includes(platform)) {
-    console.error(`Plataforma "${platform}" no soportada (claude|codex|opencode|hermes).`);
-    process.exitCode = 1;
-    return;
-  }
+/** Backfill de sesiones de un repo → proyecto (lo invoca `cortex connect-sessions`). */
+export async function runSessionsBackfill(slug: string, repoPath: string, platform: string): Promise<void> {
 
   const limit = process.env.CORTEX_SESSIONS_LIMIT ? Number(process.env.CORTEX_SESSIONS_LIMIT) : undefined;
 
@@ -275,18 +261,4 @@ async function main(): Promise<void> {
     console.log(`  ${s.sessionId.slice(0, 8)}…: +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas${r.failed ? `, ${r.failed} fallos` : ""}`);
   }
   console.log(`Backfill: +${savedTotal} nuevas, ~${updatedTotal} UPDATE, ⊘${supersededTotal} SUPERSEDE${failedTotal ? `, ${failedTotal} fallos (¿cortex auth login / servidor?)` : ""}.`);
-}
-
-// CLI directo (no al importar `ingestSessionFile` desde el hook).
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main()
-    .catch((e) => {
-      console.error("Error en connect-sessions:", e);
-      process.exitCode = 1;
-    })
-    .finally(async () => {
-      await shutdownObservability();
-      await closeSql();
-      process.exit(process.exitCode ?? 0);
-    });
 }
