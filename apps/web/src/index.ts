@@ -346,6 +346,11 @@ app.get("/entry/:id", async (c) => {
 
 app.post("/entry/:id/validate", async (c) => {
   const id = c.req.param("id");
+  // Mismo gate que la vista de detalle (GET /entry/:id): sin acceso al proyecto de la
+  // entrada no se permite cambiar su estado.
+  const detail = await getEntryDetail(id);
+  if (!detail) return c.html(layout("No encontrado", `<p><a class="back" href="/">← Inicio</a></p><div class="empty">Entrada no encontrada.</div>`), 404);
+  if (!(await guardProject(c.get("user")?.email ?? null, detail.projectName))) return c.html(deniedPage(c.get("user")), 403);
   const form = await c.req.parseBody();
   const status = String(form.status) as "validated" | "rejected" | "obsolete";
   await validateEntry(id, status);

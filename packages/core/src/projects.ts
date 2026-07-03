@@ -36,6 +36,15 @@ export async function findProjectByName(name: string): Promise<ProjectRef | null
   return toRef(rows[0]);
 }
 
+export async function getEntryProject(entryId: string): Promise<ProjectRef | null> {
+  const rows = (await getSql()`
+    SELECT p.id, p.name, p.slug, p.visibility, p.owner_email, p.parent_id
+    FROM context_entries ce JOIN entities p ON p.id = ce.project_id
+    WHERE ce.id = ${entryId} LIMIT 1
+  `) as unknown as Row[];
+  return toRef(rows[0]);
+}
+
 /** Crea (o recupera) un proyecto. Público por defecto; `private` lo restringe; `parentSlug`
  * lo cuelga de un padre (cliente) → hereda contexto y permisos. */
 export async function createProject(

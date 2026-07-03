@@ -9,6 +9,7 @@ import {
   captureBatch,
   createUiTicket,
   findProjectBySlug,
+  getEntryProject,
   getContextPack,
   listAccessibleProjects,
   relateEntries,
@@ -181,6 +182,11 @@ app.post("/relate", async (c) => {
   if (!user) return c.json({ error: "No autenticado." }, 401);
   const b = (await c.req.json().catch(() => ({}))) as { sourceId?: string; targetId?: string; relationType?: string };
   if (!b.sourceId || !b.targetId || !b.relationType) return c.json({ error: "Faltan sourceId/targetId/relationType." }, 400);
+  // Permiso por entrada (no por nombre de proyecto): hay que poder acceder a AMBAS.
+  for (const eid of [b.sourceId, b.targetId]) {
+    const proj = await getEntryProject(eid);
+    if (proj && !(await canAccessProject(proj, user.email))) return c.json({ error: "Sin acceso." }, 403);
+  }
   try {
     await relateEntries(b.sourceId, b.targetId, b.relationType as never);
     return c.json({ ok: true });

@@ -3,6 +3,7 @@ import { loadEnv, saveContextInput, searchContextInput } from "@cortex/shared";
 import {
   canAccessProject,
   findProjectByName,
+  getEntryProject,
   getContextPack,
   lintProject,
   listDecisions,
@@ -152,6 +153,12 @@ export function buildMcpServer(user?: AuthUser): McpServer {
     },
     async ({ id, status }) => {
       try {
+        // Esta tool opera por ID de entrada, no por nombre de proyecto → el `guard` por
+        // proyecto no la cubre: resolvemos el proyecto de la entrada y comprobamos acceso.
+        if (user) {
+          const proj = await getEntryProject(id);
+          if (proj && !(await canAccessProject(proj, user.email))) return errorText(`Sin acceso a la entrada ${id}.`);
+        }
         const entry = await validateEntry(id, status);
         if (!entry) return errorText(`No existe ninguna entrada con id ${id}.`);
         return text(`Entrada ${entry.id} actualizada a estado "${entry.status}".`);
