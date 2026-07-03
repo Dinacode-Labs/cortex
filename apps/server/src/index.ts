@@ -22,7 +22,7 @@ import {
   type AuthUser,
   type BatchItem,
 } from "@cortex/core";
-import { isLlmEnabled, wireReconciler } from "@cortex/agents";
+import { wireLlm } from "@cortex/agents";
 
 /**
  * API HTTP de Cortex (Hono). Autenticación email + OTP + endpoints autenticados de
@@ -31,7 +31,7 @@ import { isLlmEnabled, wireReconciler } from "@cortex/agents";
  * docs/decisions.md.
  */
 loadEnv();
-if (isLlmEnabled()) wireReconciler(); // reconciliación LLM (ADD/UPDATE/SUPERSEDE/NOOP) en /capture
+wireLlm(); // hooks LLM (reconciliación en /capture) + sink de uso de embeddings
 
 const app = new Hono();
 

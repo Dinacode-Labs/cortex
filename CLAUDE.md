@@ -47,10 +47,11 @@ docs/
 ```
 
 `@cortex/core` es determinista (sin LLM). La capa de inteligencia (`@cortex/agents`,
-Mastra + LLM vía nan/OpenRouter) se inyecta desde los entrypoints con
-`setClassifier()`/`setReranker()`/`setReconciler()` cuando hay LLM (`LLM_PROVIDER`).
-MCP, API, UI y CLI consumen `core`. Nota: `agents` usa zod v4 (lo exige Mastra),
-aislado del zod v3 del resto del repo; no cruzar schemas entre ambos.
+Mastra + LLM vía nan/OpenRouter) se inyecta desde cada entrypoint llamando a
+`wireLlm()` tras `loadEnv()` (cablea `setClassifier`/`setReranker`/`setReconciler` y
+el sink de uso de embeddings; sin `LLM_PROVIDER`, core cae a heurísticas). MCP, API,
+UI y CLI consumen `core`. Nota: `agents` usa zod v4 (lo exige Mastra), aislado del
+zod v3 del resto del repo; no cruzar schemas entre ambos.
 
 ## Reglas de dependencia (qué puede importar qué)
 
@@ -69,8 +70,7 @@ apps/*      → cualquier package
 - Principales violaciones hoy (las corrige el refactor; inventario completo en
   `docs/refactor/hallazgos.md`): `core/extract.ts` llama a visión/whisper y `core`
   hace HTTP saliente (api-client/conectores), hay entrypoints ejecutables dentro de
-  `packages/*`, hay side effects al importar (wiring/usage sink) y el CLI importa por
-  ruta. No añadas violaciones nuevas.
+  `packages/*` y el CLI importa por ruta. No añadas violaciones nuevas.
 
 ## Refactor en curso (julio 2026)
 

@@ -4,7 +4,7 @@ export { classifyEntry, type ClassificationResult } from "./classify.js";
 export { extractGraph, type GraphExtraction } from "./enrich.js";
 export { synthesizeContextAnswer, type ContextSnippet } from "./synthesize.js";
 export { rerankLLM } from "./rerank.js";
-export { wireReconciler } from "./reconcile.js";
+export { wireLlm } from "./wire.js";
 export {
   captureContextWorkflow,
   runCaptureWorkflow,

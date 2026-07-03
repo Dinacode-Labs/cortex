@@ -93,7 +93,7 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   y `capture.ts:31` van por `name` exacto). **Antes** del cambio, test de integración
   «Acme Portal» vs «acme portal» que demuestra el bug — unificar cambia comportamiento a
   propósito (la reconciliación empezará a encontrar lo que hoy ignora).
-- [ ] **A-3 · Wiring explícito** (M): `wireLlm()` en `@cortex/agents` (encapsula
+- [x] **A-3 · Wiring explícito** (M): `wireLlm()` en `@cortex/agents` (encapsula
   `isLlmEnabled` + `setClassifier` + `setReranker` + `wireReconciler` + `CORTEX_RERANK`);
   `registerUsageSink()` exportado en vez del `import "./usage.js"` fantasma; quitar el
   `wireReconciler()` top-level de `connect-sessions.ts`; `buildMcpServer` queda como

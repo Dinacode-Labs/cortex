@@ -2,7 +2,6 @@ import { toVectorLiteral, type Sql } from "@cortex/database";
 import type { EmbeddingProvider } from "@cortex/embeddings";
 import type { ContextEntry, ContextEntryType } from "@cortex/shared";
 import { rowToContextEntry, type Row } from "./map.js";
-import "./usage.js"; // registra el sink de uso de embeddings (observabilidad de coste)
 
 /** Guarda (o actualiza) el embedding de una entrada para el texto dado. */
 export async function storeEmbedding(

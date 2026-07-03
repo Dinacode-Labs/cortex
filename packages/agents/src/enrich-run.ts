@@ -1,6 +1,7 @@
 import { closeSql } from "@cortex/database";
 import { enrichProject } from "./enrich-project.js";
 import { shutdownObservability } from "./mastra.js";
+import { wireLlm } from "./wire.js";
 
 /**
  * CLI del pase de enriquecimiento de grafo (§7/§12.4) de un proyecto.
@@ -8,6 +9,7 @@ import { shutdownObservability } from "./mastra.js";
  * Env: CORTEX_ENRICH_ONLY_MISSING=1 para saltar las ya enriquecidas.
  */
 async function main(): Promise<void> {
+  wireLlm();
   const project = process.argv[2];
   const limit = Number(process.argv[3] ?? "0") || undefined;
   if (!project) {

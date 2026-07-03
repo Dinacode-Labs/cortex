@@ -1,12 +1,14 @@
 import { resolve } from "node:path";
 import { closeSql } from "@cortex/database";
 import { indexRepo } from "./code.js";
+import { registerUsageSink } from "./usage.js";
 
 /**
  * Indexa el código de un repo local en un proyecto.
  * Uso: tsx src/index-code.ts "<Proyecto>" <ruta-repo> [nombre-repo]
  */
 async function main(): Promise<void> {
+  registerUsageSink();
   const project = process.argv[2];
   const repoPath = process.argv[3];
   const repoName = process.argv[4];

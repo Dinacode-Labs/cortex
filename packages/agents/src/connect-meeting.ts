@@ -6,6 +6,7 @@ import { closeSql } from "@cortex/database";
 import { extractFileText } from "@cortex/core";
 import { captureCondensedViaApi } from "./connect-sessions.js";
 import { shutdownObservability } from "./mastra.js";
+import { wireLlm } from "./wire.js";
 
 /**
  * Conector de REUNIONES: transcribe grabaciones (audio/vídeo, vía `extract`) y, en vez de
@@ -26,6 +27,7 @@ function walk(p: string): string[] {
 }
 
 async function main(): Promise<void> {
+  wireLlm();
   const slug = process.argv[2];
   const path = process.argv[3];
   if (!slug || !path) {
