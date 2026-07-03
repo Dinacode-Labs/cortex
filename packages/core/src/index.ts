@@ -30,7 +30,7 @@ export { autoCurate, type CurationResult } from "./curate.js";
 export { requestOtp, verifyOtp, validateToken, revokeToken, createUiTicket, redeemUiTicket, isAdmin, isAllowedEmail, listAdmins, type AuthUser } from "./auth.js";
 export { sendOtpEmail } from "./email.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture.js";
-export { extractFileText, SUPPORTED_EXTS, type ExtractedFile } from "./extract.js";
+export { extractFileText, setMediaExtractor, SUPPORTED_EXTS, type ExtractedFile, type MediaExtractorHooks } from "./extract.js";
 export {
   classifyType,
   extractEntities,

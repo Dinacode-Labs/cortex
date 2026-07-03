@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { apiPost } from "@cortex/shared";
 import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
+import { wireLlm } from "@cortex/agents";
 
 /**
  * Conector de export de Notion (Markdown + ADJUNTOS), **consciente del contenido**:
@@ -92,6 +93,7 @@ async function postBatch(slug: string, items: BatchItem[]): Promise<BatchResult[
 }
 
 export async function run(args: string[]): Promise<void> {
+  wireLlm(); // extract multimodal: caption/OCR/whisper vía setMediaExtractor
   const slug = args[0];
   const dir = args[1];
   if (!slug || !dir) {

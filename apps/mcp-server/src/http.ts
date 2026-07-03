@@ -4,9 +4,9 @@ import { Hono, type Context } from "hono";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { closeSql } from "@cortex/database";
-import { loadEnv } from "@cortex/shared";
+import { isLlmEnabled, loadEnv } from "@cortex/shared";
 import { validateToken, type AuthUser } from "@cortex/core";
-import { isLlmEnabled, wireLlm } from "@cortex/agents";
+import { wireLlm } from "@cortex/agents";
 import { buildMcpServer } from "./server.js";
 
 /**

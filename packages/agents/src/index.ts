@@ -1,4 +1,3 @@
-export { isLlmEnabled, getLlmConfig, type LlmConfig } from "./openrouter.js";
 export { getAgent, runAgent, shutdownObservability, type AgentRole } from "./mastra.js";
 export { classifyEntry, type ClassificationResult } from "./classify.js";
 export { extractGraph, type GraphExtraction } from "./enrich.js";
