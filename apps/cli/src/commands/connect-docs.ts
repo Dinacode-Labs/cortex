@@ -1,10 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
-import { loadEnv } from "@cortex/shared";
-loadEnv();
 import { apiPost } from "@cortex/shared";
-import type { BatchItem } from "./capture.js";
-import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
+import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
 
 /**
  * Conector GENÉRICO de documentos: recorre un directorio e ingiere los ficheros (vía la
@@ -12,7 +9,7 @@ import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
  * atribución (created_by=email) + permisos + embedding por lotes server-side. Requiere
  * `cortex auth login` y el servidor en marcha.
  *
- * Uso: tsx src/connect-docs.ts "<slug>" <ruta-dir>
+ * Uso: cortex connect-docs "<slug>" <ruta-dir>
  */
 const MIN_CHARS = Number(process.env.CORTEX_DOCS_MIN_CHARS ?? "40");
 const MAX_CONTENT = 8000;
@@ -31,11 +28,11 @@ function walk(dir: string): string[] {
   return out;
 }
 
-async function main(): Promise<void> {
-  const slug = process.argv[2];
-  const dir = process.argv[3];
+export async function run(args: string[]): Promise<void> {
+  const slug = args[0];
+  const dir = args[1];
   if (!slug || !dir) {
-    console.error('Uso: tsx src/connect-docs.ts "<slug>" <ruta-dir>');
+    console.error('Uso: cortex connect-docs "<slug>" <ruta-dir>');
     process.exitCode = 1;
     return;
   }
@@ -60,7 +57,8 @@ async function main(): Promise<void> {
     const r = await apiPost<{ results?: { action: string }[]; error?: string }>("/capture/batch", { slug, items: items.slice(i, i + CHUNK) });
     if (!r.ok) {
       console.error(`✗ Captura fallida (${r.status}): ${r.data.error ?? "¿cortex auth login / servidor en marcha?"}`);
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     for (const x of r.data.results ?? []) x.action === "added" ? added++ : existing++;
     console.log(`  ${Math.min(i + CHUNK, items.length)}/${items.length}`);
@@ -68,7 +66,4 @@ async function main(): Promise<void> {
   console.log(`Conector docs: ${added} nuevos, ${existing} ya existían.`);
 }
 
-main().catch((e) => {
-  console.error("Error en connect-docs:", e);
-  process.exit(1);
-});
+

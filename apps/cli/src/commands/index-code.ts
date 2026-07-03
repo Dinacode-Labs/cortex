@@ -1,19 +1,14 @@
 import { resolve } from "node:path";
-import { closeSql } from "@cortex/database";
-import { indexRepo } from "./code.js";
-import { registerUsageSink } from "./usage.js";
+import { indexRepo, registerUsageSink } from "@cortex/core";
 
-/**
- * Indexa el código de un repo local en un proyecto.
- * Uso: tsx src/index-code.ts "<Proyecto>" <ruta-repo> [nombre-repo]
- */
-async function main(): Promise<void> {
+/** Indexa el código de un repo local en un proyecto. */
+export async function run(args: string[]): Promise<void> {
   registerUsageSink();
-  const project = process.argv[2];
-  const repoPath = process.argv[3];
-  const repoName = process.argv[4];
+  const project = args[0];
+  const repoPath = args[1];
+  const repoName = args[2];
   if (!project || !repoPath) {
-    console.error('Uso: tsx src/index-code.ts "<Proyecto>" <ruta-repo> [nombre-repo]');
+    console.error('Uso: cortex index-code "<Proyecto>" <ruta-repo> [nombre-repo]');
     process.exitCode = 1;
     return;
   }
@@ -29,10 +24,3 @@ async function main(): Promise<void> {
   console.log(`Hecho: ${r.files} ficheros → ${r.chunks} chunks indexados.`);
   if (r.skippedOverCap > 0) console.log(`⚠️ ${r.skippedOverCap} chunks omitidos por el límite (maxChunks).`);
 }
-
-main()
-  .catch((e) => {
-    console.error("Error indexando código:", e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());

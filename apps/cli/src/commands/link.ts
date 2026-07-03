@@ -1,19 +1,15 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadEnv, readCredentials } from "@cortex/shared";
-loadEnv();
-import { closeSql, getSql } from "@cortex/database";
-import { canAccessProject, createProject, findProjectBySlug } from "./projects.js";
-import { readCortexLink, slugify } from "./project-config.js";
-import { listAdmins } from "./auth.js";
-import type { ProjectRef } from "./projects.js";
+import { readCredentials } from "@cortex/shared";
+import { getSql } from "@cortex/database";
+import { canAccessProject, createProject, findProjectBySlug, listAdmins, readCortexLink, slugify, type ProjectRef } from "@cortex/core";
 
 /** Mensaje para solicitar acceso a un proyecto privado al que no llegas. */
 function askAccessMsg(p: ProjectRef): string {
   const admins = listAdmins();
   return `✗ El proyecto "${p.name}" (slug "${p.slug}") existe pero es privado y no tienes acceso.\n  Pídele acceso al admin${admins.length ? ` (${admins.join(", ")})` : ""} — no se ha creado nada.`;
 }
-import type { Row } from "./map.js";
+type Row = Record<string, unknown>;
 
 /** Email autenticado de la CLI (~/.cortex/credentials), o null. Es el dueño al crear. */
 function credsEmail(): string | null {
@@ -39,8 +35,7 @@ function writeLink(obj: Record<string, unknown>, msg: string): void {
   console.log(`✓ ${msg}\n  → ${file}`);
 }
 
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+export async function run(args: string[]): Promise<void> {
   const positional = args.filter((a) => !a.startsWith("--"));
 
   if (args.includes("--ignore")) {
@@ -111,14 +106,4 @@ async function main(): Promise<void> {
   console.log('\nUso:\n  cortex:link <slug>               vincular a un proyecto existente\n  cortex:link --create "<Nombre>"  crear el proyecto y vincular\n  cortex:link --ignore             opt-out (no usar Cortex aquí)');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main()
-    .catch((e) => {
-      console.error("Error en cortex link:", e);
-      process.exitCode = 1;
-    })
-    .finally(async () => {
-      await closeSql();
-      process.exit(process.exitCode ?? 0);
-    });
-}
+

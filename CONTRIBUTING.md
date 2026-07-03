@@ -43,17 +43,19 @@ está en [`CLAUDE.md`](./CLAUDE.md#reglas-de-dependencia-qué-puede-importar-qu�
 - **Añadir un MCP / skill / comando al toolbelt** → edítalo en `config/toolbelt.json`
   (y vendoriza la skill en `config/skills/<name>/`). `cortex sync` lo reparte. **Nunca**
   metas credenciales: declara el `env` que requiere y se omite si falta (`--doctor` lo lista).
-- **Añadir un conector de fuente** → `packages/core/src/connect-<x>.ts`. Reutiliza la capa
-  `extract` (multimodal) y `saveWithReconciliation` (dedup/merge). Incremental por
-  `sourceReference`. Enrútalo en el dispatcher (`apps/cli/src/index.ts`).
+- **Añadir un conector de fuente** → `apps/cli/src/commands/connect-<x>.ts` (exporta
+  `run(args)`). Reutiliza la capa `extract` de core (multimodal) y escribe por la API
+  autenticada (`apiPost` de shared, `/capture/batch`). Incremental por
+  `sourceReference`. Añade su entrada en `COMMANDS` (`apps/cli/src/index.ts`).
 - **Soportar un formato de fichero nuevo** → `packages/core/src/extract.ts`
   (`SUPPORTED_EXTS` + un branch en `extractFileText`). Todos los conectores lo heredan.
 - **Cambiar el esquema** → nueva migración `packages/database/migrations/NNNN_desc.sql`
   (idempotente, `IF NOT EXISTS`). El runner aplica en orden las no registradas.
 - **Nuevo rol de agente LLM** → añádelo a `AgentRole` + `INSTRUCTIONS` + el registro en
   `packages/agents/src/mastra.ts` (JSON_ROLES si devuelve JSON).
-- **Nuevo subcomando `cortex`** → entrada en `COMMANDS` de `apps/cli/src/index.ts`
-  apuntando al script; si el script tiene guard `import.meta.url === argv[1]`, se activa solo.
+- **Nuevo subcomando `cortex`** → crea `apps/cli/src/commands/<cmd>.ts` exportando
+  `run(args: string[])` (sin `process.exit` ni side effects de import: el ciclo de vida
+  lo gestiona el dispatcher) y añade su entrada en `COMMANDS` de `apps/cli/src/index.ts`.
 
 ## Convenciones
 
