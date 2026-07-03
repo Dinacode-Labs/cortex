@@ -120,13 +120,13 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
 
 ### Fase C — apps (~1-2 semanas)
 
-- [ ] **C-1 · Guard de acceso único + apps testeables** (M): `checkProjectAccess` /
-  `checkEntryAccess` en core con retorno `'ok'|'not_found'|'forbidden'` (obliga a decidir
-  la política de «proyecto inexistente», hoy inconsistente — ADR al hacerlo; cubre
-  `backlog #4`); `createApp()` exportada en las 3 apps Hono + helper `runServer` común;
-  **smoke tests con `app.request()` antes de partir nada** (401/403/404, guard de /save);
-  fix de la semántica `CORTEX_MCP_AUTH=off` y sweep de sesiones MCP inactivas
-  (`backlog #30`).
+- [x] **C-1 · Guard de acceso único + apps testeables** (M, PR #11): `checkProjectAccess`
+  / `checkEntryAccess` en core con `'ok'|'not_found'|'forbidden'` y política unificada
+  (inexistente → not_found; ADR; cubre `backlog #4`); `createApp()` en las 3 apps Hono
+  (web/server: `app.ts`; mcp: `http-app.ts`) + 5 smoke tests con `app.request()`; fix de
+  `CORTEX_MCP_AUTH=off` y sweep de sesiones MCP (`backlog #30`). El helper `runServer`
+  común se descartó: `shared` no puede depender de hono/database sin romper las reglas —
+  tres entrypoints de ~15 líneas ganan a una dependencia mal puesta.
 - [ ] **C-2 · Split de `apps/web`** (L): `routes/` por recurso + `views/` migradas a
   `html` de `hono/html` (autoescape; mata la clase del XSS y los ~90 `esc()`) **en una
   sola pasada** para tocar cada handler una vez; CSS y `graph.js` a `public/` con

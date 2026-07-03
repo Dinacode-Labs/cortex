@@ -1,9 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { saveContextInput, searchContextInput } from "@cortex/shared";
 import {
-  canAccessProject,
-  findProjectByName,
-  getEntryProject,
+  checkEntryAccess,
+  checkProjectAccess,
   getContextPack,
   lintProject,
   listDecisions,
@@ -34,12 +33,15 @@ const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }
 export function buildMcpServer(user?: AuthUser): McpServer {
   const server = new McpServer({ name: "cortex", version: "0.0.0" });
 
-  // Permiso de acceso al proyecto (solo si hay usuario autenticado). Devuelve mensaje de
-  // error si NO tiene acceso, o null si puede continuar.
-  const guard = async (project?: string): Promise<string | null> => {
+  // Permiso de acceso al proyecto (solo si hay usuario autenticado; sin `user` — stdio
+  // local — no se aplican guards). Devuelve el mensaje de denegación, o null si puede
+  // continuar. En LECTURAS un proyecto inexistente se rechaza (`not_found`); las
+  // ESCRITURAS por nombre pasan `allowMissing` porque el save auto-crea el proyecto (ADR).
+  const guard = async (project?: string, opts?: { allowMissing?: boolean }): Promise<string | null> => {
     if (!user || !project) return null;
-    const p = await findProjectByName(project);
-    if (p && !(await canAccessProject(p, user.email))) return `Sin acceso al proyecto "${project}".`;
+    const access = await checkProjectAccess(user.email, { name: project });
+    if (access.status === "forbidden") return `Sin acceso al proyecto "${project}".`;
+    if (access.status === "not_found" && !opts?.allowMissing) return `Proyecto no encontrado: "${project}".`;
     return null;
   };
 
@@ -56,7 +58,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
     },
     async (args) => {
       try {
-        const denied = await guard(args.project);
+        const denied = await guard(args.project, { allowMissing: true });
         if (denied) return errorText(denied);
         const result = await saveContext(user ? { ...args, createdBy: user.email } : args);
         return text(renderSaveResult(result));
@@ -146,10 +148,11 @@ export function buildMcpServer(user?: AuthUser): McpServer {
     async ({ id, status }) => {
       try {
         // Esta tool opera por ID de entrada, no por nombre de proyecto → el `guard` por
-        // proyecto no la cubre: resolvemos el proyecto de la entrada y comprobamos acceso.
+        // proyecto no la cubre: el acceso se comprueba vía la entrada (checkEntryAccess).
         if (user) {
-          const proj = await getEntryProject(id);
-          if (proj && !(await canAccessProject(proj, user.email))) return errorText(`Sin acceso a la entrada ${id}.`);
+          const access = await checkEntryAccess(user.email, id);
+          if (access.status === "not_found") return errorText(`No existe ninguna entrada con id ${id}.`);
+          if (access.status === "forbidden") return errorText(`Sin acceso a la entrada ${id}.`);
         }
         const entry = await validateEntry(id, status);
         if (!entry) return errorText(`No existe ninguna entrada con id ${id}.`);
