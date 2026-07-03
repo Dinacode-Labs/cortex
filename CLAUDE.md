@@ -25,24 +25,59 @@ un MCP corporativo. Documento fundacional: `dinacode-cortex-contexto-y-plan-demo
 
 ```
 packages/
-  shared/      # tipos del dominio, enums, schemas zod (modelo §14 del plan)
+  shared/      # tipos del dominio, enums, schemas zod v3 + env (modelo §14 del plan)
   database/    # esquema SQL + migraciones + cliente Postgres
-  embeddings/  # proveedor de embeddings enchufable (local | openai | voyage)
-  core/        # operaciones de dominio: save/search/context-pack + loops de mejora
-  agents/      # capa LLM: clasificación (OpenRouter/DeepSeek) + síntesis (Mastra)
+  embeddings/  # proveedor de embeddings enchufable (local | nan | openai | voyage)
+  core/        # dominio: save/search/context-pack, dedup/reconciliación, lint,
+               # bi-temporal, proyectos/permisos, extract, indexación de código
+  agents/      # capa LLM (Mastra + nan/OpenRouter): classifier, graph, rerank,
+               # synthesize, distill, reconcile, maintain
 apps/
-  mcp-server/  # servidor MCP (stdio) con las 5 tools corporativas
-  web/         # UI web de demo (Hono, render en servidor)
+  mcp-server/  # servidor MCP con las 8 tools (stdio + Streamable HTTP autenticado)
+  server/      # API HTTP + auth email/OTP (Hono) — la usan CLI, hooks y conectores
+  web/         # UI web (Hono SSR, cookie de sesión)
+  cli/         # CLI `cortex` (auth, link, ui, conectores…)
+scripts/       # install.sh + cortex-sync.ts (instala toolbelt/hooks/shim)
+config/        # toolbelt distribuible (MCP + skills + comandos) — ver config/README.md
+tests/         # unit + integration (Postgres real; ver CONTRIBUTING.md)
 docs/
   decisions.md # ADR ligero: decisiones = hipótesis a revisar
-  demo-script.md
+  refactor/    # revisión de arquitectura 2026-07 + plan de refactor por fases (EN CURSO)
+  audit/       # auditoría integral (junio 2026) + backlog priorizado
 ```
 
 `@cortex/core` es determinista (sin LLM). La capa de inteligencia (`@cortex/agents`,
-Mastra + LLM por OpenRouter) se inyecta con `setClassifier()` desde los entrypoints
-cuando hay LLM (`LLM_PROVIDER=openrouter`). Tanto el MCP como la UI consumen `core`.
-Nota: `agents` usa zod v4 (lo exige Mastra), aislado del zod v3 del resto del repo;
-no cruzar schemas entre ambos.
+Mastra + LLM vía nan/OpenRouter) se inyecta desde los entrypoints con
+`setClassifier()`/`setReranker()`/`setReconciler()` cuando hay LLM (`LLM_PROVIDER`).
+MCP, API, UI y CLI consumen `core`. Nota: `agents` usa zod v4 (lo exige Mastra),
+aislado del zod v3 del resto del repo; no cruzar schemas entre ambos.
+
+## Reglas de dependencia (qué puede importar qué)
+
+```
+shared      → (ninguna dependencia interna)
+database    → shared
+embeddings  → shared
+core        → database, embeddings, shared   # sin LLM ni HTTP saliente
+agents      → core, database, shared         # implementa los hooks LLM de core
+apps/*      → cualquier package
+```
+
+- Los packages **jamás** importan de `apps/*` ni ficheros de otro paquete por ruta.
+- Side effects (`loadEnv`, wiring de hooks, `serve`, `process.exit`) **solo** en
+  entrypoints, nunca al importar un módulo de librería.
+- Principales violaciones hoy (las corrige el refactor; inventario completo en
+  `docs/refactor/hallazgos.md`): `core/extract.ts` llama a visión/whisper y `core`
+  hace HTTP saliente (api-client/conectores), hay entrypoints ejecutables dentro de
+  `packages/*`, hay side effects al importar (wiring/usage sink) y el CLI importa por
+  ruta. No añadas violaciones nuevas.
+
+## Refactor en curso (julio 2026)
+
+Hay un plan de refactor por fases en `docs/refactor/README.md` (hallazgos completos en
+`docs/refactor/hallazgos.md`). Antes de tocar un área, mira si el plan ya la cubre y en
+qué fase. Disciplina: un PR por paso, `typecheck` + tests en verde, sin arreglos «ya que
+estoy» fuera del alcance del paso.
 
 ## Comandos
 
@@ -52,11 +87,13 @@ pnpm db:up              # levantar Postgres (Docker, puerto host 5433)
 pnpm db:migrate         # aplicar migraciones
 pnpm db:seed            # cargar datos de demo (proyecto ficticio Acme Portal)
 pnpm typecheck          # comprobar tipos en todos los paquetes
+pnpm test               # tests unitarios (Vitest, sin BD)
+pnpm test:integration   # tests de integración (requiere pnpm db:up)
 ```
 
 Copia `.env.example` a `.env` antes de empezar. Por defecto todo funciona **sin
-claves** (embeddings `local`); conecta OpenAI/Voyage/Anthropic cuando quieras
-calidad real.
+claves** (embeddings `local`, no semánticos); conecta nan/OpenAI/Voyage cuando
+quieras calidad real.
 
 ## Convenciones
 

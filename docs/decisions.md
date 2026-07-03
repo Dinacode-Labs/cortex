@@ -362,3 +362,51 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   conecta y responde `/health`; `/install.sh` sirve con la URL pública.
 - **Revisar cuando:** se ponga tras proxy/HTTPS real (Traefik/Caddy/Coolify), se quiera
   compilar en vez de tsx, o separar la imagen por servicio.
+
+## Refactor de arquitectura por fases (revisión 2026-07)
+
+- **Decisión:** tras la revisión de arquitectura de julio 2026 (informe y ~70 hallazgos
+  en [`refactor/`](./refactor/README.md)), se ejecuta un refactor **incremental por
+  fases** (A: parches de riesgo y unificaciones; B: entrypoints fuera de `packages/*` y
+  `core` sin LLM; C: apps testeables y split de la web; D: splits internos, config y
+  poda). **No** se rediseña: el grafo de paquetes es sano y la inversión de dependencia
+  LLM (`setClassifier`/`setReranker`/`setReconciler`) ya es el patrón correcto — se
+  completa y se protege con las **reglas de dependencia** formalizadas en `CLAUDE.md`.
+- **Qué se descarta deliberadamente** (anti-sobreingeniería, razonado en el informe):
+  DDD táctico (entities/aggregates/repositories formales), ORM/query-builder, contenedor
+  de DI, capa de "services" entre handlers y core, framework de frontend, microservicios,
+  node-pg-migrate/drizzle, índices HNSW/dimensión fija ya. Máximo un paquete nuevo
+  (`auth`, al final de la fase D).
+- **Disciplina:** un PR por paso con `typecheck` + `test` + `test:integration` en verde;
+  no se mergea sin CI; la vara de cada paso es "elimina un bug o una clase de bugs".
+- **Por qué:** el prototipo se construyó en días con vibecoding y los problemas reales
+  son locales (entrypoints mezclados, duplicación con bugs funcionales, side effects de
+  import, god-files), no de esqueleto. Cada abstracción extra debe justificar su coste
+  en un producto que sigue siendo hipótesis.
+- **Revisar cuando:** el producto pivote (las fases C-D son posponibles; A-B eliminan el
+  riesgo real), o al cerrar cada fase (marcar los pasos en el plan).
+
+## UI: seguir en Hono SSR estructurado (sin SPA ni htmx, con umbrales)
+
+- **Decisión:** la UI web se queda en **Hono SSR** y se estructura (fase C del refactor):
+  `createApp()` + `routes/` por recurso + vistas con `html` de `hono/html` (autoescape
+  por defecto; elimina el escapado manual con `esc()` y la clase de bug del XSS de
+  `/graph`) + estáticos en `public/` con `serveStatic`. **No** se adopta SPA
+  (Vite+Preact/React) ni meta-framework ni htmx todavía.
+- **`apps/web` y `apps/server` NO se fusionan** y la web **no** consume la API JSON:
+  sirven a clientes distintos (navegador/cookie vs CLI-hooks/Bearer) y ambos son
+  consumidores finos de `@cortex/core`; su duplicación real se elimina extrayendo
+  helpers compartidos (guard de acceso, wiring LLM, boilerplate de servidor), no
+  acoplando deploys.
+- **Por qué:** toda la interacción actual son formularios GET/POST con recarga completa
+  y una única isla de JS (el grafo). Una SPA obligaría a duplicar ~15 operaciones de
+  core como API JSON, auth de navegador, build y segundo deploy — coste permanente sin
+  beneficio presente.
+- **Umbrales para subir de nivel** (para que la decisión no se re-litigue por impulso):
+  1. **htmx / parciales** cuando haga falta el primer refresco parcial real (validar
+     entradas sin recarga, auto-refresh de `/usage`, búsqueda en vivo). `GET /api/graph`
+     ya es el precedente de endpoint JSON parcial.
+  2. **Preact+Vite (isla o SPA)** solo si el grafo evoluciona a explorador interactivo
+     con estado de cliente, o la UI pasa de demo interna a producto.
+- **Revisar cuando:** se cruce cualquiera de los dos umbrales, o la UI gane un segundo
+  consumidor (móvil, embebida) que exija API JSON de todas formas.

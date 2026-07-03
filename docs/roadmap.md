@@ -3,6 +3,17 @@
 Producto **interno** de Dinacode. Este fichero recoge lo que queda por hacer; las
 decisiones técnicas firmes viven en [`decisions.md`](./decisions.md).
 
+## Refactor de arquitectura — EN CURSO (julio 2026)
+
+Revisión de arquitectura completada (2026-07-03) con plan de refactor **incremental por
+fases**: informe, hallazgos y estado de cada paso en [`refactor/`](./refactor/README.md).
+Resumen: fase A (parches de riesgo + unificación de lookups/wiring), fase B (entrypoints
+a `apps/cli`, `core` sin LLM de verdad), fase C (apps testeables + split de la web con
+`hono/html`), fase D (splits internos, config centralizada, poda). Las reglas de
+dependencia entre paquetes quedan formalizadas en `CLAUDE.md`; los hallazgos que también
+detectó la auditoría de junio se referencian contra su
+[backlog](./audit/99-backlog-priorizado.md).
+
 ## Identidad, atribución y permisos (para "luego", necesita servidor)
 
 - **Necesidad:** registrar **quién** mete **qué** dato y **cuándo** (atribución/auditoría).
