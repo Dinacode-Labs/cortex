@@ -42,6 +42,13 @@ importers:
       '@cortex/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      node-cron:
+        specifier: ^4.5.0
+        version: 4.5.0
+    devDependencies:
+      '@types/node-cron':
+        specifier: ^3.0.11
+        version: 3.0.11
 
   apps/mcp-server:
     dependencies:
@@ -138,16 +145,9 @@ importers:
       ai:
         specifier: ^6.0.208
         version: 6.0.208(zod@4.4.3)
-      node-cron:
-        specifier: ^4.5.0
-        version: 4.5.0
       zod:
         specifier: ^4.4.3
         version: 4.4.3
-    devDependencies:
-      '@types/node-cron':
-        specifier: ^3.0.11
-        version: 3.0.11
 
   packages/core:
     dependencies:

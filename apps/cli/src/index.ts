@@ -57,10 +57,14 @@ const COMMANDS: Record<string, Cmd> = {
   "hook-context": { help: "hook SessionStart: emite el context-pack del proyecto vinculado", load: () => import("./commands/hook-context.js") },
   server: boot("apps/server/src/index.ts", "arrancar el servidor HTTP de Cortex (API + auth)"),
   "mcp-http": boot("apps/mcp-server/src/http.ts", "arrancar el MCP por HTTP autenticado (Streamable HTTP)"),
+  "connect-sessions": { help: "backfill de sesiones de un agente a un proyecto", load: () => import("./commands/connect-sessions.js") },
+  "connect-meeting": { help: "transcribir + destilar grabaciones de reunión", load: () => import("./commands/connect-meeting.js") },
+  "hook-capture": { help: "hook SessionEnd: destila la sesión y la captura en Cortex", load: () => import("./commands/hook-capture.js") },
+  enrich: { help: "pase de enriquecimiento de grafo (entidades + relaciones) de un proyecto", load: () => import("./commands/enrich.js") },
+  maintain: { help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
+  "maintain-worker": { help: "worker de mantenimiento programado (cron)", managed: false, load: () => import("./commands/maintain-worker.js") },
+  "demo-capture": { help: "demo del workflow de captura de Mastra", load: () => import("./commands/demo-capture.js") },
   sync: legacy("scripts/cortex-sync.ts", "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)"),
-  maintain: legacy("packages/agents/src/maintain.ts", "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint"),
-  "connect-sessions": legacy("packages/agents/src/connect-sessions.ts", "backfill de sesiones de un agente a un proyecto"),
-  "connect-meeting": legacy("packages/agents/src/connect-meeting.ts", "transcribir + destilar grabaciones de reunión"),
 };
 
 function usage(): void {

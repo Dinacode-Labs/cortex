@@ -203,7 +203,7 @@ pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker, puerto host 5433) +
 pnpm cortex server            # API HTTP + auth (8787) — sirve también /install.sh
 pnpm web                      # UI web (8080)
 pnpm cortex mcp-http          # MCP por HTTP autenticado (Streamable HTTP, 8788)
-pnpm --filter @cortex/agents run maintain:worker   # mantenimiento programado (cron)
+pnpm cortex maintain-worker   # mantenimiento programado (cron)
 ```
 
 - **Auth:** login **email + OTP** sin passwords; el usuario **es su correo**
@@ -218,8 +218,8 @@ pnpm --filter @cortex/agents run maintain:worker   # mantenimiento programado (c
   ```
   `local` no es semántico (solo arranque sin claves); al cambiar de proveedor de
   embeddings hay que reindexar (cambian las dimensiones).
-- **Mantenimiento** (server, idempotente, con lock): `pnpm --filter @cortex/agents run
-  maintain ["<Proyecto>"]` encadena enrich(only-missing) → resolve → temporal → curate →
+- **Mantenimiento** (server, idempotente, con lock): `pnpm cortex maintain
+  ["<Proyecto>"]` encadena enrich(only-missing) → resolve → temporal → curate →
   reconcile → lint. El **sync de fuentes es manual** (lo dispara el developer); esto es
   solo mantenimiento.
 
