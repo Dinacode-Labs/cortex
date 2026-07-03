@@ -1,12 +1,13 @@
-import { getEnv, loadEnv } from "@cortex/shared";
+import { getEnv, loadEnv } from "./env.js";
 
 /**
  * Configuración de LLM por endpoint OpenAI-compatible. Soporta varios proveedores
  * vía LLM_PROVIDER:
  *   - "nan"        -> servidor nan.builders (modelos free; OpenAI-compatible)
  *   - "openrouter" -> OpenRouter (DeepSeek, etc.)
- * Las llamadas al LLM las hacen los Agents de Mastra (ver mastra.ts); aquí solo
- * vive la resolución de credenciales/modelo. Ver ADR-0006/0008/0015.
+ * Aquí solo vive la resolución de credenciales/modelo (compartida por la capa de
+ * agentes Mastra y el extractor multimodal); las llamadas al LLM las hacen los
+ * consumidores en @cortex/agents. Ver ADR-0006/0008/0015.
  */
 
 export interface LlmConfig {

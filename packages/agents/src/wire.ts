@@ -1,7 +1,8 @@
-import { registerUsageSink, setClassifier, setReranker } from "@cortex/core";
+import { registerUsageSink, setClassifier, setMediaExtractor, setReranker } from "@cortex/core";
+import { isLlmEnabled } from "@cortex/shared";
 import { classifyEntry } from "./classify.js";
 import { rerankLLM } from "./rerank.js";
-import { isLlmEnabled } from "./openrouter.js";
+import { createMediaExtractor } from "./media.js";
 import { wireReconciler } from "./reconcile.js";
 
 /**
@@ -18,5 +19,7 @@ export function wireLlm(): void {
   if (!isLlmEnabled()) return;
   setClassifier(classifyEntry);
   if (process.env.CORTEX_RERANK !== "off") setReranker(rerankLLM);
+  const media = createMediaExtractor();
+  if (media) setMediaExtractor(media);
   wireReconciler();
 }

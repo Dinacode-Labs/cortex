@@ -113,10 +113,10 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   por agente). Los hooks instalados NO se rompieron: los scripts `hook:context`/
   `hook:capture` quedan como puentes de compatibilidad (retirar en fase D) y
   `cortex sync --apply` detecta y ACTUALIZA la sintaxis antigua de los hooks.
-- [ ] **B-2 · `setMediaExtractor`** (M): visión/OCR/whisper salen de `core/extract.ts` a
-  `agents/media.ts` con el patrón de hooks existente; `getLlmConfig` se unifica en
-  `shared` (borra la config LLM duplicada core↔agents y la interfaz `VisionCfg` declarada
-  dos veces). `core` vuelve a ser determinista de verdad.
+- [x] **B-2 · `setMediaExtractor`** (M, PR #10): visión/OCR/whisper salen de
+  `core/extract.ts` a `agents/media.ts` con el patrón de hooks existente; la config LLM
+  se unifica en `shared/llm-config.ts` (fuera `openrouter.ts` y las dos `VisionCfg`).
+  `core` vuelve a ser determinista de verdad — **fase B completa**.
 
 ### Fase C — apps (~1-2 semanas)
 
