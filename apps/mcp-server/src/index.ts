@@ -1,8 +1,8 @@
 #!/usr/bin/env -S npx tsx
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { closeSql } from "@cortex/database";
-import { loadEnv } from "@cortex/shared";
-import { isLlmEnabled, wireLlm } from "@cortex/agents";
+import { isLlmEnabled, loadEnv } from "@cortex/shared";
+import { wireLlm } from "@cortex/agents";
 import { buildMcpServer } from "./server.js";
 
 /**

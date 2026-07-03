@@ -2,6 +2,7 @@ import { readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { apiPost } from "@cortex/shared";
 import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
+import { wireLlm } from "@cortex/agents";
 
 /**
  * Conector GENÉRICO de documentos: recorre un directorio e ingiere los ficheros (vía la
@@ -29,6 +30,7 @@ function walk(dir: string): string[] {
 }
 
 export async function run(args: string[]): Promise<void> {
+  wireLlm(); // extract multimodal: caption/OCR/whisper vía setMediaExtractor
   const slug = args[0];
   const dir = args[1];
   if (!slug || !dir) {

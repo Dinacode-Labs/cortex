@@ -3,7 +3,7 @@ import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core";
 import { Observability } from "@mastra/observability";
 import { recordUsage } from "@cortex/core";
-import { getLlmConfig } from "./openrouter.js";
+import { getLlmConfig } from "@cortex/shared";
 import { CortexTraceExporter } from "./trace-exporter.js";
 
 /**

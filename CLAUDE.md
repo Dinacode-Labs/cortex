@@ -67,10 +67,10 @@ apps/*      → cualquier package
 - Los packages **jamás** importan de `apps/*` ni ficheros de otro paquete por ruta.
 - Side effects (`loadEnv`, wiring de hooks, `serve`, `process.exit`) **solo** en
   entrypoints, nunca al importar un módulo de librería.
-- Principales violaciones hoy (las corrige el refactor; inventario completo en
-  `docs/refactor/hallazgos.md`): `core/extract.ts` llama a visión/whisper y `core`
-  hace HTTP saliente (api-client/conectores), hay entrypoints ejecutables dentro de
-  `packages/*` y el CLI importa por ruta. No añadas violaciones nuevas.
+- Tras las fases A y B del refactor estas reglas **se cumplen** (la capa multimodal
+  con LLM se inyecta con `setMediaExtractor`, como classifier/reranker/reconciler).
+  Excepción documentada: `shared` contiene credentials/api-client/llm-config (I/O
+  consciente, ver ADR). No añadas violaciones nuevas.
 
 ## Refactor en curso (julio 2026)
 

@@ -447,3 +447,21 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   (más módulos cliente), extraer `packages/client` es mover 2 ficheros.
 - **Revisar cuando:** los conectores se muden a `apps/cli` (fase B-1) — quizá entonces
   el único consumidor fuera del CLI sea agents y convenga reubicar.
+
+## Extracción multimodal vía hook `setMediaExtractor` (core sin LLM de verdad)
+
+- **Decisión:** `core/extract.ts` queda solo con la extracción **determinista**
+  (docx/pdf-con-capa-de-texto/xlsx/drawio, filtros); el caption de imágenes, el OCR de
+  PDF escaneado y la transcripción whisper viven en `agents/media.ts` y se inyectan con
+  `setMediaExtractor` (mismo patrón que classifier/reranker/reconciler), cableado por
+  `wireLlm()`. La config LLM (`getLlmConfig`/`isLlmEnabled`) se unifica en
+  `shared/llm-config.ts` (antes duplicada entre `agents/openrouter.ts` y el
+  `visionConfig` de extract) y `SUPPORTED_EXTS` no cambia: sin hook, los formatos de
+  media devuelven `null` igual que antes sin API keys.
+- **Por qué:** era la última violación de la regla «core determinista, sin LLM»
+  declarada en CLAUDE.md; el patrón de hook ya existía y no añade capas nuevas.
+- **Matiz de comportamiento:** la config de visión/whisper se resuelve UNA vez en
+  `wireLlm()` (tras `loadEnv`), no en cada llamada como hacía `visionConfig()`;
+  equivalente en todos los flujos reales (los entrypoints cablean tras cargar el env).
+- **Revisar cuando:** se añada otro proveedor de visión/ASR con config distinta a la
+  del LLM de chat, o un formato nuevo cuya extracción necesite modelo.
