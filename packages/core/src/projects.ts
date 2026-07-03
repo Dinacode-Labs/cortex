@@ -1,7 +1,8 @@
-import { getSql } from "@cortex/database";
+import { getSql, type Sql } from "@cortex/database";
 import { resolveEntity } from "./entities.js";
 import { isAdmin } from "./auth.js";
 import { readCortexLink, slugify } from "./project-config.js";
+import { canonicalize } from "./text.js";
 import type { Row } from "./map.js";
 
 /** Referencia a un proyecto (entidad type='project') con visibilidad y dueño. */
@@ -24,6 +25,18 @@ function toRef(r: Row | undefined): ProjectRef | null {
     ownerEmail: (r.owner_email as string) ?? null,
     parentId: (r.parent_id as string) ?? null,
   };
+}
+
+/**
+ * Id de un proyecto por nombre con la semántica CANÓNICA del repo (`canonical_name`:
+ * minúsculas, sin acentos) — la ÚNICA resolución por nombre para operaciones de datos;
+ * mayúsculas o acentos distintos no deben crear proyectos nuevos ni saltarse el dedup.
+ */
+export async function findProjectIdByName(sql: Sql, project: string): Promise<string | null> {
+  const rows = (await sql`
+    SELECT id FROM entities WHERE type = 'project' AND canonical_name = ${canonicalize(project)} LIMIT 1
+  `) as unknown as Row[];
+  return rows[0] ? (rows[0].id as string) : null;
 }
 
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {

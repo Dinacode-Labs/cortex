@@ -88,7 +88,7 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   `sourceType`); (c) guard `import.meta.url` en `lint-act.ts`, `seed.ts` (¡hace TRUNCATE!)
   y `link.ts`; (d) fallback del reconciler `'update'` → `'noop'`
   (`packages/agents/src/reconcile.ts:22`).
-- [ ] **A-2 · Lookup canónico único de proyecto** (S): `findProjectId(sql, ref)` con
+- [x] **A-2 · Lookup canónico único de proyecto** (S): `findProjectId(sql, ref)` con
   semántica `canonical_name` en `projects.ts`; borrar las 6-7 copias (la de `dedup.ts:28`
   y `capture.ts:31` van por `name` exacto). **Antes** del cambio, test de integración
   «Acme Portal» vs «acme portal» que demuestra el bug — unificar cambia comportamiento a

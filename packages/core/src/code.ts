@@ -2,7 +2,7 @@ import { closeSync, openSync, readSync, readdirSync, readFileSync, statSync } fr
 import { join, relative, extname, basename } from "node:path";
 import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
 import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
-import { canonicalize } from "./text.js";
+import { findProjectIdByName } from "./projects.js";
 import type { Row } from "./map.js";
 import "./usage.js"; // registra el sink de uso de embeddings (observabilidad de coste)
 
@@ -138,12 +138,6 @@ export function chunkFile(file: CodeFile): CodeChunk[] {
   return chunks;
 }
 
-async function findProjectId(sql: Sql, project: string): Promise<string | null> {
-  const rows = (await sql`
-    SELECT id FROM entities WHERE type='project' AND canonical_name=${canonicalize(project)} LIMIT 1
-  `) as unknown as Row[];
-  return rows[0] ? (rows[0].id as string) : null;
-}
 
 export interface CodeHit {
   path: string;
@@ -162,7 +156,7 @@ export async function searchProjectCode(
 ): Promise<CodeHit[]> {
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const projectId = await findProjectId(sql, project);
+  const projectId = await findProjectIdByName(sql, project);
   if (!projectId) return [];
 
   const pool = Math.max(limit * 4, 32);
@@ -242,7 +236,7 @@ export async function indexRepo(
 ): Promise<{ files: number; chunks: number; skippedOverCap: number }> {
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const projectId = await findProjectId(sql, project);
+  const projectId = await findProjectIdByName(sql, project);
   if (!projectId) throw new Error(`Proyecto no encontrado: "${project}".`);
   const repoName = opts.repoName ?? basename(repoPath.replace(/\/$/, ""));
   const batchSize = opts.batchSize ?? 32;
