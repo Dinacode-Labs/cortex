@@ -429,3 +429,21 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   acceso único de la fase C-1 (`checkProjectAccess`).
 - **Revisar cuando:** llegue C-1, o si aparece la necesidad de resolver por slug y nombre
   en una sola función.
+
+## Credenciales y api-client únicos en `shared` (excepción de I/O consciente)
+
+- **Decisión:** la lectura/escritura de `~/.cortex/credentials` y el cliente HTTP de la
+  API (`apiGet`/`apiPost`) viven en `@cortex/shared` (`credentials.ts`, `api-client.ts`)
+  como ÚNICA copia. Antes: 4 parsers de credenciales con 3 interfaces `Creds` distintas
+  (cli/auth, cli/ui, core/api-client, core/link) y el cliente HTTP DENTRO de core
+  (dirección de dependencia opuesta al resto del paquete). El default de
+  `CORTEX_SERVER_URL` queda unificado (`DEFAULT_SERVER_URL`), y `cortex auth`/`cortex ui`
+  leen env vía `getEnv` (antes ignoraban el `.env` del repo). Se elimina
+  `isAuthenticated` (muerto, sin consumidores).
+- **Por qué en shared y no en un paquete `client`:** shared es el único paquete visible
+  a la vez desde core (conectores), agents (connect-sessions) y apps/cli; un paquete
+  nuevo para 2 ficheros sería sobreingeniería (regla "máximo un paquete nuevo" del plan,
+  reservada para `auth`). Es una excepción CONSCIENTE a "shared sin I/O": si crece
+  (más módulos cliente), extraer `packages/client` es mover 2 ficheros.
+- **Revisar cuando:** los conectores se muden a `apps/cli` (fase B-1) — quizá entonces
+  el único consumidor fuera del CLI sea agents y convenga reubicar.

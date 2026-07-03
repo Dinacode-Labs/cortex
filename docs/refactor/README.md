@@ -98,7 +98,7 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   `registerUsageSink()` exportado en vez del `import "./usage.js"` fantasma; quitar el
   `wireReconciler()` top-level de `connect-sessions.ts`; `buildMcpServer` queda como
   factoría pura (el `loadEnv`+wiring se va a los entrypoints).
-- [ ] **A-4 · `api-client` + `credentials` únicos** (S): a `@cortex/shared` (excepción
+- [x] **A-4 · `api-client` + `credentials` únicos** (S): a `@cortex/shared` (excepción
   pragmática documentada — no merece paquete propio); borra las 4 copias de lectura de
   `~/.cortex/credentials` y unifica el default de `CORTEX_SERVER_URL`.
 - [x] **A-5 · Tabla de reglas de dependencia en `CLAUDE.md`** (S) — hecho en el PR de
