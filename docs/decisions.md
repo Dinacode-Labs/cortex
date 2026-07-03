@@ -465,3 +465,27 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   equivalente en todos los flujos reales (los entrypoints cablean tras cargar el env).
 - **Revisar cuando:** se añada otro proveedor de visión/ASR con config distinta a la
   del LLM de chat, o un formato nuevo cuya extracción necesite modelo.
+
+## Política única de acceso: `checkProjectAccess` / `checkEntryAccess` (inexistente → not_found)
+
+- **Decisión:** el control de acceso vive en UN sitio (`packages/core/src/projects.ts`)
+  con retorno discriminado `ok | not_found | forbidden`, y cada capa lo traduce (MCP →
+  `errorText`; API → JSON 404/403; web → página 404 / `deniedPage`). La política para
+  proyecto/entrada **inexistente es `not_found` (denegar)** — antes convivían tres
+  semánticas: la web era *fail-open* (auditoría, backlog #4), el MCP dejaba pasar y la
+  API devolvía 404.
+- **Excepción deliberada (escritura por nombre):** `save_project_context` (MCP) y
+  `POST /save` (web) tratan `not_found` como «el proyecto se creará» — el save por
+  nombre auto-crea proyecto (comportamiento de producto ya documentado en el ADR de
+  vinculación; `forbidden` sí deniega). Revisar junto a ese ADR si el save pasa a exigir
+  slug+permiso.
+- **Cambios observables:** consultas web/MCP sobre proyectos con typo pasan de listar
+  «como si nada» a 404; `/relate` con entryId inexistente → 404. Además se corrige
+  `CORTEX_MCP_AUTH=off`: el usuario sintético con email `""` denegaba TODOS los privados;
+  ahora auth off ⇒ `buildMcpServer(undefined)` (sin guards ni atribución, como stdio).
+- **Apps testeables:** `createApp()` puro en web/server/mcp-http (entrypoints finos con
+  `loadEnv → wireLlm → serve`), smoke tests de guards con `app.request()` en
+  `tests/integration/apps.test.ts`, y sweep de sesiones MCP (`lastSeen` + intervalo
+  `unref` + tope `CORTEX_MCP_MAX_SESSIONS`, TTL `CORTEX_MCP_SESSION_TTL_SEC`).
+- **Revisar cuando:** la web pase a resolver por slug (hoy por nombre), o el save
+  MCP/web exija slug+permiso.
