@@ -64,7 +64,7 @@ services:
 
   worker:
     <<: *cortex
-    command: pnpm --filter @cortex/agents run maintain:worker
+    command: pnpm cortex maintain-worker
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

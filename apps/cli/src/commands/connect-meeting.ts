@@ -1,12 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
-import { loadEnv } from "@cortex/shared";
-loadEnv();
-import { closeSql } from "@cortex/database";
 import { extractFileText } from "@cortex/core";
-import { captureCondensedViaApi } from "./connect-sessions.js";
-import { shutdownObservability } from "./mastra.js";
-import { wireLlm } from "./wire.js";
+import { captureCondensedViaApi, shutdownObservability, wireLlm } from "@cortex/agents";
 
 /**
  * Conector de REUNIONES: transcribe grabaciones (audio/vídeo, vía `extract`) y, en vez de
@@ -14,7 +9,7 @@ import { wireLlm } from "./wire.js";
  * incidencias, acuerdos…) reutilizando el pipeline de captura (distiller + reconciliación
  * + API autenticada → atribución/permisos). Una reunión de 1h → unas pocas entradas útiles.
  *
- * Uso: tsx src/connect-meeting.ts "<slug>" <fichero|carpeta>
+ * Uso: cortex connect-meeting "<slug>" <fichero|carpeta>
  * Requiere `cortex auth login`, el servidor en marcha y ffmpeg (para A/V).
  */
 const AV = new Set(["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga", "mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"]);
@@ -26,12 +21,18 @@ function walk(p: string): string[] {
   return out;
 }
 
-async function main(): Promise<void> {
+export async function run(args: string[]): Promise<void> {
   wireLlm();
-  const slug = process.argv[2];
-  const path = process.argv[3];
+  try {
+    await runMeeting(args[0], args[1]);
+  } finally {
+    await shutdownObservability();
+  }
+}
+
+async function runMeeting(slug: string | undefined, path: string | undefined): Promise<void> {
   if (!slug || !path) {
-    console.error('Uso: tsx src/connect-meeting.ts "<slug>" <fichero-audio/vídeo|carpeta>');
+    console.error('Uso: cortex connect-meeting "<slug>" <fichero-audio/vídeo|carpeta>');
     process.exitCode = 1;
     return;
   }
@@ -63,13 +64,4 @@ async function main(): Promise<void> {
   console.log(`Reuniones: +${saved} nuevas, ~${updated} UPDATE, ⊘${superseded} SUPERSEDE${failed ? `, ${failed} fallos (¿cortex auth login / servidor?)` : ""}.`);
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en connect-meeting:", e);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await shutdownObservability();
-    await closeSql();
-    process.exit(process.exitCode ?? 0);
-  });
+

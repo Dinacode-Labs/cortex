@@ -1,19 +1,24 @@
-import { closeSql } from "@cortex/database";
-import { enrichProject } from "./enrich-project.js";
-import { shutdownObservability } from "./mastra.js";
-import { wireLlm } from "./wire.js";
+import { enrichProject, shutdownObservability, wireLlm } from "@cortex/agents";
 
 /**
  * CLI del pase de enriquecimiento de grafo (§7/§12.4) de un proyecto.
- * Uso: tsx src/enrich-run.ts "<Proyecto>" [limite]
+ * Uso: cortex enrich "<Proyecto>" [limite]
  * Env: CORTEX_ENRICH_ONLY_MISSING=1 para saltar las ya enriquecidas.
  */
-async function main(): Promise<void> {
+export async function run(args: string[]): Promise<void> {
   wireLlm();
-  const project = process.argv[2];
-  const limit = Number(process.argv[3] ?? "0") || undefined;
+  try {
+    await enrich(args);
+  } finally {
+    await shutdownObservability();
+  }
+}
+
+async function enrich(args: string[]): Promise<void> {
+  const project = args[0];
+  const limit = Number(args[1] ?? "0") || undefined;
   if (!project) {
-    console.error('Uso: tsx src/enrich-run.ts "<Proyecto>" [limite]');
+    console.error('Uso: cortex enrich "<Proyecto>" [limite]');
     process.exitCode = 1;
     return;
   }
@@ -31,13 +36,4 @@ async function main(): Promise<void> {
   );
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en enriquecimiento:", e);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await shutdownObservability();
-    await closeSql();
-    process.exit(process.exitCode ?? 0);
-  });
+

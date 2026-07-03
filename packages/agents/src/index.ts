@@ -5,6 +5,14 @@ export { extractGraph, type GraphExtraction } from "./enrich.js";
 export { synthesizeContextAnswer, type ContextSnippet } from "./synthesize.js";
 export { rerankLLM } from "./rerank.js";
 export { wireLlm } from "./wire.js";
+export { enrichProject, type EnrichResult } from "./enrich-project.js";
+export { runMaintenance, type MaintenanceReport } from "./maintain.js";
+export {
+  captureCondensedViaApi,
+  captureSessionViaApi,
+  runSessionsBackfill,
+  type ApiCaptureResult,
+} from "./connect-sessions.js";
 export {
   captureContextWorkflow,
   runCaptureWorkflow,
