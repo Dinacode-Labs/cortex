@@ -114,6 +114,54 @@ export async function canAccessProject(project: ProjectRef, email: string | null
   return false;
 }
 
+/** Resultado del guard único de acceso a proyecto. */
+export type AccessCheck =
+  | { status: "ok"; project: ProjectRef }
+  | { status: "not_found" }
+  | { status: "forbidden" };
+
+/**
+ * Política ÚNICA de acceso a proyecto para las apps (MCP, API, web). Resuelve el
+ * proyecto por `slug` (si viene) o por `name` y aplica `canAccessProject`:
+ * - proyecto inexistente → `not_found` (los callers de ESCRITURA por nombre pueden
+ *   tratarlo como «se creará», porque el save auto-crea el proyecto; ver ADR),
+ * - existente sin permiso → `forbidden`,
+ * - existente con permiso → `ok` + el ProjectRef resuelto.
+ * Sin `name` ni `slug` es un bug del caller → Error.
+ */
+export async function checkProjectAccess(
+  email: string | null,
+  ref: { name?: string; slug?: string },
+): Promise<AccessCheck> {
+  if (!ref.slug && !ref.name) throw new Error("checkProjectAccess: se necesita 'name' o 'slug' (bug del caller).");
+  const project = ref.slug ? await findProjectBySlug(ref.slug) : await findProjectByName(ref.name!);
+  if (!project) return { status: "not_found" };
+  if (!(await canAccessProject(project, email))) return { status: "forbidden" };
+  return { status: "ok", project };
+}
+
+/**
+ * Acceso vía ID de entrada (validar, relacionar…): el permiso lo manda el proyecto de
+ * la entrada.
+ * - entrada inexistente → `not_found`,
+ * - entrada sin proyecto → `ok` con `project: null` (no hay permisos que aplicar),
+ * - proyecto de la entrada sin permiso → `forbidden`.
+ */
+export async function checkEntryAccess(
+  email: string | null,
+  entryId: string,
+): Promise<{ status: "ok"; project: ProjectRef | null } | { status: "not_found" } | { status: "forbidden" }> {
+  const rows = (await getSql()`
+    SELECT p.id, p.name, p.slug, p.visibility, p.owner_email, p.parent_id
+    FROM context_entries ce LEFT JOIN entities p ON p.id = ce.project_id
+    WHERE ce.id = ${entryId} LIMIT 1
+  `) as unknown as Row[];
+  if (rows.length === 0) return { status: "not_found" };
+  const project = rows[0]!.id ? toRef(rows[0]) : null;
+  if (project && !(await canAccessProject(project, email))) return { status: "forbidden" };
+  return { status: "ok", project };
+}
+
 /** Proyectos visibles para `email`: admin → todos; resto → públicos + privados propios/compartidos. */
 export async function listAccessibleProjects(email: string | null): Promise<ProjectRef[]> {
   const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' ORDER BY name`) as unknown as Row[];
