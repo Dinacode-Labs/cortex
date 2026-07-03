@@ -13,6 +13,8 @@ automatizan el bucle: tu agente arranca **sabiendo** el proyecto y, al terminar,
 - Plan fundacional: [`dinacode-cortex-contexto-y-plan-demo.md`](./dinacode-cortex-contexto-y-plan-demo.md)
 - Decisiones (ADR): [`docs/decisions.md`](./docs/decisions.md) · Roadmap: [`docs/roadmap.md`](./docs/roadmap.md)
 - Contribuir (PRs): [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Auditoría integral (jun 2026): [`docs/audit/`](./docs/audit/README.md) · **Refactor de
+  arquitectura en curso** (jul 2026): [`docs/refactor/`](./docs/refactor/README.md)
 
 > **Cómo leer este README.** Tiene dos partes. La **práctica** (instalar, usar, operar)
 > es referencia rápida. La **[guía formativa](#guía-formativa-cómo-funciona-por-dentro)**
@@ -242,12 +244,16 @@ docker compose -f deploy/docker-compose.yml up -d --build
 ## Estructura del repo
 
 ```
-apps/        mcp-server (MCP stdio) · web (UI) · server (API + auth) · cli (cortex)
+apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth) · cli (cortex)
 packages/    core · agents · embeddings · database · shared
 config/      toolbelt.json (registry) · skills/ (vendored) · commands/
 scripts/     install.sh (instalador) · cortex-sync.ts (toolbelt + hooks + CLI)
-docs/        decisions.md · roadmap.md · research/ · capturas
+docs/        decisions.md · roadmap.md · research/ · audit/ (jun 2026) · refactor/ (jul 2026)
 ```
+
+Las **reglas de dependencia** entre paquetes (qué puede importar qué) están en
+[`CLAUDE.md`](./CLAUDE.md); hay un **refactor por fases en curso** — antes de tocar un
+área, mira [`docs/refactor/README.md`](./docs/refactor/README.md).
 
 Cómo contribuir, dónde vive cada cosa y convenciones: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
