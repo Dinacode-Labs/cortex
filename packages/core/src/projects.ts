@@ -162,12 +162,27 @@ export async function checkEntryAccess(
   return { status: "ok", project };
 }
 
-/** Proyectos visibles para `email`: admin → todos; resto → públicos + privados propios/compartidos. */
-export async function listAccessibleProjects(email: string | null): Promise<ProjectRef[]> {
-  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' ORDER BY name`) as unknown as Row[];
-  const refs = rows.map(toRef).filter((r): r is ProjectRef => r !== null);
+/** Proyecto accesible con su nº de entradas (para los listados/selectores de la UI). */
+export interface AccessibleProject extends ProjectRef {
+  entryCount: number;
+}
+
+/**
+ * Proyectos visibles para `email`: admin → todos; resto → públicos + privados
+ * propios/compartidos. Incluye `entryCount` con UNA sola query agregada
+ * (GROUP BY project_id) fusionada por id — no una query por proyecto.
+ */
+export async function listAccessibleProjects(email: string | null): Promise<AccessibleProject[]> {
+  const sql = getSql();
+  const rows = (await sql`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' ORDER BY name`) as unknown as Row[];
+  const countRows = (await sql`SELECT project_id, count(*)::int AS entry_count FROM context_entries WHERE project_id IS NOT NULL GROUP BY project_id`) as unknown as Row[];
+  const counts = new Map(countRows.map((r) => [r.project_id as string, Number(r.entry_count)]));
+  const refs = rows
+    .map(toRef)
+    .filter((r): r is ProjectRef => r !== null)
+    .map((r): AccessibleProject => ({ ...r, entryCount: counts.get(r.id) ?? 0 }));
   if (isAdmin(email)) return refs;
-  const out: ProjectRef[] = [];
+  const out: AccessibleProject[] = [];
   for (const r of refs) if (await canAccessProject(r, email)) out.push(r);
   return out;
 }

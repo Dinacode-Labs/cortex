@@ -2,6 +2,7 @@ export { getAgent, runAgent, shutdownObservability, type AgentRole } from "./mas
 export { classifyEntry, type ClassificationResult } from "./classify.js";
 export { extractGraph, type GraphExtraction } from "./enrich.js";
 export { synthesizeContextAnswer, type ContextSnippet } from "./synthesize.js";
+export { askProjectContext, type AskResult } from "./ask.js";
 export { rerankLLM } from "./rerank.js";
 export { wireLlm } from "./wire.js";
 export { enrichProject, type EnrichResult } from "./enrich-project.js";

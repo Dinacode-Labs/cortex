@@ -35,7 +35,8 @@ packages/
 apps/
   mcp-server/  # servidor MCP con las 8 tools (stdio + Streamable HTTP autenticado)
   server/      # API HTTP + auth email/OTP (Hono) — la usan CLI, hooks y conectores
-  web/         # UI web (Hono SSR, cookie de sesión)
+  web/         # UI web (Hono SSR, cookie de sesión): src/routes/ + views/ (hono/html,
+               # autoescape) + middleware/ + public/ (estáticos)
   cli/         # CLI `cortex` (auth, link, ui, conectores…)
 scripts/       # install.sh (instalador remoto; lo sirve apps/server)
 config/        # toolbelt distribuible (MCP + skills + comandos) — ver config/README.md
