@@ -1,7 +1,12 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
+import {
+  DEFAULT_SERVER_URL,
+  clearCredentials,
+  credentialsPath,
+  getEnv,
+  readCredentials,
+  writeCredentials,
+} from "@cortex/shared";
 
 /**
  * `cortex auth` — login por email + OTP contra el servidor de Cortex. Guarda el token en
@@ -12,31 +17,6 @@ import { createInterface } from "node:readline/promises";
  *   cortex auth status | whoami
  *   cortex auth logout
  */
-const CREDS_DIR = join(homedir(), ".cortex");
-const CREDS_FILE = join(CREDS_DIR, "credentials");
-const DEFAULT_SERVER = process.env.CORTEX_SERVER_URL || "http://localhost:8787";
-
-interface Creds {
-  server: string;
-  token: string;
-  email: string;
-}
-
-function readCreds(): Creds | null {
-  if (!existsSync(CREDS_FILE)) return null;
-  try {
-    return JSON.parse(readFileSync(CREDS_FILE, "utf8")) as Creds;
-  } catch {
-    return null;
-  }
-}
-
-function writeCreds(c: Creds): void {
-  mkdirSync(CREDS_DIR, { recursive: true });
-  writeFileSync(CREDS_FILE, JSON.stringify(c, null, 2) + "\n");
-  chmodSync(CREDS_FILE, 0o600);
-}
-
 function argOf(name: string): string | undefined {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : undefined;
@@ -49,7 +29,7 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 }
 
 async function login(): Promise<void> {
-  const server = argOf("--server") || DEFAULT_SERVER;
+  const server = argOf("--server") || getEnv("CORTEX_SERVER_URL", DEFAULT_SERVER_URL);
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
     const email = (argOf("--email") || (await rl.question("Email corporativo: "))).trim();
@@ -67,15 +47,15 @@ async function login(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    writeCreds({ server, token: ver.data.token, email: ver.data.user.email });
-    console.log(`✓ Sesión iniciada como ${ver.data.user.email}.\n  → ${CREDS_FILE}`);
+    writeCredentials({ server, token: ver.data.token, email: ver.data.user.email });
+    console.log(`✓ Sesión iniciada como ${ver.data.user.email}.\n  → ${credentialsPath()}`);
   } finally {
     rl.close();
   }
 }
 
 async function status(): Promise<void> {
-  const creds = readCreds();
+  const creds = readCredentials();
   if (!creds) {
     console.log("No autenticado. Ejecuta: cortex auth login");
     return;
@@ -91,10 +71,10 @@ async function status(): Promise<void> {
 }
 
 async function logout(): Promise<void> {
-  const creds = readCreds();
+  const creds = readCredentials();
   if (creds) {
     await fetch(`${creds.server}/auth/logout`, { method: "POST", headers: { authorization: `Bearer ${creds.token}` } }).catch(() => {});
-    rmSync(CREDS_FILE, { force: true });
+    clearCredentials();
   }
   console.log("Sesión cerrada.");
 }

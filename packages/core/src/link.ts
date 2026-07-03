@@ -1,7 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadEnv } from "@cortex/shared";
+import { loadEnv, readCredentials } from "@cortex/shared";
 loadEnv();
 import { closeSql, getSql } from "@cortex/database";
 import { canAccessProject, createProject, findProjectBySlug } from "./projects.js";
@@ -18,13 +17,7 @@ import type { Row } from "./map.js";
 
 /** Email autenticado de la CLI (~/.cortex/credentials), o null. Es el dueño al crear. */
 function credsEmail(): string | null {
-  const f = join(homedir(), ".cortex", "credentials");
-  if (!existsSync(f)) return null;
-  try {
-    return (JSON.parse(readFileSync(f, "utf8")) as { email?: string }).email ?? null;
-  } catch {
-    return null;
-  }
+  return readCredentials()?.email ?? null;
 }
 
 /**
