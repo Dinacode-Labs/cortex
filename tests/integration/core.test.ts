@@ -59,4 +59,17 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     const b = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "s2" } as never, opts);
     expect(b.action).toBe("noop"); // idéntico (≥ NOOP) y mismo source_type → NOOP
   });
+
+  it("la resolución de proyecto es canónica: reconcilia aunque cambie la capitalización", async () => {
+    const p = await createProject(`IT Canonical ${RID}`);
+    const content = "La cola de trabajos usa Redis con reintentos exponenciales.";
+    const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
+    const a = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "c1" } as never, opts);
+    expect(a.action).toBe("add");
+    // Mismo proyecto con otra grafía: con el lookup por `name` exacto (bug) esto no
+    // encontraba el proyecto y devolvía "add" (dedup silenciosamente inoperante).
+    const b = await saveWithReconciliation({ content, project: p.name.toLowerCase(), type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "c2" } as never, opts);
+    expect(b.action).toBe("noop");
+    expect(await isNearDuplicate(p.name.toUpperCase(), content)).toBe(true);
+  });
 });

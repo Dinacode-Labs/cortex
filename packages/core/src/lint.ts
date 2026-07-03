@@ -1,5 +1,5 @@
 import { getSql, type Sql } from "@cortex/database";
-import { canonicalize } from "./text.js";
+import { findProjectIdByName } from "./projects.js";
 import type { Row } from "./map.js";
 
 /**
@@ -18,16 +18,10 @@ export interface LintReport {
   gaps: { area: string; type: string; incidents: number }[];
 }
 
-async function projectId(sql: Sql, project: string): Promise<string | null> {
-  const rows = (await sql`
-    SELECT id FROM entities WHERE type='project' AND canonical_name=${canonicalize(project)} LIMIT 1
-  `) as unknown as Row[];
-  return rows[0] ? (rows[0].id as string) : null;
-}
 
 export async function lintProject(project: string): Promise<LintReport> {
   const sql = getSql();
-  const pid = await projectId(sql, project);
+  const pid = await findProjectIdByName(sql, project);
   if (!pid) throw new Error(`Proyecto no encontrado: "${project}".`);
 
   const totalEntries = Number(
