@@ -18,7 +18,7 @@ import {
   validateEntry,
   type AuthUser,
 } from "@cortex/core";
-import { synthesizeContextAnswer } from "@cortex/agents";
+import { askProjectContext } from "@cortex/agents";
 import { z } from "zod";
 
 /**
@@ -180,11 +180,8 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       try {
         const denied = await guard(project);
         if (denied) return errorText(denied);
-        const hits = await searchContext({ query: question, project, limit: 6 });
-        const answer = await synthesizeContextAnswer(
-          question,
-          hits.map((h) => ({ title: h.entry.title, summary: h.entry.summary ?? h.entry.content, type: h.entry.type })),
-        );
+        // Orquestación compartida con la web (/ask): recuperar + sintetizar (@cortex/agents).
+        const { answer, hits } = await askProjectContext(question, project);
         return text(answer ? `${answer}\n\n---\nFuentes consultadas:\n${renderSearchHits(hits)}` : renderSearchHits(hits));
       } catch (e) {
         return errorText(`Error al responder: ${(e as Error).message}`);

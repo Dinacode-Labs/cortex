@@ -10,7 +10,7 @@ export { recordUsage, registerUsageSink, getUsageSummary, getRecentTraces, type 
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
 export { resolveProjectFromCwd, readCortexLink, slugify, type CortexLink } from "./project-config.js";
-export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, type ProjectRef, type AccessCheck } from "./projects.js";
+export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects.js";
 export {
   isNearDuplicate,
   findNearest,
