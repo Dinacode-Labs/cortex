@@ -67,9 +67,11 @@ async function main(): Promise<void> {
   );
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en lint-act:", e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main()
+    .catch((e) => {
+      console.error("Error en lint-act:", e);
+      process.exitCode = 1;
+    })
+    .finally(() => closeSql());
+}

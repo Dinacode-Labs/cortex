@@ -118,12 +118,14 @@ async function main(): Promise<void> {
   console.log('\nUso:\n  cortex:link <slug>               vincular a un proyecto existente\n  cortex:link --create "<Nombre>"  crear el proyecto y vincular\n  cortex:link --ignore             opt-out (no usar Cortex aquí)');
 }
 
-main()
-  .catch((e) => {
-    console.error("Error en cortex link:", e);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await closeSql();
-    process.exit(process.exitCode ?? 0);
-  });
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main()
+    .catch((e) => {
+      console.error("Error en cortex link:", e);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await closeSql();
+      process.exit(process.exitCode ?? 0);
+    });
+}

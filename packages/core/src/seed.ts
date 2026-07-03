@@ -157,9 +157,11 @@ async function seed(): Promise<void> {
   console.log("\nSeed completado.");
 }
 
-seed()
-  .catch((err) => {
-    console.error("Error en el seed:", err);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seed()
+    .catch((err) => {
+      console.error("Error en el seed:", err);
+      process.exitCode = 1;
+    })
+    .finally(() => closeSql());
+}
