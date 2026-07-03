@@ -80,7 +80,7 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
 
 ### Fase A — riesgo real (~1 semana; se mergea pase lo que pase)
 
-- [ ] **A-1 · Parches de corrección** (S): (a) XSS de `/graph` —
+- [x] **A-1 · Parches de corrección** (S): (a) XSS de `/graph` —
   `JSON.stringify(project).replaceAll('<','\\u003c')` en `apps/web/src/index.ts:664`, y
   borrar la rama legacy `?token=` de `/auth/cli`; (b) guard de acceso + `createdBy=email`
   en `POST /save` (web) — y en el mismo PR ajustar el criterio de `autoCurate` (hoy filtra
@@ -101,7 +101,7 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
 - [ ] **A-4 · `api-client` + `credentials` únicos** (S): a `@cortex/shared` (excepción
   pragmática documentada — no merece paquete propio); borra las 4 copias de lectura de
   `~/.cortex/credentials` y unifica el default de `CORTEX_SERVER_URL`.
-- [ ] **A-5 · Tabla de reglas de dependencia en `CLAUDE.md`** (S) — hecho en el PR de
+- [x] **A-5 · Tabla de reglas de dependencia en `CLAUDE.md`** (S) — hecho en el PR de
   esta documentación.
 
 ### Fase B — estructura (~1-2 semanas)
