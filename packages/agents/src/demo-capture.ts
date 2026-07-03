@@ -1,5 +1,6 @@
 import { closeSql } from "@cortex/database";
 import { runCaptureWorkflow } from "./workflows.js";
+import { wireLlm } from "./wire.js";
 
 /**
  * Demo ejecutable del workflow de captura de Mastra (§20.4 / §21.2).
@@ -13,6 +14,7 @@ const content =
 const project = process.argv[3] ?? "Acme Portal";
 
 async function main() {
+  wireLlm();
   console.log(`▶ captureContextWorkflow (Mastra)\n  proyecto: ${project}\n  texto: ${content}\n`);
   const out = await runCaptureWorkflow({ content, project, createdBy: "demo:capture" });
   console.log("Resultado del workflow:");

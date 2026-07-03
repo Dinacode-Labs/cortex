@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { loadEnv, saveContextInput, searchContextInput } from "@cortex/shared";
+import { saveContextInput, searchContextInput } from "@cortex/shared";
 import {
   canAccessProject,
   findProjectByName,
@@ -16,12 +16,10 @@ import {
   renderSearchHits,
   saveContext,
   searchContext,
-  setClassifier,
-  setReranker,
   validateEntry,
   type AuthUser,
 } from "@cortex/core";
-import { classifyEntry, isLlmEnabled, rerankLLM, synthesizeContextAnswer } from "@cortex/agents";
+import { synthesizeContextAnswer } from "@cortex/agents";
 import { z } from "zod";
 
 /**
@@ -30,12 +28,6 @@ import { z } from "zod";
  * autenticado), las tools **atribuyen** las escrituras (`created_by`=email) y **aplican
  * permisos** (acceso al proyecto); sin `user` (stdio local) se comportan como antes.
  */
-loadEnv();
-if (isLlmEnabled()) {
-  setClassifier(classifyEntry);
-  if (process.env.CORTEX_RERANK !== "off") setReranker(rerankLLM);
-}
-
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
 
@@ -245,5 +237,3 @@ export function buildMcpServer(user?: AuthUser): McpServer {
 
   return server;
 }
-
-export { isLlmEnabled };

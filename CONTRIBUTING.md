@@ -27,8 +27,9 @@ No hay build de frontend ni paso de compilación: todo se ejecuta con **tsx** (T
 | Instalador (`cortex sync`) + hooks + shim CLI | `scripts/cortex-sync.ts` |
 
 **Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
-se **inyecta** desde los entrypoints: `setClassifier()`, `setReranker()`, `setReconciler()`.
-Si una operación de core necesita LLM, define el hook en core y enchúfalo en agents.
+se **inyecta**: cada entrypoint llama a `wireLlm()` (de `@cortex/agents`) tras `loadEnv()`,
+que cablea `setClassifier`/`setReranker`/`setReconciler` y el sink de uso de embeddings.
+Si una operación de core necesita LLM, define el hook en core y cabléalo en `wire.ts`.
 La tabla completa de reglas (qué paquete puede importar qué, dónde van los side effects)
 está en [`CLAUDE.md`](./CLAUDE.md#reglas-de-dependencia-qué-puede-importar-qué).
 

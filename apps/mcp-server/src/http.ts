@@ -4,14 +4,18 @@ import { Hono, type Context } from "hono";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { closeSql } from "@cortex/database";
+import { loadEnv } from "@cortex/shared";
 import { validateToken, type AuthUser } from "@cortex/core";
-import { buildMcpServer, isLlmEnabled } from "./server.js";
+import { isLlmEnabled, wireLlm } from "@cortex/agents";
+import { buildMcpServer } from "./server.js";
 
 /**
  * Cortex MCP — transporte HTTP (Streamable HTTP, Web-standard) AUTENTICADO. El MCP deja
  * de ser solo local (stdio): se sirve por HTTP con sesiones, exigiendo el mismo token
  * Bearer que el resto de la API (`cortex auth login`). Un McpServer por sesión.
  */
+loadEnv();
+wireLlm();
 const REQUIRE_AUTH = process.env.CORTEX_MCP_AUTH !== "off"; // por defecto: exige token
 // Sesión → su transporte + el usuario dueño (las tools del server llevan ese usuario baked).
 const sessions = new Map<string, { transport: WebStandardStreamableHTTPServerTransport; email?: string }>();

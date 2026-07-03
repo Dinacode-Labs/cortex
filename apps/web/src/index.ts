@@ -19,8 +19,6 @@ import {
   searchProjectCode,
   saveContext,
   searchContext,
-  setClassifier,
-  setReranker,
   validateEntry,
   validateToken,
   redeemUiTicket,
@@ -33,7 +31,7 @@ import {
   type AuthUser,
   type ProjectRef,
 } from "@cortex/core";
-import { classifyEntry, isLlmEnabled, rerankLLM, synthesizeContextAnswer } from "@cortex/agents";
+import { synthesizeContextAnswer, wireLlm } from "@cortex/agents";
 import { badge, confidenceBadge, entryCard, esc, layout, mdLite, statusBadge, typeBadge } from "./views.js";
 
 /**
@@ -43,10 +41,7 @@ import { badge, confidenceBadge, entryCard, esc, layout, mdLite, statusBadge, ty
  */
 
 loadEnv();
-if (isLlmEnabled()) {
-  setClassifier(classifyEntry);
-  if (process.env.CORTEX_RERANK !== "off") setReranker(rerankLLM);
-}
+wireLlm();
 const app = new Hono<{ Variables: { user: AuthUser | null } }>();
 
 const WEB_COOKIE_TTL = 60 * 60 * 24 * 30; // 30 días

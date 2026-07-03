@@ -164,14 +164,25 @@ export async function getRecentTraces(limit = 15): Promise<TraceTree[]> {
   return [...byTrace.values()];
 }
 
-// Registra el uso de embeddings (el paquete embeddings emite tokens vía su sink).
-setEmbeddingUsageSink((u) => {
-  void recordUsage({
-    kind: "embedding",
-    provider: getEnv("EMBEDDINGS_PROVIDER", "local").toLowerCase(),
-    model: u.model,
-    operation: "embedding",
-    inputTokens: u.totalTokens,
-    totalTokens: u.totalTokens,
+// El registro del sink es EXPLÍCITO: lo llaman los entrypoints (directamente o vía
+// wireLlm() de @cortex/agents). Antes se ejecutaba como side effect al importar este
+// módulo (import "./usage.js" desde vectors/code), lo que hacía la contabilidad
+// dependiente del orden de imports.
+let sinkRegistered = false;
+
+/** Registra el sink que contabiliza el uso de embeddings en llm_usage (idempotente).
+ * Sin registro, las operaciones que embeben no dejan rastro de coste. */
+export function registerUsageSink(): void {
+  if (sinkRegistered) return;
+  sinkRegistered = true;
+  setEmbeddingUsageSink((u) => {
+    void recordUsage({
+      kind: "embedding",
+      provider: getEnv("EMBEDDINGS_PROVIDER", "local").toLowerCase(),
+      model: u.model,
+      operation: "embedding",
+      inputTokens: u.totalTokens,
+      totalTokens: u.totalTokens,
+    });
   });
-});
+}
