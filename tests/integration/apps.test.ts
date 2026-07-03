@@ -90,6 +90,35 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     expect((await srv.request(`/context-pack?slug=${prvForeign.slug}`, { headers: auth })).status).toBe(403);
   });
 
+  it("server: POST /capture — body inválido → 400 con issues; body válido → 200 y persiste", async () => {
+    const srv = createServerApp();
+    const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+
+    // Sin slug y con type fuera del enum → 400 con issues legibles (validación zod).
+    const bad = await srv.request("/capture", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ content: "algo", type: "no-es-un-tipo" }),
+    });
+    expect(bad.status).toBe(400);
+    const badBody = (await bad.json()) as { error?: string; issues?: { path: string; message: string }[] };
+    expect(badBody.error).toBeTruthy();
+    expect(badBody.issues?.some((i) => i.path === "slug")).toBe(true);
+    expect(badBody.issues?.some((i) => i.path === "type")).toBe(true);
+
+    // Body válido → 200 y la entrada existe con atribución (created_by = email del Bearer).
+    const content = `Convención de captura por API ${RID}: los bodies se validan con zod.`;
+    const ok = await srv.request("/capture", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ slug: prvOwn.slug, content, type: "convention", confidence: "medium" }),
+    });
+    expect(ok.status).toBe(200);
+    const saved = (await listEntries({ project: prvOwn.name })).find((e) => e.content === content);
+    expect(saved).toBeDefined();
+    expect(saved!.createdBy).toBe(USER);
+  });
+
   it("web: autoescape real — contenido con <script> se muestra escapado en /entry/:id", async () => {
     const web = createWebApp();
     // Contenido malicioso: si el autoescape de hono/html no funcionara, esto sería XSS.
