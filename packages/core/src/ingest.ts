@@ -5,6 +5,7 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
 import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shared";
 import { saveContext } from "./operations.js";
 import { storeEmbeddingsBatch } from "./vectors.js";
+import { registerUsageSink } from "./usage.js";
 
 /**
  * Ingesta masiva de contexto desde un fichero JSON (array de items) hacia un
@@ -32,6 +33,7 @@ const PHASE1_CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "8");
 const EMBED_BATCH = Number(process.env.CORTEX_EMBED_BATCH ?? "32");
 
 async function ingest(): Promise<void> {
+  registerUsageSink();
   const project = process.argv[2];
   const file = process.argv[3];
   if (!project || !file) {

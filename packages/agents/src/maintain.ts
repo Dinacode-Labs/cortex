@@ -2,6 +2,7 @@ import { closeSql, getSql } from "@cortex/database";
 import { applyTemporalInvalidation, autoCurate, lintProject, listProjects, reconcileProject, resolveEntities } from "@cortex/core";
 import { enrichProject } from "./enrich-project.js";
 import { shutdownObservability } from "./mastra.js";
+import { wireLlm } from "./wire.js";
 
 /**
  * Pipeline de MANTENIMIENTO de Cortex (loops §12), pensado para ejecutarse en server
@@ -87,6 +88,7 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
 
 // CLI directo (no al importar desde el worker).
 if (import.meta.url === `file://${process.argv[1]}`) {
+  wireLlm();
   runMaintenance(process.argv[2])
     .catch((e) => { console.error("Error en mantenimiento:", e); process.exitCode = 1; })
     .finally(async () => {

@@ -2,6 +2,7 @@ import { closeSql, getSql } from "@cortex/database";
 import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shared";
 import { relate, resolveEntity } from "./entities.js";
 import { saveContext } from "./operations.js";
+import { registerUsageSink } from "./usage.js";
 
 /**
  * Datos de demo: proyecto ficticio "Acme Portal" del cliente "Acme Corp"
@@ -113,6 +114,7 @@ const ENTRIES: SeedEntry[] = [
 ];
 
 async function seed(): Promise<void> {
+  registerUsageSink();
   const sql = getSql();
 
   // Salvaguarda: el seed BORRA todas las tablas y recarga el demo Acme. Para no

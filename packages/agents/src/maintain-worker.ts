@@ -1,5 +1,8 @@
 import cron from "node-cron";
 import { runMaintenance } from "./maintain.js";
+import { wireLlm } from "./wire.js";
+
+wireLlm(); // entrypoint de proceso: cablea LLM + sink de uso
 
 /**
  * Worker de mantenimiento: ejecuta el pipeline `runMaintenance` periódicamente
