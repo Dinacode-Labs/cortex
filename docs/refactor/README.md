@@ -135,9 +135,11 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   `entryCount` (query agregada única); `askProjectContext()` extraído a agents
   (des-duplicado entre `/ask` y la tool MCP); `onError` global, `safeParse` de `type`
   y cookie `secure` en producción; test de integración de autoescape (XSS real).
-- [ ] **C-3 · Gemelo ligero en `apps/server`** (S): `app.ts` + rutas; validar bodies con
-  los schemas zod de `shared` (`safeParse` — fuera los `as never`); `onError` en vez de
-  `catch {}` mudos.
+- [x] **C-3 · Gemelo ligero en `apps/server`** (S, PR #13): `routes/{auth,context,
+  install}.ts` + `auth-helpers` + `parseBody` con zod de `shared` (`safeParse` → 400 con
+  issues; fuera los `as never`; paridad de enums verificada contra todos los conectores);
+  `onError` global; el catch de `/context-pack` queda SOLO para la carrera guard→consulta
+  (contrato del hook intacto) — **fase C completa**.
 
 ### Fase D — solo si el producto no ha pivotado
 
