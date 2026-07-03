@@ -29,6 +29,13 @@ No hay build de frontend ni paso de compilación: todo se ejecuta con **tsx** (T
 **Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
 se **inyecta** desde los entrypoints: `setClassifier()`, `setReranker()`, `setReconciler()`.
 Si una operación de core necesita LLM, define el hook en core y enchúfalo en agents.
+La tabla completa de reglas (qué paquete puede importar qué, dónde van los side effects)
+está en [`CLAUDE.md`](./CLAUDE.md#reglas-de-dependencia-qué-puede-importar-qué).
+
+> **Refactor en curso (julio 2026):** hay un plan por fases en
+> [`docs/refactor/README.md`](./docs/refactor/README.md). Antes de tocar un área, mira si
+> el plan la cubre; algunas rutas de esta guía (p.ej. dónde viven los conectores o los
+> subcomandos del CLI) cambiarán al ejecutarlo — cada PR del refactor actualiza esta guía.
 
 ## Recetas frecuentes
 

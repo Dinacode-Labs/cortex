@@ -34,3 +34,7 @@ Severidad: 🔴 crítica/alta · 🟡 media · 🟢 baja / bien hecho. Cada hall
 
 > Estos documentos son una **foto a junio de 2026**. Al corregir un hallazgo, anótalo en el
 > backlog o en `docs/decisions.md`; el código manda sobre la auditoría.
+
+> **Complemento (julio 2026):** la [revisión de arquitectura y plan de refactor](../refactor/README.md)
+> audita la *estructura del código* (god-files, duplicación, capas, entrypoints) de cara al
+> refactor por fases; donde coincide con esta auditoría referencia los números del backlog.
