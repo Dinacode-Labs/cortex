@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { closeSql, getSql } from "@cortex/database";
 import { apiPost, saveWithReconciliation } from "@cortex/core";
-import { wireReconciler } from "./reconcile.js";
+import { wireLlm } from "./wire.js";
 import { readSessions } from "./session-readers.js";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextEntryType } from "@cortex/shared";
@@ -136,9 +136,6 @@ async function alreadyIngested(project: string, sessionId: string): Promise<bool
   return rows.length > 0;
 }
 
-// Inyecta el reconciliador LLM en core (saveWithReconciliation → ADD/UPDATE/SUPERSEDE/NOOP).
-wireReconciler();
-
 export interface ApiCaptureResult { saved: number; updated: number; superseded: number; noop: number; failed: number }
 
 /** Pipeline compartido: dado el transcript YA CONDENSADO de una sesión (de cualquier
@@ -228,6 +225,7 @@ export async function ingestSessionFile(project: string, file: string, platform 
 }
 
 async function main(): Promise<void> {
+  wireLlm();
   const slug = process.argv[2];
   const repoPath = process.argv[3];
   const platform = (process.argv[4] ?? "claude").toLowerCase();

@@ -1,13 +1,17 @@
 #!/usr/bin/env -S npx tsx
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { closeSql } from "@cortex/database";
-import { buildMcpServer, isLlmEnabled } from "./server.js";
+import { loadEnv } from "@cortex/shared";
+import { isLlmEnabled, wireLlm } from "@cortex/agents";
+import { buildMcpServer } from "./server.js";
 
 /**
  * Cortex Knowledge MCP — transporte STDIO (local, por proceso). stdout es el canal del
  * protocolo, así que todo log va a stderr. El HTTP autenticado está en `http.ts`.
  */
 async function main(): Promise<void> {
+  loadEnv();
+  wireLlm();
   const server = buildMcpServer();
   const transport = new StdioServerTransport();
   await server.connect(transport);

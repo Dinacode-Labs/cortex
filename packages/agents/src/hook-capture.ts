@@ -3,6 +3,7 @@ import { closeSql } from "@cortex/database";
 import { readCortexLink } from "@cortex/core";
 import { captureSessionViaApi } from "./connect-sessions.js";
 import { shutdownObservability } from "./mastra.js";
+import { wireLlm } from "./wire.js";
 
 /**
  * Hook de AUTO-CAPTURA (SessionEnd de Claude Code, y equivalentes). Lee el JSON del
@@ -22,6 +23,7 @@ async function readStdin(): Promise<string> {
 }
 
 async function main(): Promise<void> {
+  wireLlm();
   let input: { cwd?: string; transcript_path?: string } = {};
   try {
     input = JSON.parse((await readStdin()) || "{}");
