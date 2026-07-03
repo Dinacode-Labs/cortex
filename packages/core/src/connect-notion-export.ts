@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { loadEnv } from "@cortex/shared";
 loadEnv();
-import { apiPost } from "./api-client.js";
+import { apiPost } from "@cortex/shared";
 import type { BatchItem } from "./capture.js";
 import { extractFileText, SUPPORTED_EXTS } from "./extract.js";
 

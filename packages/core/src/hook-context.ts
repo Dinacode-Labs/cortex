@@ -1,4 +1,4 @@
-import { apiGet } from "./api-client.js";
+import { apiGet } from "@cortex/shared";
 import { readCortexLink } from "./project-config.js";
 
 /**

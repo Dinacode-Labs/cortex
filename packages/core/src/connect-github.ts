@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { loadEnv } from "@cortex/shared";
 loadEnv();
-import { apiPost } from "./api-client.js";
+import { apiPost } from "@cortex/shared";
 import type { BatchItem } from "./capture.js";
 
 /**
