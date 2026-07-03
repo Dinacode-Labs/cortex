@@ -1,9 +1,8 @@
 import { existsSync } from "node:fs";
+import { loadEnv } from "@cortex/shared";
 import { closeSql } from "@cortex/database";
 import { readCortexLink } from "@cortex/core";
-import { captureSessionViaApi } from "./connect-sessions.js";
-import { shutdownObservability } from "./mastra.js";
-import { wireLlm } from "./wire.js";
+import { captureSessionViaApi, shutdownObservability, wireLlm } from "@cortex/agents";
 
 /**
  * Hook de AUTO-CAPTURA (SessionEnd de Claude Code, y equivalentes). Lee el JSON del
@@ -13,7 +12,7 @@ import { wireLlm } from "./wire.js";
  * Cierra el bucle "trabajas → Cortex aprende" sin que el dev haga nada. Silencioso
  * (un hook nunca rompe la sesión). Ver research/hooks-integration.md.
  *
- * Manual: echo '{"cwd":"/ruta","transcript_path":"/...jsonl"}' | tsx src/hook-capture.ts
+ * Manual: echo '{"cwd":"/ruta","transcript_path":"/...jsonl"}' | cortex hook-capture
  */
 
 async function readStdin(): Promise<string> {
@@ -22,7 +21,7 @@ async function readStdin(): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-async function main(): Promise<void> {
+export async function run(): Promise<void> {
   wireLlm();
   let input: { cwd?: string; transcript_path?: string } = {};
   try {
@@ -42,12 +41,16 @@ async function main(): Promise<void> {
     console.error(`[cortex hook] "${link.slug}": +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas, ${r.noop} ya cubiertas${r.failed ? `, ${r.failed} fallos (¿cortex auth login / servidor?)` : ""}`);
 }
 
-main()
-  .catch(() => {
-    /* silencioso: un hook no debe romper la sesión */
-  })
-  .finally(async () => {
-    await shutdownObservability();
-    await closeSql();
-    process.exit(0);
-  });
+// Compat: los hooks instalados lo invocan directamente (script pnpm hook:capture).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  loadEnv();
+  run()
+    .catch(() => {
+      /* silencioso: un hook no debe romper la sesión */
+    })
+    .finally(async () => {
+      await shutdownObservability();
+      await closeSql().catch(() => {});
+      process.exit(0);
+    });
+}

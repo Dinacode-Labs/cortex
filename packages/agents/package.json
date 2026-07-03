@@ -8,12 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "demo:capture": "tsx src/demo-capture.ts",
-    "enrich": "tsx src/enrich-run.ts",
-    "connect-sessions": "tsx src/connect-sessions.ts",
-    "maintain": "tsx src/maintain.ts",
-    "maintain:worker": "tsx src/maintain-worker.ts",
-    "hook:capture": "tsx src/hook-capture.ts"
+    "hook:capture": "tsx ../../apps/cli/src/commands/hook-capture.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.51",
@@ -24,10 +19,6 @@
     "@mastra/observability": "^1.15.0",
     "@openrouter/ai-sdk-provider": "^2.9.1",
     "ai": "^6.0.208",
-    "node-cron": "^4.5.0",
     "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@types/node-cron": "^3.0.11"
   }
 }
