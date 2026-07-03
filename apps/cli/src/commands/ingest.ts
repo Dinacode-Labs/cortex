@@ -1,11 +1,9 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { closeSql, getSql } from "@cortex/database";
+import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shared";
-import { saveContext } from "./operations.js";
-import { storeEmbeddingsBatch } from "./vectors.js";
-import { registerUsageSink } from "./usage.js";
+import { registerUsageSink, saveContext, storeEmbeddingsBatch } from "@cortex/core";
 
 /**
  * Ingesta masiva de contexto desde un fichero JSON (array de items) hacia un
@@ -13,7 +11,7 @@ import { registerUsageSink } from "./usage.js";
  *   1) Persistir entradas SIN embedding (solo BD, rápido).
  *   2) Generar embeddings por LOTES (pocas peticiones; nan: 60 rpm, 3 paralelas).
  *
- * Uso: tsx src/ingest.ts "<Proyecto>" <items.json>
+ * Uso: cortex ingest "<Proyecto>" <items.json>
  * Env: CORTEX_INGEST_LLM=1 para clasificar cada item con LLM (más lento).
  */
 
@@ -32,12 +30,12 @@ const USE_LLM = process.env.CORTEX_INGEST_LLM === "1";
 const PHASE1_CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "8");
 const EMBED_BATCH = Number(process.env.CORTEX_EMBED_BATCH ?? "32");
 
-async function ingest(): Promise<void> {
+export async function run(args: string[]): Promise<void> {
   registerUsageSink();
-  const project = process.argv[2];
-  const file = process.argv[3];
+  const project = args[0];
+  const file = args[1];
   if (!project || !file) {
-    console.error('Uso: tsx src/ingest.ts "<Proyecto>" <items.json>');
+    console.error('Uso: cortex ingest "<Proyecto>" <items.json>');
     process.exitCode = 1;
     return;
   }
@@ -90,9 +88,4 @@ async function ingest(): Promise<void> {
   console.log("Ingesta completada.");
 }
 
-ingest()
-  .catch((e) => {
-    console.error("Error en ingesta:", e);
-    process.exitCode = 1;
-  })
-  .finally(() => closeSql());
+

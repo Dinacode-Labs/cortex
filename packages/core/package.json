@@ -8,18 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "seed": "tsx src/seed.ts",
-    "ingest": "tsx src/ingest.ts",
-    "resolve-entities": "tsx src/resolve-entities.ts",
-    "lint": "tsx src/lint-run.ts",
-    "lint-act": "tsx src/lint-act.ts",
-    "index-code": "tsx src/index-code.ts",
-    "temporal": "tsx src/temporal-run.ts",
-    "connect-github": "tsx src/connect-github.ts",
-    "connect-notion-export": "tsx src/connect-notion-export.ts",
-    "connect-docs": "tsx src/connect-docs.ts",
-    "hook:context": "tsx src/hook-context.ts",
-    "link": "tsx src/link.ts"
+    "hook:context": "tsx ../../apps/cli/src/commands/hook-context.ts"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",

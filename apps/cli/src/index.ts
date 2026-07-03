@@ -1,32 +1,66 @@
 import { resolve } from "node:path";
+import { loadEnv } from "@cortex/shared";
+import { closeSql } from "@cortex/database";
 
 /**
- * CLI `cortex` — dispatcher único (estilo `gh`). Enruta cada subcomando al script
- * existente y lo ejecuta EN PROCESO vía import dinámico (ya corremos bajo tsx, así que
- * no hace falta otro arranque). Cada script lee `process.argv`; los que tienen guard
- * `import.meta.url === argv[1]` (maintain, connect-sessions) se activan porque fijamos
- * argv[1] = su ruta. Instalado en el PATH por `cortex sync` (shim a ~/.local/bin).
+ * CLI `cortex` — dispatcher único (estilo `gh`). Cada subcomando vive en
+ * ./commands/<nombre>.ts y exporta `run(args)`. La carga es perezosa con rutas
+ * LITERALES (no se paga el arranque de mastra/pg para `--help`, y no se muta
+ * process.argv). El ciclo de vida (loadEnv, closeSql, exit code) lo gestiona
+ * este dispatcher. Instalado en el PATH por `cortex sync` (shim a ~/.local/bin).
  */
 const REPO = resolve(import.meta.dirname, "../../..");
 
+type CommandModule = { run: (args: string[]) => Promise<void> };
+
 interface Cmd {
-  script: string;
   help: string;
+  load: () => Promise<CommandModule>;
+  /** false = el script gestiona su propio ciclo de vida (servidores, legacy). */
+  managed?: boolean;
+}
+
+/** Scripts pendientes de migrar (agents + sync, fase B-1b/c): import por ruta + argv. */
+function legacy(script: string, help: string): Cmd {
+  return {
+    help,
+    managed: false,
+    load: async () => ({
+      run: async (args: string[]) => {
+        const p = resolve(REPO, script);
+        process.argv = [process.argv[0]!, p, ...args];
+        await import(p);
+      },
+    }),
+  };
+}
+
+/** Entrypoints de otras apps (arrancan un servidor al importarse). */
+function boot(script: string, help: string): Cmd {
+  return { help, managed: false, load: async () => ({ run: async () => void (await import(resolve(REPO, script))) }) };
 }
 
 const COMMANDS: Record<string, Cmd> = {
-  auth: { script: "apps/cli/src/auth.ts", help: "iniciar sesión por email + OTP (login/status/logout)" },
-  ui: { script: "apps/cli/src/ui.ts", help: "abrir la UI web ya autenticada (sin OTP)" },
-  server: { script: "apps/server/src/index.ts", help: "arrancar el servidor HTTP de Cortex (API + auth)" },
-  "mcp-http": { script: "apps/mcp-server/src/http.ts", help: "arrancar el MCP por HTTP autenticado (Streamable HTTP)" },
-  link: { script: "packages/core/src/link.ts", help: "vincular/crear el proyecto de esta carpeta (escribe .cortex.json)" },
-  sync: { script: "scripts/cortex-sync.ts", help: "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)" },
-  maintain: { script: "packages/agents/src/maintain.ts", help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint" },
-  "connect-notion": { script: "packages/core/src/connect-notion-export.ts", help: "ingerir un export de Notion (páginas + adjuntos)" },
-  "connect-docs": { script: "packages/core/src/connect-docs.ts", help: "ingerir una carpeta de documentos (Word/PDF/Excel/…)" },
-  "connect-github": { script: "packages/core/src/connect-github.ts", help: "ingerir PRs/issues de un repo de GitHub" },
-  "connect-sessions": { script: "packages/agents/src/connect-sessions.ts", help: "backfill de sesiones de un agente a un proyecto" },
-  "connect-meeting": { script: "packages/agents/src/connect-meeting.ts", help: "transcribir + destilar grabaciones de reunión a conocimiento tipado" },
+  auth: { help: "iniciar sesión por email + OTP (login/status/logout)", load: () => import("./commands/auth.js") },
+  ui: { help: "abrir la UI web ya autenticada (sin OTP)", load: () => import("./commands/ui.js") },
+  link: { help: "vincular/crear el proyecto de esta carpeta (escribe .cortex.json)", load: () => import("./commands/link.js") },
+  seed: { help: "cargar los datos de demo (proyecto ficticio Acme Portal)", load: () => import("./commands/seed.js") },
+  ingest: { help: "ingesta masiva de contexto desde un JSON de items", load: () => import("./commands/ingest.js") },
+  lint: { help: "salud del conocimiento de un proyecto (contradicciones, huecos…)", load: () => import("./commands/lint.js") },
+  "lint-act": { help: "plan de acciones (dry-run) a partir del lint", load: () => import("./commands/lint-act.js") },
+  temporal: { help: "invalidación temporal: cierra la validez de hechos no vigentes", load: () => import("./commands/temporal.js") },
+  "index-code": { help: "indexar el código de un repo local en un proyecto", load: () => import("./commands/index-code.js") },
+  "resolve-entities": { help: "fusionar variantes de entidades en una canónica", load: () => import("./commands/resolve-entities.js") },
+  "connect-github": { help: "ingerir PRs/issues de un repo de GitHub (vía gh)", load: () => import("./commands/connect-github.js") },
+  "connect-docs": { help: "ingerir una carpeta de documentos (Word/PDF/Excel/…)", load: () => import("./commands/connect-docs.js") },
+  "connect-notion": { help: "ingerir un export de Notion (páginas + adjuntos)", load: () => import("./commands/connect-notion.js") },
+  "hook-context": { help: "hook SessionStart: emite el context-pack del proyecto vinculado", load: () => import("./commands/hook-context.js") },
+  server: boot("apps/server/src/index.ts", "arrancar el servidor HTTP de Cortex (API + auth)"),
+  "mcp-http": boot("apps/mcp-server/src/http.ts", "arrancar el MCP por HTTP autenticado (Streamable HTTP)"),
+  sync: legacy("scripts/cortex-sync.ts", "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)"),
+  maintain: legacy("packages/agents/src/maintain.ts", "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint"),
+  "connect-sessions": legacy("packages/agents/src/connect-sessions.ts", "backfill de sesiones de un agente a un proyecto"),
+  "connect-meeting": legacy("packages/agents/src/connect-meeting.ts", "transcribir + destilar grabaciones de reunión"),
 };
 
 function usage(): void {
@@ -50,10 +84,22 @@ async function main(): Promise<void> {
     usage();
     process.exit(1);
   }
-  const script = resolve(REPO, cmd.script);
-  // Los scripts leen process.argv (y algunos comparan import.meta.url con argv[1]).
-  process.argv = [process.argv[0]!, script, ...rest];
-  await import(script);
+  loadEnv();
+  const mod = await cmd.load();
+  if (cmd.managed === false) {
+    // Servidores y scripts legacy: gestionan su propio shutdown/exit.
+    await mod.run(rest);
+    return;
+  }
+  try {
+    await mod.run(rest);
+  } catch (e) {
+    console.error(`Error en cortex ${sub}:`, e instanceof Error ? e.message : e);
+    process.exitCode = 1;
+  } finally {
+    await closeSql().catch(() => {});
+    process.exit(process.exitCode ?? 0);
+  }
 }
 
 main().catch((e) => {
