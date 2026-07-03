@@ -17,9 +17,11 @@ async function reconcile(existing: string, incoming: string): Promise<"noop" | "
   try {
     const raw = await runAgent("reconciler", prompt, { maxOutputTokens: 60 });
     const m = raw.match(/noop|update|supersede/i);
-    return (m ? m[0].toLowerCase() : "update") as "noop" | "update" | "supersede";
+    // Si el LLM no responde algo reconocible, NO tocar lo existente: un fallo
+    // (timeout, respuesta truncada) no debe reescribir conocimiento vía merge.
+    return (m ? m[0].toLowerCase() : "noop") as "noop" | "update" | "supersede";
   } catch {
-    return "update"; // ante duda, fusionar (no invalidar a la ligera)
+    return "noop";
   }
 }
 

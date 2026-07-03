@@ -85,16 +85,10 @@ const deniedPage = (user: AuthUser | null): string =>
 
 // Handshake CLI → cookie de sesión. `cortex ui` abre /auth/cli?ticket=… (un solo uso):
 // el ticket se canjea por una sesión web nueva (el token de CLI nunca viaja en la URL).
-// Se mantiene ?token= como compat, pero ticket es lo preferido. Exento del gate.
+// Exento del gate.
 app.get("/auth/cli", async (c) => {
   const ticket = c.req.query("ticket");
-  const legacyToken = c.req.query("token");
-  let session: string | null = null;
-  if (ticket) {
-    session = (await redeemUiTicket(ticket))?.token ?? null;
-  } else if (legacyToken && (await validateToken(legacyToken))) {
-    session = legacyToken;
-  }
+  const session = ticket ? ((await redeemUiTicket(ticket))?.token ?? null) : null;
   if (!session) return c.html(loginPage("Enlace inválido o caducado. Ejecuta `cortex ui` de nuevo."), 401);
   setCookie(c, "cortex_session", session, { httpOnly: true, sameSite: "Lax", path: "/", maxAge: WEB_COOKIE_TTL });
   return c.redirect("/");
@@ -359,14 +353,16 @@ app.post("/entry/:id/validate", async (c) => {
 
 // --- Guardar contexto --------------------------------------------------------
 app.post("/save", async (c) => {
+  const user = c.get("user")!;
   const form = await c.req.parseBody();
   const content = String(form.content ?? "").trim();
   if (!content) return c.redirect("/?capture=1");
   const project = String(form.project ?? "").trim() || undefined;
+  if (project && !(await guardProject(user.email, project))) return c.html(deniedPage(user), 403);
   const typeRaw = String(form.type ?? "").trim();
   const type = typeRaw ? (typeRaw as never) : undefined;
 
-  const { entry, warnings } = await saveContext({ content, project, type, createdBy: "web-ui" });
+  const { entry, warnings } = await saveContext({ content, project, type, createdBy: user.email });
 
   const warnHtml = warnings
     .map(
@@ -660,8 +656,7 @@ app.get("/graph", async (c) => {
         return COLORS[group] || "#768390";
       }
       (async () => {
-        const params = new URLSearchParams(location.search);
-        const project = ${JSON.stringify(project)};
+        const project = ${JSON.stringify(project).replaceAll("<", "\\u003c")};
         const entries = ${includeEntries ? "1" : "0"};
         const res = await fetch("/api/graph?project="+encodeURIComponent(project)+"&entries="+entries);
         const g = await res.json();
