@@ -2,8 +2,8 @@ import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { storeEmbedding, vectorSearch } from "./vectors.js";
 import { saveContext } from "./operations.js";
+import { findProjectIdByName } from "./projects.js";
 import { relate } from "./entities.js";
-import type { Row } from "./map.js";
 
 /**
  * Reconciliación de escritura (estilo mem0: ADD / UPDATE / NOOP). Antes de guardar
@@ -25,14 +25,9 @@ export interface NearestEntry {
   sourceType: string;
 }
 
-async function findProjectId(project: string): Promise<string | null> {
-  const rows = (await getSql()`SELECT id FROM entities WHERE type = 'project' AND name = ${project} LIMIT 1`) as unknown as Row[];
-  return (rows[0]?.id as string) ?? null;
-}
-
 /** Entrada más similar del proyecto al texto dado (o null). */
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
-  const pid = await findProjectId(project);
+  const pid = await findProjectIdByName(getSql(), project);
   if (!pid) return null;
   try {
     const hits = await vectorSearch(getSql(), getEmbeddingProvider(), { queryText: text, projectId: pid, limit: 1 });
@@ -142,7 +137,7 @@ const NON_DEDUP_FORMATS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "t
 
 export async function reconcileProject(project: string, maxDistance = Number(process.env.CORTEX_DEDUP_MAX_DIST ?? "0.05")): Promise<{ deduped: number }> {
   const sql = getSql();
-  const pid = await findProjectId(project);
+  const pid = await findProjectIdByName(sql, project);
   if (!pid) return { deduped: 0 };
   const pairs = (await sql`
     SELECT a.id AS keep, b.id AS drop
