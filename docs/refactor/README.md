@@ -106,12 +106,13 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
 
 ### Fase B — estructura (~1-2 semanas)
 
-- [ ] **B-1 · Entrypoints → `apps/cli/src/commands/`** (L, en 2-3 PRs): la lógica queda
-  como función exportada en su paquete (sin argv/exit); cada comando parsea argv y la
-  llama; el dispatcher pasa a imports estáticos (sin mutar `process.argv`).
-  `scripts/cortex-sync.ts` → `commands/sync/` (un adapter por agente). ⚠️ Rompe rutas
-  instaladas (hooks, shim): actualizar cortex-sync en el mismo PR y re-ejecutar
-  `cortex sync --apply` en cada máquina.
+- [x] **B-1 · Entrypoints → `apps/cli/src/commands/`** (L, hecho en 3 PRs: #7 core,
+  #8 agents, #9 sync): la lógica queda como función exportada en su paquete; cada
+  comando parsea argv y la llama; dispatcher con carga perezosa de rutas literales
+  (sin mutar `process.argv`). `scripts/cortex-sync.ts` → `commands/sync/` (un adapter
+  por agente). Los hooks instalados NO se rompieron: los scripts `hook:context`/
+  `hook:capture` quedan como puentes de compatibilidad (retirar en fase D) y
+  `cortex sync --apply` detecta y ACTUALIZA la sintaxis antigua de los hooks.
 - [ ] **B-2 · `setMediaExtractor`** (M): visión/OCR/whisper salen de `core/extract.ts` a
   `agents/media.ts` con el patrón de hooks existente; `getLlmConfig` se unifica en
   `shared` (borra la config LLM duplicada core↔agents y la interfaz `VisionCfg` declarada

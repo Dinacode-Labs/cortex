@@ -37,7 +37,7 @@ apps/
   server/      # API HTTP + auth email/OTP (Hono) — la usan CLI, hooks y conectores
   web/         # UI web (Hono SSR, cookie de sesión)
   cli/         # CLI `cortex` (auth, link, ui, conectores…)
-scripts/       # install.sh + cortex-sync.ts (instala toolbelt/hooks/shim)
+scripts/       # install.sh (instalador remoto; lo sirve apps/server)
 config/        # toolbelt distribuible (MCP + skills + comandos) — ver config/README.md
 tests/         # unit + integration (Postgres real; ver CONTRIBUTING.md)
 docs/

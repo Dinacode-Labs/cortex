@@ -24,7 +24,7 @@ No hay build de frontend ni paso de compilación: todo se ejecuta con **tsx** (T
 | Proveedor de embeddings | `packages/embeddings/` |
 | Servidor MCP (stdio) · UI web · API+auth · CLI | `apps/mcp-server` · `apps/web` · `apps/server` · `apps/cli` |
 | Toolbelt distribuible (MCP/skills/comandos) | `config/toolbelt.json` + `config/skills/` + `config/commands/` |
-| Instalador (`cortex sync`) + hooks + shim CLI | `scripts/cortex-sync.ts` |
+| Instalador (`cortex sync`) + hooks + shim CLI | `apps/cli/src/commands/sync.ts` (+ `sync/` un adapter por agente) |
 
 **Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
 se **inyecta**: cada entrypoint llama a `wireLlm()` (de `@cortex/agents`) tras `loadEnv()`,
