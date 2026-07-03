@@ -2,6 +2,7 @@ import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "./operations.js";
 import { storeEmbeddingsBatch } from "./vectors.js";
+import { findProjectIdByName } from "./projects.js";
 import { relate } from "./entities.js";
 import type { RelationType } from "@cortex/shared";
 import type { Row } from "./map.js";
@@ -28,8 +29,7 @@ export interface BatchItemResult {
 
 export async function captureBatch(projectName: string, items: BatchItem[], createdBy: string): Promise<BatchItemResult[]> {
   const sql = getSql();
-  const pr = (await sql`SELECT id FROM entities WHERE type = 'project' AND name = ${projectName} LIMIT 1`) as unknown as Row[];
-  const projectId = pr[0]?.id as string | undefined;
+  const projectId = await findProjectIdByName(sql, projectName);
   if (!projectId) throw new Error(`Proyecto no encontrado: ${projectName}`);
 
   const results: BatchItemResult[] = [];

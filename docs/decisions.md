@@ -410,3 +410,22 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
      con estado de cliente, o la UI pasa de demo interna a producto.
 - **Revisar cuando:** se cruce cualquiera de los dos umbrales, o la UI gane un segundo
   consumidor (móvil, embebida) que exija API JSON de todas formas.
+
+## Resolución de proyecto por nombre: semántica canónica única
+
+- **Decisión:** la resolución de un proyecto por nombre en operaciones de datos usa UNA
+  única función (`findProjectIdByName`, en `packages/core/src/projects.ts`) con semántica
+  **canónica** (`canonical_name`: minúsculas, sin acentos). Se eliminan las 6 copias que
+  convivían en core, dos de ellas con semántica de `name` **exacto** (dedup y
+  captureBatch), que dejaban la reconciliación/dedup silenciosamente inoperante si el
+  caller usaba otra capitalización ("Acme Portal" vs "acme portal" → siempre ADD).
+  Test de integración que lo demuestra: `tests/integration/core.test.ts`
+  ("resolución de proyecto canónica").
+- **Cambio de comportamiento (intencionado):** capturas que antes fallaban el dedup por
+  grafía ahora reconcilian (más UPDATE/SUPERSEDE/NOOP sobre datos existentes), y
+  `captureBatch` acepta el nombre con cualquier capitalización.
+- **Fuera de alcance:** `findProjectByName` (devuelve `ProjectRef`, por `name` exacto)
+  se mantiene — la usan la web y `resolveLinkedProject`; se revisará con el guard de
+  acceso único de la fase C-1 (`checkProjectAccess`).
+- **Revisar cuando:** llegue C-1, o si aparece la necesidad de resolver por slug y nombre
+  en una sola función.

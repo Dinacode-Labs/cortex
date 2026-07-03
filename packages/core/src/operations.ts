@@ -11,6 +11,7 @@ import {
   searchContextInput,
 } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "./entities.js";
+import { findProjectIdByName } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import {
   canonicalize,
@@ -240,7 +241,7 @@ export async function searchContext(input: SearchContextInput): Promise<SearchHi
   const parsed = searchContextInput.parse(input);
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const projectId = parsed.project ? await findProjectId(sql, parsed.project) : null;
+  const projectId = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
 
   // Si hay reranker, sobre-recuperamos para que reordene un pool mayor.
   const overFetch = reranker ? Math.min(parsed.limit * 3, 30) : parsed.limit;
@@ -260,7 +261,7 @@ export async function searchContext(input: SearchContextInput): Promise<SearchHi
 /** Lista las decisiones técnicas de un proyecto. */
 export async function listDecisions(project: string, limit = 20): Promise<ContextEntry[]> {
   const sql = getSql();
-  const projectId = await findProjectId(sql, project);
+  const projectId = await findProjectIdByName(sql, project);
   if (!projectId) return [];
   const rows = (await sql`
     SELECT * FROM context_entries
@@ -307,7 +308,7 @@ export interface ContextPack {
  */
 export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
   const sql = getSql();
-  const projectId = await findProjectId(sql, project);
+  const projectId = await findProjectIdByName(sql, project);
   if (!projectId) {
     throw new Error(`Proyecto no encontrado: "${project}".`);
   }
@@ -375,14 +376,6 @@ function mergeEntities(
     }
   }
   return [...byKey.values()];
-}
-
-async function findProjectId(sql: Sql, project: string): Promise<string | null> {
-  const canonical = canonicalize(project);
-  const rows = (await sql`
-    SELECT id FROM entities WHERE type = 'project' AND canonical_name = ${canonical} LIMIT 1
-  `) as unknown as Row[];
-  return rows[0] ? (rows[0].id as string) : null;
 }
 
 /** IDs del proyecto + todos sus ancestros (jerarquía padre). Para herencia de contexto. */

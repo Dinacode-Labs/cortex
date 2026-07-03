@@ -1,6 +1,6 @@
 import { getSql, type Sql } from "@cortex/database";
 import type { ContextEntry, ContextEntryType, ContextEntryStatus, Entity, Source } from "@cortex/shared";
-import { canonicalize } from "./text.js";
+import { findProjectIdByName } from "./projects.js";
 import { rowToContextEntry, rowToEntity, rowToSource, type Row } from "./map.js";
 
 /** Consultas de lectura para la UI / inspección (no semánticas). */
@@ -31,7 +31,7 @@ export async function listEntries(filter: ListEntriesFilter = {}): Promise<Conte
   const sql = getSql();
   let where = sql`WHERE true`;
   if (filter.project) {
-    const projectId = await findProjectId(sql, filter.project);
+    const projectId = await findProjectIdByName(sql, filter.project);
     if (!projectId) return [];
     where = sql`${where} AND ce.project_id = ${projectId}`;
   }
@@ -113,7 +113,7 @@ export async function getProjectGraph(
   opts: { includeEntries?: boolean; maxEntries?: number } = {},
 ): Promise<ProjectGraph> {
   const sql = getSql();
-  const projectId = await findProjectId(sql, project);
+  const projectId = await findProjectIdByName(sql, project);
   if (!projectId) return { nodes: [], edges: [] };
   const includeEntries = opts.includeEntries ?? true;
   const maxEntries = opts.maxEntries ?? 500;
@@ -179,10 +179,3 @@ export async function getProjectGraph(
   return { nodes, edges };
 }
 
-async function findProjectId(sql: Sql, project: string): Promise<string | null> {
-  const canonical = canonicalize(project);
-  const rows = (await sql`
-    SELECT id FROM entities WHERE type = 'project' AND canonical_name = ${canonical} LIMIT 1
-  `) as unknown as Row[];
-  return rows[0] ? (rows[0].id as string) : null;
-}
