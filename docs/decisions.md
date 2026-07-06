@@ -269,6 +269,29 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   (la config lo soporta). Pendiente menor: silenciar el warning de in-memory store de
   Mastra (no usamos su storage).
 
+## ADR-0017 · Workflows de Mastra: evaluados y NO adoptados para la captura
+
+- **Estado:** aceptada. Sustituye el «Workflows» de ADR-0006 y el matiz de ADR-0015.
+- **Contexto:** el spike `captureContextWorkflow` (§20.4, `packages/agents/src/workflows.ts`
+  + comando `demo-capture`) demostraba el motor de *workflows* de Mastra
+  (`createWorkflow`/`createStep`) orquestando la captura como pasos observables
+  (classify → persist). Era un ~140 LOC de demostración: el pipeline **real** de
+  captura nunca lo usó (lo consumía solo `demo-capture`).
+- **Decisión:** **no adoptar** los workflows de Mastra para la captura y **borrar** el
+  spike (`workflows.ts` + `demo-capture.ts` + el script `workflow:capture`). La captura
+  usa la vía **determinista de `core`** (`saveWithReconciliation`: dedup/reconciliación
+  con el reconciler LLM **inyectado** vía `setReconciler`), más simple y sin acoplar la
+  captura al runtime de workflows de Mastra.
+- **Qué se mantiene:** Mastra **sí** se usa para los **agentes individuales**
+  (`classify`/`enrich`/`rerank`/`synthesize`/`distill`) vía `runAgent` (`mastra.ts`).
+  Esto no cambia. Lo descartado es solo el runtime de *workflows*, no los *Agents*.
+- **Por qué:** el paso classify → persist ya vive en `core` (clasificador inyectado con
+  `setClassifier`, reconciliación con `setReconciler`); el workflow lo duplicaba con la
+  API de Mastra (zod v4) sin aportar valor operativo. Menos código, menos acoplamiento.
+- **Revisar cuando:** aparezca un caso de **orquestación multi-paso real** (varios pasos
+  con estado/reintentos/observabilidad por paso, p.ej. context-pack o dedup/contradicción
+  en batch) que justifique reintroducir el runtime de workflows.
+
 ## Vinculación de proyectos: slug + gate server-side (vincular ≠ crear)
 
 - **Decisión:** un repo se vincula a un proyecto de Cortex con un `.cortex.json`

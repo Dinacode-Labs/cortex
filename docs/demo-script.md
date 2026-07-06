@@ -53,18 +53,6 @@ revisión humana en lugar de aceptarla a ciegas.
 
 (con `validate_context_entry`).
 
-## 6b. Orquestación con Mastra (workflow)
-
-Muestra el motor de workflows de Mastra orquestando la ingesta como pasos
-observables (clasificar → persistir):
-
-```bash
-pnpm workflow:capture "Migramos los informes a generación asíncrona con colas para evitar timeouts" "Acme Portal"
-```
-
-Salida: el tipo y título propuestos por el LLM, la entrada persistida y las
-señales del loop de mejora. (Requiere LLM configurado.)
-
 ## 7. Preparado para Codex
 
 Las tools MCP son neutras: cualquier herramienta que hable MCP (Codex, ChatGPT,
