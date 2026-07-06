@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { getEnvNum } from "@cortex/shared";
 
 /**
  * Utilidades de transcript (puras / de lectura) compartidas por la destilación y el
@@ -9,9 +10,9 @@ import { readFileSync } from "node:fs";
  *      CORTEX_SESSIONS_TURN_CHARS (def 2500).
  */
 
-const MAX_WINDOWS = Number(process.env.CORTEX_SESSIONS_MAX_WINDOWS ?? "8");
-const WINDOW_CHARS = Number(process.env.CORTEX_SESSIONS_WINDOW_CHARS ?? "9000");
-const TURN_CHARS = Number(process.env.CORTEX_SESSIONS_TURN_CHARS ?? "2500");
+const MAX_WINDOWS = getEnvNum("CORTEX_SESSIONS_MAX_WINDOWS", 8);
+const WINDOW_CHARS = getEnvNum("CORTEX_SESSIONS_WINDOW_CHARS", 9000);
+const TURN_CHARS = getEnvNum("CORTEX_SESSIONS_TURN_CHARS", 2500);
 
 /** Borra secretos antes de mandar al LLM o de guardar (best-effort, amplio). */
 export function scrub(s: string): string {

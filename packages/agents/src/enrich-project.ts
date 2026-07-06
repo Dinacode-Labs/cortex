@@ -1,4 +1,5 @@
 import { getSql } from "@cortex/database";
+import { getEnvNum } from "@cortex/shared";
 import { linkEntryToEntity, listEntries, relate, resolveEntity } from "@cortex/core";
 import { extractGraph } from "./enrich.js";
 
@@ -8,7 +9,7 @@ import { extractGraph } from "./enrich.js";
  * dedup). Reutilizable desde el CLI (`enrich-run`) y el mantenimiento (`maintain`).
  */
 
-const CONCURRENCY = Number(process.env.CORTEX_ENRICH_CONCURRENCY ?? "3");
+const CONCURRENCY = getEnvNum("CORTEX_ENRICH_CONCURRENCY", 3);
 
 export interface EnrichResult {
   processed: number;

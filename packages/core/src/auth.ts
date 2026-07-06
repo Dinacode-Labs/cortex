@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
 import { getSql } from "@cortex/database";
+import { getEnvNum } from "@cortex/shared";
 import { sendOtpEmail } from "./email.js";
 import type { Row } from "./map.js";
 
@@ -15,10 +16,10 @@ const normEmail = (e: string): string => e.trim().toLowerCase();
 const csv = (v: string | undefined): string[] => (v ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
 // Config leída LAZY (no al cargar el módulo): robusta ante el orden de loadEnv/imports.
-const otpTtlMin = (): number => Number(process.env.CORTEX_OTP_TTL_MIN ?? "10");
-const tokenTtlDays = (): number => Number(process.env.CORTEX_TOKEN_TTL_DAYS ?? "30");
-const otpRateMax = (): number => Number(process.env.CORTEX_OTP_RATE_MAX ?? "5");
-const otpRateWindowMin = (): number => Number(process.env.CORTEX_OTP_RATE_WINDOW_MIN ?? "15");
+const otpTtlMin = (): number => getEnvNum("CORTEX_OTP_TTL_MIN", 10);
+const tokenTtlDays = (): number => getEnvNum("CORTEX_TOKEN_TTL_DAYS", 30);
+const otpRateMax = (): number => getEnvNum("CORTEX_OTP_RATE_MAX", 5);
+const otpRateWindowMin = (): number => getEnvNum("CORTEX_OTP_RATE_WINDOW_MIN", 15);
 /** Dominios permitidos (whitelist, coma-separado). Vacío = cualquiera. Sin registro: el primer login válido crea el usuario. */
 const authDomains = (): string[] => csv(process.env.CORTEX_AUTH_DOMAIN ?? "dinacode.com");
 /** Emails admin (coma-separado; puede haber varios). Gestionan permisos y ven todos los proyectos. */
@@ -128,7 +129,7 @@ export async function revokeToken(token: string): Promise<void> {
   await getSql()`DELETE FROM auth_tokens WHERE token_hash = ${sha(token)}`;
 }
 
-const TICKET_TTL_SEC = Number(process.env.CORTEX_UI_TICKET_TTL_SEC ?? "90");
+const TICKET_TTL_SEC = getEnvNum("CORTEX_UI_TICKET_TTL_SEC", 90);
 
 /** Emite un ticket de un solo uso (corto) para el handshake `cortex ui`. Requiere un
  * token de CLI válido. El ticket NO es el token: la web lo canjea por una sesión propia. */

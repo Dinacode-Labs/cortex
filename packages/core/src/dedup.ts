@@ -1,5 +1,6 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
+import { getEnvNum } from "@cortex/shared";
 import { storeEmbedding, vectorSearch } from "./vectors.js";
 import { saveContext } from "./save.js";
 import { findProjectIdByName } from "./projects.js";
@@ -14,8 +15,8 @@ import { relate } from "./entities.js";
  * Umbrales calibrados con qwen3-embedding (exacto ~0.99, paráfrasis ~0.84, distinto
  * ~0.67): por encima de UPDATE se reconcilia; por encima de NOOP es casi idéntico.
  */
-export const UPDATE_THRESHOLD = Number(process.env.CORTEX_DEDUP_THRESHOLD ?? "0.82");
-export const NOOP_THRESHOLD = Number(process.env.CORTEX_DEDUP_NOOP ?? "0.95");
+export const UPDATE_THRESHOLD = getEnvNum("CORTEX_DEDUP_THRESHOLD", 0.82);
+export const NOOP_THRESHOLD = getEnvNum("CORTEX_DEDUP_NOOP", 0.95);
 
 export interface NearestEntry {
   id: string;
@@ -135,7 +136,7 @@ export async function saveWithReconciliation(
 // visión): captions genéricos agrupan imágenes DISTINTAS → nunca deduplicar por embedding.
 const NON_DEDUP_FORMATS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "tif", "tiff"];
 
-export async function reconcileProject(project: string, maxDistance = Number(process.env.CORTEX_DEDUP_MAX_DIST ?? "0.05")): Promise<{ deduped: number }> {
+export async function reconcileProject(project: string, maxDistance = getEnvNum("CORTEX_DEDUP_MAX_DIST", 0.05)): Promise<{ deduped: number }> {
   const sql = getSql();
   const pid = await findProjectIdByName(sql, project);
   if (!pid) return { deduped: 0 };

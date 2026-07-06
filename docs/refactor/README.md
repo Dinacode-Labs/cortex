@@ -159,8 +159,12 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   (48 vars antes sin documentar, con su default real; esenciales sin comentar, tunables
   comentadas); Mastra-workflows **no adoptado** — borrados `workflows.ts` + `demo-capture`
   + `workflow:capture` (ADR-0017; Mastra sigue para los agentes vía `runAgent`).
-- [ ] **D-3b · `config.ts` lazy por paquete** (M): centralizar la lectura de env (defaults
-  en un sitio por paquete) sobre `getEnv` de shared; mismos nombres/defaults.
+- [x] **D-3b · helper env tipado + fix de default divergente** (PR #18): `getEnvNum` en
+  shared (parseo numérico DRY; corrige el sutil `Number("")→0`); migrados los ~17 reads
+  numéricos de core/agents; **fijado** el default divergente `CORTEX_INGEST_CONCURRENCY`
+  (era 8 en ingest y 4 en connect-notion, mismo var → unificado a 8). Desviación consciente
+  del plan: NO se crea `config.ts` por paquete — los tunables ya viven junto a su lógica
+  (dedup, OTP); un módulo aparte reduciría locality (over-engineering para un prototipo).
 - [ ] **D-4 · `packages/auth`** (M): extraer auth+email (único paquete nuevo; `isAdmin`
   puro a `shared` para no crear ciclo). Al final, con todo verde.
 - [ ] **D-5 · ADRs y docs** (S): matriz de las 3 vías de escritura

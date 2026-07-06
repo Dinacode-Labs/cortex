@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
-import { apiPost } from "@cortex/shared";
+import { apiPost, getEnvNum } from "@cortex/shared";
 import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
 import { wireLlm } from "@cortex/agents";
 
@@ -14,7 +14,10 @@ import { wireLlm } from "@cortex/agents";
  * Uso: cortex connect-notion "<slug>" <ruta-export>
  * Requiere `cortex auth login` y el servidor en marcha. Env: CORTEX_DRY=1.
  */
-const PHASE1_CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "4");
+// Comparte la palanca de concurrencia de ingesta con `cortex ingest` (misma env,
+// mismo default 8). El conector sube por la API autenticada; si se quiere más
+// conservador con Notion, baja CORTEX_INGEST_CONCURRENCY en el entorno.
+const PHASE1_CONCURRENCY = getEnvNum("CORTEX_INGEST_CONCURRENCY", 8);
 const CHUNK = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
 const MIN_BODY = Number(process.env.CORTEX_NOTION_MIN_BODY ?? "40");
 const MAX_CONTENT = 8000;
