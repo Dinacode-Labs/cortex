@@ -1,5 +1,6 @@
 import { getSql } from "@cortex/database";
 import type { Row } from "./map.js";
+import { canonicalize } from "./text.js";
 
 /**
  * Loop de resolución de entidades (§12.4): fusiona variantes de una misma entidad
@@ -11,12 +12,10 @@ import type { Row } from "./map.js";
  * la entidad con más enlaces (desempate: nombre más descriptivo).
  */
 
+// Normalización sobre la base canónica compartida (NFD + sin diacríticos +
+// minúsculas + trim + colapsa espacios) y además quita todo lo no alfanumérico.
 function norm(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
+  return canonicalize(s).replace(/[^a-z0-9]+/g, "");
 }
 
 export interface ResolveResult {

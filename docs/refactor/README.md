@@ -149,9 +149,12 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   código de seguridad — 8 casos); borrado el pipeline muerto (`ingestSessionFile`,
   `alreadyIngested`, `resolveProjectFromCwd`, `SUPPORTED_DOC_EXTS`). Superficie pública
   de los barrels intacta.
-- [ ] **D-2 · Consolidaciones que arreglan bugs** (M): `rrfFuse` único, `extractJson` +
-  **una** política de retry (hoy retry×2 sobre `maxRetries:6` de Mastra = hasta 14
-  requests), `canonicalize` como única normalización, Voyage como OpenAICompatible.
+- [x] **D-2 · Consolidaciones que arreglan bugs** (M, PR #16): `rrfFuse` único
+  (vectors↔code, conservando el score normalizado en híbrido vs sin normalizar en código);
+  `extractJson` único en `agents/llm-json.ts` (3→1; distill gana el manejo de fences);
+  `canonicalize` como base de `norm`/`slugify` (equivalencia de output verificada); Voyage
+  plegado en `OpenAICompatibleEmbeddingProvider` (gana reintentos). La unificación de la
+  política de retry (retry×2 sobre Mastra) se aplaza: es tuning con riesgo, no dedup.
 - [ ] **D-3 · Config y poda** (M): `config.ts` lazy por paquete (defaults en un sitio);
   `.env.example` completo (~37 vars sin documentar); poda de código muerto y del barrel
   de core; decidir la hipótesis Mastra-workflows (adoptar o borrar `workflows.ts` +
