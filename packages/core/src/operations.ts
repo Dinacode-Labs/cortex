@@ -11,7 +11,7 @@ import {
   searchContextInput,
 } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "./entities.js";
-import { findProjectIdByName } from "./projects.js";
+import { findProjectIdByName, listAccessibleProjects } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import {
   canonicalize,
@@ -236,18 +236,41 @@ async function detectImprovements(
 
 // --- search_project_context --------------------------------------------------
 
-/** Búsqueda híbrida (vector + FTS + RRF) con rerank opcional. §15.6. */
-export async function searchContext(input: SearchContextInput): Promise<SearchHit[]> {
+/**
+ * Búsqueda híbrida (vector + FTS + RRF) con rerank opcional. §15.6.
+ *
+ * SCOPING DE SEGURIDAD (P0): sin `input.project`, por defecto se busca en TODOS los
+ * proyectos (comportamiento confiable local, p.ej. stdio MCP). Los callers expuestos
+ * a red (MCP autenticado, web) deben pasar `opts.restrictToAccessibleOf` con el email
+ * del usuario (o null) para restringir la búsqueda a los proyectos accesibles y no
+ * filtrar contenido de proyectos privados ajenos. Con `input.project` concreto el
+ * comportamiento es intacto (el guard del caller ya controla el acceso a ese proyecto).
+ */
+export async function searchContext(
+  input: SearchContextInput,
+  opts?: { restrictToAccessibleOf?: string | null },
+): Promise<SearchHit[]> {
   const parsed = searchContextInput.parse(input);
   const sql = getSql();
   const provider = getEmbeddingProvider();
   const projectId = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
 
-  // Si hay reranker, sobre-recuperamos para que reordene un pool mayor.
+  // Scoping por accesibles: solo cuando NO hay proyecto concreto Y el caller ha pedido
+  // restringir (distinguimos "opts ausente" = llamada confiable, de "restrictToAccessibleOf:
+  // null" = usuario anónimo → solo proyectos públicos).
+  let projectIds: string[] | null | undefined;
+  if (!projectId && opts && "restrictToAccessibleOf" in opts) {
+    const accessible = await listAccessibleProjects(opts.restrictToAccessibleOf ?? null);
+    projectIds = accessible.map((p) => p.id); // array vacío permitido → cero resultados
+  }
+
+  // Si hay reranker, sobre-recuperamos para que reordene un pool mayor. El filtro por
+  // projectIds se aplica en hybridSearch (antes del rerank), no filtra tras reordenar.
   const overFetch = reranker ? Math.min(parsed.limit * 3, 30) : parsed.limit;
   const hits = await hybridSearch(sql, provider, {
     queryText: parsed.query,
     projectId,
+    projectIds,
     type: parsed.type,
     limit: overFetch,
   });

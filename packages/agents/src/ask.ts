@@ -14,8 +14,15 @@ export interface AskResult {
   hits: SearchHit[];
 }
 
-export async function askProjectContext(question: string, project?: string, limit = 6): Promise<AskResult> {
-  const hits = await searchContext({ query: question, project, limit });
+export async function askProjectContext(
+  question: string,
+  project?: string,
+  limit = 6,
+  opts?: { restrictToAccessibleOf?: string | null },
+): Promise<AskResult> {
+  // Scoping de seguridad: se propaga tal cual a searchContext (ver su doc). Sin `opts`
+  // = llamada confiable (busca en todo); con él = restringe a los proyectos accesibles.
+  const hits = await searchContext({ query: question, project, limit }, opts);
   const answer = await synthesizeContextAnswer(
     question,
     hits.map((h) => ({ title: h.entry.title, summary: h.entry.summary ?? h.entry.content, type: h.entry.type })),

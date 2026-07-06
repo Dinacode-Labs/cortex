@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { closeSql } from "@cortex/database";
-import { createProject, listEntries, requestOtp, verifyOtp, type ProjectRef } from "@cortex/core";
+import { createProject, listEntries, requestOtp, verifyOtp, saveContext, type ProjectRef } from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 import { createApp as createServerApp } from "../../apps/server/src/app.js";
 import { createMcpHttpApp } from "../../apps/mcp-server/src/http-app.js";
@@ -147,6 +147,31 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     const search = await web.request(`/search?q=${encodeURIComponent(`Restricción de seguridad ${RID}`)}&project=${encodeURIComponent(prvOwn.name)}`, { headers: { cookie: `cortex_session=${token}` } });
     expect(search.status).toBe(200);
     expect(await search.text()).not.toContain("<script>alert");
+  });
+
+  it("web: GET /search sin proyecto NO filtra entradas de privados ajenos (P0)", async () => {
+    // Fuga P0 (backlog #1): la web con sesión pero sin proyecto no puede devolver
+    // contenido de proyectos privados ajenos. Sembramos una entrada en el privado de
+    // OWNER (prvForeign) y buscamos como USER (no miembro): su título no debe aparecer.
+    // Usamos DOS tokens: `queryTok` va en el contenido (dispara la búsqueda) y se
+    // devuelve en el <h1> "Resultados para ..."; `secretTok` SOLO en el título → si
+    // aparece en el body, es que se filtró la entrada privada (no el eco de la query).
+    const web = createWebApp();
+    const queryTok = `webbuscable${RID}`;
+    const secretTok = `WEBTITULOSECRETO${RID}`;
+    await saveContext({
+      content: `Contenido reservado ${queryTok}.`,
+      project: prvForeign.name,
+      type: "constraint",
+      title: `Restricción ${secretTok}`,
+    });
+
+    const res = await web.request(`/search?q=${encodeURIComponent(queryTok)}`, {
+      headers: { cookie: `cortex_session=${token}` },
+    });
+    expect(res.status).toBe(200);
+    const bodyHtml = await res.text();
+    expect(bodyHtml).not.toContain(secretTok); // el título del privado ajeno NO se filtra
   });
 
   it("mcp http: POST /mcp sin Bearer → 401 (auth on por defecto)", async () => {

@@ -81,7 +81,11 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       try {
         const denied = await guard(args.project);
         if (denied) return errorText(denied);
-        return text(renderSearchHits(await searchContext(args)));
+        // Con usuario (HTTP autenticado) y sin proyecto concreto, restringimos la
+        // búsqueda a los proyectos accesibles (no filtrar privados ajenos). Sin `user`
+        // (stdio local, confiable) se busca en todo, como antes.
+        const hits = user ? await searchContext(args, { restrictToAccessibleOf: user.email }) : await searchContext(args);
+        return text(renderSearchHits(hits));
       } catch (e) {
         return errorText(`Error en la búsqueda: ${(e as Error).message}`);
       }
@@ -181,7 +185,14 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         const denied = await guard(project);
         if (denied) return errorText(denied);
         // Orquestación compartida con la web (/ask): recuperar + sintetizar (@cortex/agents).
-        const { answer, hits } = await askProjectContext(question, project);
+        // Con usuario y sin proyecto concreto, restringimos a proyectos accesibles (P0);
+        // `undefined` como limit conserva el default (6). Sin `user` (stdio) sin cambio.
+        const { answer, hits } = await askProjectContext(
+          question,
+          project,
+          undefined,
+          user ? { restrictToAccessibleOf: user.email } : undefined,
+        );
         return text(answer ? `${answer}\n\n---\nFuentes consultadas:\n${renderSearchHits(hits)}` : renderSearchHits(hits));
       } catch (e) {
         return errorText(`Error al responder: ${(e as Error).message}`);
