@@ -1,5 +1,6 @@
 import type { ContextEntry } from "@cortex/shared";
-import type { ContextPack, SaveContextResult } from "./operations.js";
+import type { ContextPack } from "./context-pack.js";
+import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "./vectors.js";
 
 /** Renderizadores a Markdown para que las tools MCP devuelvan texto legible. */
