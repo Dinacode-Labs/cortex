@@ -7,8 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "hook:context": "tsx ../../apps/cli/src/commands/hook-context.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cortex/database": "workspace:*",

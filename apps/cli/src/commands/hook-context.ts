@@ -1,4 +1,4 @@
-import { apiGet, loadEnv } from "@cortex/shared";
+import { apiGet } from "@cortex/shared";
 import { readCortexLink } from "@cortex/core";
 
 /**
@@ -25,42 +25,41 @@ function argOf(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
+/**
+ * Comando `managed: false`: gestiona su propio ciclo de vida. Un hook NUNCA debe romper
+ * la sesión ni ensuciar stderr, así que traga cualquier error en silencio y sale con 0.
+ * (loadEnv lo hace el dispatcher antes de invocar el comando.)
+ */
 export async function run(): Promise<void> {
-  // Formato de salida por agente: claude/codex (additionalContext) | hermes ({context}) | text.
-  const format = (argOf("--format") || "claude").toLowerCase();
-  let input: { cwd?: string; hook_event_name?: string } = {};
   try {
-    input = JSON.parse((await readStdin()) || "{}");
+    // Formato de salida por agente: claude/codex (additionalContext) | hermes ({context}) | text.
+    const format = (argOf("--format") || "claude").toLowerCase();
+    let input: { cwd?: string; hook_event_name?: string } = {};
+    try {
+      input = JSON.parse((await readStdin()) || "{}");
+    } catch {
+      /* sin stdin (p.ej. OpenCode pasa --cwd) */
+    }
+    const cwd = argOf("--cwd") || input.cwd || process.cwd();
+    const link = readCortexLink(cwd);
+    if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
+
+    // Vía API autenticada (no toca la BD): respeta permisos y no expone proyectos sin acceso.
+    const res = await apiGet<{ project: string; text: string }>(`/context-pack?slug=${encodeURIComponent(link.slug)}`);
+    if (!res || !res.text.trim()) return; // sin sesión, sin servidor, sin acceso, o pack vacío
+
+    const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${res.project}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${res.text.slice(0, MAX_CTX)}`;
+
+    if (format === "hermes") {
+      process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call
+    } else if (format === "text") {
+      process.stdout.write(additionalContext); // OpenCode plugin lee stdout
+    } else {
+      process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: input.hook_event_name || "SessionStart", additionalContext } })); // Claude / Codex
+    }
   } catch {
-    /* sin stdin (p.ej. OpenCode pasa --cwd) */
+    /* un hook nunca debe romper la sesión: silencioso */
+  } finally {
+    process.exit(0);
   }
-  const cwd = argOf("--cwd") || input.cwd || process.cwd();
-  const link = readCortexLink(cwd);
-  if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
-
-  // Vía API autenticada (no toca la BD): respeta permisos y no expone proyectos sin acceso.
-  const res = await apiGet<{ project: string; text: string }>(`/context-pack?slug=${encodeURIComponent(link.slug)}`);
-  if (!res || !res.text.trim()) return; // sin sesión, sin servidor, sin acceso, o pack vacío
-
-  const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${res.project}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${res.text.slice(0, MAX_CTX)}`;
-
-  if (format === "hermes") {
-    process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call
-  } else if (format === "text") {
-    process.stdout.write(additionalContext); // OpenCode plugin lee stdout
-  } else {
-    process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: input.hook_event_name || "SessionStart", additionalContext } })); // Claude / Codex
-  }
-}
-
-// Compat: los hooks instalados lo invocan directamente (script pnpm hook:context).
-if (import.meta.url === `file://${process.argv[1]}`) {
-  loadEnv();
-  run()
-    .catch(() => {
-      /* un hook nunca debe romper la sesión: silencioso */
-    })
-    .finally(() => {
-      process.exit(0);
-    });
 }

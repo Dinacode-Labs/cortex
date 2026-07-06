@@ -54,7 +54,10 @@ export function buildCtx(apply: boolean): SyncCtx {
     toolbelt: JSON.parse(readFileSync(join(repo, "config/toolbelt.json"), "utf8")) as Manifest,
     hookContextCmd,
     hookCaptureCmd,
-    // Sintaxis anterior a B-1 (scripts de paquete): se sustituye al re-sincronizar.
+    // Sintaxis anterior a B-1 (scripts de paquete `hook:context`/`hook:capture`, ya
+    // RETIRADOS): `cortex sync --apply` la detecta en los hooks instalados y la sustituye
+    // por la sintaxis del CLI. Imprescindible hasta que todo el equipo re-sincronice (un
+    // hook con la sintaxis vieja ya no funciona: el script puente no existe).
     legacyHookCmds: [
       { old: `pnpm -C ${repo} --filter @cortex/core run hook:context`, now: hookContextCmd },
       { old: `pnpm -C ${repo} --filter @cortex/agents run hook:capture`, now: hookCaptureCmd },
