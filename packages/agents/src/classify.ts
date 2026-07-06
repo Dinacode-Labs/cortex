@@ -1,6 +1,7 @@
 import { contextEntryType, entityType } from "@cortex/shared";
 import type { ContextEntryType, EntityType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
+import { extractJson } from "./llm-json.js";
 
 /**
  * Agente de clasificación / ingesta (§7). Dado un texto libre de conocimiento,
@@ -33,15 +34,6 @@ ${content}
 """
 
 Responde solo con el JSON.`;
-}
-
-/** Extrae el primer bloque JSON de la respuesta (por si llega con fences). */
-function extractJson(raw: string): string {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced?.[1]) return fenced[1].trim();
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
-  return start >= 0 && end > start ? raw.slice(start, end + 1) : raw;
 }
 
 /**

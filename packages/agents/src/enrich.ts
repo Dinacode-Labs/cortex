@@ -1,6 +1,7 @@
 import { entityType, relationType } from "@cortex/shared";
 import type { EntityType, RelationType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
+import { extractJson } from "./llm-json.js";
 
 /**
  * Agente de extracción de grafo (§7 Entity Resolution + Knowledge Graph Agents).
@@ -47,14 +48,6 @@ Conocimiento:
 """
 ${content.slice(0, 3500)}
 """`;
-}
-
-function extractJson(raw: string): string {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced?.[1]) return fenced[1].trim();
-  const s = raw.indexOf("{");
-  const e = raw.lastIndexOf("}");
-  return s >= 0 && e > s ? raw.slice(s, e + 1) : raw;
 }
 
 /** Extrae grafo de una entrada. Devuelve null si falla (tolerante a errores). */

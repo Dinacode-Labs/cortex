@@ -1,11 +1,11 @@
 import { getEnv, requireEnv } from "@cortex/shared";
 import { LocalEmbeddingProvider } from "./local.js";
 import { type EmbeddingProvider } from "./provider.js";
-import { OpenAICompatibleEmbeddingProvider, VoyageEmbeddingProvider } from "./remote.js";
+import { OpenAICompatibleEmbeddingProvider } from "./remote.js";
 
 export { type EmbeddingProvider, l2normalize } from "./provider.js";
 export { LocalEmbeddingProvider } from "./local.js";
-export { OpenAICompatibleEmbeddingProvider, VoyageEmbeddingProvider } from "./remote.js";
+export { OpenAICompatibleEmbeddingProvider } from "./remote.js";
 export { setEmbeddingUsageSink, type EmbeddingUsage } from "./usage-sink.js";
 
 let cached: EmbeddingProvider | undefined;
@@ -37,7 +37,14 @@ export function getEmbeddingProvider(): EmbeddingProvider {
       });
       break;
     case "voyage":
-      cached = new VoyageEmbeddingProvider(requireEnv("VOYAGE_API_KEY"));
+      // Voyage es OpenAI-compatible para embeddings: reutilizamos el mismo cliente
+      // (con reintentos y reporte de uso unificado). Mismo env var y mismo fallo si falta.
+      cached = new OpenAICompatibleEmbeddingProvider({
+        apiKey: requireEnv("VOYAGE_API_KEY"),
+        baseURL: "https://api.voyageai.com/v1",
+        model: "voyage-3",
+        dim: 1024,
+      });
       break;
     case "local":
       cached = new LocalEmbeddingProvider();
