@@ -20,7 +20,11 @@ askRoutes.get("/ask", async (c) => {
 
   let answerHtml: Html = html``;
   if (q) {
-    const { answer, hits } = await askProjectContext(q, project);
+    // Scoping de seguridad (P0): sin proyecto concreto, restringe a accesibles.
+    // `undefined` como limit conserva el default (6).
+    const { answer, hits } = await askProjectContext(q, project, undefined, {
+      restrictToAccessibleOf: c.get("user")?.email ?? null,
+    });
     const sources = hits.length
       ? html`<div class="panel"><h2>Fuentes consultadas</h2>${hits.map(
           (h) => html`<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#0099ff")} <a href="/entry/${h.entry.id}">${h.entry.title}</a></div>`,

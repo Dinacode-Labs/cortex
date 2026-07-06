@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { closeSql } from "@cortex/database";
-import { createProject, canAccessProject, addProjectMember, findProjectBySlug, saveContext, listEntries, getEntryProject } from "@cortex/core";
+import { createProject, canAccessProject, addProjectMember, findProjectBySlug, saveContext, searchContext, listEntries, getEntryProject } from "@cortex/core";
 
 const RID = Date.now().toString(36);
 afterAll(async () => {
@@ -36,6 +36,31 @@ describe("permisos de proyecto (público/privado, admin, miembros, cascada)", ()
     expect(await canAccessProject(proj!, "ajeno@dinacode.com")).toBe(false); // sin acceso → bloqueado
 
     expect(await getEntryProject("00000000-0000-0000-0000-000000000000")).toBeNull(); // entrada inexistente
+  });
+
+  it("searchContext sin proyecto: restringe a proyectos accesibles (P0, no filtra privados ajenos)", async () => {
+    // Fuga P0 (backlog #1): buscar SIN proyecto no puede devolver entradas de proyectos
+    // privados ajenos. El scoping va en core (opts.restrictToAccessibleOf), compartido
+    // por MCP y web. Este test fallaría si se revierte el fix (searchContext buscaría en
+    // TODO y el marcador aparecería con el email de userB, que no es miembro).
+    const userA = `owner-search-${RID}@dinacode.com`;
+    const userB = `ajeno-search-${RID}@dinacode.com`; // NO miembro, NO admin
+    const marker = `MARCADORSECRETO${RID}`; // marcador único en el contenido
+    const prv = await createProject(`IT Search Prv ${RID}`, { visibility: "private", ownerEmail: userA });
+    await saveContext({ content: `Secreto: la clave es ${marker}.`, project: prv.name, type: "constraint" });
+
+    const foundBy = async (email: string | null) =>
+      (await searchContext({ query: marker, limit: 20 }, { restrictToAccessibleOf: email })).some(
+        (h) => h.entry.content.includes(marker),
+      );
+
+    // userB (ajeno) NO debe ver la entrada del privado de userA.
+    expect(await foundBy(userB)).toBe(false);
+    // userA (dueño) SÍ.
+    expect(await foundBy(userA)).toBe(true);
+    // Sin opts (llamada confiable, p.ej. stdio local) → busca en TODO → SÍ.
+    const trusted = await searchContext({ query: marker, limit: 20 });
+    expect(trusted.some((h) => h.entry.content.includes(marker))).toBe(true);
   });
 
   it("cascada: subproyecto público bajo padre privado queda restringido", async () => {

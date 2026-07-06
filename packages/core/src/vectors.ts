@@ -66,6 +66,12 @@ export async function hybridSearch(
   args: {
     queryText: string;
     projectId?: string | null;
+    /**
+     * Scoping por conjunto de proyectos ACCESIBLES (búsqueda sin proyecto concreto).
+     * Solo se aplica cuando NO hay `projectId` (un proyecto concreto manda). Un array
+     * VACÍO restringe a CERO filas (usuario sin proyectos accesibles → nada).
+     */
+    projectIds?: string[] | null;
     type?: ContextEntryType;
     limit: number;
     excludeId?: string;
@@ -80,7 +86,13 @@ export async function hybridSearch(
 
   // Filtros comunes (se aplican a ambas ramas; tabla siempre aliasada `ce`).
   let filters = sql``;
-  if (args.projectId) filters = sql`${filters} AND ce.project_id = ${args.projectId}`;
+  if (args.projectId) {
+    filters = sql`${filters} AND ce.project_id = ${args.projectId}`;
+  } else if (args.projectIds) {
+    // Sin proyecto concreto pero con scoping de accesibles: restringe al conjunto.
+    // Array vacío → `= ANY('{}')` no casa con nada → cero filas (fail-closed).
+    filters = sql`${filters} AND ce.project_id = ANY(${args.projectIds})`;
+  }
   if (args.type) filters = sql`${filters} AND ce.type = ${args.type}`;
   if (args.excludeId) filters = sql`${filters} AND ce.id <> ${args.excludeId}`;
   if (!args.includeArchived) filters = sql`${filters} AND ce.status NOT IN ('rejected', 'obsolete')`;
@@ -154,6 +166,11 @@ export async function vectorSearch(
   args: {
     queryText: string;
     projectId?: string | null;
+    /**
+     * Scoping por conjunto de proyectos ACCESIBLES (búsqueda sin proyecto concreto).
+     * Solo se aplica cuando NO hay `projectId`. Array VACÍO → cero filas.
+     */
+    projectIds?: string[] | null;
     type?: ContextEntryType;
     limit: number;
     excludeId?: string;
@@ -167,7 +184,12 @@ export async function vectorSearch(
   const lit = toVectorLiteral(vectors[0]!);
 
   let where = sql`WHERE e.embedding_model = ${provider.model} AND e.embedding_version = ${provider.version}`;
-  if (args.projectId) where = sql`${where} AND ce.project_id = ${args.projectId}`;
+  if (args.projectId) {
+    where = sql`${where} AND ce.project_id = ${args.projectId}`;
+  } else if (args.projectIds) {
+    // Array vacío → `= ANY('{}')` no casa con nada → cero filas (fail-closed).
+    where = sql`${where} AND ce.project_id = ANY(${args.projectIds})`;
+  }
   if (args.type) where = sql`${where} AND ce.type = ${args.type}`;
   if (args.excludeId) where = sql`${where} AND ce.id <> ${args.excludeId}`;
   if (!args.includeArchived) where = sql`${where} AND ce.status NOT IN ('rejected', 'obsolete')`;
