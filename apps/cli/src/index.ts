@@ -48,7 +48,6 @@ const COMMANDS: Record<string, Cmd> = {
   enrich: { help: "pase de enriquecimiento de grafo (entidades + relaciones) de un proyecto", load: () => import("./commands/enrich.js") },
   maintain: { help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
   "maintain-worker": { help: "worker de mantenimiento programado (cron)", managed: false, load: () => import("./commands/maintain-worker.js") },
-  "demo-capture": { help: "demo del workflow de captura de Mastra", load: () => import("./commands/demo-capture.js") },
   sync: { help: "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)", load: () => import("./commands/sync.js") },
 };
 

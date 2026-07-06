@@ -17,7 +17,9 @@ un MCP corporativo. Documento fundacional: `dinacode-cortex-contexto-y-plan-demo
 - **Monorepo** pnpm (`packages/*` librerías, `apps/*` ejecutables).
 - **TypeScript** + ESM (`NodeNext`), ejecución con `tsx`, Node ≥ 20.
 - **Postgres 16 + pgvector** como base única (documental + vectorial + relacional).
-- **Mastra** para agentes/workflows (hipótesis a validar en código).
+- **Mastra** para los agentes individuales (classify/enrich/rerank/synthesize/distill
+  vía `runAgent`). Sus *workflows* se evaluaron y **no** se adoptaron para la captura
+  (ver ADR en `docs/decisions.md`); la captura usa la vía determinista de `core`.
 - **MCP** (SDK oficial TS) como interfaz hacia Claude Code / Codex / ChatGPT.
 - Embeddings y LLM **enchufables**, con fallback local sin API keys.
 

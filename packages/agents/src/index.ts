@@ -13,9 +13,3 @@ export {
   runSessionsBackfill,
   type ApiCaptureResult,
 } from "./capture-pipeline.js";
-export {
-  captureContextWorkflow,
-  runCaptureWorkflow,
-  type CaptureInput,
-  type CaptureOutput,
-} from "./workflows.js";
