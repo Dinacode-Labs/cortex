@@ -23,7 +23,6 @@ const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
 const DRAWIO_EXTS = ["drawio", "xml"];
 const AUDIO_EXTS = ["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga"];
 const VIDEO_EXTS = ["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"];
-export const SUPPORTED_DOC_EXTS = new Set(DOC_EXTS);
 export const SUPPORTED_EXTS = new Set([...DOC_EXTS, ...IMAGE_EXTS, ...DRAWIO_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS]);
 
 // Por debajo de esto, una imagen suele ser ruido (iconos, separadores) → no se captiona.
