@@ -1,5 +1,9 @@
 import { contextEntryType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
+// extractJson compartido: además del recorte por llaves (comportamiento previo de
+// distill), ahora entiende bloques cercados ```json — mejora estricta, no regresión:
+// el fence es un superconjunto del recorte simple que hacíamos aquí.
+import { extractJson } from "./llm-json.js";
 
 /**
  * Destilación LLM de un fragmento de transcript de sesión → conocimiento TIPADO
@@ -11,12 +15,6 @@ import { runAgent } from "./mastra.js";
 const TYPES = contextEntryType.options as readonly string[];
 
 export interface Item { type: string; title: string; content: string }
-
-function extractJson(raw: string): string {
-  const s = raw.indexOf("{");
-  const e = raw.lastIndexOf("}");
-  return s >= 0 && e > s ? raw.slice(s, e + 1) : raw;
-}
 
 export async function distill(project: string, window: string): Promise<Item[]> {
   const prompt = `Proyecto: "${project}". Fragmento de transcript de una sesión de un agente de IA trabajando en este proyecto:
