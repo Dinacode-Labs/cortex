@@ -1,5 +1,11 @@
 # Revisión de arquitectura y plan de refactor — julio 2026
 
+> ## ✅ REFACTOR COMPLETADO (2026-07-06)
+> Las fases A–D están mergeadas (PRs #2–#20) con CI verde en cada paso, más el fix de
+> seguridad P0 (búsqueda sin proyecto, backlog #1). Este documento se conserva como
+> registro del encargo y su ejecución. Lo aplazado por proporcionalidad queda anotado en
+> cada paso y en los ADR-0017–0022 de [`decisions.md`](../decisions.md).
+
 > **Encargo:** revisar la arquitectura del prototipo (construido en días, con vibecoding,
 > sin pruebas reales) y refactorizar hacia **código limpio y modular, sin sobreingeniería**.
 > Este documento es el informe y el plan; los ~70 hallazgos con evidencia `fichero:línea`
@@ -165,13 +171,17 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   (era 8 en ingest y 4 en connect-notion, mismo var → unificado a 8). Desviación consciente
   del plan: NO se crea `config.ts` por paquete — los tunables ya viven junto a su lógica
   (dedup, OTP); un módulo aparte reduciría locality (over-engineering para un prototipo).
-- [ ] **D-4 · `packages/auth`** (M): extraer auth+email (único paquete nuevo; `isAdmin`
-  puro a `shared` para no crear ciclo). Al final, con todo verde.
-- [ ] **D-5 · ADRs y docs** (S): matriz de las 3 vías de escritura
-  (`saveContext`/`saveWithReconciliation`/`captureBatch`), zod de filas (validar o
-  degradar a tipos), FTS `'spanish'`, pricing hardcodeado en `usage.ts`, migración
-  `UNIQUE(source_id,target_id,relation_type)` en relations (`backlog #16`) y CHECK de
-  visibility, columna vector sin dimensión (`backlog #34`).
+- [x] **D-4 · `packages/auth` — evaluado y NO extraído** (decisión con el usuario,
+  ADR-0018): auth+email se quedan en core; el beneficio era puramente topológico y no
+  justificaba la churn (paquete + tsconfig + 2 vitest configs) en un prototipo. La
+  extracción queda como movimiento mecánico si el repo crece.
+- [x] **D-5 · Hardening de BD + ADRs** (PRs #19-#20): migración 0013 con UNIQUE parcial
+  de aristas activas (`backlog #16`), CHECK de visibility, `relate()` atómico y
+  `resolve-entities` conflict-safe. ADRs de las decisiones diferidas: matriz de las 3 vías
+  de escritura (ADR-0019), FTS `'spanish'` (ADR-0020), pricing hardcodeado (ADR-0021), zod
+  de filas como tipos (ADR-0022). Aplazado por proporcionalidad: unificación de las vías de
+  escritura y columna vector con dimensión fija/HNSW (`backlog #34`, se decide al fijar
+  proveedor de embeddings serio).
 
 ## Qué NO hacemos (deliberadamente)
 
