@@ -3,15 +3,11 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
 import {
   type ContextEntry,
   type ContextEntryType,
-  type ContextEntryStatus,
   type EntityType,
   type SaveContextInput,
-  type SearchContextInput,
   saveContextInput,
-  searchContextInput,
 } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "./entities.js";
-import { findProjectIdByName, listAccessibleProjects } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import {
   canonicalize,
@@ -22,9 +18,7 @@ import {
   polarityTags,
   summarize,
 } from "./text.js";
-import { hybridSearch, storeEmbedding, vectorSearch, type SearchHit } from "./vectors.js";
-
-export type { SearchHit } from "./vectors.js";
+import { storeEmbedding, vectorSearch } from "./vectors.js";
 
 // --- Hook de clasificación opcional (capa LLM) -------------------------------
 
@@ -47,16 +41,6 @@ let classifier: Classifier | null = null;
  */
 export function setClassifier(fn: Classifier | null): void {
   classifier = fn;
-}
-
-/** Reranker opcional de 2ª etapa (p.ej. LLM). Reordena los hits por relevancia. */
-export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]>;
-
-let reranker: Reranker | null = null;
-
-/** Registra (o desregistra con null) un reranker. Lo cablean los entrypoints. */
-export function setReranker(fn: Reranker | null): void {
-  reranker = fn;
 }
 
 // --- save_project_context ----------------------------------------------------
@@ -234,159 +218,6 @@ async function detectImprovements(
   return warnings;
 }
 
-// --- search_project_context --------------------------------------------------
-
-/**
- * Búsqueda híbrida (vector + FTS + RRF) con rerank opcional. §15.6.
- *
- * SCOPING DE SEGURIDAD (P0): sin `input.project`, por defecto se busca en TODOS los
- * proyectos (comportamiento confiable local, p.ej. stdio MCP). Los callers expuestos
- * a red (MCP autenticado, web) deben pasar `opts.restrictToAccessibleOf` con el email
- * del usuario (o null) para restringir la búsqueda a los proyectos accesibles y no
- * filtrar contenido de proyectos privados ajenos. Con `input.project` concreto el
- * comportamiento es intacto (el guard del caller ya controla el acceso a ese proyecto).
- */
-export async function searchContext(
-  input: SearchContextInput,
-  opts?: { restrictToAccessibleOf?: string | null },
-): Promise<SearchHit[]> {
-  const parsed = searchContextInput.parse(input);
-  const sql = getSql();
-  const provider = getEmbeddingProvider();
-  const projectId = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
-
-  // Scoping por accesibles: solo cuando NO hay proyecto concreto Y el caller ha pedido
-  // restringir (distinguimos "opts ausente" = llamada confiable, de "restrictToAccessibleOf:
-  // null" = usuario anónimo → solo proyectos públicos).
-  let projectIds: string[] | null | undefined;
-  if (!projectId && opts && "restrictToAccessibleOf" in opts) {
-    const accessible = await listAccessibleProjects(opts.restrictToAccessibleOf ?? null);
-    projectIds = accessible.map((p) => p.id); // array vacío permitido → cero resultados
-  }
-
-  // Si hay reranker, sobre-recuperamos para que reordene un pool mayor. El filtro por
-  // projectIds se aplica en hybridSearch (antes del rerank), no filtra tras reordenar.
-  const overFetch = reranker ? Math.min(parsed.limit * 3, 30) : parsed.limit;
-  const hits = await hybridSearch(sql, provider, {
-    queryText: parsed.query,
-    projectId,
-    projectIds,
-    type: parsed.type,
-    limit: overFetch,
-  });
-  if (!reranker) return hits;
-  const reranked = await reranker(parsed.query, hits).catch(() => hits);
-  return reranked.slice(0, parsed.limit);
-}
-
-// --- list_project_decisions --------------------------------------------------
-
-/** Lista las decisiones técnicas de un proyecto. */
-export async function listDecisions(project: string, limit = 20): Promise<ContextEntry[]> {
-  const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
-  if (!projectId) return [];
-  const rows = (await sql`
-    SELECT * FROM context_entries
-    WHERE project_id = ${projectId} AND type = 'decision'
-      AND status NOT IN ('rejected') AND valid_to IS NULL
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `) as unknown as Row[];
-  return rows.map(rowToContextEntry);
-}
-
-// --- validate_context_entry --------------------------------------------------
-
-/** Cambia el estado de validación de una entrada. §15.4. */
-export async function validateEntry(
-  id: string,
-  status: Extract<ContextEntryStatus, "validated" | "rejected" | "obsolete">,
-): Promise<ContextEntry | null> {
-  const sql = getSql();
-  const rows = (await sql`
-    UPDATE context_entries SET status = ${status} WHERE id = ${id} RETURNING *
-  `) as unknown as Row[];
-  return rows[0] ? rowToContextEntry(rows[0]) : null;
-}
-
-// --- get_project_context_pack ------------------------------------------------
-
-export interface ContextPack {
-  project: string;
-  generatedAt: Date;
-  decisions: ContextEntry[];
-  constraints: ContextEntry[];
-  risks: ContextEntry[];
-  technicalDebt: ContextEntry[];
-  conventions: ContextEntry[];
-  sensitiveModules: string[];
-  relevantToArea: SearchHit[];
-  totalEntries: number;
-}
-
-/**
- * Genera un paquete de contexto para herramientas de IA (Claude Code/Codex).
- * §12.10, §15.3. Por defecto solo hechos VIGENTES; `asOf` para point-in-time.
- */
-export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
-  const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
-  if (!projectId) {
-    throw new Error(`Proyecto no encontrado: "${project}".`);
-  }
-
-  // Herencia: el pack incluye el conocimiento del proyecto + el de sus ancestros (padre).
-  const ids = await projectIdsWithAncestors(sql, projectId);
-  const [decisions, constraints, risks, technicalDebt, conventions] = await Promise.all([
-    entriesByType(sql, ids, "decision", asOf),
-    entriesByType(sql, ids, "constraint", asOf),
-    entriesByType(sql, ids, "risk", asOf),
-    entriesByType(sql, ids, "technical_debt", asOf),
-    entriesByType(sql, ids, "convention", asOf),
-  ]);
-
-  const moduleRows = (await sql`
-    SELECT DISTINCT e.name
-    FROM entities e
-    JOIN context_entry_entities cee ON cee.entity_id = e.id
-    JOIN context_entries ce ON ce.id = cee.context_entry_id
-    WHERE e.type = 'module' AND ce.project_id = ${projectId}
-  `) as unknown as Row[];
-  const sensitiveModules = moduleRows.map((r) => r.name as string);
-
-  const countRows = (await sql`
-    SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${projectId}
-  `) as unknown as Row[];
-  const totalEntries = Number(countRows[0]!.n);
-
-  let relevantToArea: SearchHit[] = [];
-  if (area) {
-    const provider = getEmbeddingProvider();
-    relevantToArea = await vectorSearch(sql, provider, {
-      queryText: area,
-      projectId,
-      limit: 5,
-      asOf,
-    });
-  }
-
-  return {
-    project,
-    generatedAt: new Date(),
-    decisions,
-    constraints,
-    risks,
-    technicalDebt,
-    conventions,
-    sensitiveModules,
-    relevantToArea,
-    totalEntries,
-  };
-}
-
-// --- helpers -----------------------------------------------------------------
-
 /** Une entidades heurísticas y de LLM, deduplicando por (tipo + nombre canónico). */
 function mergeEntities(
   ...lists: { name: string; type: EntityType }[][]
@@ -399,38 +230,4 @@ function mergeEntities(
     }
   }
   return [...byKey.values()];
-}
-
-/** IDs del proyecto + todos sus ancestros (jerarquía padre). Para herencia de contexto. */
-async function projectIdsWithAncestors(sql: Sql, projectId: string): Promise<string[]> {
-  const rows = (await sql`
-    WITH RECURSIVE chain AS (
-      SELECT id, parent_id FROM entities WHERE id = ${projectId}
-      UNION ALL
-      SELECT e.id, e.parent_id FROM entities e JOIN chain c ON e.id = c.parent_id
-    )
-    SELECT id FROM chain
-  `) as unknown as Row[];
-  return rows.map((r) => r.id as string);
-}
-
-async function entriesByType(
-  sql: Sql,
-  projectIds: string[],
-  type: ContextEntryType,
-  asOf?: Date,
-  limit = 20,
-): Promise<ContextEntry[]> {
-  const temporal = asOf
-    ? sql`AND valid_from <= ${asOf} AND (valid_to IS NULL OR valid_to > ${asOf})`
-    : sql`AND valid_to IS NULL`;
-  const rows = (await sql`
-    SELECT * FROM context_entries
-    WHERE project_id = ANY(${projectIds}) AND type = ${type}
-      AND status NOT IN ('rejected', 'obsolete')
-      ${temporal}
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `) as unknown as Row[];
-  return rows.map(rowToContextEntry);
 }

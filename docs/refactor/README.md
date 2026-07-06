@@ -143,10 +143,12 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
 
 ### Fase D — solo si el producto no ha pivotado
 
-- [ ] **D-1 · Split interno de core y agents** (M): `operations.ts` →
+- [x] **D-1 · Split interno de core y agents** (M, PR #15): `operations.ts` →
   `save.ts`/`search.ts`/`context-pack.ts`; `connect-sessions.ts` →
   `transcript-utils`/`distill`/`capture-pipeline` (+ unit test de `scrub()`, que es
-  código de seguridad); borrar el pipeline muerto (`ingestSessionFile` y compañía).
+  código de seguridad — 8 casos); borrado el pipeline muerto (`ingestSessionFile`,
+  `alreadyIngested`, `resolveProjectFromCwd`, `SUPPORTED_DOC_EXTS`). Superficie pública
+  de los barrels intacta.
 - [ ] **D-2 · Consolidaciones que arreglan bugs** (M): `rrfFuse` único, `extractJson` +
   **una** política de retry (hoy retry×2 sobre `maxRetries:6` de Mastra = hasta 14
   requests), `canonicalize` como única normalización, Voyage como OpenAICompatible.
