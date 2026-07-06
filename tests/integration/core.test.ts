@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest";
-import { closeSql } from "@cortex/database";
+import { closeSql, getSql } from "@cortex/database";
 import {
   createProject,
   saveContext,
@@ -9,6 +9,9 @@ import {
   saveWithReconciliation,
   isNearDuplicate,
   listEntries,
+  resolveEntity,
+  relate,
+  resolveEntities,
 } from "@cortex/core";
 
 const RID = Date.now().toString(36); // sufijo único → aísla cada ejecución
@@ -71,5 +74,49 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     const b = await saveWithReconciliation({ content, project: p.name.toLowerCase(), type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "c2" } as never, opts);
     expect(b.action).toBe("noop");
     expect(await isNearDuplicate(p.name.toUpperCase(), content)).toBe(true);
+  });
+});
+
+describe("integridad del grafo (UNIQUE parcial de aristas activas, D-5)", () => {
+  it("relate es idempotente: dos veces la misma arista → una sola fila", async () => {
+    const sql = getSql();
+    // Entidades no-proyecto (evitan la exclusión de `project` en resolveEntities).
+    const a = await resolveEntity(sql, `Vendor A ${RID}`, "vendor");
+    const b = await resolveEntity(sql, `Vendor B ${RID}`, "vendor");
+
+    await relate(sql, { sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
+    // Segunda vez: con el UNIQUE parcial + ON CONFLICT DO NOTHING no lanza ni duplica.
+    await relate(sql, { sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
+
+    const rows = (await sql`
+      SELECT count(*)::int AS n FROM relations
+      WHERE source_id = ${a.id} AND target_id = ${b.id} AND relation_type = 'related_to' AND valid_to IS NULL
+    `) as unknown as { n: number }[];
+    expect(rows[0]!.n).toBe(1);
+  });
+
+  it("resolveEntities fusiona entidades con aristas colisionantes sin lanzar (re-apuntado conflict-safe)", async () => {
+    const sql = getSql();
+    // Dos variantes del mismo nombre normalizado → se fusionan; un tercero como destino común.
+    const canon = await resolveEntity(sql, `Acme Corp ${RID}`, "vendor");
+    const dup = await resolveEntity(sql, `acme-corp ${RID}`, "vendor"); // misma norma → loser
+    const target = await resolveEntity(sql, `Payments Svc ${RID}`, "service");
+
+    // Ambas variantes tienen una arista al MISMO tercero con el MISMO tipo: tras re-apuntar
+    // `source_id` del loser a la canónica, chocaría con la de la canónica (UNIQUE parcial).
+    await relate(sql, { sourceId: canon.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
+    await relate(sql, { sourceId: dup.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
+
+    // No debe lanzar (sin el fix del punto 3, el UPDATE viola relations_active_unique → excepción).
+    await expect(resolveEntities()).resolves.toBeDefined();
+
+    // El loser desaparece (fusionado) y queda UNA sola arista activa canónica→target.
+    const loser = (await sql`SELECT 1 FROM entities WHERE id = ${dup.id}`) as unknown as unknown[];
+    expect(loser.length).toBe(0);
+    const edges = (await sql`
+      SELECT count(*)::int AS n FROM relations
+      WHERE source_id = ${canon.id} AND target_id = ${target.id} AND relation_type = 'depends_on' AND valid_to IS NULL
+    `) as unknown as { n: number }[];
+    expect(edges[0]!.n).toBe(1);
   });
 });
