@@ -3,6 +3,7 @@ import { join, relative, extname, basename } from "node:path";
 import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
 import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
 import { findProjectIdByName } from "./projects.js";
+import { rrfFuse } from "./vectors.js";
 import type { Row } from "./map.js";
 
 /** Indexación y búsqueda de código por proyecto/cliente (search_project_code). */
@@ -176,30 +177,23 @@ export async function searchProjectCode(
     ORDER BY rank DESC LIMIT ${pool}
   `) as unknown as Row[];
 
-  const K = 60;
-  const acc = new Map<string, { rrf: number; cosine?: number }>();
-  vecRows.forEach((r, i) => {
-    const cur = acc.get(r.id) ?? { rrf: 0 };
-    cur.rrf += 1 / (K + i + 1);
-    cur.cosine = 1 - Number(r.distance);
-    acc.set(r.id, cur);
-  });
-  ftsRows.forEach((r, i) => {
-    const cur = acc.get(r.id) ?? { rrf: 0 };
-    cur.rrf += 1 / (K + i + 1);
-    acc.set(r.id, cur);
-  });
-
-  const ranked = [...acc.entries()].sort((a, b) => b[1].rrf - a[1].rrf).slice(0, limit);
+  // Reciprocal Rank Fusion (fusión compartida en rrfFuse). A diferencia del híbrido
+  // de vectors.ts, la búsqueda de código NO normaliza el RRF: usa el coseno si lo
+  // hay, o el RRF crudo.
+  const ranked = rrfFuse(
+    vecRows as unknown as { id: string; distance?: number | string }[],
+    ftsRows as unknown as { id: string }[],
+    limit,
+  );
   if (ranked.length === 0) return [];
-  const ids = ranked.map(([id]) => id);
+  const ids = ranked.map((s) => s.id);
   const rows = (await sql`SELECT * FROM code_chunks WHERE id IN ${sql(ids)}`) as unknown as Row[];
   const byId = new Map(rows.map((r) => [r.id as string, r]));
 
   return ranked
-    .filter(([id]) => byId.has(id))
-    .map(([id, s]) => {
-      const r = byId.get(id)!;
+    .filter((s) => byId.has(s.id))
+    .map((s) => {
+      const r = byId.get(s.id)!;
       return {
         path: r.path as string,
         startLine: Number(r.start_line),
