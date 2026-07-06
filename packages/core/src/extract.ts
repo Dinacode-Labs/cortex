@@ -4,6 +4,7 @@ import { inflateRawSync } from "node:zlib";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { extractText, getDocumentProxy } from "unpdf";
+import { getEnvNum } from "@cortex/shared";
 
 /**
  * Capa de extracción de ficheros REUTILIZABLE por todos los conectores (la idea
@@ -26,8 +27,8 @@ const VIDEO_EXTS = ["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"];
 export const SUPPORTED_EXTS = new Set([...DOC_EXTS, ...IMAGE_EXTS, ...DRAWIO_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS]);
 
 // Por debajo de esto, una imagen suele ser ruido (iconos, separadores) → no se captiona.
-const MIN_IMAGE_BYTES = Number(process.env.CORTEX_IMAGE_MIN_BYTES ?? "8000");
-const OCR_MIN_TEXT = Number(process.env.CORTEX_OCR_MIN_TEXT ?? "120"); // < esto → PDF escaneado, OCR
+const MIN_IMAGE_BYTES = getEnvNum("CORTEX_IMAGE_MIN_BYTES", 8000);
+const OCR_MIN_TEXT = getEnvNum("CORTEX_OCR_MIN_TEXT", 120); // < esto → PDF escaneado, OCR
 
 export interface ExtractedFile {
   text: string;

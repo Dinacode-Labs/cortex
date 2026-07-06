@@ -33,3 +33,17 @@ export function getEnv(name: string, fallback: string): string {
   loadEnv();
   return process.env[name] ?? fallback;
 }
+
+/**
+ * Lee una env var numérica (int o float) con default. NaN → default.
+ *
+ * OJO comportamiento: `Number(process.env.X ?? "8")` con X="" da Number("")=0
+ * (¡no 8!); getEnvNum trata ""→fallback y NaN→fallback, más correcto (mejora
+ * deliberada). Ningún caller del repo depende del antiguo ""→0.
+ */
+export function getEnvNum(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw == null || raw === "") return fallback;
+  const n = Number(raw);
+  return Number.isNaN(n) ? fallback : n;
+}

@@ -1,4 +1,5 @@
 import { getSql } from "@cortex/database";
+import { getEnvNum } from "@cortex/shared";
 import type { Row } from "./map.js";
 
 /**
@@ -17,7 +18,7 @@ export interface CurationResult {
   decayed: number;
 }
 
-export async function autoCurate(decayDays = Number(process.env.CORTEX_DECAY_DAYS ?? "120")): Promise<CurationResult> {
+export async function autoCurate(decayDays = getEnvNum("CORTEX_DECAY_DAYS", 120)): Promise<CurationResult> {
   const sql = getSql();
   const promoted = (await sql`
     UPDATE context_entries SET confidence = 'medium'
