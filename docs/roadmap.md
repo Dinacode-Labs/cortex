@@ -32,7 +32,7 @@ junio quedan referenciados en su [backlog](./audit/99-backlog-priorizado.md).
   **llegan juntos con el servidor**. Necesita además un servicio de envío de email (OTP).
 - **Hecho:** servidor HTTP (apps/server) + auth email/OTP + endpoints autenticados
   `/context-pack`, `/capture`, `/projects`. Los **hooks** ya pasan por la API (cliente
-  `core/api-client`): hook:context→GET /context-pack, hook:capture→distila local y POST
+  `core/api-client`): `cortex hook-context`→GET /context-pack, `cortex hook-capture`→distila local y POST
   /capture con atribución (created_by=email) + permisos. **Requiere el servidor en marcha**
   (`cortex server`); si no, los hooks degradan en silencio. **Pendiente:** migrar los
   conectores batch (docs/notion/github/backfill) — necesitan un `POST /capture/batch` (para
@@ -119,10 +119,10 @@ Bucle automático sin invocación manual. Análisis + fricción:
 [`research/hooks-integration.md`](./research/hooks-integration.md).
 
 > **Implementado (Claude Code):**
-> - **SessionStart → inyección de contexto** (`@cortex/core hook:context`): resuelve el
+> - **SessionStart → inyección de contexto** (`cortex hook-context`): resuelve el
 >   proyecto del repo (`.cortex.json`: `{"project":"…"}`) y emite el context-pack como
 >   `additionalContext`. Va directo a la BD (el MCP aún no está conectado en SessionStart).
-> - **SessionEnd → auto-captura** (`@cortex/agents hook:capture`): destila la sesión
+> - **SessionEnd → auto-captura** (`cortex hook-capture`): destila la sesión
 >   actual (reutiliza `connect-sessions`/`distiller`) y la guarda en Cortex. Silencioso,
 >   idempotente.
 > - **Distribución:** `cortex sync` los instala/actualiza en `~/.claude/settings.json`
@@ -132,13 +132,13 @@ Bucle automático sin invocación manual. Análisis + fricción:
   Hermes también) — la fricción es de **forma**, no de ausencia.
 
 > **Adaptadores de inyección de contexto — hechos (los 4 agentes), distribuidos por `cortex sync`:**
-> - **Codex**: `[[hooks.SessionStart]]` en `config.toml` → `hook:context` (mismo
+> - **Codex**: `[[hooks.SessionStart]]` en `config.toml` → `cortex hook-context` (mismo
 >   `additionalContext` que Claude, contrato idéntico).
 > - **OpenCode**: plugin TS generado (`~/.config/opencode/plugin/cortex.js`) que en
->   `session.created` hace shell-out a `hook:context --format text` e inyecta en `chat.message`.
-> - **Hermes**: `pre_llm_call` en `~/.hermes/config.yaml` → `hook:context --format hermes`
+>   `session.created` hace shell-out a `cortex hook-context --format text` e inyecta en `chat.message`.
+> - **Hermes**: `pre_llm_call` en `~/.hermes/config.yaml` → `cortex hook-context --format hermes`
 >   (salida `{"context":…}`).
-> - `hook:context` es multi-formato (`--format claude|hermes|text`, `--cwd`).
+> - `cortex hook-context` es multi-formato (`--format claude|hermes|text`, `--cwd`).
 > Codex/OpenCode/Hermes construidos según sus contratos documentados; runtime no
 > probado localmente (esos agentes no tienen sesión aquí), como el MCP de Hermes.
 
