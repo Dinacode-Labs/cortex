@@ -68,9 +68,35 @@ export async function resolveEntities(): Promise<ResolveResult> {
               WHERE c2.context_entry_id = cee.context_entry_id AND c2.entity_id = ${canonical.id})
         `;
         await tx`DELETE FROM context_entry_entities WHERE entity_id = ${x.id}`;
-        // Re-apuntar relaciones.
-        await tx`UPDATE relations SET source_id = ${canonical.id} WHERE source_id = ${x.id}`;
-        await tx`UPDATE relations SET target_id = ${canonical.id} WHERE target_id = ${x.id}`;
+        // Re-apuntar relaciones sin violar el UNIQUE parcial `relations_active_unique`
+        // (source_id, target_id, relation_type) WHERE valid_to IS NULL. Cada UPDATE re-apunta
+        // SOLO las aristas del loser que, tras mover el extremo a `canonical`, NO colisionarían
+        // con una arista ya vigente; el DELETE posterior elimina las que sí habrían chocado.
+        // Hay que tratar source_id y target_id por separado: una arista del loser puede colisionar
+        // por cualquiera de los dos extremos según cuál se re-apunte.
+
+        // (a) Re-apuntar source_id: la arista (x.id, target, type) pasa a (canonical.id, target, type).
+        await tx`
+          UPDATE relations r SET source_id = ${canonical.id}
+          WHERE r.source_id = ${x.id}
+            AND NOT EXISTS (
+              SELECT 1 FROM relations c2
+              WHERE c2.source_id = ${canonical.id} AND c2.target_id = r.target_id
+                AND c2.relation_type = r.relation_type AND c2.valid_to IS NULL)
+        `;
+        await tx`DELETE FROM relations WHERE source_id = ${x.id}`;
+
+        // (b) Re-apuntar target_id: la arista (source, x.id, type) pasa a (source, canonical.id, type).
+        await tx`
+          UPDATE relations r SET target_id = ${canonical.id}
+          WHERE r.target_id = ${x.id}
+            AND NOT EXISTS (
+              SELECT 1 FROM relations c2
+              WHERE c2.target_id = ${canonical.id} AND c2.source_id = r.source_id
+                AND c2.relation_type = r.relation_type AND c2.valid_to IS NULL)
+        `;
+        await tx`DELETE FROM relations WHERE target_id = ${x.id}`;
+
         await tx`DELETE FROM entities WHERE id = ${x.id}`;
         merged++;
       }
