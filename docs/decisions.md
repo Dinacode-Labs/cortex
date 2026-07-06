@@ -492,3 +492,20 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   `unref` + tope `CORTEX_MCP_MAX_SESSIONS`, TTL `CORTEX_MCP_SESSION_TTL_SEC`).
 - **Revisar cuando:** la web pase a resolver por slug (hoy por nombre), o el save
   MCP/web exija slug+permiso.
+
+## Búsqueda/ask sin proyecto: scoping a proyectos accesibles (fix P0)
+
+- **Decisión:** `searchContext` (y `askProjectContext`) aceptan un `opts.restrictToAccessibleOf`
+  (email o null). Sin proyecto concreto y con ese opts presente, la búsqueda se restringe a
+  los ids de `listAccessibleProjects(email)` (default-deny); email null → solo públicos.
+  Con proyecto concreto el guard de acceso ya controla. Sin opts (llamada confiable, p.ej.
+  stdio MCP local) no hay restricción. Cierra el backlog #1 (P0): antes, buscar sin proyecto
+  desde MCP HTTP o la web devolvía entradas de proyectos privados ajenos.
+- **Implementación:** el scoping vive en core (`vectors.ts` filtra `project_id = ANY(ids)`;
+  array vacío → cero filas, fail-closed). Las entradas con `project_id NULL` quedan excluidas
+  de la búsqueda restringida (fail-closed): son globales y solo visibles por la ruta confiable.
+- **Distinción clave:** `"restrictToAccessibleOf" in opts` separa "no restringir" (opts ausente)
+  de "restringir a públicos" (valor null) — un truthy check no bastaría.
+- **Revisar cuando:** aparezcan entradas globales legítimas que deban buscarse por usuarios
+  (hoy toda escritura de las apps va asociada a un proyecto), o se quiera scoping también en
+  las tools que hoy exigen proyecto.

@@ -10,7 +10,7 @@
 
 | # | Prio | Dimensión | Hallazgo / Recomendación accionable | Sev | Esf |
 |---|------|-----------|--------------------------------------|-----|-----|
-| 1 | P0 | Seguridad | Búsqueda/ask sin proyecto filtra proyectos privados (web y MCP). Empujar autorización a core: sin proyecto, restringir a `listAccessibleProjects` (default-deny). | critical | M |
+| 1 | P0 | Seguridad | ✅ **HECHO** (2026-07). Búsqueda/ask sin proyecto filtraba proyectos privados (web y MCP). `searchContext(input, {restrictToAccessibleOf})` restringe a `listAccessibleProjects` cuando no hay proyecto; MCP HTTP y web lo pasan, stdio local no. Ver ADR en `decisions.md`. | critical | M |
 | 2 | P1 | Seguridad | `validateEntry` sin control de acceso (MCP y web): IDOR para mutar estado de entradas ajenas por UUID. Pasar email y verificar `canAccessProject`. | high | S |
 | 3 | P1 | Seguridad | `POST /save` (web) escribe en cualquier proyecto sin autorización. Exigir `guardProject`, `createdBy=user.email`, validar `type`. | high | S |
 | 4 | P1 | Seguridad | `guardProject` es fail-open (devuelve true si no encuentra el proyecto). Default-deny por slug; unificar resolución con el core. | high | S |

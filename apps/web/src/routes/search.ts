@@ -14,7 +14,15 @@ searchRoutes.get("/search", async (c) => {
   const project = c.req.query("project");
   const denied = await requireProject(c, project);
   if (denied) return denied;
-  const hits = q ? await searchContext({ query: q, project: project || undefined, limit: 15 }) : [];
+  // Scoping de seguridad: la web siempre tiene sesión. Con proyecto concreto el
+  // requireProject de arriba ya controla el acceso; sin proyecto, restringimos la
+  // búsqueda a los proyectos accesibles del usuario (no filtrar privados ajenos).
+  const hits = q
+    ? await searchContext(
+        { query: q, project: project || undefined, limit: 15 },
+        { restrictToAccessibleOf: c.get("user")?.email ?? null },
+      )
+    : [];
 
   const results = hits.length
     ? html`<div class="grid">${hits.map(
