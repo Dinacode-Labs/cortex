@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getEnv, getLlmConfig, type LlmConfig } from "@cortex/shared";
+import { getEnv, getEnvNum, getLlmConfig, type LlmConfig } from "@cortex/shared";
 import type { MediaExtractorHooks } from "@cortex/core";
 
 const execFileAsync = promisify(execFile);
@@ -70,7 +70,7 @@ async function ocrImage(path: string, cfg: LlmConfig): Promise<string | null> {
   return t && !/^SIN_TEXTO/i.test(t) ? t : null;
 }
 
-const MAX_OCR_PAGES = Number(process.env.CORTEX_OCR_MAX_PAGES ?? "10");
+const MAX_OCR_PAGES = getEnvNum("CORTEX_OCR_MAX_PAGES", 10);
 
 /** OCR de un PDF escaneado: renderiza páginas con pdftoppm (poppler) y las pasa por visión. */
 async function ocrPdf(path: string, cfg: LlmConfig): Promise<string | null> {
@@ -97,7 +97,7 @@ async function ocrPdf(path: string, cfg: LlmConfig): Promise<string | null> {
 
 let tmpCounter = 0;
 const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // límite del endpoint whisper
-const SEGMENT_SEC = Number(process.env.CORTEX_AUDIO_SEGMENT_SEC ?? "600"); // 10 min (mono 16k 64k ≈ 5 MB/chunk)
+const SEGMENT_SEC = getEnvNum("CORTEX_AUDIO_SEGMENT_SEC", 600); // 10 min (mono 16k 64k ≈ 5 MB/chunk)
 
 /** POST de un buffer de audio a whisper, con reintentos en 429/5xx. */
 async function postWhisper(buf: Buffer, cfg: LlmConfig, model: string): Promise<string | null> {

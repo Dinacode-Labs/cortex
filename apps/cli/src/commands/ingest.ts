@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
+import { getEnvNum } from "@cortex/shared";
 import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shared";
 import { registerUsageSink, saveContext, storeEmbeddingsBatch } from "@cortex/core";
 
@@ -27,7 +28,7 @@ interface IngestItem {
 }
 
 const USE_LLM = process.env.CORTEX_INGEST_LLM === "1";
-const PHASE1_CONCURRENCY = Number(process.env.CORTEX_INGEST_CONCURRENCY ?? "8");
+const PHASE1_CONCURRENCY = getEnvNum("CORTEX_INGEST_CONCURRENCY", 8);
 const EMBED_BATCH = Number(process.env.CORTEX_EMBED_BATCH ?? "32");
 
 export async function run(args: string[]): Promise<void> {
