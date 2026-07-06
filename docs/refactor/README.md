@@ -116,8 +116,10 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   #8 agents, #9 sync): la lógica queda como función exportada en su paquete; cada
   comando parsea argv y la llama; dispatcher con carga perezosa de rutas literales
   (sin mutar `process.argv`). `scripts/cortex-sync.ts` → `commands/sync/` (un adapter
-  por agente). Los hooks instalados NO se rompieron: los scripts `hook:context`/
-  `hook:capture` quedan como puentes de compatibilidad (retirar en fase D) y
+  por agente). Los hooks instalados NO se rompieron durante el refactor: los scripts
+  puente `hook:context`/`hook:capture` mantuvieron la compatibilidad y se **retiraron al
+  cerrar la fase D** (PR de limpieza) — un dev con la sintaxis vieja re-sincroniza con
+  `cortex sync --apply`, que la detecta y la actualiza. Además
   `cortex sync --apply` detecta y ACTUALIZA la sintaxis antigua de los hooks.
 - [x] **B-2 · `setMediaExtractor`** (M, PR #10): visión/OCR/whisper salen de
   `core/extract.ts` a `agents/media.ts` con el patrón de hooks existente; la config LLM
