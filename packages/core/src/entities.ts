@@ -35,7 +35,12 @@ export async function linkEntryToEntity(
   `;
 }
 
-/** Crea una relación entre dos entidades/entradas si no existe una equivalente. */
+/**
+ * Crea una relación entre dos entidades/entradas si no existe una equivalente
+ * vigente. Atómico y sin race TOCTOU: se apoya en el índice UNIQUE parcial
+ * `relations_active_unique` (source_id, target_id, relation_type) WHERE valid_to IS NULL.
+ * El ON CONFLICT debe replicar ese mismo predicado parcial para casar con el índice.
+ */
 export async function relate(
   sql: Sql,
   args: {
@@ -47,16 +52,10 @@ export async function relate(
     confidence?: ConfidenceLevel;
   },
 ): Promise<void> {
-  const exists = (await sql`
-    SELECT 1 FROM relations
-    WHERE source_id = ${args.sourceId} AND target_id = ${args.targetId}
-      AND relation_type = ${args.relationType}
-    LIMIT 1
-  `) as unknown as Row[];
-  if (exists.length > 0) return;
   await sql`
     INSERT INTO relations (source_id, source_type, target_id, target_type, relation_type, confidence)
     VALUES (${args.sourceId}, ${args.sourceType}, ${args.targetId}, ${args.targetType},
             ${args.relationType}, ${args.confidence ?? "medium"})
+    ON CONFLICT (source_id, target_id, relation_type) WHERE valid_to IS NULL DO NOTHING
   `;
 }
