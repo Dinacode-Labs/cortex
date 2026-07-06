@@ -12,7 +12,7 @@ export {
   captureSessionViaApi,
   runSessionsBackfill,
   type ApiCaptureResult,
-} from "./connect-sessions.js";
+} from "./capture-pipeline.js";
 export {
   captureContextWorkflow,
   runCaptureWorkflow,

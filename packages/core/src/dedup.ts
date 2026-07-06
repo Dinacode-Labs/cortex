@@ -1,7 +1,7 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { storeEmbedding, vectorSearch } from "./vectors.js";
-import { saveContext } from "./operations.js";
+import { saveContext } from "./save.js";
 import { findProjectIdByName } from "./projects.js";
 import { relate } from "./entities.js";
 

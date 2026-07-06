@@ -1,4 +1,6 @@
-export * from "./operations.js";
+export * from "./save.js";
+export * from "./search.js";
+export * from "./context-pack.js";
 export * from "./queries.js";
 export * from "./render.js";
 export { lintProject, renderLintReport, type LintReport } from "./lint.js";
@@ -9,7 +11,7 @@ export { storeEmbeddingsBatch } from "./vectors.js";
 export { recordUsage, registerUsageSink, getUsageSummary, getRecentTraces, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./usage.js";
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
-export { resolveProjectFromCwd, readCortexLink, slugify, type CortexLink } from "./project-config.js";
+export { readCortexLink, slugify, type CortexLink } from "./project-config.js";
 export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects.js";
 export {
   isNearDuplicate,
