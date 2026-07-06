@@ -155,10 +155,12 @@ bugs?** Si solo mueve código para que el grafo quede más bonito, va al final o
   `canonicalize` como base de `norm`/`slugify` (equivalencia de output verificada); Voyage
   plegado en `OpenAICompatibleEmbeddingProvider` (gana reintentos). La unificación de la
   política de retry (retry×2 sobre Mastra) se aplaza: es tuning con riesgo, no dedup.
-- [ ] **D-3 · Config y poda** (M): `config.ts` lazy por paquete (defaults en un sitio);
-  `.env.example` completo (~37 vars sin documentar); poda de código muerto y del barrel
-  de core; decidir la hipótesis Mastra-workflows (adoptar o borrar `workflows.ts` +
-  `demo-capture.ts`, con ADR).
+- [x] **D-3a · `.env.example` + decisión Mastra + poda** (PR #17): `.env.example` completo
+  (48 vars antes sin documentar, con su default real; esenciales sin comentar, tunables
+  comentadas); Mastra-workflows **no adoptado** — borrados `workflows.ts` + `demo-capture`
+  + `workflow:capture` (ADR-0017; Mastra sigue para los agentes vía `runAgent`).
+- [ ] **D-3b · `config.ts` lazy por paquete** (M): centralizar la lectura de env (defaults
+  en un sitio por paquete) sobre `getEnv` de shared; mismos nombres/defaults.
 - [ ] **D-4 · `packages/auth`** (M): extraer auth+email (único paquete nuevo; `isAdmin`
   puro a `shared` para no crear ciclo). Al final, con todo verde.
 - [ ] **D-5 · ADRs y docs** (S): matriz de las 3 vías de escritura
