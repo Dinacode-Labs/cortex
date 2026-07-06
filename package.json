@@ -18,7 +18,6 @@
     "db:seed": "tsx apps/cli/src/index.ts seed",
     "mcp": "pnpm --filter @cortex/mcp-server start",
     "web": "pnpm --filter @cortex/web start",
-    "workflow:capture": "tsx apps/cli/src/index.ts demo-capture",
     "cortex": "tsx apps/cli/src/index.ts",
     "cortex:sync": "tsx apps/cli/src/index.ts sync",
     "cortex:link": "tsx apps/cli/src/index.ts link",
