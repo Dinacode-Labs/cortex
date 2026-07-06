@@ -532,3 +532,84 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** aparezcan entradas globales legítimas que deban buscarse por usuarios
   (hoy toda escritura de las apps va asociada a un proyecto), o se quiera scoping también en
   las tools que hoy exigen proyecto.
+
+## ADR-0018 · Identidad (auth+email) permanece en `@cortex/core` (packages/auth NO extraído)
+
+- **Decisión:** el contexto de identidad (`auth.ts`: OTP, tokens, tickets, `isAdmin`;
+  `email.ts`: Brevo) se **queda en core**, NO se extrae a un `packages/auth` propio.
+  Evaluado en el refactor (paso D-4) y descartado.
+- **Por qué:** el beneficio es **puramente topológico** (que core no "contenga" identidad);
+  las apps ya consumen auth vía el barrel de core sin fricción, y no hay bug ni cambio de
+  comportamiento en juego. El coste sí es real: paquete nuevo + `tsconfig` + dos configs de
+  vitest + grafo pnpm + romper el `core→isAdmin` de `projects.ts`. Para un prototipo
+  pre-validación y un equipo pequeño, la churn no compensa la pureza. Alineado con el
+  principio del encargo: patrones que aportan valor, sin sobreingeniería.
+- **Revisar cuando:** el repo crezca a varios equipos/servicios y la identidad gane peso
+  propio (rotación de tokens, SSO, multi-tenant), o si se decide blindar las reglas de
+  dependencia con `no-restricted-imports` y core→identidad estorbe. Entonces la extracción
+  es mecánica (mover 2 ficheros + `isAdmin`/`isAllowedEmail` puros a `shared`).
+
+## ADR-0019 · Tres vías de escritura de contexto (matriz documentada, no unificada)
+
+- **Decisión:** conviven tres funciones de escritura en core, cada una para una intención
+  distinta; se **documenta la matriz** en vez de forzar una unificación prematura.
+  - `saveContext(input, opts)` — escritura **directa**: clasifica (LLM opcional), resume,
+    extrae entidades, embebe y corre los loops de mejora. La usa la UI web (`/save`) y es la
+    base de las otras dos.
+  - `saveWithReconciliation(input, opts)` — escritura **reconciliada** (estilo mem0:
+    ADD/UPDATE/SUPERSEDE/NOOP contra lo existente del mismo `sourceType`). La usan la API
+    `/capture` y el backfill de sesiones (conocimiento auto-capturado que puede refinar o
+    superar lo previo). Nunca reescribe fuente/curado.
+  - `captureBatch(project, items, createdBy)` — ingesta **por lotes** de conectores:
+    persiste sin embedding e indexa por lotes al final; incremental por `sourceReference`;
+    sin clasificador LLM.
+- **Por qué no unificar (todavía):** las tres cubren intenciones legítimamente distintas
+  (fricción baja vs anti-duplicado vs rendimiento de lotes). Colapsarlas en
+  `saveInteractive`/`saveIngested` es un rediseño de API con riesgo; para un prototipo,
+  documentar cuál usar aporta el 90% del valor.
+- **Revisar cuando:** un cuarto caso de escritura aparezca, o la divergencia entre las tres
+  cause bugs (hoy comparten `saveContext` como base, así que el drift es bajo).
+
+## ADR-0020 · FTS en español (`plainto_tsquery('spanish')`) — limitación conocida
+
+- **Decisión:** la rama léxica de la búsqueda híbrida usa la config FTS `'spanish'` de
+  Postgres (stemming en español), pese a que el contenido real es **mixto ES/EN** (código,
+  jerga técnica, PRs en inglés). Se documenta como límite consciente, no se cambia ahora.
+- **Por qué:** el producto es de una consultora hispanohablante y el grueso del conocimiento
+  de negocio es español; el stemming inglés sobre términos técnicos aporta poco. Un FTS
+  multi-idioma real (detección por entrada, columnas `tsvector` por idioma, o `simple` +
+  n-gramas) es trabajo no justificado a esta escala. La rama vectorial (semántica) cubre en
+  parte el idioma cruzado.
+- **Revisar cuando:** se mida recall pobre en consultas/contenido en inglés, o el corpus
+  vire a mayoría inglés. Alternativa: `tsvector` por idioma o `simple` + trigram.
+
+## ADR-0021 · Tabla de precios de LLM hardcodeada en `usage.ts` — coste 0 silencioso
+
+- **Decisión:** la estimación de coste (`recordUsage`/`getUsageSummary`) usa una tabla
+  `PRICING` fija en `packages/core/src/usage.ts`; un modelo **no listado** cae a
+  `{ in: 0, out: 0 }` → coste estimado **0** sin aviso. Se documenta; no se mueve a config
+  ni se alarma ahora.
+- **Por qué:** con el proveedor por defecto (nan, gratis) el coste real es 0, así que la
+  estimación solo importa al conectar OpenAI/Anthropic/OpenRouter de pago. La observabilidad
+  de tokens (lo que de verdad se mide) es correcta; el coste es orientativo. Mantener los
+  precios como código es aceptable mientras la lista sea corta.
+- **Revisar cuando:** se use un proveedor de pago en serio: entonces mover `PRICING` a config
+  (o a la BD, versionada por fecha) y **loguear un aviso** cuando un modelo no tenga precio,
+  para no reportar $0 engañoso. Anotar la fecha de los precios.
+
+## ADR-0022 · Schemas zod de fila usados solo como tipos (mapeo manual)
+
+- **Decisión:** los schemas zod de `@cortex/shared/domain.ts` que describen filas
+  (contextEntry, entity, relation, source) se usan **solo como tipos TypeScript**; el mapeo
+  `snake_case → camelCase` desde Postgres se hace a mano en `packages/core/src/map.ts`, sin
+  `.parse()` en el borde. Se mantiene así (no se degradan a interfaces ni se fuerza la
+  validación en runtime).
+- **Por qué:** las filas vienen de nuestra propia BD con esquema controlado por migraciones,
+  no de entrada externa; validar cada fila con zod en el camino caliente de lectura añade
+  coste sin proteger de nada real (el borde no confiable —API/formularios— sí valida con zod,
+  ver `apps/server` C-3). Los schemas como tipos dan el chequeo estático sin el coste runtime.
+- **Consecuencia asumida:** `entity` en el schema puede quedar desincronizado del esquema real
+  (le faltan slug/visibility/parent_id, añadidos por migraciones posteriores); no rompe nada
+  porque nadie lo `.parse()`a, pero conviene sincronizar el tipo si se usa para construir
+  filas. **Revisar cuando:** un schema de fila se use para VALIDAR datos que entren (no salgan)
+  de la BD, o el drift tipo↔esquema cause un bug.

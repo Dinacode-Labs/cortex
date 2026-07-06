@@ -75,12 +75,14 @@ apps/*      → cualquier package
   Excepción documentada: `shared` contiene credentials/api-client/llm-config (I/O
   consciente, ver ADR). No añadas violaciones nuevas.
 
-## Refactor en curso (julio 2026)
+## Refactor de arquitectura (julio 2026) — COMPLETADO
 
-Hay un plan de refactor por fases en `docs/refactor/README.md` (hallazgos completos en
-`docs/refactor/hallazgos.md`). Antes de tocar un área, mira si el plan ya la cubre y en
-qué fase. Disciplina: un PR por paso, `typecheck` + tests en verde, sin arreglos «ya que
-estoy» fuera del alcance del paso.
+El refactor por fases (A–D) está **completado** (PRs #2–#20). El informe, el plan y los
+~70 hallazgos quedan como registro en `docs/refactor/`; las decisiones (incluidas las
+aplazadas por proporcionalidad) están en `docs/decisions.md` (ADR-0017–0022). Estado
+actual del código: reglas de dependencia cumplidas, entrypoints en `apps/cli`, apps
+testeables, guards unificados, sin código muerto conocido. Disciplina para nuevos cambios:
+un PR por cambio, `typecheck` + tests en verde, sin arreglos «ya que estoy» fuera de alcance.
 
 ## Comandos
 
