@@ -1,5 +1,5 @@
 import { closeSync, openSync, readSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative, extname, basename } from "node:path";
+import { join, relative, extname, basename, sep } from "node:path";
 import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
 import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
 import { findProjectIdByName } from "./projects.js";
@@ -15,6 +15,15 @@ export const IGNORE_DIRS = new Set([
   "node_modules", ".git", "dist", "build", ".next", ".turbo", "coverage",
   ".cache", "vendor", "__pycache__", ".venv", "out", ".vercel", ".expect",
   ".idea", ".vscode", "tmp",
+]);
+
+/** Rutas generadas por frameworks (dos segmentos, no un nombre suelto): caché/logs de
+ * Symfony, Laravel, etc. Sin esto, indexar la raíz de un backend Symfony mete miles de
+ * chunks de `var/cache` (catálogos de traducción cacheados) que ensucian la búsqueda de
+ * código. Se comparan contra la ruta relativa al root, normalizada a "/". */
+const IGNORE_PATHS = new Set([
+  "var/cache", "var/log", "var/logs", "var/sessions",
+  "storage/framework", "storage/logs", "bootstrap/cache",
 ]);
 
 const LANG: Record<string, string> = {
@@ -83,7 +92,8 @@ export function walkRepo(root: string): CodeFile[] {
     for (const e of entries) {
       const full = join(dir, e.name);
       if (e.isDirectory()) {
-        if (!e.name.startsWith(".") && !IGNORE_DIRS.has(e.name)) visit(full);
+        const rel = relative(root, full).split(sep).join("/");
+        if (!e.name.startsWith(".") && !IGNORE_DIRS.has(e.name) && !IGNORE_PATHS.has(rel)) visit(full);
         continue;
       }
       if (!e.isFile() || ignoredFile(e.name)) continue;
