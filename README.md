@@ -189,9 +189,10 @@ cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes]  # b
 ```
 
 Por defecto la captura tipa los items por **heurística** (barato) y la inteligencia
-(grafo, reconciliación, curación) se aplica luego con `cortex maintain`. Con
-`CORTEX_CAPTURE_LLM=1` cada item se **clasifica con el LLM** ya en la ingesta (tipos
-fiables: decisiones/constraints/riesgos), a cambio de 1 llamada LLM por item.
+(reclasificación de tipos, grafo, reconciliación, curación) se aplica luego con
+`cortex maintain` (su paso `reclassify` re-tipa con LLM lo ingerido por heurística, sin
+re-ingerir). Con `CORTEX_CAPTURE_LLM=1` cada item se **clasifica con el LLM** ya en la
+ingesta (tipos fiables desde el minuto uno), a cambio de 1 llamada LLM por item.
 
 La **indexación de código** (`cortex index-code`) y `cortex lint` / `resolve-entities` /
 `temporal` sueltos son tareas de servidor (acceso directo a BD) — ver `cortex --help` y CONTRIBUTING.
@@ -224,8 +225,9 @@ pnpm cortex maintain-worker   # mantenimiento programado (cron)
   `local` no es semántico (solo arranque sin claves); al cambiar de proveedor de
   embeddings hay que reindexar (cambian las dimensiones).
 - **Mantenimiento** (server, idempotente, con lock): `pnpm cortex maintain
-  ["<Proyecto>"]` encadena enrich(only-missing) → resolve → temporal → curate →
-  reconcile → lint. El **sync de fuentes es manual** (lo dispara el developer); esto es
+  ["<Proyecto>"]` encadena reclassify(tipos heurísticos→LLM) → enrich(only-missing) →
+  resolve → temporal → curate → reconcile → lint. El **sync de fuentes es manual** (lo
+  dispara el developer); esto es
   solo mantenimiento.
 
 ### Despliegue (docker-compose)

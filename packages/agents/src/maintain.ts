@@ -1,13 +1,14 @@
 import { closeSql, getSql } from "@cortex/database";
-import { applyTemporalInvalidation, autoCurate, lintProject, listProjects, reconcileProject, resolveEntities } from "@cortex/core";
+import { applyTemporalInvalidation, autoCurate, lintProject, listProjects, reclassifyProject, reconcileProject, resolveEntities } from "@cortex/core";
 import { enrichProject } from "./enrich-project.js";
 import { shutdownObservability } from "./mastra.js";
 
 /**
  * Pipeline de MANTENIMIENTO de Cortex (loops §12), pensado para ejecutarse en server
  * de forma periódica (ver maintain-worker / cron). Encadena, de forma idempotente:
- *   1) enrich (only-missing) por proyecto   2) resolve-entities (global)
- *   3) invalidación temporal (global)        4) lint (salud) por proyecto
+ *   1) reclassify (tipos heurísticos → LLM)  2) enrich (only-missing) por proyecto
+ *   3) resolve-entities (global)             4) invalidación temporal (global)
+ *   5) curate + reconcile por proyecto        6) lint (salud) por proyecto
  *
  * El **sync de fuentes NO va aquí**: lo dispara el developer manualmente (tiene su
  * contexto/criterio). Esto es solo mantenimiento, que ocurre 100% en server.
@@ -29,6 +30,7 @@ export interface MaintenanceReport {
   promoted: number;
   decayed: number;
   deduped: number;
+  reclassified: number;
 }
 
 export async function runMaintenance(only?: string): Promise<MaintenanceReport> {
@@ -40,11 +42,21 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
     locked = rows[0]?.locked === true;
     if (!locked) {
       console.log("[maintain] otro mantenimiento en curso (lock no adquirido) — saltando.");
-      return { ran: false, projects: [], enriched: {}, merged: 0, historical: 0, superseded: 0, promoted: 0, decayed: 0, deduped: 0 };
+      return { ran: false, projects: [], enriched: {}, merged: 0, historical: 0, superseded: 0, promoted: 0, decayed: 0, deduped: 0, reclassified: 0 };
     }
 
     const projects = only ? [only] : (await listProjects()).map((p) => p.entity.name);
     console.log(`[maintain] ${projects.length} proyecto(s): ${projects.join(", ")}`);
+
+    // Reclasificación diferida: arregla con el LLM los tipos heurísticos de lo ingerido
+    // por conectores (decisiones/constraints/riesgos), sin re-ingerir. Antes de enrich/lint
+    // para que el grafo y los "huecos" se calculen sobre tipos correctos.
+    let reclassified = 0;
+    for (const p of projects) {
+      const rc = await reclassifyProject(p);
+      reclassified += rc.reclassified;
+      if (rc.reclassified) console.log(`  [reclassify] ${p}: ${rc.reclassified}/${rc.scanned} re-tipadas con LLM`);
+    }
 
     const enriched: Record<string, number> = {};
     for (const p of projects) {
@@ -78,7 +90,7 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
     }
 
     console.log("[maintain] completado.");
-    return { ran: true, projects, enriched, merged: res.merged, historical: t.historical, superseded: t.superseded, promoted: c.promoted, decayed: c.decayed, deduped };
+    return { ran: true, projects, enriched, merged: res.merged, historical: t.historical, superseded: t.superseded, promoted: c.promoted, decayed: c.decayed, deduped, reclassified };
   } finally {
     if (locked) { try { await conn`SELECT pg_advisory_unlock(${LOCK_KEY})`; } catch { /* best-effort */ } }
     await conn.release();
