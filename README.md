@@ -93,8 +93,8 @@ MCP de Cortex + skills del ecosistema (Plane, Jira, Notion, Teams…).
 - **Grafo de conocimiento** — entidades y relaciones (LLM) con resolución de variantes y visualización.
 - **Bi-temporal** — cada hecho tiene vigencia; lo obsoleto se **invalida, no se borra** (consultas *point-in-time*).
 - **Context packs y Q&A** — paquete por proyecto/área + respuestas con citas; **herencia** del padre en la jerarquía.
-- **Ingesta multimodal** — capa `extract` única: Word/PDF/Excel, `.drawio`, imágenes
-  (caption por visión), audio/vídeo (whisper + ffmpeg).
+- **Ingesta multimodal** — capa `extract` única: texto/Markdown, Word/PDF/Excel, `.drawio`,
+  imágenes (caption por visión), audio/vídeo (whisper + ffmpeg).
 - **Identidad y gobierno** — login email+OTP (sin passwords), admin(s) por env, proyectos
   públicos/privados, jerarquía cliente→subproyectos, atribución `created_by`=email.
 - **Lint** del conocimiento + **indexación de código** + **observabilidad de IA** (coste/tokens + AI tracing).
