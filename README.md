@@ -188,6 +188,11 @@ cortex connect-notion   "<slug>" <ruta-export>    # export de Notion (páginas +
 cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes]  # backfill de sesiones
 ```
 
+Por defecto la captura tipa los items por **heurística** (barato) y la inteligencia
+(grafo, reconciliación, curación) se aplica luego con `cortex maintain`. Con
+`CORTEX_CAPTURE_LLM=1` cada item se **clasifica con el LLM** ya en la ingesta (tipos
+fiables: decisiones/constraints/riesgos), a cambio de 1 llamada LLM por item.
+
 La **indexación de código** (`cortex index-code`) y `cortex lint` / `resolve-entities` /
 `temporal` sueltos son tareas de servidor (acceso directo a BD) — ver `cortex --help` y CONTRIBUTING.
 
