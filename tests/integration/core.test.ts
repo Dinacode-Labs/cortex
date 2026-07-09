@@ -13,6 +13,8 @@ import {
   relate,
   resolveEntities,
   setClassifier,
+  lintProject,
+  invalidateEntry,
 } from "@cortex/core";
 
 const RID = Date.now().toString(36); // sufijo único → aísla cada ejecución
@@ -103,6 +105,27 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     const b = await saveWithReconciliation({ content, project: p.name.toLowerCase(), type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "c2" } as never, opts);
     expect(b.action).toBe("noop");
     expect(await isNearDuplicate(p.name.toUpperCase(), content)).toBe(true);
+  });
+});
+
+describe("lint solo mira entradas vigentes (BD real)", () => {
+  it("no cuenta como duplicado un par que reconcile ya invalidó (histórica)", async () => {
+    const p = await createProject(`IT Lint ${RID}`);
+    const content = "El worker de exportaciones usa RabbitMQ con reintentos y DLQ.";
+    const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
+    // Dos entradas idénticas y VIGENTES → el lint las ve como duplicado.
+    const a = await saveContext({ content, project: p.name, type: "decision", sourceReference: "l1" } as never, opts);
+    const b = await saveContext({ content, project: p.name, type: "decision", sourceReference: "l2" } as never, opts);
+    const before = await lintProject(p.name);
+    expect(before.duplicates.length).toBeGreaterThan(0);
+    expect(before.totalEntries).toBe(2);
+
+    // Invalidar una (como hace reconcile) → deja de ser vigente.
+    await invalidateEntry(b.entry.id, a.entry.id);
+    const after = await lintProject(p.name);
+    expect(after.duplicates.length).toBe(0); // ya no cuenta la histórica
+    expect(after.totalEntries).toBe(1); // solo la vigente
+    expect(after.staleHistorical).toBeGreaterThan(0); // pero sí la reporta como histórica
   });
 });
 
