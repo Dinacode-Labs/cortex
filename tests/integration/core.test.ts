@@ -12,6 +12,7 @@ import {
   resolveEntity,
   relate,
   resolveEntities,
+  setClassifier,
 } from "@cortex/core";
 
 const RID = Date.now().toString(36); // sufijo único → aísla cada ejecución
@@ -50,6 +51,34 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     expect(r2[0]!.action).toBe("existing"); // ya ingerido
     const entries = await listEntries({ project: p.name });
     expect(entries.some((e) => e.createdBy === "dev@dinacode.com")).toBe(true);
+  });
+
+  it("captureBatch clasifica con el LLM solo si CORTEX_CAPTURE_LLM=1", async () => {
+    const p = await createProject(`IT CaptureLLM ${RID}`);
+    let calls = 0;
+    // Clasificador falso: fuerza un tipo que la heurística no daría para este texto.
+    setClassifier(async () => {
+      calls++;
+      return { type: "business_rule", title: "Regla", summary: "s", entities: [] };
+    });
+    try {
+      // Sin el flag → NO se llama al clasificador (tipo por heurística).
+      delete process.env.CORTEX_CAPTURE_LLM;
+      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, alfa.", sourceType: "document", sourceReference: "cap-off" }], "dev@dinacode.com");
+      expect(calls).toBe(0);
+
+      // Con el flag → se clasifica con el LLM y el tipo lo pone el clasificador.
+      process.env.CORTEX_CAPTURE_LLM = "1";
+      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, beta.", sourceType: "document", sourceReference: "cap-on" }], "dev@dinacode.com");
+      expect(calls).toBe(1);
+
+      const entries = await listEntries({ project: p.name });
+      expect(entries.find((e) => e.sourceReference === "cap-on")?.type).toBe("business_rule");
+      expect(entries.find((e) => e.sourceReference === "cap-off")?.type).not.toBe("business_rule");
+    } finally {
+      delete process.env.CORTEX_CAPTURE_LLM;
+      setClassifier(null);
+    }
   });
 
   it("saveWithReconciliation hace NOOP de un near-duplicate idéntico", async () => {
