@@ -5,6 +5,10 @@ import type { Row } from "./map.js";
 /**
  * Lint del conocimiento (patrón "LLM Wiki" de Karpathy + loops §12): health-check
  * por proyecto que reporta señales de calidad para curar la memoria.
+ *
+ * Todas las señales miran SOLO entradas vigentes (`valid_to IS NULL`) — salvo
+ * `staleHistorical`, que precisamente cuenta las históricas. Sin este filtro, el lint
+ * volvía a reportar como "duplicados" las entradas que `reconcile` ya había invalidado.
  */
 
 export interface LintReport {
@@ -25,7 +29,7 @@ export async function lintProject(project: string): Promise<LintReport> {
   if (!pid) throw new Error(`Proyecto no encontrado: "${project}".`);
 
   const totalEntries = Number(
-    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid}`) as unknown as Row[])[0]!.n,
+    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
 
   // Contradicciones: relaciones 'contradicts' con algún extremo en el proyecto.
@@ -49,8 +53,8 @@ export async function lintProject(project: string): Promise<LintReport> {
     FROM embeddings a
     JOIN embeddings b ON a.context_entry_id < b.context_entry_id
       AND a.embedding_model = b.embedding_model
-    JOIN context_entries ca ON ca.id=a.context_entry_id AND ca.project_id=${pid}
-    JOIN context_entries cb ON cb.id=b.context_entry_id AND cb.project_id=${pid}
+    JOIN context_entries ca ON ca.id=a.context_entry_id AND ca.project_id=${pid} AND ca.valid_to IS NULL
+    JOIN context_entries cb ON cb.id=b.context_entry_id AND cb.project_id=${pid} AND cb.valid_to IS NULL
     WHERE (a.vector <=> b.vector) < 0.12
     ORDER BY score DESC
     LIMIT 25
@@ -61,7 +65,7 @@ export async function lintProject(project: string): Promise<LintReport> {
     SELECT en.name, en.type
     FROM entities en
     JOIN context_entry_entities cee ON cee.entity_id=en.id
-    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid}
+    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid} AND ce.valid_to IS NULL
     WHERE en.type<>'project'
       AND NOT EXISTS (SELECT 1 FROM relations r WHERE r.source_id=en.id OR r.target_id=en.id)
     GROUP BY en.id, en.name, en.type
@@ -70,7 +74,7 @@ export async function lintProject(project: string): Promise<LintReport> {
   `) as unknown as Row[];
 
   const lowConfidence = Number(
-    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND confidence='low'`) as unknown as Row[])[0]!.n,
+    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND confidence='low' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
   const staleHistorical = Number(
     ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND (validity='historical' OR metadata->>'state'='Histórico')`) as unknown as Row[])[0]!.n,
@@ -81,7 +85,7 @@ export async function lintProject(project: string): Promise<LintReport> {
     SELECT en.name, en.type, count(*) FILTER (WHERE ce.type='incident') AS incidents
     FROM entities en
     JOIN context_entry_entities cee ON cee.entity_id=en.id
-    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid}
+    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid} AND ce.valid_to IS NULL
     WHERE en.type IN ('module','service')
     GROUP BY en.id, en.name, en.type
     HAVING count(*) FILTER (WHERE ce.type='incident') >= 2
