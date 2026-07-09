@@ -9,9 +9,10 @@ import { getEnvNum } from "@cortex/shared";
 /**
  * Capa de extracción de ficheros REUTILIZABLE por todos los conectores (la idea
  * versátil: cualquier fuente que traiga ficheros —Notion, GitHub, carpeta— los parsea
- * y RAGea). Tipos: documentos ofimáticos (determinista), diagramas .drawio (XML), e
- * **imágenes** (caption con el modelo de visión del proveedor LLM, p.ej. qwen3.6/gemma4
- * de nan). Vídeo/audio (transcripción) igual. Ver research/multimodal-ingestion.md.
+ * y RAGea). Tipos: texto plano / Markdown (lectura directa), documentos ofimáticos
+ * (determinista), diagramas .drawio (XML), e **imágenes** (caption con el modelo de
+ * visión del proveedor LLM, p.ej. qwen3.6/gemma4 de nan). Vídeo/audio (transcripción)
+ * igual. Ver research/multimodal-ingestion.md.
  *
  * Este módulo es DETERMINISTA: la parte que necesita LLM (caption de imágenes, OCR de
  * PDF escaneado, whisper) se inyecta con setMediaExtractor() desde @cortex/agents
@@ -19,12 +20,13 @@ import { getEnvNum } from "@cortex/shared";
  * hook, esos formatos devuelven null, igual que antes sin API keys.
  */
 
+const TEXT_EXTS = ["md", "markdown", "txt", "text"];
 const DOC_EXTS = ["docx", "pdf", "xlsx"];
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
 const DRAWIO_EXTS = ["drawio", "xml"];
 const AUDIO_EXTS = ["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga"];
 const VIDEO_EXTS = ["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"];
-export const SUPPORTED_EXTS = new Set([...DOC_EXTS, ...IMAGE_EXTS, ...DRAWIO_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS]);
+export const SUPPORTED_EXTS = new Set([...TEXT_EXTS, ...DOC_EXTS, ...IMAGE_EXTS, ...DRAWIO_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS]);
 
 // Por debajo de esto, una imagen suele ser ruido (iconos, separadores) → no se captiona.
 const MIN_IMAGE_BYTES = getEnvNum("CORTEX_IMAGE_MIN_BYTES", 8000);
@@ -85,6 +87,10 @@ function extractDrawio(path: string): string {
 export async function extractFileText(path: string): Promise<ExtractedFile | null> {
   const ext = extname(path).slice(1).toLowerCase();
   try {
+    if (TEXT_EXTS.includes(ext)) {
+      // Texto plano / Markdown: se lee tal cual (ya es texto legible por humanos y LLM).
+      return clean(readFileSync(path, "utf8"), ext);
+    }
     if (ext === "docx") {
       const t = (await mammoth.extractRawText({ buffer: readFileSync(path) })).value;
       return clean(t, ext);
