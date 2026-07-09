@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { apiPost } from "@cortex/shared";
-import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
+import { extractFileText, SUPPORTED_EXTS, IGNORE_DIRS, type BatchItem } from "@cortex/core";
 import { wireLlm } from "@cortex/agents";
 
 /**
@@ -17,10 +17,14 @@ const MAX_CONTENT = 8000;
 const CHUNK = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
 const HEX32 = /\s+[0-9a-f]{32}$/i;
 
-function walk(dir: string): string[] {
+/** Recorre `dir` y devuelve los ficheros con extensión soportada, SALTANDO dotfiles y
+ * los directorios de dependencias/artefactos (IGNORE_DIRS: node_modules, vendor, dist…).
+ * Sin ese filtro, apuntar el conector a la raíz de un repo arrastra basura de `vendor/`
+ * (p.ej. fixtures de php_codesniffer) a la memoria. Exportada para test. */
+export function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
-    if (name.startsWith(".") || name.startsWith("~$")) continue;
+    if (name.startsWith(".") || name.startsWith("~$") || IGNORE_DIRS.has(name)) continue;
     const p = join(dir, name);
     const st = statSync(p);
     if (st.isDirectory()) out.push(...walk(p));
