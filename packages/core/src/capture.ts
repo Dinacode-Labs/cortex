@@ -11,6 +11,12 @@ import type { Row } from "./map.js";
  * Captura por LOTES para conectores (vía API autenticada). Conserva la ingesta en 2 fases:
  * guarda sin embedding e indexa por lotes al final (respeta los límites del proveedor).
  * Incremental por `sourceReference` (salta lo ya ingerido). Atribuye con `createdBy`.
+ *
+ * Clasificación: por defecto los items entran con tipo por HEURÍSTICA (barato, sin LLM) —
+ * la inteligencia (grafo, reconcile, curación) la aplica luego `cortex maintain`. Con
+ * `CORTEX_CAPTURE_LLM=1` se clasifica cada item con el LLM ya en la ingesta (tipo fiable:
+ * decisiones/constraints/riesgos bien tipados), a cambio de 1 llamada LLM por item. Un
+ * `type` explícito del conector (p.ej. `pr_summary`) siempre gana al LLM (precedencia).
  */
 export interface BatchItem {
   title?: string;
@@ -28,6 +34,7 @@ export interface BatchItemResult {
 }
 
 export async function captureBatch(projectName: string, items: BatchItem[], createdBy: string): Promise<BatchItemResult[]> {
+  const useClassifier = process.env.CORTEX_CAPTURE_LLM === "1";
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, projectName);
   if (!projectId) throw new Error(`Proyecto no encontrado: ${projectName}`);
@@ -54,7 +61,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
         createdBy,
         metadata: it.metadata,
       } as never,
-      { useClassifier: false, detectImprovements: false, skipEmbedding: true },
+      { useClassifier, detectImprovements: false, skipEmbedding: true },
     );
     toEmbed.push({ contextEntryId: entry.id, text: `${it.title ?? ""}\n\n${it.content}` });
     results.push({ ref: it.sourceReference ?? null, id: entry.id, action: "added" });
