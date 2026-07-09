@@ -9,6 +9,7 @@ import {
 } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "./entities.js";
 import { rowToContextEntry, type Row } from "./map.js";
+import { findProjectIdByName } from "./projects.js";
 import {
   canonicalize,
   classifyType,
@@ -230,4 +231,40 @@ function mergeEntities(
     }
   }
   return [...byKey.values()];
+}
+
+// --- reclasificación diferida (maintain) -------------------------------------
+
+/**
+ * Reclasifica con el LLM el `type` de las entradas VIGENTES de un proyecto que se
+ * tiparon por HEURÍSTICA (los conectores ingieren barato: `enrichedBy != 'llm'`). Es la
+ * pieza que hace real la filosofía «ingesta barata → maintain añade inteligencia»: arregla
+ * los tipos de lo ya ingerido SIN re-ingerir, y complementa a `CORTEX_CAPTURE_LLM` (que
+ * tipa en la propia ingesta). Solo toca el `type` (no el embedding). Idempotente: marca
+ * `enrichedBy='llm'`, así que la siguiente pasada salta lo ya reclasificado. Sin
+ * clasificador cableado (sin LLM), es un no-op. Precedencia intacta: no pisa lo que ya
+ * clasificó el LLM ni lo curado por humanos (solo entradas heurísticas).
+ */
+export async function reclassifyProject(project: string): Promise<{ scanned: number; reclassified: number }> {
+  const sql = getSql();
+  const projectId = await findProjectIdByName(sql, project);
+  if (!projectId) throw new Error(`Proyecto no encontrado: "${project}".`);
+  if (!classifier) return { scanned: 0, reclassified: 0 }; // sin LLM → no-op
+
+  const rows = (await sql`
+    SELECT id, content, type, metadata
+    FROM context_entries
+    WHERE project_id = ${projectId} AND valid_to IS NULL
+      AND COALESCE(metadata->>'enrichedBy', 'heuristic') <> 'llm'
+  `) as unknown as Row[];
+
+  let reclassified = 0;
+  for (const r of rows) {
+    const res = await classifier(r.content as string).catch(() => null);
+    if (!res?.type) continue; // el LLM no clasificó: se reintentará en la próxima pasada
+    if (res.type !== r.type) reclassified++;
+    const meta = { ...((r.metadata as Record<string, unknown>) ?? {}), enrichedBy: "llm" } as Parameters<typeof sql.json>[0];
+    await sql`UPDATE context_entries SET type = ${res.type}, metadata = ${sql.json(meta)} WHERE id = ${r.id}`;
+  }
+  return { scanned: rows.length, reclassified };
 }

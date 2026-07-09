@@ -15,6 +15,7 @@ import {
   setClassifier,
   lintProject,
   invalidateEntry,
+  reclassifyProject,
 } from "@cortex/core";
 
 const RID = Date.now().toString(36); // sufijo único → aísla cada ejecución
@@ -105,6 +106,37 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     const b = await saveWithReconciliation({ content, project: p.name.toLowerCase(), type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "c2" } as never, opts);
     expect(b.action).toBe("noop");
     expect(await isNearDuplicate(p.name.toUpperCase(), content)).toBe(true);
+  });
+});
+
+describe("reclasificación diferida (maintain, BD real)", () => {
+  it("reclassifyProject re-tipa con LLM solo las entradas heurísticas, no las ya-LLM", async () => {
+    const p = await createProject(`IT Reclass ${RID}`);
+    const opts = { detectImprovements: false, skipEmbedding: false } as const;
+    // Entrada HEURÍSTICA (sin clasificador) → enrichedBy != 'llm'.
+    await saveContext({ content: "Cerramos que el panel usará diálogos en cascada.", project: p.name, type: "incident", sourceReference: "rc-h" } as never, { ...opts, useClassifier: false });
+
+    let calls = 0;
+    setClassifier(async () => {
+      calls++;
+      return { type: "decision", title: "T", summary: "s", entities: [] };
+    });
+    try {
+      // Entrada ya clasificada por el LLM → no debe reprocesarse.
+      await saveContext({ content: "Otra cosa distinta clasificada por el LLM.", project: p.name, sourceReference: "rc-llm" } as never, { ...opts, useClassifier: true });
+      const callsAfterSaves = calls; // 1 (solo el save con useClassifier:true)
+
+      const rc = await reclassifyProject(p.name);
+      expect(rc.scanned).toBe(1); // solo la heurística
+      expect(rc.reclassified).toBe(1);
+      expect(calls).toBe(callsAfterSaves + 1); // 1 llamada extra: solo la heurística
+
+      const entries = await listEntries({ project: p.name });
+      expect(entries.find((e) => e.sourceReference === "rc-h")?.type).toBe("decision"); // re-tipada
+      expect(entries.find((e) => e.sourceReference === "rc-llm")?.type).toBe("decision"); // ya lo era, intacta
+    } finally {
+      setClassifier(null);
+    }
   });
 });
 
