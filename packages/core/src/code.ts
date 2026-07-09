@@ -8,7 +8,10 @@ import type { Row } from "./map.js";
 
 /** Indexación y búsqueda de código por proyecto/cliente (search_project_code). */
 
-const IGNORE_DIRS = new Set([
+/** Directorios que NUNCA se recorren al indexar/ingerir un repo: dependencias y
+ * artefactos generados. Compartido con los conectores de documentos (connect-docs)
+ * para no arrastrar basura de `vendor/`/`node_modules` a la memoria. */
+export const IGNORE_DIRS = new Set([
   "node_modules", ".git", "dist", "build", ".next", ".turbo", "coverage",
   ".cache", "vendor", "__pycache__", ".venv", "out", ".vercel", ".expect",
   ".idea", ".vscode", "tmp",
