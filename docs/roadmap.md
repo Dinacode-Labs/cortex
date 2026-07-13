@@ -324,8 +324,8 @@ Intelligence Index v4.1, jul 2026) y con los datos reales de `llm_usage`.
 - **Coste de ingesta inicial del backlog** (docs/tareas ya existentes): embeddings puros
   decenas de $ una vez (todo el corpus); el pipeline completo de enriquecimiento es el
   grueso pero es opcional/gradual. Detalle en §3.1 del doc.
-- **Al implementar:** registrar ADR en [`decisions.md`](./decisions.md) y revisar
-  precios/benchmarks (cambian rápido) antes de fijar modelos.
+- **Decisión registrada:** [ADR-0023](./decisions.md) (dirección aceptada; implementación
+  por fases). Revisar precios/benchmarks (cambian rápido) antes de fijar modelos.
 
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible

@@ -613,3 +613,51 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   porque nadie lo `.parse()`a, pero conviene sincronizar el tipo si se usa para construir
   filas. **Revisar cuando:** un schema de fila se use para VALIDAR datos que entren (no salgan)
   de la BD, o el drift tipo↔esquema cause un bug.
+
+## ADR-0023 · Estrategia de modelos LLM (por rol) y chunking; salida de NaN
+
+- **Estado:** aceptada (dirección); implementación por fases. Documento completo con
+  costes, benchmarks y métodos: [`research/llm-model-strategy.md`](./research/llm-model-strategy.md).
+- **Contexto:** (1) los 7 agentes Mastra comparten **un único modelo** (`getLlmConfig()`
+  no distingue rol), desaprovechando que cada rol tiene criticidad distinta (un fallo del
+  reconciler/merger/distiller destruye conocimiento; uno del rerank solo molesta).
+  (2) **Perdemos el acceso a NaN próximamente**, que servía 4 patas: chat, embeddings
+  (`qwen3-embedding`), visión y whisper — incluso para desarrollo. (3) El chunking de
+  documentos está roto (§5 del doc): un doc entra como 1 entry / 1 vector **truncado a
+  8.000 chars** (`connect-docs.ts`), así que ingerir documentación larga no sirve.
+  (4) Objetivo: calidad media-alta sin dispararnos de coste, y **aprender a hacerlo por
+  nuestra cuenta** sobre pgvector propio (no un RAG gestionado).
+- **Decisión:**
+  1. **Salir de NaN → OpenRouter (chat/visión) + OpenAI (embeddings/STT).** Un mismo
+     proveedor (OpenAI) cubre embeddings y whisper. El proveedor `local` (feature-hash
+     léxico, no semántico) queda solo para tests/CI, no para relevancia real.
+  2. **Routing por rol** vía `CORTEX_MODEL_<ROLE>` (fallback al default) + `CORTEX_VISION_MODEL`
+     separado: `deepseek-v4-flash` (classifier/graph/rerank, mecánico), `deepseek-v4-pro`
+     (reconciler/merger/distiller, juicio), `grok-4.5` (retriever, superficie visible).
+  3. **Embeddings: `text-embedding-3-large`** (multilingüe, corpus en español). Voyage
+     `voyage-3.5` como *upgrade* solo si un eval lo justifica.
+  4. **Chunking:** estructural (800–1.200 tokens, respetando headings/páginas) + Contextual
+     Retrieval (Anthropic) + parent-document; arreglar el truncado a 8k.
+  5. **Medir, no opinar:** set de mini-evals de retrieval (recall@5/MRR) antes/después de
+     cada cambio (ver ADR-0009 y §7 del doc).
+- **Alternativas descartadas:** **todo-NaN** e **híbrida NaN+OpenRouter** (dependían de NaN,
+  que se retira; la resiliencia se cubre con `models:[...]` de OpenRouter). **Embeddings
+  locales/MiniLM**: MiniLM es inglés-céntrico y gama media sobre corpus ES y arrastra al
+  dedup; cualquier local bueno (bge-m3/e5) añade runtime nativo en Node — se deja como
+  contingencia on-prem, no como plan. **Vertex/RAG gestionado**: costes de suelo, lock-in y
+  es justo lo que queremos aprender a hacer nosotros.
+- **Coste:** ~$20/mes (10 devs) recurrente; ingerir el backlog existente son **decenas de $
+  una vez** (embeddings puros ~$0.13/M tokens; el pipeline de enriquecimiento es el grueso
+  pero opcional/gradual). Detalle en §3 y §3.1 del doc.
+- **Consecuencias asumidas:** (a) **dependencia dura de API keys** — sin NaN ni local
+  semántico, Cortex necesita OpenRouter+OpenAI también en desarrollo (gestionar keys y
+  topes de gasto). (b) Los umbrales de dedup (0.82/0.95, ADR-0009) se calibraron para
+  qwen3-embedding (4096-dim); con 3-large (3072-dim) hay que **recalibrar una vez** —
+  sin migración de datos, porque hoy solo hay embeddings de prueba. (c) Activa el
+  **"revisar cuando" de [ADR-0021]**: al usar proveedor de pago en serio, mover `PRICING`
+  a config y avisar del $0 engañoso de modelos sin precio. (d) El soporte de `nan` en
+  `llm-config`/`embeddings` se puede **podar** al confirmar la baja.
+- **Revisar cuando:** los precios/benchmarks cambien (revisar catálogo al fijar modelos —
+  cambian rápido); aparezca un sustituto claro de DeepSeek v4 (la config por rol hace el
+  cambio trivial — esa es la apuesta arquitectónica real); un cliente exija on-prem/no-API
+  (entonces bge-m3/e5 local) o SLA de hyperscaler (reconsiderar Vertex).

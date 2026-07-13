@@ -1,7 +1,8 @@
 # Estrategia de modelos LLM y chunking — propuesta
 
-- **Estado:** dirección acordada (2026-07-13) → registrar ADR en `docs/decisions.md`
-  al implementar. Pendiente solo el detalle fino de cada fase.
+- **Estado:** dirección acordada (2026-07-13), registrada en `docs/decisions.md`
+  (**ADR-0023**). Este documento es el detalle (costes, benchmarks, métodos); el ADR
+  es el resumen decisorio. Pendiente solo la implementación por fases (§8).
 - **Fecha:** 2026-07-13.
 - **Contexto:** hoy los 7 agentes Mastra usan **un único modelo** (`getLlmConfig()`
   no distingue roles) y el chunking tiene un fallo grave en documentos (ver §5).
