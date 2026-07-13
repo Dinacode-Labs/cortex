@@ -4,17 +4,19 @@ import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getEnv, getEnvNum, getLlmConfig, type LlmConfig } from "@cortex/shared";
+import { getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig } from "@cortex/shared";
 import type { MediaExtractorHooks } from "@cortex/core";
 
 const execFileAsync = promisify(execFile);
 
 /**
- * Extractor multimodal (capa LLM): caption de imágenes y OCR de PDF escaneado con el
- * modelo de visión del proveedor (p.ej. qwen3.6/gemma4 de nan), y transcripción de
- * audio/vídeo con whisper. Se inyecta en @cortex/core vía setMediaExtractor (cableado
- * en wireLlm), manteniendo core determinista. Ver research/multimodal-ingestion.md.
- */
+ * Extractor multimodal (capa LLM): caption de imágenes y OCR de PDF escaneado con un
+ * modelo de VISIÓN (getVisionConfig: mismo proveedor de chat, modelo propio vía
+ * CORTEX_VISION_MODEL), y transcripción de audio/vídeo con un STT (getSttConfig:
+ * endpoint PROPIO, OpenAI/whisper por defecto — OpenRouter no sirve STT). Se inyecta en
+ * @cortex/core vía setMediaExtractor (cableado en wireLlm), manteniendo core determinista.
+ * Ver research/multimodal-ingestion.md y ADR-0023. Cada capacidad se ofrece solo si su
+ * config existe (visión y STT son independientes). */
 
 // Formatos que el endpoint whisper acepta directamente; el resto (opus de WhatsApp,
 // amr, vídeo…) se transcodifican con ffmpeg a mp3 mono 16 kHz antes de transcribir.
@@ -100,13 +102,13 @@ const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // límite del endpoint whisper
 const SEGMENT_SEC = getEnvNum("CORTEX_AUDIO_SEGMENT_SEC", 600); // 10 min (mono 16k 64k ≈ 5 MB/chunk)
 
 /** POST de un buffer de audio a whisper, con reintentos en 429/5xx. */
-async function postWhisper(buf: Buffer, cfg: LlmConfig, model: string): Promise<string | null> {
+async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> {
   const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const fd = new FormData(); // se reconstruye en cada intento (el body se consume)
       fd.append("file", new Blob([buf]), "audio.mp3");
-      fd.append("model", model);
+      fd.append("model", cfg.model);
       fd.append("response_format", "json");
       const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/audio/transcriptions`, { method: "POST", headers, body: fd });
       if (res.ok) {
@@ -126,8 +128,7 @@ async function postWhisper(buf: Buffer, cfg: LlmConfig, model: string): Promise<
 /** Transcribe audio/vídeo con whisper. Vídeo y formatos no soportados (opus de WhatsApp,
  * amr…) se transcodifican con ffmpeg a mp3 mono 16 kHz. Los audios largos (> límite de
  * whisper) se TROCEAN con ffmpeg en segmentos y se transcriben por partes. */
-async function transcribe(path: string, ext: string, kind: "audio" | "video", cfg: LlmConfig): Promise<string | null> {
-  const model = getEnv("NAN_WHISPER_MODEL", "whisper");
+async function transcribe(path: string, ext: string, kind: "audio" | "video", cfg: SttConfig): Promise<string | null> {
   let audioPath = path;
   let temp: string | null = null;
   if (kind === "video" || !WHISPER_OK.has(ext)) {
@@ -142,7 +143,7 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
   let segDir: string | null = null;
   try {
     if (statSync(audioPath).size <= MAX_AUDIO_BYTES) {
-      return await postWhisper(readFileSync(audioPath), cfg, model);
+      return await postWhisper(readFileSync(audioPath), cfg);
     }
     // Largo: trocear en segmentos mono 16 kHz mp3 y transcribir cada uno.
     segDir = mkdtempSync(join(tmpdir(), "cortex-seg-"));
@@ -158,7 +159,7 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
     const segs = readdirSync(segDir).filter((f) => f.endsWith(".mp3")).sort();
     const parts: string[] = [];
     for (const s of segs) {
-      const t = await postWhisper(readFileSync(join(segDir, s)), cfg, model);
+      const t = await postWhisper(readFileSync(join(segDir, s)), cfg);
       if (t) parts.push(t);
     }
     return parts.join("\n").trim() || null;
@@ -180,13 +181,17 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
   }
 }
 
-/** Factoría del extractor multimodal: null si no hay proveedor LLM configurado. */
+/** Factoría del extractor multimodal. Visión y STT son independientes: se ofrece cada
+ * capacidad solo si su config existe. Null si no hay ninguna. */
 export function createMediaExtractor(): MediaExtractorHooks | null {
-  const cfg = getLlmConfig();
-  if (!cfg) return null;
-  return {
-    captionImage: (path, ext) => captionImage(path, ext, cfg),
-    ocrPdf: (path) => ocrPdf(path, cfg),
-    transcribe: (path, ext, kind) => transcribe(path, ext, kind, cfg),
-  };
+  const vision = getVisionConfig();
+  const stt = getSttConfig();
+  if (!vision && !stt) return null;
+  const hooks: MediaExtractorHooks = {};
+  if (vision) {
+    hooks.captionImage = (path, ext) => captionImage(path, ext, vision);
+    hooks.ocrPdf = (path) => ocrPdf(path, vision);
+  }
+  if (stt) hooks.transcribe = (path, ext, kind) => transcribe(path, ext, kind, stt);
+  return hooks;
 }
