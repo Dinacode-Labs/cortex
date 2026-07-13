@@ -17,17 +17,21 @@ export interface LlmConfig {
   baseURL: string;
 }
 
-/** Devuelve la config LLM si está habilitada, o null. */
-export function getLlmConfig(): LlmConfig | null {
+/** Devuelve la config LLM si está habilitada, o null. Con `role`, el modelo se resuelve
+ * por rol: `CORTEX_MODEL_<ROLE>` (p. ej. `CORTEX_MODEL_DISTILLER`) gana al default del
+ * proveedor. Permite routing barato/potente por rol sin tocar código (ADR-0023). Sin
+ * `role` (o sin esa var), usa el modelo por defecto del proveedor, como antes. */
+export function getLlmConfig(role?: string): LlmConfig | null {
   loadEnv();
   const provider = getEnv("LLM_PROVIDER", "none").toLowerCase();
+  const roleModel = role ? getEnv(`CORTEX_MODEL_${role.toUpperCase()}`, "").trim() : "";
   if (provider === "nan") {
     const apiKey = process.env.NAN_API_KEY;
     if (!apiKey) return null;
     return {
       provider,
       apiKey,
-      model: getEnv("NAN_LLM_MODEL", "qwen3.6"),
+      model: roleModel || getEnv("NAN_LLM_MODEL", "qwen3.6"),
       baseURL: getEnv("NAN_BASE_URL", "https://api.nan.builders/v1"),
     };
   }
@@ -37,7 +41,7 @@ export function getLlmConfig(): LlmConfig | null {
     return {
       provider,
       apiKey,
-      model: getEnv("OPENROUTER_MODEL", "deepseek/deepseek-v4-pro"),
+      model: roleModel || getEnv("OPENROUTER_MODEL", "deepseek/deepseek-v4-pro"),
       baseURL: "https://openrouter.ai/api/v1",
     };
   }
