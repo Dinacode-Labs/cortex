@@ -320,16 +320,19 @@ Retrieval (Fase 4).
   por estructura (headings → párrafos → frases) en fragmentos de ~1000 tokens con solape,
   cada uno referido a su doc padre. **Pendiente:** Contextual Retrieval (prefijo LLM por
   chunk) + parent-document + set de mini-evals (recall@5/MRR).
-- **🔬 Investigar estrategias de chunking (a valorar, no cerrado):** la v1 usa un tamaño
-  objetivo ~fijo; **no está claro que sea lo óptimo** para nuestro corpus (contratos,
-  actas, código mezclados). Antes de invertir más: (1) ver **cómo lo hacen frameworks RAG
-  de referencia** (LlamaIndex/LangChain: recursive, semantic, markdown/section-aware;
-  Unstructured/Docling: layout-aware; late chunking de Jina) y comparar; (2) cuestionar
-  el tamaño fijo frente a chunking por estructura real del documento; (3) **medir si el
-  chunking mueve la aguja tanto como se cree**: con **búsqueda híbrida** (vector+FTS+RRF,
-  ADR-0009) + rerank, buena parte del recall lo aporta el léxico y el rerank, no el corte.
-  Método: montar el set de mini-evals (recall@5/MRR) y **medir variantes de chunking**
-  sobre datos reales antes de decidir — no elegir por intuición.
+- **🔬 Estrategias de chunking — INVESTIGADO (jul 2026):** deep-research con
+  verificación adversarial (23 claims confirmados, 2 refutados), informe completo en
+  [`research/chunking-strategies.md`](./research/chunking-strategies.md). Conclusiones:
+  (1) el **chunker estructural v1 es el patrón que la evidencia respalda** (Docling/
+  RAGFlow hacen lo mismo; NAACL 2025: el semantic chunking no justifica su coste;
+  la intuición de que con híbrido+rerank el chunking importa menos, **acotadamente
+  confirmada** — las capas se suman, no se compensan). (2) Descartados semantic chunking
+  (English-only, sin ganancias consistentes) y late chunking (inviable vía API).
+  (3) Contextual Retrieval con LLM **aplazado**: solo si el eval muestra fallos por
+  pérdida de contexto (rebaja la Fase 4 de ADR-0023). **Siguiente paso: el eval set**
+  (30–100 queries ES con evidencia anotada, incluir queries evidence-dense; plantilla:
+  benchmark open-source de Chroma). Pendiente de leer: arXiv 2604.01733 (posible
+  ablación chunking×rerank, sin verificar).
 - **Config de modelo por rol:** `CORTEX_MODEL_<ROLE>` con fallback al default +
   `CORTEX_VISION_MODEL` separado (hoy `media.ts` hereda el modelo de chat y se rompe con
   modelos text-only) + loguear el modelo **servido** (detecta routing de OpenRouter).
