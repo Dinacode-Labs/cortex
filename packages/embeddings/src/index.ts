@@ -20,11 +20,14 @@ export function getEmbeddingProvider(): EmbeddingProvider {
   const provider = getEnv("EMBEDDINGS_PROVIDER", "local").toLowerCase();
   switch (provider) {
     case "openai":
+      // Modelo/dim configurables (ADR-0023). Default text-embedding-3-large (3072-dim,
+      // buen multilingüe); baja a text-embedding-3-small (1536) por coste con
+      // OPENAI_EMBEDDING_MODEL/OPENAI_EMBEDDING_DIM.
       cached = new OpenAICompatibleEmbeddingProvider({
         apiKey: requireEnv("OPENAI_API_KEY"),
         baseURL: "https://api.openai.com/v1",
-        model: "text-embedding-3-small",
-        dim: 1536,
+        model: getEnv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-large"),
+        dim: Number(getEnv("OPENAI_EMBEDDING_DIM", "3072")),
       });
       break;
     case "nan":
