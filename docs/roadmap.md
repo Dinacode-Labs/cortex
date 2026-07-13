@@ -57,8 +57,10 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
   grafo lo añade `maintain`/`enrich`. PDF escaneado (sin capa de texto) se omite.
   Verificado: 23 documentos de CE Portal (contratos, certificados, registros de
   mantenimiento…), 0 secretos.
+- **Chunking de docs largos — hecho (#30):** ya no se trunca; `chunkDocument` trocea por
+  estructura con solape (ver «Estrategia de modelos LLM y chunking» más abajo).
 - **Pendiente:** `.pptx` (officeparser), OCR para PDF escaneado (Unstructured/Docling
-  self-host o tesseract), trocear documentos muy largos (hoy cap por entrada).
+  self-host o tesseract).
 
 ### 2. Captura de imágenes y diagramas — **hecho (v1)**
 - **Implementado en `extract.ts`:** imágenes (`.png/.jpg/.jpeg/.webp/.gif`) → **caption
@@ -301,19 +303,33 @@ proyecto" es **recuperación, no índice navegable siempre presente**.
 ## Estrategia de modelos LLM y chunking (dirección acordada, jul 2026)
 
 Documento completo en [`research/llm-model-strategy.md`](./research/llm-model-strategy.md):
-asignación de **modelo por rol** (hoy los 7 agentes Mastra comparten un único modelo)
-y arreglo del **chunking**. Contrastado con benchmarks recientes (Artificial Analysis
-Intelligence Index v4.1, jul 2026) y con los datos reales de `llm_usage`.
+asignación de **modelo por rol** y arreglo del **chunking**. Contrastado con benchmarks
+recientes (Artificial Analysis Intelligence Index v4.1, jul 2026) y datos reales de
+`llm_usage`. **Estado:** Fase 0 (off-NaN, #29), Fase 1 (chunking v1, #30) y Fase 2
+(modelo por rol + log servido, #31) **mergeadas**. Pendiente: activar el routing en el
+`.env` (solo config), recalibrar umbrales de dedup (necesita key OpenAI) y Contextual
+Retrieval (Fase 4).
 
 - **🔴 Migrar off-NaN (urgente):** perdemos el acceso a NaN próximamente y con él
   embeddings (`qwen3-embedding`), visión y whisper. El proveedor `local` es feature-hash
   léxico, **no semántico** → sin NaN no hay retrieval real. Plan: `EMBEDDINGS_PROVIDER=openai`
   (`text-embedding-3-large`) + STT/visión a OpenAI/OpenRouter + recalibrar umbrales de
   dedup (hoy solo hay embeddings de prueba, así que no hay migración de datos).
-- **🔴 Chunking de documentos (bloqueante):** hoy un doc entra como **1 entry / 1
-  vector truncado a 8.000 chars** (`connect-docs.ts`) → la ingesta de docs largos no
-  sirve. Fix: chunking estructural (800–1.200 tokens) + Contextual Retrieval (Anthropic)
-  + parent-document. Set de mini-evals (recall@5/MRR) para medir antes/después.
+- **Chunking de documentos — v1 hecho (#30):** antes un doc entraba como 1 entry / 1
+  vector **truncado a 8k** (perdía casi todo en silencio). Ahora `chunkDocument` trocea
+  por estructura (headings → párrafos → frases) en fragmentos de ~1000 tokens con solape,
+  cada uno referido a su doc padre. **Pendiente:** Contextual Retrieval (prefijo LLM por
+  chunk) + parent-document + set de mini-evals (recall@5/MRR).
+- **🔬 Investigar estrategias de chunking (a valorar, no cerrado):** la v1 usa un tamaño
+  objetivo ~fijo; **no está claro que sea lo óptimo** para nuestro corpus (contratos,
+  actas, código mezclados). Antes de invertir más: (1) ver **cómo lo hacen frameworks RAG
+  de referencia** (LlamaIndex/LangChain: recursive, semantic, markdown/section-aware;
+  Unstructured/Docling: layout-aware; late chunking de Jina) y comparar; (2) cuestionar
+  el tamaño fijo frente a chunking por estructura real del documento; (3) **medir si el
+  chunking mueve la aguja tanto como se cree**: con **búsqueda híbrida** (vector+FTS+RRF,
+  ADR-0009) + rerank, buena parte del recall lo aporta el léxico y el rerank, no el corte.
+  Método: montar el set de mini-evals (recall@5/MRR) y **medir variantes de chunking**
+  sobre datos reales antes de decidir — no elegir por intuición.
 - **Config de modelo por rol:** `CORTEX_MODEL_<ROLE>` con fallback al default +
   `CORTEX_VISION_MODEL` separado (hoy `media.ts` hereda el modelo de chat y se rompe con
   modelos text-only) + loguear el modelo **servido** (detecta routing de OpenRouter).
