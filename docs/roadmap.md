@@ -298,6 +298,35 @@ proyecto" es **recuperación, no índice navegable siempre presente**.
 (construir / no construir / construir acotado) **antes de tocar código**.
 **Responsable:** Alejandro. (Aquí solo queda indicado.)
 
+## Estrategia de modelos LLM y chunking (dirección acordada, jul 2026)
+
+Documento completo en [`research/llm-model-strategy.md`](./research/llm-model-strategy.md):
+asignación de **modelo por rol** (hoy los 7 agentes Mastra comparten un único modelo)
+y arreglo del **chunking**. Contrastado con benchmarks recientes (Artificial Analysis
+Intelligence Index v4.1, jul 2026) y con los datos reales de `llm_usage`.
+
+- **🔴 Migrar off-NaN (urgente):** perdemos el acceso a NaN próximamente y con él
+  embeddings (`qwen3-embedding`), visión y whisper. El proveedor `local` es feature-hash
+  léxico, **no semántico** → sin NaN no hay retrieval real. Plan: `EMBEDDINGS_PROVIDER=openai`
+  (`text-embedding-3-large`) + STT/visión a OpenAI/OpenRouter + recalibrar umbrales de
+  dedup (hoy solo hay embeddings de prueba, así que no hay migración de datos).
+- **🔴 Chunking de documentos (bloqueante):** hoy un doc entra como **1 entry / 1
+  vector truncado a 8.000 chars** (`connect-docs.ts`) → la ingesta de docs largos no
+  sirve. Fix: chunking estructural (800–1.200 tokens) + Contextual Retrieval (Anthropic)
+  + parent-document. Set de mini-evals (recall@5/MRR) para medir antes/después.
+- **Config de modelo por rol:** `CORTEX_MODEL_<ROLE>` con fallback al default +
+  `CORTEX_VISION_MODEL` separado (hoy `media.ts` hereda el modelo de chat y se rompe con
+  modelos text-only) + loguear el modelo **servido** (detecta routing de OpenRouter).
+- **Routing acordado (~$20/mes, 10 devs):** todo-OpenRouter — `deepseek-v4-flash` para
+  lo mecánico, `deepseek-v4-pro` para juicio (reconciler/merger/distiller), `grok-4.5`
+  para el retriever (visible); embeddings+STT por OpenAI (OpenRouter no los sirve).
+  **NaN/híbrida/MiniLM/Vertex descartados** (ver §4 del doc).
+- **Coste de ingesta inicial del backlog** (docs/tareas ya existentes): embeddings puros
+  decenas de $ una vez (todo el corpus); el pipeline completo de enriquecimiento es el
+  grueso pero es opcional/gradual. Detalle en §3.1 del doc.
+- **Decisión registrada:** [ADR-0023](./decisions.md) (dirección aceptada; implementación
+  por fases). Revisar precios/benchmarks (cambian rápido) antes de fijar modelos.
+
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
   (docker-compose). Deploy real a server, lo último (de momento no hay server).
