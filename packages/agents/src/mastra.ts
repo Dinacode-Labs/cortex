@@ -3,7 +3,7 @@ import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core";
 import { Observability } from "@mastra/observability";
 import { recordUsage } from "@cortex/core";
-import { getLlmConfig } from "@cortex/shared";
+import { getLlmConfig, type LlmConfig } from "@cortex/shared";
 import { CortexTraceExporter } from "./trace-exporter.js";
 
 /**
@@ -74,24 +74,26 @@ const jsonFetch: typeof fetch = async (url, init) => {
 let mastra: Mastra | null | undefined;
 
 function build(): Mastra | null {
-  const cfg = getLlmConfig();
-  if (!cfg) return null;
-  const model = (json: boolean) =>
+  if (!getLlmConfig()) return null;
+  // Un modelo POR ROL: getLlmConfig(role) resuelve CORTEX_MODEL_<ROLE> (ADR-0023), así
+  // que roles distintos pueden usar modelos distintos (barato para lo mecánico, potente
+  // para el juicio). Mismo endpoint OpenAI-compatible; solo cambia el id de modelo.
+  const buildModel = (cfg: LlmConfig, json: boolean) =>
     createOpenAICompatible({
       name: cfg.provider,
       baseURL: cfg.baseURL,
       apiKey: cfg.apiKey,
       ...(json ? { fetch: jsonFetch } : {}),
     })(cfg.model);
-  const jsonModel = model(true);
-  const textModel = model(false);
-  const mk = (role: AgentRole) =>
-    new Agent({
+  const mk = (role: AgentRole) => {
+    const cfg = getLlmConfig(role)!; // no null: getLlmConfig() ya validó arriba
+    return new Agent({
       id: `cortex-${role}`,
       name: `cortex-${role}`,
       instructions: INSTRUCTIONS[role],
-      model: JSON_ROLES.has(role) ? jsonModel : textModel,
+      model: buildModel(cfg, JSON_ROLES.has(role)),
     });
+  };
   // Instancia Mastra: agentes registrados + observabilidad (AI tracing) hacia
   // nuestro exporter (ADR-0016 parte B). Los agentes se sirven desde aquí para
   // que `generate()` emita spans.
@@ -134,14 +136,19 @@ export async function runAgent(
   const res = (await agent.generate(prompt, options as never)) as {
     text?: string;
     usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number };
+    response?: { modelId?: string };
   };
-  const cfg = getLlmConfig();
+  const cfg = getLlmConfig(role);
   const u = res.usage ?? {};
   if (cfg) {
+    // Registramos el modelo SERVIDO (res.response.modelId) si viene, no el pedido: detecta
+    // routing de OpenRouter y degradación silenciosa del proveedor (ADR-0023 §6.3). Fallback
+    // al modelo pedido por rol.
+    const servedModel = res.response?.modelId?.trim() || cfg.model;
     await recordUsage({
       operation: role,
       provider: cfg.provider,
-      model: cfg.model,
+      model: servedModel,
       inputTokens: u.inputTokens ?? u.promptTokens ?? 0,
       outputTokens: u.outputTokens ?? u.completionTokens ?? 0,
       totalTokens: u.totalTokens,

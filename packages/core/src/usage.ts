@@ -21,26 +21,39 @@ export interface UsageRecord {
   durationMs?: number;
 }
 
-/** Precios públicos aproximados (USD por 1M tokens). Solo para ESTIMAR coste si se
- * cambia de proveedor; ajustar según contrato. Lo no listado se cuenta como 0. */
+/** Precios públicos aproximados (USD por 1M tokens), a 2026-07-13. Solo para ESTIMAR
+ * coste; ajustar según contrato/catálogo (cambian rápido). Lo no listado se cuenta como
+ * 0 y se avisa una vez (ADR-0021 / ADR-0023 §6.3). */
 const PRICING: Record<string, { in: number; out: number }> = {
-  // nan.builders (modelos free)
+  // nan.builders (⚠️ en retirada; modelos free)
   "qwen3.6": { in: 0, out: 0 },
   "qwen3-embedding": { in: 0, out: 0 },
-  // OpenAI (referencia)
+  // OpenAI
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
   "gpt-4o": { in: 2.5, out: 10 },
   "text-embedding-3-small": { in: 0.02, out: 0 },
   "text-embedding-3-large": { in: 0.13, out: 0 },
-  // DeepSeek vía OpenRouter (referencia)
-  "deepseek/deepseek-v4-pro": { in: 0.28, out: 0.88 },
-  // Voyage (referencia)
+  // OpenRouter — routing por rol (ADR-0023)
+  "deepseek/deepseek-v4-pro": { in: 0.43, out: 0.87 },
+  "deepseek/deepseek-v4-flash": { in: 0.08, out: 0.15 },
+  "x-ai/grok-4.5": { in: 2.0, out: 6.0 },
+  "qwen/qwen3.5-flash-02-23": { in: 0.07, out: 0.26 },
+  // Voyage
   "voyage-3": { in: 0.06, out: 0 },
   "voyage-3-lite": { in: 0.02, out: 0 },
 };
 
+const warnedUnpriced = new Set<string>();
+
 function estimateCostUsd(model: string, inTok: number, outTok: number): number {
-  const p = PRICING[model] ?? PRICING[model.split("/").pop() ?? ""] ?? { in: 0, out: 0 };
+  const p = PRICING[model] ?? PRICING[model.split("/").pop() ?? ""];
+  if (!p) {
+    if (!warnedUnpriced.has(model)) {
+      warnedUnpriced.add(model);
+      console.warn(`[usage] modelo sin precio en PRICING: "${model}" → coste estimado $0. Añádelo a usage.ts.`);
+    }
+    return 0;
+  }
   return (inTok / 1_000_000) * p.in + (outTok / 1_000_000) * p.out;
 }
 
