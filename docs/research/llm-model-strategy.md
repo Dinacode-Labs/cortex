@@ -249,6 +249,11 @@ sistema.
    búsqueda híbrida + rerank (que ya tenemos, ADR-0009) reduce fallos de retrieval
    ~50–65% según su evaluación. Coste con v4-flash: ~$1/mes a nuestro volumen
    (con prompt caching del doc, menos). Barato porque el write path es barato.
+   > **Actualización (jul 2026):** APLAZADO tras la investigación de
+   > [chunking-strategies.md](./chunking-strategies.md) — números de vendor no
+   > reproducibles, y la contextualización barata (título+sección ya embebidos por el
+   > chunker v1) captura parte del beneficio. Adoptar solo si el eval set muestra
+   > fallos por pérdida de contexto de documento.
 3. **Parent-document retrieval (small-to-big).** Se busca por el vector del chunk
    (preciso), se entrega al context-pack/síntesis la sección padre (contexto
    completo). Encaja directo con el `context_pack` actual.
