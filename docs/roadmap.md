@@ -298,6 +298,29 @@ proyecto" es **recuperación, no índice navegable siempre presente**.
 (construir / no construir / construir acotado) **antes de tocar código**.
 **Responsable:** Alejandro. (Aquí solo queda indicado.)
 
+## Estrategia de modelos LLM y chunking (propuesta, a decidir)
+
+Propuesta completa en [`research/llm-model-strategy.md`](./research/llm-model-strategy.md):
+asignación de **modelo por rol** (hoy los 7 agentes Mastra comparten un único modelo)
+y arreglo del **chunking**. Contrastada con benchmarks recientes (Artificial Analysis
+Intelligence Index v4.1, jul 2026) y con los datos reales de `llm_usage`.
+
+- **🔴 Chunking de documentos (bloqueante):** hoy un doc entra como **1 entry / 1
+  vector truncado a 8.000 chars** (`connect-docs.ts`) → la ingesta de docs largos no
+  sirve. Fix: chunking estructural (800–1.200 tokens) + Contextual Retrieval (Anthropic)
+  + parent-document. Es lo **primero**; sin esto el modelo da igual. Set de mini-evals
+  (recall@5/MRR) para medir antes/después.
+- **Config de modelo por rol:** `CORTEX_MODEL_<ROLE>` con fallback al default +
+  `CORTEX_VISION_MODEL` separado (hoy `media.ts` hereda el modelo de chat y se rompe con
+  modelos text-only) + loguear el modelo **servido** (detecta degradación de nan/routing).
+- **Routing propuesto:** nan gratis para dev/demo; opción prod todo-OpenRouter media-alta
+  (~$20/mes, 10 devs): flash para lo mecánico, deepseek-v4-pro para juicio
+  (reconciler/merger/distiller), grok-4.5 para el retriever (visible), embeddings+STT por
+  OpenAI (OpenRouter no los sirve). **Vertex/RAG gestionado descartado** por costes de
+  suelo y lock-in, y porque queremos aprender a hacerlo sobre pgvector propio.
+- **Al adoptar:** registrar ADR en [`decisions.md`](./decisions.md) y revisar precios/
+  benchmarks (cambian rápido) antes de fijar modelos.
+
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
   (docker-compose). Deploy real a server, lo último (de momento no hay server).
