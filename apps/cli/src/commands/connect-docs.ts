@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { apiPost } from "@cortex/shared";
-import { extractFileText, SUPPORTED_EXTS, IGNORE_DIRS, type BatchItem } from "@cortex/core";
+import { chunkDocument, extractFileText, SUPPORTED_EXTS, IGNORE_DIRS, type BatchItem } from "@cortex/core";
 import { wireLlm } from "@cortex/agents";
 
 /**
@@ -10,10 +10,13 @@ import { wireLlm } from "@cortex/agents";
  * atribución (created_by=email) + permisos + embedding por lotes server-side. Requiere
  * `cortex auth login` y el servidor en marcha.
  *
+ * Cada documento se **trocea** (chunkDocument, ADR-0023): un doc largo produce N chunks,
+ * cada uno una entrada/vector con `sourceReference` propio (`ref#k`) y referencia a su
+ * documento padre en metadata. Antes se truncaba a 8k y se perdía el resto en silencio.
+ *
  * Uso: cortex connect-docs "<slug>" <ruta-dir>
  */
 const MIN_CHARS = Number(process.env.CORTEX_DOCS_MIN_CHARS ?? "40");
-const MAX_CONTENT = 8000;
 const CHUNK = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
 const HEX32 = /\s+[0-9a-f]{32}$/i;
 
@@ -48,14 +51,36 @@ export async function run(args: string[]): Promise<void> {
 
   const items: BatchItem[] = [];
   let skipped = 0;
+  let docs = 0;
   for (const file of files) {
     const ex = await extractFileText(file);
     if (!ex || ex.text.length < MIN_CHARS) { skipped++; continue; }
+    docs++;
     const title = basename(file, extname(file)).replace(HEX32, "").trim().slice(0, 200);
     const ref = relative(root, file).slice(0, 200);
-    items.push({ content: `${title}\n\n${ex.text}`.slice(0, MAX_CONTENT), title, sourceType: "document", sourceReference: ref, metadata: { format: ex.format, file: ref } });
+    const chunks = chunkDocument(ex.text);
+    for (const ch of chunks) {
+      const multi = ch.total > 1;
+      // El título lleva el doc + parte (+ sección); captureBatch lo incluye en el embedding.
+      const partTitle = multi
+        ? `${title} (${ch.index + 1}/${ch.total}${ch.section ? ` · ${ch.section}` : ""})`
+        : title;
+      items.push({
+        content: ch.content,
+        title: partTitle.slice(0, 200),
+        sourceType: "document",
+        // ref único por chunk → incremental idempotente; doc de 1 chunk conserva el ref plano.
+        sourceReference: multi ? `${ref}#${ch.index}` : ref,
+        metadata: {
+          format: ex.format,
+          file: ref,
+          ...(multi ? { chunk: ch.index, chunks: ch.total } : {}),
+          ...(ch.section ? { section: ch.section } : {}),
+        },
+      });
+    }
   }
-  console.log(`${items.length} con texto (${skipped} vacíos/escaneados/no soportados). Subiendo a "${slug}" vía API...`);
+  console.log(`${docs} documentos con texto → ${items.length} chunks (${skipped} vacíos/escaneados/no soportados). Subiendo a "${slug}" vía API...`);
 
   let added = 0;
   let existing = 0;
