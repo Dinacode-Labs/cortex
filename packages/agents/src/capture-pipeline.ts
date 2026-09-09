@@ -26,6 +26,10 @@ export interface ApiCaptureResult { saved: number; updated: number; superseded: 
 export async function captureCondensedViaApi(slug: string, condensed: string, sessionId: string, platform: string, sourceType = "agent_session"): Promise<ApiCaptureResult> {
   const res: ApiCaptureResult = { saved: 0, updated: 0, superseded: 0, noop: 0, failed: 0 };
   if (condensed.length < 200) return res;
+  // Punto ÚNICO de borrado de secretos antes del LLM: `condenseSession` (Claude) ya escruba,
+  // pero los lectores de codex/opencode/hermes y los transcripts de reunión llegan crudos.
+  // `scrub` es idempotente, así que aplicarlo aquí cubre todas las plataformas sin duplicar.
+  condensed = scrub(condensed);
   const items: Item[] = [];
   const seen = new Set<string>();
   for (const w of windows(condensed)) {

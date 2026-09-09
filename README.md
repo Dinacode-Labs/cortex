@@ -638,9 +638,11 @@ se fusionan o se superan solas; si una nota nueva contradice algo curado, se ano
 nunca se corroboró. La calidad sube sola con el tiempo, sin frenar la captura.
 
 **Secretos.** Antes de que el LLM vea nada —y otra vez antes de guardar— se **borran
-secretos** (claves PEM, JWT, `sk-…`, tokens de GitHub/Slack/AWS/Google, `Bearer …`,
-`api_key=…`). Las sesiones de trabajo son logs personales: se destila el conocimiento, no se
-guarda el transcript crudo.
+secretos** (claves PEM, JWT, `sk-…`, tokens de GitHub/Slack/AWS/Google, `Bearer …`/`Basic …`,
+`api_key=…`, contraseñas dentro de connection strings y cabeceras `Cookie`). El borrado se
+aplica en dos capas independientes: en la destilación, sea cual sea el agente de origen, y en
+el guardado del servidor, que **no confía** en que el cliente haya limpiado. Las sesiones de
+trabajo son logs personales: se destila el conocimiento, no se guarda el transcript crudo.
 
 > **⚠️ Qué mirar.** Los umbrales (`0.95`, `0.82`) son **parámetros a calibrar**: muy altos
 > → duplicados; muy bajos → fusiona cosas distintas. El reconciler, ante la duda (error del
