@@ -671,3 +671,36 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   cambian rápido); aparezca un sustituto claro de DeepSeek v4 (la config por rol hace el
   cambio trivial — esa es la apuesta arquitectónica real); un cliente exija on-prem/no-API
   (entonces bge-m3/e5 local) o SLA de hyperscaler (reconsiderar Vertex).
+
+---
+
+## ADR-0028 · Email transaccional enchufable (`log | brevo | smtp`)
+
+- **Estado:** aceptada (2026-09-09).
+- **Contexto:** el OTP —única puerta de entrada al producto— solo sabía salir por Brevo:
+  `email.ts` tenía el endpoint cableado, el remitente por defecto era de Dinacode y no
+  había forma de usar otro emisor. Un operador sin cuenta de Brevo no podía autenticar a
+  nadie. Además el fallo se descubría tarde: sin `BREVO_API_KEY` el sistema se limitaba a
+  imprimir el código por consola, lo que en producción es un fallo silencioso de seguridad
+  (los códigos acaban en el log) disfrazado de "modo dev".
+- **Decisión:** interfaz `EmailSender` en `@cortex/core` con tres implementaciones: `log`
+  (imprime, no envía; default sin configurar), `brevo` (API) y `smtp` (nodemailer, con
+  import perezoso para que solo lo cargue quien lo use). Selección por
+  `CORTEX_EMAIL_PROVIDER`, remitente en `CORTEX_EMAIL_FROM` (obligatorio con brevo/smtp;
+  `BREVO_SENDER` sigue valiendo como alias), y `setEmailSender()` para tests u overrides.
+  `validateEmailConfig()` corre **al arrancar el servidor**: lanza si el proveedor elegido
+  no puede funcionar y avisa si en producción los OTP solo se loguean.
+- **Por qué la selección vive en core y no en los entrypoints**, a diferencia del
+  classifier/reranker/reconciler: el único consumidor es `requestOtp`, en este mismo
+  paquete, y la elección es configuración pura sin dependencias externas. Pasarla por los
+  cuatro entrypoints sería ritual sin ganancia; el punto de inyección que sí hace falta
+  (tests) lo cubre `setEmailSender`.
+- **Alternativas:** inyectarlo desde los entrypoints como el resto de hooks (descartado,
+  arriba); añadir ya Resend o SES (se añaden como implementaciones el día que hagan falta,
+  el contrato es de tres líneas).
+- **Consecuencias:** `packages/core` gana una dependencia (`nodemailer`), pero solo se
+  carga en el camino SMTP. El contrato de la línea que imprime el modo `log` (contiene el
+  código de 6 dígitos) queda fijado por tests: los de integración del flujo de auth lo
+  capturan de ahí.
+- **Revisar cuando:** haya más correos que el OTP (entonces plantillas e i18n), o se pida
+  cola/reintentos de envío.
