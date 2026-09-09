@@ -102,7 +102,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "sensibles y, si se indica un área, lo más relevante para ella. Úsalo antes " +
         "de tocar un módulo.",
       inputSchema: {
-        project: z.string().describe("Nombre del proyecto, p.ej. 'LevelUp Pasión'"),
+        project: z.string().describe("Nombre del proyecto, p.ej. 'Acme Portal'"),
         area: z.string().optional().describe("Área/módulo opcional, p.ej. 'facturación'"),
         asOf: z.string().optional().describe("Fecha ISO (YYYY-MM-DD) para contexto point-in-time; por defecto, estado actual"),
       },

@@ -7,7 +7,7 @@ import { openCodeAdapter } from "./sync/opencode.js";
 import { hermesAdapter } from "./sync/hermes.js";
 
 /**
- * cortex sync — instalador del toolbelt de IA de Dinacode en los agentes del dev.
+ * cortex sync — instalador del toolbelt de IA del equipo en los agentes del dev.
  *
  * Lee el registry `config/toolbelt.json` (MCPs + skills + comandos) e instala/actualiza
  * cada uno en los agentes detectados (un adapter por agente: ./sync/*.ts). El registry
@@ -84,7 +84,7 @@ function installCortexShim(ctx: SyncCtx): void {
   const file = join(dir, "cortex");
   const tsx = join(ctx.repo, "node_modules/.bin/tsx");
   const entry = join(ctx.repo, "apps/cli/src/index.ts");
-  const shim = `#!/usr/bin/env sh\n# Generado por 'cortex sync' — CLI de Dinacode Cortex.\nexec "${tsx}" "${entry}" "$@"\n`;
+  const shim = `#!/usr/bin/env sh\n# Generado por 'cortex sync' — CLI de Cortex.\nexec "${tsx}" "${entry}" "$@"\n`;
   if (existsSync(file) && readFileSync(file, "utf8").includes(entry)) {
     plan(ctx, "cli `cortex` ya instalado en ~/.local/bin");
   } else {

@@ -11,8 +11,8 @@ import { createMcpHttpApp } from "../../apps/mcp-server/src/http-app.js";
  * end-to-end (401/403/404), que son el riesgo real; no persiguen cobertura.
  */
 const RID = Date.now().toString(36);
-const USER = `dev-apps-${RID}@dinacode.com`; // NO admin (admin@dinacode.com es el admin del env)
-const OWNER = `ana-apps-${RID}@dinacode.com`; // dueña del proyecto privado ajeno
+const USER = `dev-apps-${RID}@example.com`; // NO admin (admin@example.com es el admin del env)
+const OWNER = `ana-apps-${RID}@example.com`; // dueña del proyecto privado ajeno
 
 afterAll(async () => {
   await closeSql();
@@ -51,6 +51,13 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     const web = createWebApp();
     const res = await web.request("/");
     expect(res.status).toBe(401);
+  });
+
+  it("web: la marca sale de la config, no del código", async () => {
+    const web = createWebApp();
+    const html = await (await web.request("/")).text(); // la pantalla de login ya lleva marca
+    expect(html).toContain("Cortex"); // default, sin CORTEX_BRAND_NAME
+    expect(html).not.toContain("Dinacode"); // el producto no lleva la marca de quien lo escribió
   });
 
   it("web: con sesión, proyecto inexistente → 404", async () => {

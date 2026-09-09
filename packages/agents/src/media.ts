@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig } from "@cortex/shared";
+import { getBrandName, getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig } from "@cortex/shared";
 import type { MediaExtractorHooks } from "@cortex/core";
 
 const execFileAsync = promisify(execFile);
@@ -29,7 +29,7 @@ async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cf
     max_tokens: maxTokens,
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }],
   });
-  const headers = { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
+  const headers = { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
   for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/chat/completions`, { method: "POST", headers, body });
@@ -103,7 +103,7 @@ const SEGMENT_SEC = getEnvNum("CORTEX_AUDIO_SEGMENT_SEC", 600); // 10 min (mono 
 
 /** POST de un buffer de audio a whisper, con reintentos en 429/5xx. */
 async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> {
-  const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
+  const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const fd = new FormData(); // se reconstruye en cada intento (el body se consume)

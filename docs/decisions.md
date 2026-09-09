@@ -179,21 +179,31 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** queramos decay adaptativo (por velocity/volatility) o
   invalidación por recencia en contradicciones.
 
-## ADR-0013 · UI con el sistema de diseño de Dinacode
+## ADR-0013 · UI: tokens de diseño neutros y marca configurable (revisado 2026-09)
 
-- **Estado:** aceptada (demo).
-- **Contexto:** la UI usaba una paleta genérica (morado/oscuro). Dinacode tiene un
-  design system en Open Design (`Dinacode Design System`, vinculado a
-  `dinacode-web`).
-- **Decisión:** aplicar los tokens del DS a la UI web (`apps/web/src/views.ts`):
-  azul eléctrico `#0099ff`, tinta de marca `#01001c`, tipografías Inter +
-  JetBrains Mono, rampa de radios/espaciado/sombras y componentes (cards, botones,
-  chips, inputs) del DS. Cabecera con el logo Dinacode + tag "Cortex". Tema claro;
-  lienzo del grafo en tinta de marca. Capturas del README regeneradas.
-- **Fuente:** Open Design (`colors_and_type.css`, `DESIGN.md`, `assets/logo.svg`),
-  extraído de `dinacode-web/src/app/globals.css`.
-- **Revisar cuando:** queramos modo oscuro conmutable o extraer los tokens a un
-  paquete compartido (`@cortex/ui`).
+- **Estado:** **revisada** (2026-09-09). Antes: «UI con el sistema de diseño de Dinacode».
+- **Contexto:** la UI se construyó con los tokens del design system de Dinacode (azul
+  eléctrico `#0099ff`, tinta `#01001c`, Inter + JetBrains Mono) y con el **wordmark SVG de
+  Dinacode incrustado** en `layout.ts`, más el nombre «Dinacode Cortex» en el `<title>`, el
+  login, el asunto del email de OTP y el contexto que se inyecta a los agentes. Al separar
+  producto de empresa (ADR-0026) eso no puede seguir cableado: quien despliegue Cortex no
+  debería heredar la marca de quien lo escribió.
+- **Decisión:** los **tokens** de `styles.css` se quedan como paleta por defecto — no son
+  propietarios (dos colores y dos tipografías libres) y rehacer el diseño no aportaría nada.
+  La **marca sí es configuración**: `CORTEX_BRAND_NAME` (def. «Cortex») en el `<title>`, la
+  cabecera, el login, el email de OTP, el contexto inyectado y la ayuda del CLI; logo
+  opcional por `CORTEX_BRAND_LOGO_SVG` (inline) o `CORTEX_BRAND_LOGO_FILE` (ruta), y sin
+  logo se pinta un wordmark de texto. El SVG de Dinacode sale del repo y pasa al repo
+  privado; el despliegue de Dinacode lo monta como fichero. En la misma línea,
+  `CORTEX_AUTH_DOMAIN` y `BREVO_SENDER` pierden su default con dominio de Dinacode.
+- **Nota de seguridad:** el logo se inserta con `raw()`, así que se valida que parezca un
+  SVG y no traiga `<script>`. Es configuración del operador (quien puede escribir la env ya
+  controla el proceso), no entrada de usuario: la comprobación es una red contra el error
+  tonto, no un sanitizador.
+- **Alternativas:** un paquete `@cortex/ui` con temas (sobreingeniería para una sola UI
+  SSR); tokens de color por env (ruido sin demanda real).
+- **Revisar cuando:** un segundo operador pida colores propios (entonces sí,
+  `CORTEX_BRAND_PRIMARY` y compañía), o la UI cambie de stack.
 
 ## ADR-0014 · Harness de IA distribuible (config/) y multi-agente
 

@@ -12,6 +12,16 @@ import { createApp } from "./app.js";
 loadEnv();
 wireLlm(); // hooks LLM (reconciliación en /capture) + sink de uso de embeddings
 
+// Sin dominio permitido, cualquier email del mundo puede pedir un OTP y crearse una
+// cuenta. Es un default deliberado (el producto no conoce el dominio de quien lo
+// despliega), pero en producción es casi siempre un olvido: se avisa alto y claro.
+if (!process.env.CORTEX_AUTH_DOMAIN?.trim()) {
+  console.warn(
+    "[cortex-server] CORTEX_AUTH_DOMAIN está vacío: CUALQUIER email puede registrarse. " +
+      "Fíjalo en producción (p. ej. CORTEX_AUTH_DOMAIN=tu-dominio.com).",
+  );
+}
+
 const app = createApp();
 const port = Number(process.env.CORTEX_SERVER_PORT ?? "8787");
 const server = serve({ fetch: app.fetch, port }, (info) => {
