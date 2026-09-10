@@ -1,21 +1,50 @@
 {
-  "name": "@cortex/cli",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@dinacode/cortex",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "tsx src/index.ts"
+    "build": "tsup",
+    "dev": "node --conditions=development --import tsx src/index.ts",
+    "prepublishOnly": "pnpm build && node dist/cortex.js version"
   },
   "dependencies": {
-    "@cortex/client": "workspace:*",
-    "@cortex/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "yaml": "^2.9.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node-cron": "^3.0.11"
+    "@cortex/client": "workspace:*",
+    "@cortex/shared": "workspace:*",
+    "tsup": "^8.5.0"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "description": "Cortex CLI: project memory for AI coding agents",
+  "bin": {
+    "cortex": "./dist/cortex.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dinacode-Labs/cortex.git",
+    "directory": "apps/cli"
+  },
+  "homepage": "https://github.com/Dinacode-Labs/cortex#readme",
+  "keywords": [
+    "cortex",
+    "memory",
+    "context",
+    "mcp",
+    "ai",
+    "agents"
+  ]
 }

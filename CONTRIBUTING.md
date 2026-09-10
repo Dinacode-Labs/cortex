@@ -55,6 +55,7 @@ distribuirlo como CLI instalable.
 | Integración por agente (`cortex setup`) | `apps/cli/src/setup/` — un adaptador por agente, más `hooks-json.ts` y `legacy.ts` |
 | Registry de terceros (`cortex toolbelt`) | `config/toolbelt.json` (esquema) + `apps/cli/src/toolbelt/` |
 | Diagnóstico (`cortex doctor`) | `apps/cli/src/commands/doctor.ts` |
+| Empaquetado del CLI para npm | `apps/cli/tsup.config.ts` (bundle; los `@cortex/*` van dentro) |
 
 **Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
 se **inyecta**: cada entrypoint llama a `wireLlm()` (de `@cortex/agents`) tras `loadEnv()`,

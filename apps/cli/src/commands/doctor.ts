@@ -1,6 +1,7 @@
 import { getClientConfig, readCortexLink, readCredentials, whoami } from "@cortex/client";
 import { defaultCtx, detectAgents, getAdapter } from "../setup/index.js";
 import type { SetupCtx } from "../setup/types.js";
+import { CLI_VERSION, isOlderThan } from "../version.js";
 
 /**
  * `cortex doctor` — por qué no funciona.
@@ -36,16 +37,6 @@ async function ping(url: string, opts: { token?: string } = {}): Promise<{ ok: b
   }
 }
 
-/** Compara dos versiones semver sencillas (sin pre-releases). */
-function menorQue(a: string, b: string): boolean {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] ?? 0) < (pb[i] ?? 0)) return true;
-    if ((pa[i] ?? 0) > (pb[i] ?? 0)) return false;
-  }
-  return false;
-}
 
 /**
  * Las comprobaciones, separadas de cómo se pintan. El contexto entra por parámetro porque
@@ -113,9 +104,8 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
       }
 
       const min = cfg?.minClientVersion;
-      const mine = process.env.CORTEX_CLI_VERSION || "0.0.0";
-      if (min && mine !== "0.0.0" && menorQue(mine, min)) {
-        checks.push({ nombre: "Versión del CLI", nivel: "aviso", detalle: `tienes ${mine}, el servidor pide ${min}`, arreglo: "cortex upgrade" });
+      if (min && isOlderThan(CLI_VERSION, min)) {
+        checks.push({ nombre: "Versión del CLI", nivel: "aviso", detalle: `tienes ${CLI_VERSION}, el servidor pide ${min}`, arreglo: "cortex upgrade" });
       }
     }
   }
