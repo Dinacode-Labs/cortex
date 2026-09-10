@@ -5,7 +5,6 @@ import {
   checkEntryAccess,
   checkProjectAccess,
   getContextPack,
-  listAccessibleProjects,
   relateEntries,
   renderContextPack,
   saveWithReconciliation,
@@ -146,12 +145,4 @@ contextRoutes.post("/relate", async (c) => {
   }
   await relateEntries(body.sourceId, body.targetId, body.relationType);
   return c.json({ ok: true });
-});
-
-/** Proyectos visibles para el usuario (admin → todos). */
-contextRoutes.get("/projects", async (c) => {
-  const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
-  const projects = await listAccessibleProjects(user.email);
-  return c.json({ projects: projects.map((p) => ({ slug: p.slug, name: p.name, visibility: p.visibility })) });
 });

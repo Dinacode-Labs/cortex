@@ -188,7 +188,8 @@ Requisitos: Node ≥ 20, pnpm, Docker.
 ```bash
 git clone git@github.com:Dinacode-Labs/cortex.git && cd cortex
 pnpm install
-cp .env.example .env          # proveedores, Brevo (OTP), CORTEX_ADMIN_EMAIL, CORTEX_AUTH_DOMAIN
+cp .env.example .env          # proveedores, email (OTP), CORTEX_ADMIN_EMAIL, CORTEX_AUTH_DOMAIN
+pnpm build                    # compila a dist/ (en dev puedes usar los scripts `dev` con tsx)
 pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker, puerto host 5433) + esquema
 pnpm cortex server            # API HTTP + auth (8787) — sirve también /install.sh
 pnpm web                      # UI web (8080)
@@ -196,6 +197,11 @@ pnpm cortex mcp-http          # MCP por HTTP autenticado (Streamable HTTP, 8788)
 pnpm cortex maintain-worker   # mantenimiento programado (cron)
 ```
 
+- **Endpoints de la API** (`8787`). Públicos: `/health`, `/client-config` (lo que un cliente
+  necesita saber antes de autenticarse, incluida la URL del MCP), `/version`,
+  `/toolbelt.json`, `/install.sh` y `/auth/request|verify`. Autenticados con Bearer:
+  `/auth/me`, `/auth/logout`, `/auth/ui-ticket`, `/context-pack`, `/capture`,
+  `/capture/batch`, `/relate`, `/projects` (listar y crear) y `/projects/:slug`.
 - **Auth:** login **email + OTP** sin passwords; el usuario **es su correo**.
   `CORTEX_AUTH_DOMAIN` es la whitelist de dominios y **no tiene default**: vacío significa
   que cualquier email puede registrarse, así que fíjalo en producción (el servidor avisa al

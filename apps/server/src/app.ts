@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { authRoutes } from "./routes/auth.js";
 import { contextRoutes } from "./routes/context.js";
 import { installRoutes } from "./routes/install.js";
+import { metaRoutes } from "./routes/meta.js";
+import { projectRoutes } from "./routes/projects.js";
 
 /**
  * API HTTP de Cortex (Hono). Autenticación email + OTP + endpoints autenticados de
@@ -21,9 +23,11 @@ export function createApp(): Hono {
 
   app.get("/health", (c) => c.json({ ok: true, service: "cortex-server" }));
 
+  app.route("/", metaRoutes);
   app.route("/", installRoutes);
   app.route("/", authRoutes);
   app.route("/", contextRoutes);
+  app.route("/", projectRoutes);
 
   // Errores no controlados: log completo en servidor + 500 JSON genérico,
   // sin filtrar detalles internos al cliente.
