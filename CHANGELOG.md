@@ -9,6 +9,18 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Despliegue de producción completo** (ADR-0027): imagen de tres etapas sin
+  devDependencies ni fuentes, corriendo como usuario `node`; Caddy delante con TLS
+  automático y un solo dominio (`/` la web, `/api` la API, `/mcp` el MCP, `/install.sh` el
+  instalador); Postgres sin puertos publicados; copia diaria con retención 7d/4s/6m;
+  `deploy/restore.sh` con modo simulacro y `deploy/backup-now.sh`; y `deploy/README.md` con
+  los procedimientos de actualizar, restaurar y rotar credenciales.
+- **`/health` de verdad** en API, web y MCP: hace `select 1` y devuelve 503 si la base no
+  responde. Antes decían `ok` mientras el proceso viviera, que es justo lo que no hay que
+  decirle a un orquestador. El worker, que no escucha en ningún puerto, deja un fichero de
+  latido que el compose vigila.
+- Cabeceras de seguridad en las tres apps y `CORTEX_BIND_HOST` para elegir en qué interfaz
+  escuchan. Por defecto, solo local: asomarse a la red es una decisión de quien despliega.
 - **El CLI se publica en npm como `@dinacode/cortex`**: un solo fichero de ~110 KB con
   `@cortex/client` y `@cortex/shared` dentro, y solo tres dependencias públicas fuera (el SDK
   de MCP, zod y yaml). Instalado global ocupa 24 MB, frente a los ~235 MB del clon del

@@ -383,6 +383,10 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 
 ## Despliegue: docker-compose (imagen única, un comando por servicio)
 
+- **Estado:** **sustituida** (2026-09) por el ADR-0027, que compila la imagen, la publica y
+  la pone tras Caddy con TLS, healthchecks y copias de seguridad. Lo que sigue vigente de
+  aquí es la forma: una sola imagen para todos los servicios, y `migrate` como servicio que
+  corre antes y sale.
 - **Decisión:** stack desplegable en `deploy/docker-compose.yml`: Postgres (pgvector) +
   `migrate` (aplica el esquema y sale; los demás esperan a `service_completed_successfully`)
   + `server` (API/auth, 8787) + `web` (UI, 8080) + `mcp` (MCP HTTP, 8788) + `worker`
@@ -1003,3 +1007,44 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** el repo se abra (el marketplace pasa a ser público y el fallback pierde
   sentido), Claude Code cambie el formato de plugins, o algún otro agente publique un
   mecanismo equivalente que permita retirar su adaptador.
+
+## ADR-0027 · Producción: imagen compilada en un registro, Caddy con TLS, copias de seguridad y healthchecks reales
+
+- **Estado:** aceptada (2026-09-10). Sustituye «Despliegue: docker-compose (imagen única, un
+  comando por servicio)».
+- **Contexto:** la imagen anterior copiaba el repo entero, instalaba también las
+  devDependencies, corría como root y ejecutaba las fuentes con `tsx`. Se construía en el
+  propio servidor, no había TLS, los `/health` devolvían `ok` mientras el proceso viviera
+  aunque la base de datos estuviera caída, y no había copias de seguridad de ningún tipo
+  (hallazgos #25, #51 y #56 de la auditoría).
+- **Decisión:** (1) `Dockerfile` de tres etapas —manifiestos, compilación con `tsc -b`, y una
+  imagen final sin devDependencies ni fuentes, corriendo como usuario `node`— con
+  `HEALTHCHECK`. Una sola imagen para server, web, mcp, worker y migrate; los distingue el
+  comando. (2) Se publica en un registro (`ghcr.io`) desde el workflow de release; el servidor
+  solo hace `pull`, no compila. (3) **Caddy es el único servicio con puertos publicados** y se
+  encarga del certificado. Un solo dominio con rutas: `/` la web, `/api/*` la API con el
+  prefijo recortado, `/mcp` el MCP sin buffering (habla por streaming), `/install.sh` el
+  instalador. Postgres se queda en la red interna. (4) `NODE_ENV=production` para que la
+  cookie sea `secure`, cabeceras de seguridad en las tres apps, y bind configurable
+  (`CORTEX_BIND_HOST`), que por defecto es solo local. (5) `/health` hace `select 1` y
+  devuelve 503 si la base no responde; el worker, que no escucha en ningún puerto, deja un
+  fichero de latido. (6) Copia diaria con retención 7d/4s/6m y `deploy/restore.sh` con modo
+  simulacro. (7) Los procedimientos —actualizar, restaurar, rotar credenciales— en
+  `deploy/README.md`.
+- **Por qué un solo dominio y no tres subdominios:** triplica el DNS, los certificados y las
+  URLs que hay que configurar en cada cliente, a cambio de nada.
+- **Por qué el latido del worker:** es el único servicio sin puerto. Sin latido, un worker
+  colgado (un cron que no dispara, una promesa que no resuelve) parece perfectamente sano
+  desde fuera y nadie se entera hasta que se echa en falta el mantenimiento de una semana.
+- **Un detalle que costó:** `pnpm prune --prod` no vale en un workspace. Se lleva por delante
+  también los enlaces entre paquetes internos, y la imagen arranca con «Cannot find package
+  '@cortex/shared'». Hay que borrar `node_modules` y reinstalar con `--prod`.
+- **Alternativas:** Traefik o Coolify (más piezas para lo mismo); tres subdominios; pgBackRest
+  con recuperación a un punto en el tiempo (proporcionado solo cuando el volumen lo pida);
+  seguir compilando en el servidor (lento y no reproducible).
+- **Consecuencias:** desplegar exige que la imagen esté publicada, así que el release deja de
+  ser opcional. Volver a una versión anterior solo funciona si la nueva no migró el esquema:
+  las migraciones van hacia delante. El límite de peticiones por IP sigue pendiente y ahora
+  tiene sitio natural (un plugin de Caddy o el CDN).
+- **Revisar cuando:** haya más de un nodo (las sesiones del MCP viven en memoria), se quiera
+  recuperación a un punto en el tiempo, o el tamaño de la imagen justifique una por servicio.

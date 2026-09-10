@@ -20,6 +20,7 @@ import {
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { z } from "zod";
+import { createRequire } from "node:module";
 
 /**
  * Construcción del MCP de Cortex (las 8 tools), reutilizable por cualquier transporte
@@ -30,11 +31,20 @@ import { z } from "zod";
  * Los textos que ve el agente van en INGLÉS: son parte del producto y los lee un modelo que
  * puede estar trabajando en cualquier idioma. Los comentarios del código siguen en español.
  */
+/** La versión que anuncia el MCP sale del package.json propio: mentirla confunde al cliente. */
+const VERSION: string = (() => {
+  try {
+    return (createRequire(import.meta.url)("../package.json") as { version?: string }).version ?? "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
+
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
 
 export function buildMcpServer(user?: AuthUser): McpServer {
-  const server = new McpServer({ name: "cortex", version: "0.0.0" });
+  const server = new McpServer({ name: "cortex", version: VERSION });
 
   // Permiso de acceso al proyecto (solo si hay usuario autenticado; sin `user` — stdio
   // local — no se aplican guards). Devuelve el mensaje de denegación, o null si puede

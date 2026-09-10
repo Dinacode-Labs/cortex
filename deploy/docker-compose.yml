@@ -1,25 +1,52 @@
-# Despliegue de Dinacode Cortex: Postgres + migraciones + servidor (API/auth) + UI web +
-# MCP HTTP + worker de mantenimiento. Una sola imagen, un comando por servicio.
-#   cp deploy/.env.example deploy/.env   # y edítalo (secretos, dominio, proveedores)
-#   docker compose -f deploy/docker-compose.yml up -d --build
-# Proyecto AISLADO del compose de dev (que se llama "cortex"): así su volumen
-# (cortex-deploy_cortex-pgdata) NUNCA colisiona con el de dev ni lo borra un `down -v`.
+# Despliegue de Cortex en un solo host: Caddy (TLS) → web / API / MCP, con Postgres y un
+# worker de mantenimiento detrás, y copias de seguridad diarias.
+#
+#   cp deploy/.env.example deploy/.env    # y edítalo: dominio, contraseñas, proveedores
+#   docker compose -f deploy/docker-compose.yml up -d
+#
+# La imagen se descarga de GHCR; `--build` solo hace falta para probar cambios locales.
+# El proyecto está AISLADO del compose de desarrollo (que se llama "cortex"): así su volumen
+# nunca colisiona con el de dev ni se lo lleva por delante un `down -v`.
 name: cortex-deploy
 
-x-cortex: &cortex
+x-app: &app
+  image: ${CORTEX_IMAGE:-ghcr.io/dinacode-labs/cortex}:${CORTEX_VERSION:-latest}
   build:
     context: ..
     dockerfile: Dockerfile
-  image: dinacode-cortex:latest
   env_file: [.env]
+  environment:
+    NODE_ENV: production
+    # Dentro del contenedor sí escucha en todas las interfaces: quien publica puertos al
+    # exterior es Caddy, y sólo él.
+    CORTEX_BIND_HOST: 0.0.0.0
   restart: unless-stopped
+  networks: [internal]
+  depends_on:
+    postgres: { condition: service_healthy }
+    migrate: { condition: service_completed_successfully }
 
 services:
+  # Único servicio con puertos publicados. Pide y renueva el certificado él solo.
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      CORTEX_DOMAIN: ${CORTEX_DOMAIN:?falta CORTEX_DOMAIN en deploy/.env}
+      CORTEX_ACME_EMAIL: ${CORTEX_ACME_EMAIL:?falta CORTEX_ACME_EMAIL en deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data      # certificados: perderlos significa volver a pedirlos (hay límites)
+      - caddy-config:/config
+    networks: [internal]
+    depends_on: [server, web, mcp]
+
   postgres:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cortex}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cortex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en deploy/.env}
       POSTGRES_DB: ${POSTGRES_DB:-cortex}
     volumes:
       - cortex-pgdata:/var/lib/postgresql/data
@@ -27,47 +54,85 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cortex} -d ${POSTGRES_DB:-cortex}"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 15
     restart: unless-stopped
+    networks: [internal]   # sin `ports`: la base de datos no se asoma a internet
 
-  # Aplica migraciones una vez (los demás esperan a que termine OK).
+  # Aplica migraciones una vez y termina. Los demás esperan a que salga bien.
   migrate:
-    <<: *cortex
-    command: node apps/admin/dist/index.js migrate
+    <<: *app
+    command: node packages/database/dist/migrate-cli.js
+    restart: "no"
     depends_on:
       postgres: { condition: service_healthy }
-    restart: "no"
 
   server:
-    <<: *cortex
+    <<: *app
     command: node apps/server/dist/index.js
-    depends_on:
-      postgres: { condition: service_healthy }
-      migrate: { condition: service_completed_successfully }
-    ports: ["${CORTEX_SERVER_PORT:-8787}:8787"]
+    environment:
+      NODE_ENV: production
+      CORTEX_BIND_HOST: 0.0.0.0
+      HEALTH_PORT: "8787"
 
   web:
-    <<: *cortex
+    <<: *app
     command: node apps/web/dist/index.js
-    depends_on:
-      postgres: { condition: service_healthy }
-      migrate: { condition: service_completed_successfully }
-    ports: ["8080:8080"]
+    environment:
+      NODE_ENV: production
+      CORTEX_BIND_HOST: 0.0.0.0
+      HEALTH_PORT: "8080"
 
   mcp:
-    <<: *cortex
+    <<: *app
     command: node apps/mcp-server/dist/http.js
-    depends_on:
-      postgres: { condition: service_healthy }
-      migrate: { condition: service_completed_successfully }
-    ports: ["8788:8788"]
+    environment:
+      NODE_ENV: production
+      CORTEX_BIND_HOST: 0.0.0.0
+      HEALTH_PORT: "8788"
 
+  # No escucha en ningún puerto, así que su salud se mide por el fichero de latido: sin él,
+  # un worker colgado parece sano desde fuera.
   worker:
-    <<: *cortex
+    <<: *app
     command: node apps/admin/dist/index.js maintain-worker
+    environment:
+      NODE_ENV: production
+      CORTEX_WORKER_HEARTBEAT_FILE: /tmp/cortex-worker.heartbeat
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const{statSync}=require('node:fs');process.exit(Date.now()-statSync('/tmp/cortex-worker.heartbeat').mtimeMs<120000?0:1)\""]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Volcado diario. `--blobs` y sin `--schema=public` para que el dump incluya la extensión
+  # vector: restaurar sin ella deja una base de datos que no arranca.
+  backup:
+    image: prodrigestivill/postgres-backup-local:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_USER: ${POSTGRES_USER:-cortex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-cortex}
+      POSTGRES_EXTRA_OPTS: "-Z1 --blobs"
+      SCHEDULE: "@daily"
+      BACKUP_ON_START: "TRUE"
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_KEEP_WEEKS: "4"
+      BACKUP_KEEP_MONTHS: "6"
+      TZ: ${TZ:-Europe/Madrid}
+    volumes:
+      - cortex-backups:/backups
+    networks: [internal]
     depends_on:
       postgres: { condition: service_healthy }
-      migrate: { condition: service_completed_successfully }
+
+networks:
+  internal:
 
 volumes:
   cortex-pgdata:
+  cortex-backups:
+  caddy-data:
+  caddy-config:

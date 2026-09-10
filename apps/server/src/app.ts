@@ -1,4 +1,6 @@
 import { Hono } from "hono";
+import { secureHeaders } from "hono/secure-headers";
+import { pingDatabase } from "@cortex/database";
 import { getEnvNum } from "@cortex/shared";
 import { distillSession, type DistillSessionFn } from "@cortex/agents";
 import { createCaptureQueue } from "./capture-queue.js";
@@ -31,13 +33,22 @@ export interface AppDeps {
 /** Construye la API HTTP completa (auth + contexto + captura). Sin side effects. */
 export function createApp(deps: AppDeps = {}): Hono {
   const app = new Hono();
+
+  // Cabeceras de seguridad antes que nada. Los defaults de Hono no incluyen CSP, que es lo
+  // que rompería las fuentes externas de la UI.
+  app.use("*", secureHeaders());
   const distill = deps.distill ?? distillSession;
   const captureQueue = createCaptureQueue<CaptureJob>({
     concurrency: deps.captureConcurrency ?? getEnvNum("CORTEX_CAPTURE_CONCURRENCY", 1),
     run: makeCaptureRunner(distill),
   });
 
-  app.get("/health", (c) => c.json({ ok: true, service: "cortex-server" }));
+  // Health de verdad: sin base de datos el servidor no sirve para nada, así que decirlo
+  // "ok" solo porque el proceso vive engaña al orquestador y al que mira el dashboard.
+  app.get("/health", async (c) => {
+    const db = await pingDatabase();
+    return c.json({ ok: db, service: "cortex-server", db: db ? "ok" : "down" }, db ? 200 : 503);
+  });
 
   app.route("/", metaRoutes);
   app.route("/", installRoutes);
