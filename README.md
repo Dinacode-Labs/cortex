@@ -12,8 +12,6 @@ automatizan el bucle: tu agente arranca **sabiendo** el proyecto y, al terminar,
 
 - Decisiones (ADR): [`docs/decisions.md`](./docs/decisions.md) · Roadmap: [`docs/roadmap.md`](./docs/roadmap.md)
 - Contribuir (PRs): [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- Auditoría integral (jun 2026): [`docs/audit/`](./docs/audit/README.md) · **Refactor de
-  arquitectura en curso** (jul 2026): [`docs/refactor/`](./docs/refactor/README.md)
 
 > **Cómo leer este README.** Tiene dos partes. La **práctica** (instalar, usar, operar)
 > es referencia rápida. La **[guía formativa](#guía-formativa-cómo-funciona-por-dentro)**
@@ -265,7 +263,7 @@ docs/        decisions.md · roadmap.md · research/ · audit/ (jun 2026) · ref
 
 Las **reglas de dependencia** entre paquetes (qué puede importar qué) están en
 [`CLAUDE.md`](./CLAUDE.md); hay un **refactor por fases en curso** — antes de tocar un
-área, mira [`docs/refactor/README.md`](./docs/refactor/README.md).
+área, revisa primero las decisiones en [`docs/decisions.md`](./docs/decisions.md).
 
 Cómo contribuir, dónde vive cada cosa y convenciones: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 

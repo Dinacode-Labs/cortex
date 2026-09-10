@@ -630,7 +630,7 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   (2026-09): la salida de NaN no ocurrió, así que los puntos 1 y 3 (proveedor: todo-OpenRouter
   + OpenAI para embeddings/STT) quedan superados. **Siguen vigentes** el routing por rol (2),
   el chunking (4) y la disciplina de evals (5). Documento completo con costes, benchmarks y
-  métodos: [`research/llm-model-strategy.md`](./research/llm-model-strategy.md).
+  métodos: documento interno (repo privado, ADR-0031).
 - **Contexto:** (1) los 7 agentes Mastra comparten **un único modelo** (`getLlmConfig()`
   no distingue rol), desaprovechando que cada rol tiene criticidad distinta (un fallo del
   reconciler/merger/distiller destruye conocimiento; uno del rerank solo molesta).
@@ -677,67 +677,47 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 
 ---
 
-## ADR-0024 · NaN se queda: proveedor `openai-compatible` genérico y routing por rol sobre NaN
+## ADR-0024 · Proveedor de inferencia genérico (`openai-compatible`) y routing por rol
 
-- **Estado:** aceptada (2026-09-09). Sustituye la parte de **proveedor** de ADR-0023 (puntos 1
+- **Estado:** aceptada (2026-09). Sustituye la parte de **proveedor** de ADR-0023 (puntos 1
   y 3); mantiene su routing por rol (2), chunking (4) y evals (5).
-- **Contexto:** ADR-0023 se escribió asumiendo que perderíamos el acceso a NaN, y de ahí salió
-  el plan de migrar todo a OpenRouter + OpenAI. **No ha ocurrido**: NaN (api.nan.builders,
-  cluster OpenAI-compatible con suscripción) sigue disponible, con cuotas amplias a
-  septiembre de 2026 — `deepseek-v4-flash` 3B tokens/mes con 1M de contexto, visión y tool
-  calling; `glm5.3-flash` 2B; `mimo-v2.5` 1B; `qwen3.8-flash` 500M; `qwen3-embedding` de 4096
-  dimensiones; `whisper`; `kokoro`; endpoint de rerank — y límites por clave de 60 rpm y
-  **5 peticiones concurrentes**. Además, `nan` estaba cableado como un `case` dentro de
-  `llm-config.ts` y `embeddings/index.ts`: un vendor concreto incrustado en paquetes
-  genéricos, lo que impedía apuntar a Ollama, vLLM o LM Studio (el requisito on-prem que
-  ADR-0023 dejaba como contingencia).
+- **Contexto:** ADR-0023 planificó una migración forzosa a un proveedor de pago concreto
+  porque se daba por perdido el acceso al que usábamos. No llegó a ocurrir, y al revisarlo
+  apareció el problema de fondo: el proveedor estaba **cableado como un `case`** dentro de
+  `llm-config.ts` y `embeddings/index.ts`. Un vendor concreto incrustado en dos paquetes que
+  deberían ser genéricos, lo que además impedía apuntar a un endpoint local (Ollama, vLLM,
+  LM Studio) — justo el requisito on-prem que ADR-0023 dejaba como contingencia.
 - **Decisión:**
   1. **Proveedor genérico `openai-compatible`** para chat (`LLM_PROVIDER`, `LLM_BASE_URL`,
      `LLM_API_KEY`, `LLM_MODEL`) y embeddings (`EMBEDDINGS_*`, con `EMBEDDINGS_DIM`
-     obligatorio porque la dimensión define el esquema vectorial). NaN pasa a ser un
-     **ejemplo de configuración**, no un caso del código. `nan` queda como **alias de
-     compatibilidad** durante una versión: traduce las `NAN_*` con un aviso y se retira en
-     0.2.0. Endpoints locales sin auth requieren `LLM_ALLOW_NO_KEY` explícito, para que una
-     clave olvidada no se confunda con "es local".
-  2. **Routing por rol sobre NaN:** `deepseek-v4-flash` para classifier, graph, reranker y
-     visión (`CORTEX_VISION_MODEL`), y también para reconciler, merger y distiller
-     (alternativa de más juicio: `glm5.3-flash`); `qwen3-embedding` para embeddings, lo que
-     **evita recalibrar los umbrales de dedup** de ADR-0009 (seguimos en 4096 dimensiones);
-     `whisper` vía `CORTEX_STT_*`. `CORTEX_MODEL_<ROL>` admite ahora `proveedor:modelo`, así
-     que el **retriever** —el único rol cuya salida ve el usuario— puede ir a OpenRouter
-     (`openrouter:x-ai/grok-4.5`) mientras el resto se queda en NaN. Por defecto, todo NaN.
+     obligatorio porque la dimensión define el esquema vectorial). Todo endpoint soportado
+     habla el mismo dialecto, así que el vendor pasa a ser **configuración**, no código.
+     `nan` queda como **alias de compatibilidad** durante una versión: traduce las `NAN_*`
+     con un aviso y se retira en 0.2.0. Un endpoint local sin auth exige
+     `LLM_ALLOW_NO_KEY` explícito, para que una clave olvidada no se confunda con «es local».
+  2. **Routing por rol.** `CORTEX_MODEL_<ROL>` admite `proveedor:modelo`, de modo que un rol
+     concreto puede ir a otro proveedor con sus propias credenciales sin mover el resto. El
+     caso que lo motiva es el **retriever**: es el único rol cuya salida ve el usuario, así
+     que es el único donde compensa pagar por más calidad.
   3. **Semáforo de concurrencia** `CORTEX_LLM_CONCURRENCY` (def. 4) en `@cortex/shared`,
-     compartido por chat, visión, STT y embeddings, porque el límite del proveedor es por
-     clave y no por tipo de endpoint. Sin él, `enrich`/`maintain` con concurrencia 8 dispara
-     429 en ráfaga y el backoff cuesta más de lo que ahorra el paralelismo.
-  4. **Precios:** la tabla sigue en código (ADR-0021) con los modelos de NaN a 0 (la
-     suscripción hace que el coste marginal por token sea cero), más un
-     `CORTEX_PRICING_JSON` opcional para corregir o dar de alta precios sin desplegar. Cierra
-     el «revisar cuando» de ADR-0021.
-- **Alternativas descartadas:** *podar `nan` y ejecutar ADR-0023 tal cual* — coste recurrente
-  y dependencia de claves de pago hasta para desarrollar, sin ninguna ganancia de calidad
-  medida; *mantener `nan` como caso propio* — impide el uso on-prem y deja el vendor dentro
-  de paquetes que deberían ser genéricos.
-- **Consecuencias:** sin migración de datos (mismo modelo de embedding, misma dimensión). El
-  coste recurrente vuelve a ser 0 para Dinacode y la observabilidad de tokens sigue midiendo
-  volumen. El proveedor `local` queda solo para tests y para arrancar sin claves.
-- **La clave del servidor es una membresía personal (decidido 2026-09-10).** La cuota de NaN
-  es *por miembro*, y el servidor de Cortex la consumirá para todo el equipo. Se asume a
-  sabiendas, con dos argumentos: el volumen real medido hasta ahora es pequeño frente a los
-  3B tokens/mes de `deepseek-v4-flash`, y Cortex se va a publicar como open source, lo que
-  encaja con el espíritu del cluster. **Riesgos que quedan abiertos**, y conviene tenerlos
-  presentes en vez de darlos por resueltos: (a) es una interpretación nuestra de lo que
-  NaN considerará aceptable, no algo que hayan confirmado; (b) si NaN lo objeta o cambia sus
-  condiciones, hay que poder migrar rápido — por eso importa que el proveedor sea genérico y
-  que el routing por rol se cambie solo con `.env`; (c) el consumo va contra la cuota de una
-  persona concreta, así que conviene mirar `llm_usage` de vez en cuando y no dar por hecho
-  que el margen es infinito.
-- **Revisar cuando:** NaN cambie cuotas o catálogo (verificar antes de fijar modelos en el
-  `.env`); se quiera *streaming* para `glm5.3-flash` (su guardrail global de 800K tpm lo
-  recomienda y `runAgent` hoy no lo usa); aparezca un cliente con requisito on-prem (probar
-  Ollama/vLLM con este mismo proveedor); o toque retirar el alias `nan` (0.2.0).
-
----
+     compartido por chat, visión, STT y embeddings, porque los proveedores limitan
+     peticiones **por clave** y no por tipo de endpoint. Sin él, `enrich`/`maintain` con
+     concurrencia 8 dispara 429 en ráfaga y el backoff cuesta más de lo que ahorra el
+     paralelismo.
+  4. **Precios:** la tabla sigue en código (ADR-0021) más un `CORTEX_PRICING_JSON` opcional
+     para corregir o dar de alta precios sin desplegar. Cierra el «revisar cuando» de
+     ADR-0021.
+- **Alternativas descartadas:** *ejecutar ADR-0023 tal cual* — obligaba a claves de pago
+  hasta para desarrollar, sin ninguna ganancia de calidad medida; *mantener el vendor como
+  caso propio del código* — impide el uso on-prem y deja un proveedor concreto dentro de
+  paquetes que deberían ser genéricos.
+- **Consecuencias:** sin migración de datos si se conserva el mismo modelo de embedding y la
+  misma dimensión; cambiarlos obliga a re-embeder el corpus y a recalibrar los umbrales de
+  dedup de ADR-0009. El proveedor `local` queda solo para tests y para arrancar sin claves.
+  **Qué proveedor concreto usa cada despliegue, con qué modelos y con qué clave, es decisión
+  del operador y no se documenta aquí** (ver ADR-0031).
+- **Revisar cuando:** aparezca un motivo para volver a acoplar el código a un proveedor
+  (no debería), o cuando toque retirar el alias `nan` (0.2.0).
 
 ## ADR-0026 · Separación producto/empresa: el material corporativo a un repo privado, sin reescribir la historia
 
@@ -759,7 +739,7 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
      migración aplicada es peor práctica que el comentario que arregla.
   3. **No se reescribe el historial** (`git filter-repo`). El repo sigue siendo privado, así
      que el material solo es visible para quien ya tiene acceso; reescribir invalidaría todos
-     los clones y rompería las referencias a PRs que hay en `docs/refactor` y en los propios
+     los clones y rompería las referencias a PRs que hay en los propios
      ADR. La apertura se hará desde una **instantánea limpia** —repo público nuevo con un
      commit inicial— y no publicando este historial. Si algún día hiciera falta limpiarlo:
      `git filter-repo --invert-paths --path <fichero>` en un clon fresco, force-push, todos
@@ -845,3 +825,51 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** se fije un modelo comercial (SaaS, OEM) que pida otra licencia; un
   contribuidor externo pida un CLA; o `mammoth`/MCP SDK/Mastra publiquen y el audit pueda
   pasar a bloqueante de verdad.
+
+---
+
+## ADR-0031 · Qué se publica y qué no: abrir el código no es abrir el proceso
+
+- **Estado:** aceptada (2026-09-10).
+- **Contexto:** al preparar la apertura de Cortex se coló en un ADR una decisión **operativa**
+  (con qué clave concreta se respalda el servidor y por qué asumimos ese riesgo). Eso no es
+  documentación del producto: es cómo opera una empresa concreta, y publicarlo no aporta nada
+  a quien use Cortex mientras que sí expone acuerdos con terceros y decisiones internas. El
+  incidente destapó el problema de fondo: no había criterio escrito sobre qué parte de la
+  documentación es producto y cuál es proceso.
+- **Decisión: se publica el producto y lo que hace falta para entenderlo y operarlo; el
+  proceso interno se queda fuera.** En concreto:
+
+  **Va en el repo del producto:**
+  - Código, tests, `README` (incluida la guía formativa), `CONTRIBUTING`, `SECURITY`,
+    `LICENSE`, `NOTICE`, código de conducta, `CHANGELOG`.
+  - **ADRs de diseño del producto**: por qué pgvector y no una base vectorial dedicada, por
+    qué búsqueda híbrida con RRF, por qué bi-temporal, por qué el proveedor es genérico.
+    Explican *cómo está construido* y son parte del valor de abrirlo.
+  - Documentación de configuración: qué variables existen y qué hacen, con ejemplos.
+  - Investigación técnica de interés general (chunking, panorama competitivo, políticas de
+    captura), siempre que no dependa de datos nuestros.
+
+  **No va en el repo del producto** (vive en el repo privado):
+  - **Decisiones operativas**: qué proveedor usamos, con qué clave, con qué cuota, a qué
+    coste, con qué acuerdos. El producto documenta *cómo se configura*, no *qué configuración
+    tiene nuestro despliegue*.
+  - **Auditorías de seguridad y planes de refactor** con hallazgos por fichero y línea. Aunque
+    estén resueltos, son un mapa de dónde ha habido problemas.
+  - **Prioridades de negocio y responsables**: quién hace qué y en qué orden.
+  - Clientes por su nombre y cualquier dato suyo (ya cubierto por ADR-0026).
+
+- **Regla práctica para decidir en el momento:** si un párrafo ayuda a alguien de fuera a
+  **usar, entender o mejorar Cortex**, es público. Si describe **cómo lo operamos nosotros o
+  qué acuerdos tenemos**, es privado. Ante la duda, privado: sacarlo después es fácil,
+  despublicarlo no.
+- **Alternativas:** publicar todo el proceso («build in public») — aporta transparencia pero
+  expone acuerdos con terceros, auditorías de seguridad y prioridades comerciales sin ninguna
+  ganancia para quien usa el producto; no publicar ningún ADR — se pierde justo la parte que
+  hace creíble el trabajo técnico.
+- **Consecuencias:** la apertura se hará desde una instantánea limpia (ADR-0026), y este ADR
+  es la lista de comprobación de qué debe quedar fuera. Quien trabaje en Cortex y necesite el
+  contexto interno (auditoría, estrategia de modelos, decisiones operativas) lo encuentra en
+  el repo privado.
+- **Revisar cuando:** el repo se publique de verdad (repasar esta lista antes), o aparezca un
+  tipo de documento que no encaje claramente en ninguna de las dos columnas.
