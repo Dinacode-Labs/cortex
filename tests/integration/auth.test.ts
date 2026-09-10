@@ -3,7 +3,7 @@ import { closeSql } from "@cortex/database";
 import { requestOtp, verifyOtp, validateToken, createUiTicket, redeemUiTicket } from "@cortex/core";
 
 const RID = Date.now().toString(36);
-const EMAIL = `dev-${RID}@dinacode.com`;
+const EMAIL = `dev-${RID}@example.com`;
 afterAll(async () => {
   await closeSql();
 });
@@ -48,13 +48,13 @@ describe("auth email + OTP (BD real)", () => {
   });
 
   it("rate limit: no más de CORTEX_OTP_RATE_MAX (def. 5) códigos por email en la ventana", async () => {
-    const email = `rate-${RID}@dinacode.com`;
+    const email = `rate-${RID}@example.com`;
     for (let i = 0; i < 5; i++) await requestOtp(email); // 5 OK
     await expect(requestOtp(email)).rejects.toThrow(/Demasiadas solicitudes/); // el 6º se corta
   });
 
   it("bloqueo por intentos: tras 5 códigos erróneos ni el correcto sirve", async () => {
-    const email = `lock-${RID}@dinacode.com`;
+    const email = `lock-${RID}@example.com`;
     const code = await otpFor(email);
     for (let i = 0; i < 5; i++) await expect(verifyOtp(email, "000000")).rejects.toThrow(/incorrecto/i);
     // El código ya no es válido aunque sea el correcto (intentos agotados).

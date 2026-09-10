@@ -1,4 +1,4 @@
-/* === Dinacode Design System — tokens === */
+/* === Cortex UI — design tokens === */
 :root {
   --color-primary:#0099ff; --color-primary-hover:#0077cc; --brand-ink:#01001c;
   --color-text:#111111; --color-text-muted:#666666; --color-muted:#999999;
@@ -32,6 +32,8 @@ header { position:sticky; top:0; z-index:10;
   background:color-mix(in srgb,var(--color-background) 80%,transparent);
   backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
   border-bottom:1px solid var(--color-border); }
+header .brand .wordmark { font-weight: 800; font-size: 17px; letter-spacing: -0.02em; color: var(--brand-ink); }
+header .brand .wordmark::first-letter { color: var(--color-primary); }
 header .brand { display:flex; align-items:center; gap:10px; }
 header .brand .logo { height:22px; }
 header .brand .tag { font-size:11px; font-weight:600; color:var(--color-primary);

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig, withLlmSlot } from "@cortex/shared";
+import { getBrandName, getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig, withLlmSlot } from "@cortex/shared";
 import type { MediaExtractorHooks } from "@cortex/core";
 
 const execFileAsync = promisify(execFile);
@@ -29,7 +29,7 @@ async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cf
     max_tokens: maxTokens,
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }],
   });
-  const headers = { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
+  const headers = { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
   // Ocupa un slot del proveedor durante toda la llamada, reintentos incluidos: la visión
   // compite por el mismo límite de concurrencia por API key que el chat y los embeddings.
   return withLlmSlot(async () => {
@@ -107,7 +107,7 @@ const SEGMENT_SEC = getEnvNum("CORTEX_AUDIO_SEGMENT_SEC", 600); // 10 min (mono 
 
 /** POST de un buffer de audio a whisper, con reintentos en 429/5xx. */
 async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> {
-  const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Dinacode-Cortex", "x-title": "Dinacode Cortex" };
+  const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
   return withLlmSlot(async () => {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {

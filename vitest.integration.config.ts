@@ -39,8 +39,8 @@ export default defineConfig({
       DATABASE_URL: TEST_DB,
       EMBEDDINGS_PROVIDER: "local",
       LLM_PROVIDER: "none",
-      CORTEX_AUTH_DOMAIN: "dinacode.com",
-      CORTEX_ADMIN_EMAIL: "admin@dinacode.com",
+      CORTEX_AUTH_DOMAIN: "example.com",
+      CORTEX_ADMIN_EMAIL: "admin@example.com",
     },
   },
 });

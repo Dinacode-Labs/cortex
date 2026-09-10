@@ -48,12 +48,12 @@ describe("captura por lotes + reconciliación (BD real)", () => {
   it("captureBatch es incremental por sourceReference y atribuye created_by", async () => {
     const p = await createProject(`IT Batch ${RID}`);
     const item = { content: "Contrato de mantenimiento 2026.", title: "Contrato 2026", sourceType: "document", sourceReference: "docs/contrato-2026" };
-    const r1 = await captureBatch(p.name, [item], "dev@dinacode.com");
+    const r1 = await captureBatch(p.name, [item], "dev@example.com");
     expect(r1[0]!.action).toBe("added");
-    const r2 = await captureBatch(p.name, [item], "dev@dinacode.com");
+    const r2 = await captureBatch(p.name, [item], "dev@example.com");
     expect(r2[0]!.action).toBe("existing"); // ya ingerido
     const entries = await listEntries({ project: p.name });
-    expect(entries.some((e) => e.createdBy === "dev@dinacode.com")).toBe(true);
+    expect(entries.some((e) => e.createdBy === "dev@example.com")).toBe(true);
   });
 
   it("captureBatch clasifica con el LLM solo si CORTEX_CAPTURE_LLM=1", async () => {
@@ -67,12 +67,12 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     try {
       // Sin el flag → NO se llama al clasificador (tipo por heurística).
       delete process.env.CORTEX_CAPTURE_LLM;
-      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, alfa.", sourceType: "document", sourceReference: "cap-off" }], "dev@dinacode.com");
+      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, alfa.", sourceType: "document", sourceReference: "cap-off" }], "dev@example.com");
       expect(calls).toBe(0);
 
       // Con el flag → se clasifica con el LLM y el tipo lo pone el clasificador.
       process.env.CORTEX_CAPTURE_LLM = "1";
-      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, beta.", sourceType: "document", sourceReference: "cap-on" }], "dev@dinacode.com");
+      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, beta.", sourceType: "document", sourceReference: "cap-on" }], "dev@example.com");
       expect(calls).toBe(1);
 
       const entries = await listEntries({ project: p.name });

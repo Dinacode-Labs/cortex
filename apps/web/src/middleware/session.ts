@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import { html } from "hono/html";
 import { validateToken, type AuthUser } from "@cortex/core";
+import { getBrandName } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 
 /** Entorno de la app web: el usuario de la sesión (o null) en `c.var.user`. */
@@ -12,7 +13,7 @@ export function loginPage(msg = ""): Html {
   return layout(
     "Iniciar sesión",
     html`<div class="empty" style="max-width:560px;margin:48px auto;text-align:center">
-       <h1>Dinacode Cortex</h1>
+       <h1>${getBrandName()}</h1>
        <p>Necesitas iniciar sesión para ver el contexto.</p>
        ${msg ? html`<p style="color:#c0392b">${msg}</p>` : ""}
        <p style="margin-top:16px">Desde tu terminal:</p>

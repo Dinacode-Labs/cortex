@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { loadEnv } from "@cortex/shared";
+import { getBrandName, loadEnv } from "@cortex/shared";
 import { closeSql } from "@cortex/database";
 
 /**
@@ -52,7 +52,7 @@ const COMMANDS: Record<string, Cmd> = {
 };
 
 function usage(): void {
-  console.log("cortex — memoria de contexto corporativa de Dinacode\n");
+  console.log(`cortex — ${getBrandName()}: memoria de contexto de proyectos software\n`);
   console.log("Uso: cortex <comando> [args]\n");
   console.log("Comandos:");
   const w = Math.max(...Object.keys(COMMANDS).map((k) => k.length));

@@ -212,10 +212,15 @@ pnpm cortex mcp-http          # MCP por HTTP autenticado (Streamable HTTP, 8788)
 pnpm cortex maintain-worker   # mantenimiento programado (cron)
 ```
 
-- **Auth:** login **email + OTP** sin passwords; el usuario **es su correo**
-  (`CORTEX_AUTH_DOMAIN`, whitelist). **Admin(s):** `CORTEX_ADMIN_EMAIL` (coma-separado)
-  ven todos los proyectos y gestionan permisos. OTP por **Brevo** (`BREVO_API_KEY`); sin
-  clave, modo dev (el código se loguea, no se envía).
+- **Auth:** login **email + OTP** sin passwords; el usuario **es su correo**.
+  `CORTEX_AUTH_DOMAIN` es la whitelist de dominios y **no tiene default**: vacío significa
+  que cualquier email puede registrarse, así que fíjalo en producción (el servidor avisa al
+  arrancar). **Admin(s):** `CORTEX_ADMIN_EMAIL` (coma-separado) ven todos los proyectos y
+  gestionan permisos. OTP por **Brevo** (`BREVO_API_KEY` + `BREVO_SENDER`); sin clave, modo
+  dev (el código se loguea, no se envía).
+- **Marca:** lo que ve el usuario (web, emails, contexto inyectado, CLI) sale de
+  `CORTEX_BRAND_NAME` (def. `Cortex`) y, opcionalmente, `CORTEX_BRAND_LOGO_FILE` /
+  `CORTEX_BRAND_LOGO_SVG`. Sin logo se pinta un wordmark de texto.
 - **Proveedores** (`.env`, por defecto `local`/`none` sin claves). Todo endpoint soportado
   habla el dialecto OpenAI, así que un solo proveedor genérico sirve para NaN, Ollama,
   vLLM o LM Studio (ADR-0024). Ejemplo con NaN:
