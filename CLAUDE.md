@@ -21,7 +21,9 @@ un MCP corporativo. Documento fundacional: `dinacode-cortex-contexto-y-plan-demo
   vía `runAgent`). Sus *workflows* se evaluaron y **no** se adoptaron para la captura
   (ver ADR en `docs/decisions.md`); la captura usa la vía determinista de `core`.
 - **MCP** (SDK oficial TS) como interfaz hacia Claude Code / Codex / ChatGPT.
-- Embeddings y LLM **enchufables**, con fallback local sin API keys.
+- Embeddings y LLM **enchufables** vía un proveedor `openai-compatible` genérico (NaN por
+  defecto en Dinacode; vale Ollama/vLLM/LM Studio para on-prem), con fallback local sin
+  API keys. Ver ADR-0024; `nan` sigue como alias obsoleto hasta 0.2.0.
 
 ## Estructura
 
@@ -97,13 +99,18 @@ pnpm test:integration   # tests de integración (requiere pnpm db:up)
 ```
 
 Copia `.env.example` a `.env` antes de empezar. Por defecto todo funciona **sin
-claves** (embeddings `local`, no semánticos); conecta nan/OpenAI/Voyage cuando
-quieras calidad real.
+claves** (embeddings `local`, no semánticos); conecta un endpoint real
+(`openai-compatible` con NaN, o OpenAI/Voyage) cuando quieras calidad de verdad.
 
 ## Convenciones
 
 - Idioma: código y nombres en inglés; comentarios y docs de producto en español.
 - Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
+- **Borrado de secretos**: `scrub()` vive en `@cortex/shared` (función pura, sin I/O).
+  `agents` lo aplica antes de mandar nada al LLM y `core` al persistir (`saveContext`,
+  `captureBatch`): el servidor no confía en que el cliente haya limpiado. Es idempotente,
+  así que aplicarlo en varias capas es seguro. Si añades una vía de entrada de texto,
+  pasa por uno de esos dos puntos.
 - Cada unidad de conocimiento conserva **fuente, fecha, autor, confianza, estado y
   vigencia** (principio de trazabilidad, §5.5). No conviertas inferencias en hechos.
 

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getBrandName, getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig } from "@cortex/shared";
+import { getBrandName, getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig, withLlmSlot } from "@cortex/shared";
 import type { MediaExtractorHooks } from "@cortex/core";
 
 const execFileAsync = promisify(execFile);
@@ -30,20 +30,24 @@ async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cf
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }],
   });
   const headers = { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
-  for (let attempt = 0; attempt < 4; attempt++) {
-    try {
-      const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/chat/completions`, { method: "POST", headers, body });
-      if (res.ok) {
-        const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-        return j.choices?.[0]?.message?.content?.trim() || null;
+  // Ocupa un slot del proveedor durante toda la llamada, reintentos incluidos: la visión
+  // compite por el mismo límite de concurrencia por API key que el chat y los embeddings.
+  return withLlmSlot(async () => {
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/chat/completions`, { method: "POST", headers, body });
+        if (res.ok) {
+          const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+          return j.choices?.[0]?.message?.content?.trim() || null;
+        }
+        if (res.status !== 429 && res.status < 500) return null;
+      } catch {
+        /* red */
       }
-      if (res.status !== 429 && res.status < 500) return null;
-    } catch {
-      /* red */
+      await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
     }
-    await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
-  }
-  return null;
+    return null;
+  });
 }
 
 const CAPTION_PROMPT =
@@ -104,25 +108,27 @@ const SEGMENT_SEC = getEnvNum("CORTEX_AUDIO_SEGMENT_SEC", 600); // 10 min (mono 
 /** POST de un buffer de audio a whisper, con reintentos en 429/5xx. */
 async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> {
   const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
-  for (let attempt = 0; attempt < 5; attempt++) {
-    try {
-      const fd = new FormData(); // se reconstruye en cada intento (el body se consume)
-      fd.append("file", new Blob([buf]), "audio.mp3");
-      fd.append("model", cfg.model);
-      fd.append("response_format", "json");
-      const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/audio/transcriptions`, { method: "POST", headers, body: fd });
-      if (res.ok) {
-        const ct = res.headers.get("content-type") ?? "";
-        const text = ct.includes("json") ? ((await res.json()) as { text?: string }).text ?? "" : await res.text();
-        return text.trim() || null;
+  return withLlmSlot(async () => {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const fd = new FormData(); // se reconstruye en cada intento (el body se consume)
+        fd.append("file", new Blob([buf]), "audio.mp3");
+        fd.append("model", cfg.model);
+        fd.append("response_format", "json");
+        const res = await fetch(`${cfg.baseURL.replace(/\/$/, "")}/audio/transcriptions`, { method: "POST", headers, body: fd });
+        if (res.ok) {
+          const ct = res.headers.get("content-type") ?? "";
+          const text = ct.includes("json") ? ((await res.json()) as { text?: string }).text ?? "" : await res.text();
+          return text.trim() || null;
+        }
+        if (res.status !== 429 && res.status < 500) return null;
+      } catch {
+        /* red */
       }
-      if (res.status !== 429 && res.status < 500) return null;
-    } catch {
-      /* red */
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
-    await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
-  }
-  return null;
+    return null;
+  });
 }
 
 /** Transcribe audio/vídeo con whisper. Vídeo y formatos no soportados (opus de WhatsApp,

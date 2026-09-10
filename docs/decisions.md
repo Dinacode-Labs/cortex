@@ -626,8 +626,11 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 
 ## ADR-0023 · Estrategia de modelos LLM (por rol) y chunking; salida de NaN
 
-- **Estado:** aceptada (dirección); implementación por fases. Documento completo con
-  costes, benchmarks y métodos: [`research/llm-model-strategy.md`](./research/llm-model-strategy.md).
+- **Estado:** **parcialmente sustituida por [ADR-0024](#adr-0024--nan-se-queda-proveedor-openai-compatible-genérico-y-routing-por-rol-sobre-nan)**
+  (2026-09): la salida de NaN no ocurrió, así que los puntos 1 y 3 (proveedor: todo-OpenRouter
+  + OpenAI para embeddings/STT) quedan superados. **Siguen vigentes** el routing por rol (2),
+  el chunking (4) y la disciplina de evals (5). Documento completo con costes, benchmarks y
+  métodos: [`research/llm-model-strategy.md`](./research/llm-model-strategy.md).
 - **Contexto:** (1) los 7 agentes Mastra comparten **un único modelo** (`getLlmConfig()`
   no distingue rol), desaprovechando que cada rol tiene criticidad distinta (un fallo del
   reconciler/merger/distiller destruye conocimiento; uno del rerank solo molesta).
@@ -671,3 +674,56 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   cambian rápido); aparezca un sustituto claro de DeepSeek v4 (la config por rol hace el
   cambio trivial — esa es la apuesta arquitectónica real); un cliente exija on-prem/no-API
   (entonces bge-m3/e5 local) o SLA de hyperscaler (reconsiderar Vertex).
+
+---
+
+## ADR-0024 · NaN se queda: proveedor `openai-compatible` genérico y routing por rol sobre NaN
+
+- **Estado:** aceptada (2026-09-09). Sustituye la parte de **proveedor** de ADR-0023 (puntos 1
+  y 3); mantiene su routing por rol (2), chunking (4) y evals (5).
+- **Contexto:** ADR-0023 se escribió asumiendo que perderíamos el acceso a NaN, y de ahí salió
+  el plan de migrar todo a OpenRouter + OpenAI. **No ha ocurrido**: NaN (api.nan.builders,
+  cluster OpenAI-compatible con suscripción) sigue disponible, con cuotas amplias a
+  septiembre de 2026 — `deepseek-v4-flash` 3B tokens/mes con 1M de contexto, visión y tool
+  calling; `glm5.3-flash` 2B; `mimo-v2.5` 1B; `qwen3.8-flash` 500M; `qwen3-embedding` de 4096
+  dimensiones; `whisper`; `kokoro`; endpoint de rerank — y límites por clave de 60 rpm y
+  **5 peticiones concurrentes**. Además, `nan` estaba cableado como un `case` dentro de
+  `llm-config.ts` y `embeddings/index.ts`: un vendor concreto incrustado en paquetes
+  genéricos, lo que impedía apuntar a Ollama, vLLM o LM Studio (el requisito on-prem que
+  ADR-0023 dejaba como contingencia).
+- **Decisión:**
+  1. **Proveedor genérico `openai-compatible`** para chat (`LLM_PROVIDER`, `LLM_BASE_URL`,
+     `LLM_API_KEY`, `LLM_MODEL`) y embeddings (`EMBEDDINGS_*`, con `EMBEDDINGS_DIM`
+     obligatorio porque la dimensión define el esquema vectorial). NaN pasa a ser un
+     **ejemplo de configuración**, no un caso del código. `nan` queda como **alias de
+     compatibilidad** durante una versión: traduce las `NAN_*` con un aviso y se retira en
+     0.2.0. Endpoints locales sin auth requieren `LLM_ALLOW_NO_KEY` explícito, para que una
+     clave olvidada no se confunda con "es local".
+  2. **Routing por rol sobre NaN:** `deepseek-v4-flash` para classifier, graph, reranker y
+     visión (`CORTEX_VISION_MODEL`), y también para reconciler, merger y distiller
+     (alternativa de más juicio: `glm5.3-flash`); `qwen3-embedding` para embeddings, lo que
+     **evita recalibrar los umbrales de dedup** de ADR-0009 (seguimos en 4096 dimensiones);
+     `whisper` vía `CORTEX_STT_*`. `CORTEX_MODEL_<ROL>` admite ahora `proveedor:modelo`, así
+     que el **retriever** —el único rol cuya salida ve el usuario— puede ir a OpenRouter
+     (`openrouter:x-ai/grok-4.5`) mientras el resto se queda en NaN. Por defecto, todo NaN.
+  3. **Semáforo de concurrencia** `CORTEX_LLM_CONCURRENCY` (def. 4) en `@cortex/shared`,
+     compartido por chat, visión, STT y embeddings, porque el límite del proveedor es por
+     clave y no por tipo de endpoint. Sin él, `enrich`/`maintain` con concurrencia 8 dispara
+     429 en ráfaga y el backoff cuesta más de lo que ahorra el paralelismo.
+  4. **Precios:** la tabla sigue en código (ADR-0021) con los modelos de NaN a 0 (la
+     suscripción hace que el coste marginal por token sea cero), más un
+     `CORTEX_PRICING_JSON` opcional para corregir o dar de alta precios sin desplegar. Cierra
+     el «revisar cuando» de ADR-0021.
+- **Alternativas descartadas:** *podar `nan` y ejecutar ADR-0023 tal cual* — coste recurrente
+  y dependencia de claves de pago hasta para desarrollar, sin ninguna ganancia de calidad
+  medida; *mantener `nan` como caso propio* — impide el uso on-prem y deja el vendor dentro
+  de paquetes que deberían ser genéricos.
+- **Consecuencias:** sin migración de datos (mismo modelo de embedding, misma dimensión). El
+  coste recurrente vuelve a ser 0 para Dinacode y la observabilidad de tokens sigue midiendo
+  volumen. El proveedor `local` queda solo para tests y para arrancar sin claves. Queda
+  **pendiente de resolver con NaN** si una clave de miembro puede respaldar el servidor de
+  una empresa: la cuota es por miembro.
+- **Revisar cuando:** NaN cambie cuotas o catálogo (verificar antes de fijar modelos en el
+  `.env`); se quiera *streaming* para `glm5.3-flash` (su guardrail global de 800K tpm lo
+  recomienda y `runAgent` hoy no lo usa); aparezca un cliente con requisito on-prem (probar
+  Ollama/vLLM con este mismo proveedor); o toque retirar el alias `nan` (0.2.0).

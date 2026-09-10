@@ -3,7 +3,7 @@ import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core";
 import { Observability } from "@mastra/observability";
 import { recordUsage } from "@cortex/core";
-import { getLlmConfig, type LlmConfig } from "@cortex/shared";
+import { getLlmConfig, type LlmConfig, withLlmSlot } from "@cortex/shared";
 import { CortexTraceExporter } from "./trace-exporter.js";
 
 /**
@@ -133,7 +133,9 @@ export async function runAgent(
   const options: Record<string, unknown> = { maxRetries: opts.maxRetries ?? 6 };
   if (opts.maxOutputTokens) options.maxOutputTokens = opts.maxOutputTokens;
   const t0 = Date.now();
-  const res = (await agent.generate(prompt, options as never)) as {
+  // Un slot por llamada: el proveedor limita peticiones concurrentes por API key, y el
+  // enrich/maintain lanza varias en paralelo (CORTEX_ENRICH_CONCURRENCY).
+  const res = (await withLlmSlot(() => agent.generate(prompt, options as never))) as {
     text?: string;
     usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number };
     response?: { modelId?: string };

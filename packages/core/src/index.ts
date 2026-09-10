@@ -8,7 +8,7 @@ export { planLintActions, type LintAction } from "./lint-act.js";
 export { searchProjectCode, indexRepo, renderCodeHits, IGNORE_DIRS, type CodeHit } from "./code.js";
 export { applyTemporalInvalidation } from "./temporal.js";
 export { storeEmbeddingsBatch } from "./vectors.js";
-export { recordUsage, registerUsageSink, getUsageSummary, getRecentTraces, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./usage.js";
+export { recordUsage, registerUsageSink, getUsageSummary, getRecentTraces, estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./usage.js";
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
 export { readCortexLink, slugify, type CortexLink } from "./project-config.js";

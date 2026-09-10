@@ -194,13 +194,34 @@ describe("integridad del grafo (UNIQUE parcial de aristas activas, D-5)", () => 
     // No debe lanzar (sin el fix del punto 3, el UPDATE viola relations_active_unique → excepción).
     await expect(resolveEntities()).resolves.toBeDefined();
 
-    // El loser desaparece (fusionado) y queda UNA sola arista activa canónica→target.
-    const loser = (await sql`SELECT 1 FROM entities WHERE id = ${dup.id}`) as unknown as unknown[];
-    expect(loser.length).toBe(0);
+    // Sobrevive UNA sola de las dos variantes (cuál de ellas es la canónica lo decide el
+    // desempate por enlaces/longitud/id, no el orden de filas: aquí ambas empatan, así que
+    // se asserta la propiedad —quedan fusionadas— y no el ganador concreto).
+    const survivors = (await sql`
+      SELECT id FROM entities WHERE id IN (${canon.id}, ${dup.id})
+    `) as unknown as { id: string }[];
+    expect(survivors.length).toBe(1);
+    // Y queda UNA sola arista activa superviviente→target (las colisionantes se dedupan).
     const edges = (await sql`
       SELECT count(*)::int AS n FROM relations
-      WHERE source_id = ${canon.id} AND target_id = ${target.id} AND relation_type = 'depends_on' AND valid_to IS NULL
+      WHERE source_id = ${survivors[0]!.id} AND target_id = ${target.id}
+        AND relation_type = 'depends_on' AND valid_to IS NULL
     `) as unknown as { n: number }[];
     expect(edges[0]!.n).toBe(1);
+  });
+
+  it("resolveEntities NO fusiona homónimos de tipos distintos", async () => {
+    const sql = getSql();
+    // Mismo nombre normalizado, tipos distintos: son cosas diferentes (backlog #7).
+    const vendor = await resolveEntity(sql, `Stripe ${RID}`, "vendor");
+    const service = await resolveEntity(sql, `stripe ${RID}`, "service");
+    expect(vendor.id).not.toBe(service.id);
+
+    await resolveEntities();
+
+    const rows = (await sql`
+      SELECT id FROM entities WHERE id IN (${vendor.id}, ${service.id})
+    `) as unknown as { id: string }[];
+    expect(rows.length).toBe(2); // ambas siguen vivas
   });
 });
