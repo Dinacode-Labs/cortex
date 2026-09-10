@@ -305,8 +305,13 @@ siempre.
 ```
 
 El **bucle** que lo hace automático: cuando abres una sesión con tu agente, un *hook*
-le **inyecta** lo que Cortex sabe del proyecto; cuando la cierras, otro *hook* **destila**
-lo aprendido y lo **guarda**. Trabajas → Cortex aprende → el siguiente arranca sabiendo más.
+le **inyecta** lo que Cortex sabe del proyecto; cuando la cierras, otro *hook* manda la
+conversación —condensada y sin secretos— al servidor, que **destila** lo aprendido y lo
+**guarda**. Trabajas → Cortex aprende → el siguiente arranca sabiendo más.
+
+Destilar ocurre en el **servidor**, no en tu máquina: es la parte que necesita un modelo de
+lenguaje, y así ningún portátil necesita credenciales de IA. Tu equipo solo instala el CLI e
+inicia sesión.
 
 **Una decisión de diseño que conviene tener clara desde ya:** Cortex está partido en dos.
 

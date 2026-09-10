@@ -51,3 +51,13 @@ export {
   deriveTitle,
   summarize,
 } from "./text.js";
+export {
+  findSessionCapture,
+  getSessionCaptureById,
+  hashCondensed,
+  markSessionCapture,
+  reapStuckSessionCaptures,
+  upsertSessionCapture,
+  type SessionCapture,
+  type SessionCaptureStatus,
+} from "./session-captures.js";

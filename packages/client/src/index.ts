@@ -13,3 +13,4 @@ export * from "./cortex-api.js";
 export * from "./project-config.js";
 export * from "./transcript-utils.js";
 export * from "./session-readers.js";
+export * from "./session-capture.js";
