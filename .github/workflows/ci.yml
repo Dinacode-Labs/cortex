@@ -46,3 +46,10 @@ jobs:
 
       - name: Integration tests (Postgres real)
         run: pnpm test:integration
+
+      # Informativo a propósito, no bloqueante: hoy hay vulnerabilidades altas TRANSITIVAS
+      # en mammoth, el SDK de MCP y Mastra que no podemos arreglar hasta que publiquen. Un
+      # gate que falla desde el primer día se acaba desactivando y deja de aportar nada;
+      # esto lo deja visible en cada build y Dependabot abre los PRs. Ver SECURITY.md.
+      - name: Auditoría de dependencias (informativa)
+        run: pnpm audit --prod --audit-level=high || true

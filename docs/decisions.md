@@ -727,3 +727,42 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   `.env`); se quiera *streaming* para `glm5.3-flash` (su guardrail global de 800K tpm lo
   recomienda y `runAgent` hoy no lo usa); aparezca un cliente con requisito on-prem (probar
   Ollama/vLLM con este mismo proveedor); o toque retirar el alias `nan` (0.2.0).
+
+---
+
+## ADR-0029 · Licencia Apache-2.0 y gobernanza mínima antes de abrir el código
+
+- **Estado:** aceptada (2026-09-10).
+- **Contexto:** el repo no tenía licencia, ni política de seguridad, ni plantillas
+  (backlog #79). Sin licencia, «público» equivale a «todos los derechos reservados»: nadie
+  puede usarlo legalmente, así que es lo primero que hay que resolver antes de abrirlo.
+- **Decisión: Apache-2.0.** Comprobadas una a una las licencias de las dependencias
+  directas: Apache-2.0 (Mastra, AI SDK, OpenRouter provider, TypeScript, xlsx), MIT (Hono,
+  SDK de MCP, unpdf, zod, nodemailer con MIT-0, tsx, vitest), BSD-2 (mammoth), ISC (node-cron,
+  yaml) y Unlicense (postgres). Ninguna copyleft, así que Apache-2.0 es compatible con todas.
+  Frente a MIT aporta dos cosas que aquí interesan: **concesión expresa de patentes** (con
+  cláusula de retirada si alguien demanda) y una **cláusula de marca** que evita que un
+  tercero use el nombre para respaldar un fork. Se añaden `LICENSE`, `NOTICE` y `license`
+  en los diez `package.json`.
+- **Gobernanza:** `SECURITY.md` (dónde reportar, plazo de 5 días laborables, alcance
+  explícito y qué queda fuera por ser configuración de despliegue), Contributor Covenant
+  2.1, plantillas de issue y PR con el checklist de `CONTRIBUTING.md`, y Dependabot semanal
+  agrupando minor/patch. `CHANGELOG.md` con formato Keep a Changelog.
+- **`pnpm audit` en CI: informativo, NO bloqueante.** Hoy hay 18 vulnerabilidades altas y
+  todas son **transitivas** de `mammoth` (8), `@modelcontextprotocol/sdk` (7) y
+  `@mastra/core` (3): ninguna es de código nuestro y no podemos arreglarlas hasta que esos
+  proyectos publiquen. Un gate rojo desde el primer día se acaba desactivando o ignorando,
+  y entonces no protege de nada. Se deja visible en cada build y Dependabot abre los PRs.
+- **`xlsx` desde el CDN de SheetJS** (`cdn.sheetjs.com`, 0.20.3, Apache-2.0) en vez de npm:
+  la versión de npm (0.18.5) está abandonada y arrastra CVE-2023-30533 (prototype pollution)
+  y CVE-2024-22363 (ReDoS) sin corregir. Misma API, cero cambios de código, y los tests de
+  `extract` siguen pasando. **Contrapartida asumida:** Dependabot no sigue tarballs por URL,
+  así que toca revisarlo a mano cada trimestre (anotado en `SECURITY.md` y en el propio
+  `dependabot.yml`).
+- **Alternativas:** MIT (igualmente compatible, pero sin patentes ni protección de marca);
+  sustituir `xlsx` por `exceljs` (el uso es solo `sheet_to_csv`, sería un porte de diez
+  líneas, pero añade una dependencia más pesada sin necesidad hoy); AGPL o BSL (frenarían la
+  adopción, y no hay un modelo de negocio que las justifique).
+- **Revisar cuando:** se fije un modelo comercial (SaaS, OEM) que pida otra licencia; un
+  contribuidor externo pida un CLA; o `mammoth`/MCP SDK/Mastra publiquen y el audit pueda
+  pasar a bloqueante de verdad.
