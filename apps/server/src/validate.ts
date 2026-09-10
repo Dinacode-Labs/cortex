@@ -19,7 +19,7 @@ export async function parseBody<S extends z.ZodTypeAny>(c: Context, schema: S): 
   if (!parsed.success) {
     return c.json(
       {
-        error: "Cuerpo de la petición inválido.",
+        error: "Invalid request body.",
         issues: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
       },
       400,

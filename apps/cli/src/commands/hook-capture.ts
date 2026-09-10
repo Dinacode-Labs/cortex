@@ -95,9 +95,9 @@ export async function run(args: string[] = []): Promise<void> {
     // servidor encola el trabajo y responde 202.
     const r = await sendCondensedSession({ slug: link.slug, condensed, sessionId: id, platform });
     if (r.status === "failed") {
-      console.error(`[cortex hook] no se pudo capturar "${link.slug}": ${r.error ?? "error"} (¿cortex auth login / servidor?)`);
+      console.error(`[cortex hook] could not capture "${link.slug}": ${r.error ?? "error"} (check cortex auth login and the server)`);
     } else if (r.status !== "duplicate") {
-      console.error(`[cortex hook] sesión de ${platform} enviada a "${link.slug}" (el servidor la destila).`);
+      console.error(`[cortex hook] ${platform} session sent to "${link.slug}"; the server will distil it.`);
     }
   } catch {
     /* silencioso: un hook no debe romper la sesión */

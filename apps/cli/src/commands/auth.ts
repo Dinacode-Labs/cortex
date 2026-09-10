@@ -32,23 +32,23 @@ async function login(): Promise<void> {
   const server = argOf("--server") || getEnv("CORTEX_SERVER_URL", DEFAULT_SERVER_URL);
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    const email = (argOf("--email") || (await rl.question("Email corporativo: "))).trim();
+    const email = (argOf("--email") || (await rl.question("Work email: "))).trim();
     const req = await postJson(`${server}/auth/request`, { email });
     if (!req.ok) {
-      console.error(`✗ ${req.data.error ?? "No se pudo solicitar el código."}`);
+      console.error(`✗ ${req.data.error ?? "Could not request the code."}`);
       process.exitCode = 1;
       return;
     }
-    console.log(`Te hemos enviado un código a ${email} (caduca en unos minutos).`);
-    const code = (await rl.question("Código: ")).trim();
+    console.log(`We sent a code to ${email}. It expires in a few minutes.`);
+    const code = (await rl.question("Code: ")).trim();
     const ver = await postJson(`${server}/auth/verify`, { email, code });
     if (!ver.ok) {
-      console.error(`✗ ${ver.data.error ?? "Código no válido."}`);
+      console.error(`✗ ${ver.data.error ?? "That code is not valid."}`);
       process.exitCode = 1;
       return;
     }
     writeCredentials({ server, token: ver.data.token, email: ver.data.user.email });
-    console.log(`✓ Sesión iniciada como ${ver.data.user.email}.\n  → ${credentialsPath()}`);
+    console.log(`✓ Signed in as ${ver.data.user.email}.\n  → ${credentialsPath()}`);
   } finally {
     rl.close();
   }
@@ -57,17 +57,17 @@ async function login(): Promise<void> {
 async function status(): Promise<void> {
   const creds = readCredentials();
   if (!creds) {
-    console.log("No autenticado. Ejecuta: cortex auth login");
+    console.log("Not signed in. Run: cortex auth login");
     return;
   }
   const res = await fetch(`${creds.server}/auth/me`, { headers: { authorization: `Bearer ${creds.token}` } });
   if (!res.ok) {
-    console.log(`Sesión inválida o caducada (${creds.email}). Ejecuta: cortex auth login`);
+    console.log(`Session expired or invalid (${creds.email}). Run: cortex auth login`);
     process.exitCode = 1;
     return;
   }
   const data = (await res.json()) as { user: { email: string } };
-  console.log(`Autenticado como ${data.user.email}  ·  servidor ${creds.server}`);
+  console.log(`Signed in as ${data.user.email}  ·  server ${creds.server}`);
 }
 
 async function logout(): Promise<void> {
@@ -76,7 +76,7 @@ async function logout(): Promise<void> {
     await fetch(`${creds.server}/auth/logout`, { method: "POST", headers: { authorization: `Bearer ${creds.token}` } }).catch(() => {});
     clearCredentials();
   }
-  console.log("Sesión cerrada.");
+  console.log("Signed out.");
 }
 
 export async function run(args: string[]): Promise<void> {
@@ -84,5 +84,5 @@ export async function run(args: string[]): Promise<void> {
   if (sub === "login") await login();
   else if (sub === "status" || sub === "whoami") await status();
   else if (sub === "logout") await logout();
-  else console.log("Uso: cortex auth <login|status|logout>");
+  else console.log("Usage: cortex auth <login|status|logout>");
 }

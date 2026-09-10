@@ -37,7 +37,7 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
 
   routes.post("/capture/session", async (c) => {
     const user = await currentUser(c);
-    if (!user) return c.json({ error: "No autenticado." }, 401);
+    if (!user) return c.json({ error: "Not authenticated." }, 401);
 
     const body = await parseBody(c, captureSessionRequest);
     if (body instanceof Response) return body;
@@ -50,8 +50,8 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
     }
 
     const access = await checkProjectAccess(user.email, { slug: body.slug });
-    if (access.status === "not_found") return c.json({ error: "Proyecto no encontrado." }, 404);
-    if (access.status === "forbidden") return c.json({ error: "Sin acceso." }, 403);
+    if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
+    if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
     const project = access.project;
 
     const hash = hashCondensed(body.condensed);
@@ -121,9 +121,9 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
 
   routes.get("/capture/session/:id", async (c) => {
     const user = await currentUser(c);
-    if (!user) return c.json({ error: "No autenticado." }, 401);
+    if (!user) return c.json({ error: "Not authenticated." }, 401);
     const capture = await getSessionCaptureById(c.req.param("id"));
-    if (!capture) return c.json({ error: "No encontrado." }, 404);
+    if (!capture) return c.json({ error: "Not found." }, 404);
     return c.json({
       id: capture.id,
       status: capture.status,

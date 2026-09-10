@@ -26,6 +26,9 @@ import { z } from "zod";
  * (stdio en `index.ts`, HTTP en `http.ts`). Si se pasa `user` (transporte HTTP
  * autenticado), las tools **atribuyen** las escrituras (`created_by`=email) y **aplican
  * permisos** (acceso al proyecto); sin `user` (stdio local) se comportan como antes.
+ *
+ * Los textos que ve el agente van en INGLÉS: son parte del producto y los lee un modelo que
+ * puede estar trabajando en cualquier idioma. Los comentarios del código siguen en español.
  */
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
@@ -40,20 +43,19 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   const guard = async (project?: string, opts?: { allowMissing?: boolean }): Promise<string | null> => {
     if (!user || !project) return null;
     const access = await checkProjectAccess(user.email, { name: project });
-    if (access.status === "forbidden") return `Sin acceso al proyecto "${project}".`;
-    if (access.status === "not_found" && !opts?.allowMissing) return `Proyecto no encontrado: "${project}".`;
+    if (access.status === "forbidden") return `No access to project "${project}".`;
+    if (access.status === "not_found" && !opts?.allowMissing) return `Project not found: "${project}".`;
     return null;
   };
 
   server.registerTool(
     "save_project_context",
     {
-      title: "Guardar contexto de proyecto",
+      title: "Save project context",
       description:
-        "Guarda una pieza de conocimiento de un proyecto (decisión, restricción, " +
-        "incidencia, convención, etc.) con baja fricción. Cortex la clasifica, " +
-        "resume, extrae entidades, genera embedding y detecta posibles duplicados " +
-        "o contradicciones. Solo 'content' es obligatorio.",
+        "Save one piece of project knowledge (a decision, constraint, incident, " +
+        "convention, and so on). Cortex classifies it, summarises it, extracts entities, " +
+        "embeds it and flags likely duplicates or contradictions. Only 'content' is required.",
       inputSchema: saveContextInput.shape,
     },
     async (args) => {
@@ -63,7 +65,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         const result = await saveContext(user ? { ...args, createdBy: user.email } : args);
         return text(renderSaveResult(result));
       } catch (e) {
-        return errorText(`Error al guardar contexto: ${(e as Error).message}`);
+        return errorText(`Could not save the entry: ${(e as Error).message}`);
       }
     },
   );
@@ -71,10 +73,10 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   server.registerTool(
     "search_project_context",
     {
-      title: "Buscar contexto de proyecto",
+      title: "Search project context",
       description:
-        "Búsqueda semántica de conocimiento relevante. Devuelve las entradas más " +
-        "parecidas con su puntuación, resumen y fuente. Filtrable por proyecto y tipo.",
+        "Hybrid search (semantic plus keyword) over the project knowledge base. Returns the " +
+        "closest entries with their score, summary and source. Can be filtered by project and type.",
       inputSchema: searchContextInput.shape,
     },
     async (args) => {
@@ -87,7 +89,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         const hits = user ? await searchContext(args, { restrictToAccessibleOf: user.email }) : await searchContext(args);
         return text(renderSearchHits(hits));
       } catch (e) {
-        return errorText(`Error en la búsqueda: ${(e as Error).message}`);
+        return errorText(`Search failed: ${(e as Error).message}`);
       }
     },
   );
@@ -95,16 +97,15 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   server.registerTool(
     "get_project_context_pack",
     {
-      title: "Obtener context pack de proyecto",
+      title: "Get project context pack",
       description:
-        "Genera un paquete de contexto para trabajar sobre un proyecto: decisiones " +
-        "vigentes, restricciones, riesgos, deuda técnica, convenciones, módulos " +
-        "sensibles y, si se indica un área, lo más relevante para ella. Úsalo antes " +
-        "de tocar un módulo.",
+        "Build a briefing for working on a project: current decisions, constraints, risks, " +
+        "technical debt, conventions and sensitive modules, plus whatever is most relevant to " +
+        "an area if you name one. Read this before touching a module.",
       inputSchema: {
-        project: z.string().describe("Nombre del proyecto, p.ej. 'Acme Portal'"),
-        area: z.string().optional().describe("Área/módulo opcional, p.ej. 'facturación'"),
-        asOf: z.string().optional().describe("Fecha ISO (YYYY-MM-DD) para contexto point-in-time; por defecto, estado actual"),
+        project: z.string().describe("Project name, e.g. 'Acme Portal'"),
+        area: z.string().optional().describe("Optional area or module, e.g. 'billing'"),
+        asOf: z.string().optional().describe("ISO date (YYYY-MM-DD) to see the project as it was known then; defaults to now"),
       },
     },
     async ({ project, area, asOf }) => {
@@ -113,7 +114,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         if (denied) return errorText(denied);
         return text(renderContextPack(await getContextPack(project, area, asOf ? new Date(asOf) : undefined)));
       } catch (e) {
-        return errorText(`Error al generar el context pack: ${(e as Error).message}`);
+        return errorText(`Could not build the context pack: ${(e as Error).message}`);
       }
     },
   );
@@ -121,10 +122,10 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   server.registerTool(
     "list_project_decisions",
     {
-      title: "Listar decisiones del proyecto",
-      description: "Lista las decisiones técnicas registradas de un proyecto.",
+      title: "List project decisions",
+      description: "List the technical decisions recorded for a project, most recent first.",
       inputSchema: {
-        project: z.string().describe("Nombre del proyecto"),
+        project: z.string().describe("Project name"),
         limit: z.number().int().positive().max(50).optional(),
       },
     },
@@ -134,7 +135,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         if (denied) return errorText(denied);
         return text(renderDecisions(await listDecisions(project, limit ?? 20)));
       } catch (e) {
-        return errorText(`Error al listar decisiones: ${(e as Error).message}`);
+        return errorText(`Could not list decisions: ${(e as Error).message}`);
       }
     },
   );
@@ -142,10 +143,10 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   server.registerTool(
     "validate_context_entry",
     {
-      title: "Validar entrada de contexto",
-      description: "Cambia el estado de validación de una entrada: validated, rejected u obsolete.",
+      title: "Validate a context entry",
+      description: "Change the validation state of an entry: validated, rejected or obsolete.",
       inputSchema: {
-        id: z.string().uuid().describe("ID de la entrada de contexto"),
+        id: z.string().uuid().describe("Id of the context entry"),
         status: z.enum(["validated", "rejected", "obsolete"]),
       },
     },
@@ -155,14 +156,14 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         // proyecto no la cubre: el acceso se comprueba vía la entrada (checkEntryAccess).
         if (user) {
           const access = await checkEntryAccess(user.email, id);
-          if (access.status === "not_found") return errorText(`No existe ninguna entrada con id ${id}.`);
-          if (access.status === "forbidden") return errorText(`Sin acceso a la entrada ${id}.`);
+          if (access.status === "not_found") return errorText(`No entry with id ${id}.`);
+          if (access.status === "forbidden") return errorText(`No access to entry ${id}.`);
         }
         const entry = await validateEntry(id, status);
-        if (!entry) return errorText(`No existe ninguna entrada con id ${id}.`);
-        return text(`Entrada ${entry.id} actualizada a estado "${entry.status}".`);
+        if (!entry) return errorText(`No entry with id ${id}.`);
+        return text(`Entry ${entry.id} is now "${entry.status}".`);
       } catch (e) {
-        return errorText(`Error al validar la entrada: ${(e as Error).message}`);
+        return errorText(`Could not validate the entry: ${(e as Error).message}`);
       }
     },
   );
@@ -170,14 +171,14 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   server.registerTool(
     "ask_project_context",
     {
-      title: "Preguntar al contexto del proyecto",
+      title: "Ask the project context",
       description:
-        "Hace una pregunta en lenguaje natural sobre un proyecto. Recupera el " +
-        "contexto relevante y sintetiza una respuesta fundamentada (agente de " +
-        "recuperación Mastra). Requiere LLM configurado; si no, usa la búsqueda.",
+        "Ask a question about a project in plain language. Retrieves the relevant context and " +
+        "writes an answer grounded in it, citing the entries it used. Needs an LLM configured; " +
+        "without one it falls back to search results.",
       inputSchema: {
-        question: z.string().describe("Pregunta en lenguaje natural"),
-        project: z.string().optional().describe("Nombre del proyecto"),
+        question: z.string().describe("The question, in plain language"),
+        project: z.string().optional().describe("Project name"),
       },
     },
     async ({ question, project }) => {
@@ -193,9 +194,9 @@ export function buildMcpServer(user?: AuthUser): McpServer {
           undefined,
           user ? { restrictToAccessibleOf: user.email } : undefined,
         );
-        return text(answer ? `${answer}\n\n---\nFuentes consultadas:\n${renderSearchHits(hits)}` : renderSearchHits(hits));
+        return text(answer ? `${answer}\n\n---\nSources:\n${renderSearchHits(hits)}` : renderSearchHits(hits));
       } catch (e) {
-        return errorText(`Error al responder: ${(e as Error).message}`);
+        return errorText(`Could not answer: ${(e as Error).message}`);
       }
     },
   );
@@ -203,14 +204,13 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   server.registerTool(
     "search_project_code",
     {
-      title: "Buscar en el código del proyecto",
+      title: "Search project code",
       description:
-        "Búsqueda semántica + léxica (híbrida) sobre el código indexado de un " +
-        "proyecto/cliente. Devuelve fragmentos con ruta y rango de líneas. Útil para " +
-        "localizar dónde se implementa algo antes de tocarlo.",
+        "Hybrid search over the project's indexed code. Returns snippets with their file path " +
+        "and line range. Use it to find where something is implemented before you change it.",
       inputSchema: {
-        query: z.string().describe("Qué buscar (lenguaje natural o identificador)"),
-        project: z.string().describe("Nombre del proyecto"),
+        query: z.string().describe("What to look for: plain language or an identifier"),
+        project: z.string().describe("Project name"),
         limit: z.number().int().positive().max(20).optional(),
       },
     },
@@ -220,7 +220,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         if (denied) return errorText(denied);
         return text(renderCodeHits(await searchProjectCode(query, project, limit ?? 8)));
       } catch (e) {
-        return errorText(`Error al buscar código: ${(e as Error).message}`);
+        return errorText(`Code search failed: ${(e as Error).message}`);
       }
     },
   );
@@ -228,12 +228,12 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   server.registerTool(
     "lint_project_context",
     {
-      title: "Lint del conocimiento del proyecto",
+      title: "Lint the project knowledge",
       description:
-        "Analiza la salud de la memoria de un proyecto: contradicciones, posibles " +
-        "duplicados, entidades huérfanas, baja confianza, histórico y huecos (áreas " +
-        "con incidencias pero sin decisiones documentadas).",
-      inputSchema: { project: z.string().describe("Nombre del proyecto") },
+        "Report on the health of a project's memory: contradictions, likely duplicates, orphan " +
+        "entities, low-confidence entries, superseded history, and gaps (areas with incidents " +
+        "but no documented decisions).",
+      inputSchema: { project: z.string().describe("Project name") },
     },
     async ({ project }) => {
       try {
@@ -241,7 +241,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         if (denied) return errorText(denied);
         return text(renderLintReport(await lintProject(project)));
       } catch (e) {
-        return errorText(`Error en lint: ${(e as Error).message}`);
+        return errorText(`Lint failed: ${(e as Error).message}`);
       }
     },
   );

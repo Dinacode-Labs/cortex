@@ -22,29 +22,29 @@ interface Cmd {
 }
 
 const COMMANDS: Record<string, Cmd> = {
-  auth: { help: "iniciar sesión por email + OTP (login/status/logout)", load: () => import("./commands/auth.js") },
-  link: { help: "vincular/crear el proyecto de esta carpeta (escribe .cortex.json)", load: () => import("./commands/link.js") },
-  ui: { help: "abrir la UI web ya autenticada (sin OTP)", load: () => import("./commands/ui.js") },
-  setup: { help: "configurar tus agentes (Claude Code, Codex…) para que usen Cortex", load: () => import("./commands/setup.js") },
-  mcp: { help: "servidor MCP por stdio para tu agente (proxy al servidor)", managed: false, load: () => import("./commands/mcp.js") },
-  toolbelt: { help: "instalar el toolbelt de tu organización (MCPs y skills de terceros)", load: () => import("./commands/toolbelt.js") },
-  version: { help: "versión de este CLI y la del servidor", load: () => import("./commands/version.js") },
-  upgrade: { help: "instalar la última versión publicada del CLI", load: () => import("./commands/upgrade.js") },
-  doctor: { help: "comprobar que todo está en su sitio (y decir qué falta)", load: () => import("./commands/doctor.js") },
-  "connect-github": { help: "ingerir PRs/issues de un repo de GitHub (vía gh)", load: () => import("./commands/connect-github.js") },
-  "connect-sessions": { help: "backfill de sesiones de un agente a un proyecto", load: () => import("./commands/connect-sessions.js") },
-  "hook-context": { help: "hook SessionStart: emite el context-pack del proyecto vinculado", managed: false, load: () => import("./commands/hook-context.js") },
-  "hook-capture": { help: "hook SessionEnd: envía la sesión a Cortex para que la destile", managed: false, load: () => import("./commands/hook-capture.js") },
+  auth: { help: "sign in with your email and a one-time code (login/status/logout)", load: () => import("./commands/auth.js") },
+  link: { help: "link this folder to a project, or create one (writes .cortex.json)", load: () => import("./commands/link.js") },
+  ui: { help: "open the web UI, already signed in", load: () => import("./commands/ui.js") },
+  setup: { help: "wire your coding agents (Claude Code, Codex, …) into Cortex", load: () => import("./commands/setup.js") },
+  mcp: { help: "MCP server over stdio for your agent (proxies to the Cortex server)", managed: false, load: () => import("./commands/mcp.js") },
+  toolbelt: { help: "install your organisation's toolbelt (third-party MCPs and skills)", load: () => import("./commands/toolbelt.js") },
+  version: { help: "this CLI's version and the server's", load: () => import("./commands/version.js") },
+  upgrade: { help: "install the latest published version of this CLI", load: () => import("./commands/upgrade.js") },
+  doctor: { help: "check every piece is in place, and say what to do if not", load: () => import("./commands/doctor.js") },
+  "connect-github": { help: "ingest pull requests and issues from a GitHub repo", load: () => import("./commands/connect-github.js") },
+  "connect-sessions": { help: "backfill past agent sessions into a project", load: () => import("./commands/connect-sessions.js") },
+  "hook-context": { help: "session-start hook: emit the linked project's context pack", managed: false, load: () => import("./commands/hook-context.js") },
+  "hook-capture": { help: "session-end hook: send the session to Cortex to be distilled", managed: false, load: () => import("./commands/hook-capture.js") },
 };
 
 function usage(): void {
-  console.log(`cortex ${CLI_VERSION} — ${getBrandName()}: memoria de contexto de proyectos software\n`);
-  console.log("Uso: cortex <comando> [args]\n");
-  console.log("Comandos:");
+  console.log(`cortex ${CLI_VERSION} — ${getBrandName()}: project memory for software teams\n`);
+  console.log("Usage: cortex <command> [args]\n");
+  console.log("Commands:");
   const w = Math.max(...Object.keys(COMMANDS).map((k) => k.length));
   for (const [name, c] of Object.entries(COMMANDS)) console.log(`  ${name.padEnd(w)}  ${c.help}`);
-  console.log('\nEjemplos:\n  cortex auth login\n  cortex setup --all\n  cortex link --create "Mi Proyecto"');
-  console.log("\nLos comandos de operador (migrate, maintain, ingest…) están en `cortex-admin`.");
+  console.log('\nExamples:\n  cortex auth login\n  cortex setup --all\n  cortex link --create "My Project"');
+  console.log("\nOperator commands (migrate, maintain, ingest, …) live in `cortex-admin`.");
 }
 
 async function main(): Promise<void> {
@@ -59,14 +59,14 @@ async function main(): Promise<void> {
   }
   if (sub === "sync") {
     // `cortex sync` hacía dos cosas distintas a la vez; ahora son dos comandos (ADR-0032).
-    console.error("`cortex sync` ya no existe. Ahora son dos cosas distintas:\n");
-    console.error("  cortex setup --all        instalar Cortex en tus agentes (hooks, MCP, skill)");
-    console.error("  cortex toolbelt sync      instalar los MCPs y skills de tu organización");
+    console.error("`cortex sync` is gone. It did two different things, and now they are two commands:\n");
+    console.error("  cortex setup --all        wire Cortex into your agents (hooks, MCP, skill)");
+    console.error("  cortex toolbelt sync      install your organisation's MCPs and skills");
     process.exit(1);
   }
   const cmd = COMMANDS[sub];
   if (!cmd) {
-    console.error(`Comando desconocido: "${sub}"\n`);
+    console.error(`Unknown command: "${sub}"\n`);
     usage();
     process.exit(1);
   }
@@ -78,7 +78,7 @@ async function main(): Promise<void> {
   try {
     await mod.run(rest);
   } catch (e) {
-    console.error(`Error en cortex ${sub}:`, e instanceof Error ? e.message : e);
+    console.error(`cortex ${sub} failed:`, e instanceof Error ? e.message : e);
     process.exitCode = 1;
   }
   process.exit(process.exitCode ?? 0);

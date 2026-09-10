@@ -67,7 +67,7 @@ describe("cortex doctor", () => {
   it("sin sesión, lo dice y manda a iniciarla", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const { texto, hayError } = await correrDoctor();
-    expect(texto).toContain("no has iniciado sesión");
+    expect(texto).toContain("not signed in");
     expect(texto).toContain("cortex auth login");
     expect(hayError).toBe(true);
   });
@@ -76,7 +76,7 @@ describe("cortex doctor", () => {
     conCredenciales();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("fetch failed")));
     const { texto, hayError } = await correrDoctor();
-    expect(texto).toMatch(/Servidor no responde/);
+    expect(texto).toMatch(/Server not responding/);
     expect(texto).not.toContain("Token");
     expect(hayError).toBe(true);
   });
@@ -91,7 +91,7 @@ describe("cortex doctor", () => {
       }),
     );
     const { texto, hayError } = await correrDoctor();
-    expect(texto).toMatch(/Token rechazado/);
+    expect(texto).toMatch(/Token rejected/);
     expect(texto).toContain("cortex auth login");
     expect(hayError).toBe(true);
   });
@@ -113,7 +113,7 @@ describe("cortex doctor", () => {
     );
     const { texto, hayError } = await correrDoctor();
     expect(texto).toMatch(/ok MCP/);
-    expect(texto).toContain('vinculado a "acme-portal"');
+    expect(texto).toContain('linked to "acme-portal"');
     expect(hayError).toBe(false);
   });
 
@@ -121,7 +121,7 @@ describe("cortex doctor", () => {
     conCredenciales();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
     const { texto } = await correrDoctor();
-    expect(texto).toContain("no está vinculado");
+    expect(texto).toContain("not linked to any project");
     expect(texto).toContain("cortex link");
   });
 });

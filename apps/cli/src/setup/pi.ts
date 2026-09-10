@@ -69,37 +69,37 @@ export const piAdapter: AgentAdapter = {
 
   async apply(ctx: SetupCtx): Promise<SetupReport> {
     const report = emptyReport();
-    if (writeIfChanged(ctx, EXT_FILE(ctx), EXTENSION_TS)) report.changed.push(`extensión escrita en ${tilde(ctx, EXT_FILE(ctx))} (contexto + captura)`);
-    else report.skipped.push("extensión ya al día");
+    if (writeIfChanged(ctx, EXT_FILE(ctx), EXTENSION_TS)) report.changed.push(`extension written to ${tilde(ctx, EXT_FILE(ctx))} (context and capture)`);
+    else report.skipped.push("extension already up to date");
 
     const file = MCP_FILE(ctx);
     const cfg = readJson<PiMcp>(file);
     if (cfg === null) {
-      report.warnings.push(`${tilde(ctx, file)} no es JSON válido — no lo toco. Añade el MCP \`cortex\` a mano.`);
+      report.warnings.push(`${tilde(ctx, file)} is not valid JSON, so it was left alone. Add the \`cortex\` MCP by hand.`);
       return report;
     }
     const conf: PiMcp = cfg ?? {};
     conf.mcpServers ??= {};
     const want = { command: "cortex", args: ["mcp"] };
     if (JSON.stringify(conf.mcpServers.cortex) === JSON.stringify(want)) {
-      report.skipped.push("MCP `cortex` ya declarado");
+      report.skipped.push("MCP `cortex` already declared");
     } else {
       conf.mcpServers.cortex = want;
       writeJson(ctx, file, conf);
-      report.changed.push("MCP `cortex` declarado en mcp.json");
-      report.warnings.push("Pi habla MCP a través de `pi-mcp-adapter`: si no lo tienes, instálalo con `pi install npm:pi-mcp-adapter`.");
+      report.changed.push("MCP `cortex` declared in mcp.json");
+      report.warnings.push("Pi speaks MCP through `pi-mcp-adapter`. If you do not have it: pi install npm:pi-mcp-adapter");
     }
     return report;
   },
 
   async remove(ctx: SetupCtx): Promise<SetupReport> {
     const report = emptyReport();
-    if (removeIfGenerated(ctx, EXT_FILE(ctx))) report.changed.push(`${tilde(ctx, EXT_FILE(ctx))} eliminada`);
+    if (removeIfGenerated(ctx, EXT_FILE(ctx))) report.changed.push(`${tilde(ctx, EXT_FILE(ctx))} removed`);
     const cfg = readJson<PiMcp>(MCP_FILE(ctx));
     if (cfg?.mcpServers?.cortex) {
       delete cfg.mcpServers.cortex;
       writeJson(ctx, MCP_FILE(ctx), cfg);
-      report.changed.push("MCP `cortex` fuera de mcp.json");
+      report.changed.push("MCP `cortex` removed from mcp.json");
     }
     return report;
   },
@@ -109,7 +109,7 @@ export const piAdapter: AgentAdapter = {
     const cfg = readJson<PiMcp>(MCP_FILE(ctx));
     return {
       installed: ext,
-      details: [ext ? "extensión instalada (contexto + captura)" : "extensión no instalada", cfg?.mcpServers?.cortex ? "MCP declarado" : "MCP no declarado"],
+      details: [ext ? "extension installed (context and capture)" : "extension not installed", cfg?.mcpServers?.cortex ? "MCP declared" : "MCP not declared"],
     };
   },
 };
