@@ -1,8 +1,15 @@
 # Estrategia de modelos LLM y chunking — propuesta
 
+> **⚠️ Revisión 2026-09-09: NaN se queda.** La premisa de este documento —«perdemos el
+> acceso a NaN»— no se cumplió. **§2 (todo-OpenRouter) y §4 (NaN descartado) quedan
+> superados por [ADR-0024](../decisions.md)**: el proveedor pasa a ser un
+> `openai-compatible` genérico con NaN por defecto. **Siguen vigentes** §1 (inventario de
+> roles y criticidad), §5 (chunking), §6 y §7 (evals). Las cifras de coste de §3 solo
+> aplican al escenario de pago.
+
 - **Estado:** dirección acordada (2026-07-13), registrada en `docs/decisions.md`
-  (**ADR-0023**). Este documento es el detalle (costes, benchmarks, métodos); el ADR
-  es el resumen decisorio. Pendiente solo la implementación por fases (§8).
+  (**ADR-0023**, revisado por ADR-0024). Este documento es el detalle (costes,
+  benchmarks, métodos); el ADR es el resumen decisorio.
 - **Fecha:** 2026-07-13.
 - **Contexto:** hoy los 7 agentes Mastra usan **un único modelo** (`getLlmConfig()`
   no distingue roles) y el chunking tiene un fallo grave en documentos (ver §5).

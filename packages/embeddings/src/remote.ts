@@ -1,7 +1,9 @@
+import { withLlmSlot } from "@cortex/shared";
 import { type EmbeddingProvider } from "./provider.js";
 import { reportEmbeddingUsage } from "./usage-sink.js";
 
-/** POST con reintentos exponenciales en 429/5xx (nan: 60 rpm, 3 en paralelo). */
+/** POST con reintentos exponenciales en 429/5xx. El slot lo toma el llamador (`embed`),
+ *  así que los reintentos NO liberan el cupo: reintentar es parte de la misma llamada. */
 async function postWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
   const max = 6;
   for (let attempt = 0; attempt < max; attempt++) {
@@ -44,17 +46,21 @@ export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embed(texts: string[]): Promise<number[][]> {
-    const res = await postWithRetry(
-      `${this.baseURL}/embeddings`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${this.apiKey}`,
+    // Comparte cupo con el resto de llamadas al proveedor (chat, visión, STT): el límite
+    // de concurrencia es por API key, no por tipo de endpoint.
+    const res = await withLlmSlot(() =>
+      postWithRetry(
+        `${this.baseURL}/embeddings`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify({ model: this.model, input: texts }),
         },
-        body: JSON.stringify({ model: this.model, input: texts }),
-      },
-      `Embeddings ${this.model}`,
+        `Embeddings ${this.model}`,
+      ),
     );
     const json = (await res.json()) as {
       data: { embedding: number[]; index: number }[];

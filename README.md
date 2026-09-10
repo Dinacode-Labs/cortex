@@ -216,14 +216,27 @@ pnpm cortex maintain-worker   # mantenimiento programado (cron)
   (`CORTEX_AUTH_DOMAIN`, whitelist). **Admin(s):** `CORTEX_ADMIN_EMAIL` (coma-separado)
   ven todos los proyectos y gestionan permisos. OTP por **Brevo** (`BREVO_API_KEY`); sin
   clave, modo dev (el código se loguea, no se envía).
-- **Proveedores** (`.env`, por defecto `local` sin claves):
+- **Proveedores** (`.env`, por defecto `local`/`none` sin claves). Todo endpoint soportado
+  habla el dialecto OpenAI, así que un solo proveedor genérico sirve para NaN, Ollama,
+  vLLM o LM Studio (ADR-0024). Ejemplo con NaN:
   ```bash
-  EMBEDDINGS_PROVIDER=nan        # local | nan | openai | voyage
-  LLM_PROVIDER=nan               # none | nan | openrouter
-  NAN_API_KEY=...                # nan.builders (OpenAI-compatible)
+  LLM_PROVIDER=openai-compatible
+  LLM_BASE_URL=https://api.nan.builders/v1
+  LLM_API_KEY=...
+  LLM_MODEL=deepseek-v4-flash            # 1M ctx, visión, tool calling
+  CORTEX_VISION_MODEL=deepseek-v4-flash  # el de chat puede ser text-only
+
+  EMBEDDINGS_PROVIDER=openai-compatible  # local | openai-compatible | openai | voyage
+  EMBEDDINGS_BASE_URL=https://api.nan.builders/v1
+  EMBEDDINGS_API_KEY=...
+  EMBEDDINGS_MODEL=qwen3-embedding
+  EMBEDDINGS_DIM=4096                    # obligatorio: fija el esquema vectorial
   ```
   `local` no es semántico (solo arranque sin claves); al cambiar de proveedor de
-  embeddings hay que reindexar (cambian las dimensiones).
+  embeddings hay que reindexar (cambian las dimensiones). `CORTEX_MODEL_<ROL>` cambia el
+  modelo de un agente concreto y admite `proveedor:modelo` para mandar solo ese rol a otro
+  sitio (p. ej. `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`). `CORTEX_LLM_CONCURRENCY`
+  (def. 4) limita las llamadas en paralelo: el cupo del proveedor es por API key.
 - **Mantenimiento** (server, idempotente, con lock): `pnpm cortex maintain
   ["<Proyecto>"]` encadena reclassify(tipos heurísticos→LLM) → enrich(only-missing) →
   resolve → temporal → curate → reconcile → lint. El **sync de fuentes es manual** (lo
@@ -375,8 +388,8 @@ la distancia, más parecido. Devuelve las entradas ordenadas de más a menos cer
 | Proveedor | Modelo | Dimensiones | ¿Semántico? |
 | --- | --- | --- | --- |
 | `local` (por defecto) | feature-hashing | 256 | **NO** — solo solape de palabras |
-| `nan` | `qwen3-embedding` | 4096 | Sí |
-| `openai` | `text-embedding-3-small` | 1536 | Sí |
+| `openai-compatible` | el que sirva el endpoint (p. ej. `qwen3-embedding` en NaN) | la que declares en `EMBEDDINGS_DIM` | Sí |
+| `openai` | `text-embedding-3-large` | 3072 | Sí |
 | `voyage` | `voyage-3` | 1024 | Sí |
 
 > **⚠️ Qué mirar — esto es importante para no llevarte una falsa impresión:**

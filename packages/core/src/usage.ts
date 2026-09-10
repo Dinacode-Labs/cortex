@@ -25,9 +25,14 @@ export interface UsageRecord {
  * coste; ajustar según contrato/catálogo (cambian rápido). Lo no listado se cuenta como
  * 0 y se avisa una vez (ADR-0021 / ADR-0023 §6.3). */
 const PRICING: Record<string, { in: number; out: number }> = {
-  // nan.builders (⚠️ en retirada; modelos free)
+  // NaN (suscripción mensual: el coste marginal por token es 0). ADR-0024.
+  "deepseek-v4-flash": { in: 0, out: 0 },
+  "glm5.3-flash": { in: 0, out: 0 },
+  "mimo-v2.5": { in: 0, out: 0 },
+  "qwen3.8-flash": { in: 0, out: 0 },
   "qwen3.6": { in: 0, out: 0 },
   "qwen3-embedding": { in: 0, out: 0 },
+  whisper: { in: 0, out: 0 },
   // OpenAI
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
   "gpt-4o": { in: 2.5, out: 10 },
@@ -37,6 +42,7 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "deepseek/deepseek-v4-pro": { in: 0.43, out: 0.87 },
   "deepseek/deepseek-v4-flash": { in: 0.08, out: 0.15 },
   "x-ai/grok-4.5": { in: 2.0, out: 6.0 },
+  "anthropic/claude-sonnet-5": { in: 2.0, out: 10.0 },
   "qwen/qwen3.5-flash-02-23": { in: 0.07, out: 0.26 },
   // Voyage
   "voyage-3": { in: 0.06, out: 0 },
@@ -45,8 +51,39 @@ const PRICING: Record<string, { in: number; out: number }> = {
 
 const warnedUnpriced = new Set<string>();
 
-function estimateCostUsd(model: string, inTok: number, outTok: number): number {
-  const p = PRICING[model] ?? PRICING[model.split("/").pop() ?? ""];
+let merged: Record<string, { in: number; out: number }> | undefined;
+
+/** Tabla efectiva: la de código más lo que añada `CORTEX_PRICING_JSON`. Permite corregir
+ *  un precio o dar de alta un modelo nuevo sin desplegar (cierra el «revisar cuando» de
+ *  ADR-0021). JSON inválido → aviso y se ignora: la observabilidad nunca rompe nada. */
+function pricing(): Record<string, { in: number; out: number }> {
+  if (merged) return merged;
+  merged = { ...PRICING };
+  const raw = getEnv("CORTEX_PRICING_JSON", "").trim();
+  if (raw) {
+    try {
+      const extra = JSON.parse(raw) as Record<string, { in?: number; out?: number }>;
+      for (const [model, p] of Object.entries(extra)) {
+        if (typeof p?.in === "number" && typeof p?.out === "number") merged[model] = { in: p.in, out: p.out };
+        else console.warn(`[usage] CORTEX_PRICING_JSON: entrada inválida para "${model}" (se esperan números in/out).`);
+      }
+    } catch (e) {
+      console.warn(`[usage] CORTEX_PRICING_JSON no es JSON válido, se ignora: ${(e as Error).message}`);
+    }
+  }
+  return merged;
+}
+
+/** Solo para tests: fuerza releer `CORTEX_PRICING_JSON`. @internal */
+export function resetPricingCache(): void {
+  merged = undefined;
+  warnedUnpriced.clear();
+}
+
+/** Coste estimado en USD de una llamada. @internal (exportado para tests) */
+export function estimateCostUsd(model: string, inTok: number, outTok: number): number {
+  const table = pricing();
+  const p = table[model] ?? table[model.split("/").pop() ?? ""];
   if (!p) {
     if (!warnedUnpriced.has(model)) {
       warnedUnpriced.add(model);
