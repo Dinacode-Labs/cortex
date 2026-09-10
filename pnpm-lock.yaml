@@ -21,7 +21,7 @@ importers:
         specifier: ^3.2.4
         version: 3.2.6(@types/debug@4.1.13)(@types/node@24.13.2)(tsx@4.22.4)(yaml@2.9.0)
 
-  apps/cli:
+  apps/admin:
     dependencies:
       '@cortex/agents':
         specifier: workspace:*
@@ -38,12 +38,27 @@ importers:
       '@cortex/embeddings':
         specifier: workspace:*
         version: link:../../packages/embeddings
+      '@cortex/mcp-server':
+        specifier: workspace:*
+        version: link:../mcp-server
+      '@cortex/server':
+        specifier: workspace:*
+        version: link:../server
       '@cortex/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       node-cron:
         specifier: ^4.5.0
         version: 4.5.0
+
+  apps/cli:
+    dependencies:
+      '@cortex/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@cortex/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       yaml:
         specifier: ^2.9.0
         version: 2.9.0

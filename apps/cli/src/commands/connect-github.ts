@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { apiPost } from "@cortex/client";
-import type { BatchItem } from "@cortex/core";
+import type { BatchItem } from "@cortex/shared";
 
 /**
  * Conector GitHub: ingiere PRs e issues de un repo en un proyecto, vía el CLI `gh`

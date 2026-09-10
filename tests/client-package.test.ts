@@ -42,6 +42,27 @@ describe("@cortex/client se mantiene ligero", () => {
   });
 });
 
+describe("el CLI `cortex` se mantiene instalable", () => {
+  it("no depende de los paquetes pesados: van en cortex-admin", () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, "apps/cli/package.json"), "utf8")) as {
+      dependencies?: Record<string, string>;
+    };
+    const internas = Object.keys(pkg.dependencies ?? {}).filter((d) => d.startsWith("@cortex/"));
+    expect(internas.sort()).toEqual(["@cortex/client", "@cortex/shared"]);
+  });
+
+  it("ningún comando del CLI importa Postgres, core, agents ni embeddings", () => {
+    const ofensores: string[] = [];
+    for (const f of ficherosTs(join(ROOT, "apps/cli/src"))) {
+      const src = readFileSync(f, "utf8");
+      for (const dep of PROHIBIDAS) {
+        if (src.includes(`from "${dep}"`)) ofensores.push(`${f.replace(ROOT, "")} → ${dep}`);
+      }
+    }
+    expect(ofensores).toEqual([]);
+  });
+});
+
 describe("cliente tipado de la API", () => {
   beforeEach(() => {
     vi.stubEnv("CORTEX_SERVER_URL", "https://cortex.example.com");

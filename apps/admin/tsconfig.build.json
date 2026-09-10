@@ -1,0 +1,22 @@
+{
+  "$comment": "Build real (tsc -b). El tsconfig.json de al lado sigue siendo solo typecheck.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/agents/tsconfig.build.json" },
+    { "path": "../../packages/client/tsconfig.build.json" },
+    { "path": "../../packages/core/tsconfig.build.json" },
+    { "path": "../../packages/database/tsconfig.build.json" },
+    { "path": "../../packages/embeddings/tsconfig.build.json" },
+    { "path": "../../packages/shared/tsconfig.build.json" },
+    { "path": "../server/tsconfig.build.json" },
+    { "path": "../mcp-server/tsconfig.build.json" }
+  ]
+}

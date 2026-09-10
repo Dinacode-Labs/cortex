@@ -49,6 +49,8 @@ distribuirlo como CLI instalable.
 | Proveedor de embeddings | `packages/embeddings/` |
 | Servidor MCP (stdio) · UI web · API+auth · CLI | `apps/mcp-server` · `apps/web` · `apps/server` · `apps/cli` |
 | Lado cliente (HTTP, credenciales, `.cortex.json`, transcripts) | `packages/client/` — **sin** Postgres ni LLM |
+| Comando de developer (auth, link, hooks) | `apps/cli/src/commands/` — solo `client` + `shared` |
+| Comando de operador (BD, modelo, servicios) | `apps/admin/src/commands/` |
 | Toolbelt del producto (MCP + skill de captura + comando) | `config/toolbelt.json` + `config/skills/cortex-capture/` + `config/commands/` |
 | Instalador (`cortex sync`) + hooks + shim CLI | `apps/cli/src/commands/sync.ts` (+ `sync/` un adapter por agente) |
 
