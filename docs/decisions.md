@@ -873,3 +873,49 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   el repo privado.
 - **Revisar cuando:** el repo se publique de verdad (repasar esta lista antes), o aparezca un
   tipo de documento que no encaje claramente en ninguna de las dos columnas.
+
+---
+
+## ADR-0030 · Build compilado con `tsc -b`, y `exports` duales para no perder el dev con `tsx`
+
+- **Estado:** aceptada (2026-09-10).
+- **Contexto:** el repo no tenía paso de compilación: todo corría con `tsx` desde las
+  fuentes, y los `exports` de cada paquete apuntaban a `./src/index.ts`. Para desarrollar es
+  cómodo, pero bloquea tres cosas a la vez: no se puede publicar el CLI como paquete
+  instalable, la imagen de Docker tiene que llevar las devDependencies y transpilar en cada
+  arranque, y los errores de tipos aparecen en producción en vez de en el build.
+- **Decisión:**
+  1. **`tsc -b` con project references.** Cada paquete y cada app de servidor gana un
+     `tsconfig.build.json` (composite, `outDir: dist`) con sus referencias reales, y uno raíz
+     los orquesta: `pnpm build` == `tsc -b tsconfig.build.json`. Los `tsconfig.json` que ya
+     existían **no se tocan** y siguen siendo solo typecheck (`--noEmit`); tenerlos separados
+     es lo que evita el error TS6305 («output file has not been built») al hacer
+     `tsc --noEmit` sobre un proyecto con referencias.
+  2. **`exports` duales con condición `development`.** Cada paquete expone
+     `development → ./src/index.ts` y `import → ./dist/index.js`. Los scripts de dev lanzan
+     `node --conditions=development --import tsx`, así que **desarrollar sigue sin requerir
+     build**, y `node dist/...` en producción resuelve al compilado. `pnpm typecheck` y los
+     tests funcionan con el repo recién clonado, sin `dist/`.
+  3. **`tsc` y no un bundler** para los paquetes y las apps de servidor: preserva la
+     estructura de directorios, y de eso dependen tres rutas a ficheros de datos que se
+     resuelven con `import.meta.dirname` (las migraciones SQL, los estáticos de la web y
+     `scripts/install.sh`). Un bundle plano las rompería en silencio. El CLI sí se empaquetará
+     con un bundler, porque ahí el objetivo es un artefacto único distribuible.
+  4. **`loadEnv` deja de resolver el `.env` relativo a su propio fichero fuente.** Ese era un
+     hallazgo conocido del refactor: ataba la función a vivir en `packages/shared/src` y se
+     rompía al compilar. Ahora busca `CORTEX_ENV_FILE`, luego el `.env` de `INIT_CWD` (que
+     pnpm fija a la raíz aunque `--filter` cambie el cwd) y luego el del cwd.
+  5. **El runner de migraciones deja de auto-ejecutarse al importarse.** Pasa a ser
+     `runMigrations()` (librería) más un `migrate-cli.ts` que es lo único con side effects,
+     para que el servidor o un test puedan migrar sin heredar un `process.exit`.
+- **Alternativas:** *seguir con `tsx` en producción* — arranque más lento, devDependencies en
+  la imagen y errores de tipos en runtime; *bundlear todo con tsup* — rompe las rutas a
+  ficheros de datos y complica el mapa de fuentes sin ganancia para procesos de servidor;
+  *un solo `tsconfig.json` por paquete que sirva para build y typecheck* — es justo lo que
+  provoca el TS6305.
+- **Consecuencias:** el Dockerfile compila (`pnpm build`) y arranca `node dist/...`. Quien
+  toque la resolución de rutas a ficheros de datos debe compilar y comprobar: el CI incluye
+  un smoke que verifica que `dist/` existe, que las tres rutas de datos resuelven desde el
+  compilado y que la app carga. Es un fallo que ni el typecheck ni los tests detectan.
+- **Revisar cuando:** se quiera una imagen multi-stage sin devDependencies (viene en el PR de
+  deploy), o alguna dependencia pase a ser ESM-only y obligue a revisar la resolución.

@@ -19,7 +19,8 @@ un MCP corporativo. Origen: plan interno de junio de 2026 (en el repo privado `a
 ## Stack (ver `docs/decisions.md` para el porqué)
 
 - **Monorepo** pnpm (`packages/*` librerías, `apps/*` ejecutables).
-- **TypeScript** + ESM (`NodeNext`), ejecución con `tsx`, Node ≥ 20.
+- **TypeScript** + ESM (`NodeNext`), Node ≥ 20. En dev se ejecuta con `tsx` sobre las
+  fuentes (condición `development` en los `exports`); en producción, `tsc -b` → `dist/`.
 - **Postgres 16 + pgvector** como base única (documental + vectorial + relacional).
 - **Mastra** para los agentes individuales (classify/enrich/rerank/synthesize/distill
   vía `runAgent`). Sus *workflows* se evaluaron y **no** se adoptaron para la captura
@@ -105,7 +106,9 @@ pnpm install            # instalar dependencias
 pnpm db:up              # levantar Postgres (Docker, puerto host 5433)
 pnpm db:migrate         # aplicar migraciones
 pnpm db:seed            # cargar datos de demo (proyecto ficticio Acme Portal)
-pnpm typecheck          # comprobar tipos en todos los paquetes
+pnpm typecheck          # comprobar tipos en todos los paquetes (sin build)
+pnpm build              # tsc -b: compila packages/* y apps de servidor a dist/
+pnpm clean              # borra los dist/ y los .tsbuildinfo
 pnpm test               # tests unitarios (Vitest, sin BD)
 pnpm test:integration   # tests de integración (requiere pnpm db:up)
 ```

@@ -9,6 +9,10 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Build compilado**: `pnpm build` (`tsc -b` con project references) genera `dist/` en cada
+  paquete y app de servidor, y Docker arranca `node dist/...` en vez de transpilar con `tsx`
+  en cada arranque. Desarrollar sigue sin requerir build gracias a una condición
+  `development` en los `exports` (ADR-0030).
 - Proveedor `openai-compatible` para LLM y embeddings: sirve para NaN, Ollama, vLLM o
   LM Studio con la misma configuración. `CORTEX_MODEL_<ROL>` admite `proveedor:modelo` para
   mandar un solo rol a otro proveedor (ADR-0024).
@@ -48,6 +52,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   distintas y borraba la perdedora sin vuelta atrás. Ahora la clave incluye el tipo.
 - La elección de entidad canónica no tenía desempate estable y dependía del orden de filas
   de Postgres; era la causa de un test de integración intermitente.
+- `loadEnv` resolvía el `.env` relativo a su propio fichero fuente, así que se rompía al
+  compilar o al mover el paquete. Ahora busca por `CORTEX_ENV_FILE`, `INIT_CWD` y cwd.
 - Una variable de entorno declarada pero vacía no caía a su valor por defecto:
   `EMBEDDINGS_PROVIDER=` reventaba el arranque en vez de usar `local`, y una clave vacía
   cortaba la cadena de fallback.
