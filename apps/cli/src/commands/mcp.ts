@@ -21,7 +21,7 @@ export async function run(): Promise<void> {
   });
 
   await server.connect(new StdioServerTransport());
-  console.error("[cortex mcp] proxy stdio ↔ servidor listo.");
+  console.error("[cortex mcp] stdio ↔ server proxy ready.");
 
   const shutdown = (): void => {
     void close().finally(() => process.exit(0));

@@ -12,12 +12,12 @@ export async function run(args: string[]): Promise<void> {
   const repoPath = args[1];
   const platform = (args[2] ?? "claude").toLowerCase();
   if (!slug || !repoPath) {
-    console.error('Uso: cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes|pi]');
+    console.error('Usage: cortex connect-sessions "<slug>" <repo-path> [claude|codex|opencode|hermes|pi]');
     process.exitCode = 1;
     return;
   }
   if (!(PLATAFORMAS as readonly string[]).includes(platform)) {
-    console.error(`Plataforma "${platform}" no soportada (${PLATAFORMAS.join("|")}).`);
+    console.error(`Unsupported agent "${platform}" (${PLATAFORMAS.join("|")}).`);
     process.exitCode = 1;
     return;
   }

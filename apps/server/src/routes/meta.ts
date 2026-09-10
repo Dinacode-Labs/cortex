@@ -42,6 +42,6 @@ metaRoutes.get("/toolbelt.json", (c) => {
   try {
     return c.body(readFileSync(TOOLBELT_PATH, "utf8"), 200, { "content-type": "application/json" });
   } catch {
-    return c.json({ error: "Este servidor no publica un registry de toolbelt." }, 404);
+    return c.json({ error: "This server does not publish a toolbelt registry." }, 404);
   }
 });

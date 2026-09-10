@@ -71,7 +71,7 @@ describe("opencode", () => {
     put(CFG, JSON.stringify({ mcp: { cortex: { type: "local", command: ["pnpm", "-C", "/repo", "--filter", "@cortex/mcp-server", "start"] } } }));
     const report = await openCodeAdapter.apply(ctxWith());
     expect(readJson(CFG).mcp.cortex.command).toEqual(["cortex", "mcp"]);
-    expect(report.changed.join(" ")).toContain("repo clonado");
+    expect(report.changed.join(" ")).toContain("cloned repo");
   });
 
   it("borra el plugin duplicado de la otra carpeta (OpenCode carga las dos)", async () => {
@@ -79,7 +79,7 @@ describe("opencode", () => {
     const report = await openCodeAdapter.apply(ctxWith());
     expect(existsSync(join(home, ".config/opencode/plugin/cortex.js"))).toBe(false);
     expect(existsSync(join(home, PLUGIN))).toBe(true);
-    expect(report.changed.join(" ")).toContain("duplicado");
+    expect(report.changed.join(" ")).toContain("duplicate plugin");
   });
 
   it("la segunda pasada no cambia nada ni deja otra copia", async () => {
@@ -210,7 +210,7 @@ describe("codex", () => {
     // Lo que no es de Cortex se queda donde estaba.
     expect(toml).toContain("[mcp_servers.otro]");
     expect(toml).toContain("[hooks.state]");
-    expect(report.changed.join(" ")).toContain("bloques antiguos");
+    expect(report.changed.join(" ")).toContain("old Cortex blocks");
   });
 
   it("si el marketplace falla, el MCP se registra igual y se avisa", async () => {

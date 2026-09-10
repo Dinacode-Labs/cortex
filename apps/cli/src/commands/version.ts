@@ -15,9 +15,9 @@ export async function run(): Promise<void> {
   if (!creds) return;
   const [version, cfg] = await Promise.all([getServerVersion(), getClientConfig(creds.server)]);
   if (!version && !cfg) {
-    console.log(`servidor ${creds.server} — no responde`);
+    console.log(`server ${creds.server} — not responding`);
     return;
   }
-  console.log(`servidor ${creds.server} · ${version ?? cfg?.version ?? "?"}`);
-  if (cfg?.minClientVersion) console.log(`versión mínima de cliente: ${cfg.minClientVersion}`);
+  console.log(`server ${creds.server} · ${version ?? cfg?.version ?? "?"}`);
+  if (cfg?.minClientVersion) console.log(`minimum client version: ${cfg.minClientVersion}`);
 }

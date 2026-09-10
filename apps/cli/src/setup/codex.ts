@@ -77,16 +77,16 @@ function stripLegacyToml(ctx: SetupCtx, report: SetupReport): void {
   const out = kept.map((b) => b.join("\n")).join("\n").replace(/\n{3,}/g, "\n\n");
   if (out === raw) return;
   writeText(ctx, file, out.endsWith("\n") ? out : out + "\n");
-  report.changed.push(`bloques antiguos de Cortex eliminados de ${tilde(ctx, file)} (apuntaban al repo clonado)`);
+  report.changed.push(`old Cortex blocks removed from ${tilde(ctx, file)} (they pointed at the cloned repo)`);
 }
 
 function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
   const state = mcpState(ctx);
   if (state === "ok") {
-    report.skipped.push("MCP `cortex` ya registrado con `cortex mcp`");
+    report.skipped.push("MCP `cortex` already registered as `cortex mcp`");
     return;
   }
-  report.changed.push(state === "legacy" ? "MCP `cortex` re-registrado contra el servidor" : "MCP `cortex` → `cortex mcp`");
+  report.changed.push(state === "legacy" ? "MCP `cortex` re-registered against the server" : "MCP `cortex` → `cortex mcp`");
   if (ctx.dryRun) return;
   if (state === "legacy") {
     try {
@@ -98,7 +98,7 @@ function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
   try {
     ctx.exec("codex", ["mcp", "add", "cortex", "--", "cortex", "mcp"]);
   } catch (e) {
-    report.warnings.push(`no se pudo registrar el MCP: ${(e as Error).message.split("\n")[0]}. Hazlo con: codex mcp add cortex -- cortex mcp`);
+    report.warnings.push(`could not register the MCP: ${(e as Error).message.split("\n")[0]}. Do it with: codex mcp add cortex -- cortex mcp`);
   }
 }
 
@@ -114,7 +114,7 @@ export const codexAdapter: AgentAdapter = {
   async apply(ctx: SetupCtx): Promise<SetupReport> {
     const report = emptyReport();
     if (ctx.dryRun) {
-      report.changed.push(`plugin ${PLUGIN} (marketplace ${MARKETPLACE_SOURCE}) — instalar`);
+      report.changed.push(`plugin ${PLUGIN} (marketplace ${MARKETPLACE_SOURCE}) — would install`);
     } else {
       try {
         try {
@@ -123,10 +123,10 @@ export const codexAdapter: AgentAdapter = {
           if (!/already|exists/i.test((e as Error).message)) throw e;
         }
         ctx.exec("codex", ["plugin", "add", PLUGIN]);
-        report.changed.push(`plugin ${PLUGIN} instalado (hooks, skill y /cortex-save)`);
+        report.changed.push(`plugin ${PLUGIN} installed (hooks, skill and /cortex-save)`);
       } catch (e) {
         report.warnings.push(
-          `no se pudo instalar el plugin (${(e as Error).message.split("\n")[0]}). Comprueba que tienes acceso a ${MARKETPLACE_SOURCE}; el MCP se registra igualmente.`,
+          `could not install the plugin (${(e as Error).message.split("\n")[0]}). Check you have access to ${MARKETPLACE_SOURCE}; the MCP is registered anyway.`,
         );
       }
     }
@@ -150,7 +150,7 @@ export const codexAdapter: AgentAdapter = {
           /* lo que no estuviera, no hay que quitarlo */
         }
       }
-    } else report.changed.push(`plugin ${PLUGIN} y MCP — quitar`);
+    } else report.changed.push(`plugin ${PLUGIN} and MCP — would remove`);
     stripLegacyToml(ctx, report);
     return report;
   },
@@ -158,9 +158,9 @@ export const codexAdapter: AgentAdapter = {
   async status(ctx: SetupCtx): Promise<AgentStatus> {
     const details: string[] = [];
     const plugin = pluginInstalled(ctx);
-    if (plugin) details.push(`plugin ${PLUGIN} instalado`);
+    if (plugin) details.push(`plugin ${PLUGIN} installed`);
     const mcp = mcpState(ctx);
-    details.push(mcp === "ok" ? "MCP `cortex mcp` registrado" : mcp === "legacy" ? "MCP registrado con el comando ANTIGUO" : "MCP no registrado");
+    details.push(mcp === "ok" ? "MCP `cortex mcp` registered" : mcp === "legacy" ? "MCP registered with the OLD command" : "MCP not registered");
     return { installed: plugin, details };
   },
 };

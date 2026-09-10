@@ -32,7 +32,7 @@ function write(link: CortexLink, msg: string): void {
 
 function requireSession(): boolean {
   if (readCredentials()) return true;
-  console.error("✗ No has iniciado sesión. Ejecuta `cortex auth login` primero.");
+  console.error("✗ Not signed in. Run `cortex auth login` first.");
   process.exitCode = 1;
   return false;
 }
@@ -40,21 +40,21 @@ function requireSession(): boolean {
 /** Mensaje de "existe pero es privado", con los admins a los que pedir acceso. */
 function askAccess(name: string, admins?: string[]): string {
   const quien = admins?.length ? ` (${admins.join(", ")})` : "";
-  return `✗ El proyecto "${name}" existe pero es privado y no tienes acceso.\n  Pídele acceso a un administrador${quien} — no se ha creado nada.`;
+  return `✗ The project "${name}" exists but is private and you do not have access.\n  Ask an administrator${quien} for access. Nothing was created.`;
 }
 
 export async function run(args: string[]): Promise<void> {
   const positional = args.filter((a) => !a.startsWith("--"));
 
   if (args.includes("--ignore")) {
-    write({ ignore: true }, "Cortex desactivado en este repo (opt-out).");
+    write({ ignore: true }, "Cortex turned off for this repository (opt-out).");
     return;
   }
 
   if (args.includes("--create")) {
     const name = positional.join(" ").trim();
     if (!name) {
-      console.error('Uso: cortex link --create "<Nombre del proyecto>" [--private] [--parent <slug>]');
+      console.error('Usage: cortex link --create "<Project name>" [--private] [--parent <slug>]');
       process.exitCode = 1;
       return;
     }
@@ -71,7 +71,7 @@ export async function run(args: string[]): Promise<void> {
       return;
     }
     if (!res.ok) {
-      console.error(`✗ ${res.data.error ?? `No se pudo crear el proyecto (HTTP ${res.status}).`}`);
+      console.error(`✗ ${res.data.error ?? `Could not create the project (HTTP ${res.status}).`}`);
       process.exitCode = 1;
       return;
     }
@@ -79,8 +79,8 @@ export async function run(args: string[]): Promise<void> {
     write(
       { slug: project.slug },
       created
-        ? `Proyecto "${project.name}" (${project.visibility}) creado y vinculado · slug: ${project.slug}.`
-        : `Ya existía "${project.name}" (${project.visibility}); vinculado · slug: ${project.slug}.`,
+        ? `Project "${project.name}" (${project.visibility}) created and linked · slug: ${project.slug}.`
+        : `"${project.name}" (${project.visibility}) already existed; linked · slug: ${project.slug}.`,
     );
     return;
   }
@@ -90,7 +90,7 @@ export async function run(args: string[]): Promise<void> {
     const slug = positional[0];
     const res = await getProject(slug);
     if (res.status === 404) {
-      console.error(`✗ No existe ningún proyecto con slug "${slug}".\n  Créalo con: cortex link --create "<Nombre>"`);
+      console.error(`✗ There is no project with slug "${slug}".\n  Create it with: cortex link --create "<Name>"`);
       process.exitCode = 1;
       return;
     }
@@ -100,35 +100,35 @@ export async function run(args: string[]): Promise<void> {
       return;
     }
     if (!res.ok) {
-      console.error(`✗ No se pudo consultar el proyecto (HTTP ${res.status}).`);
+      console.error(`✗ Could not look up the project (HTTP ${res.status}).`);
       process.exitCode = 1;
       return;
     }
-    write({ slug: res.data.project.slug }, `Vinculado a "${res.data.project.name}" · slug: ${res.data.project.slug}.`);
+    write({ slug: res.data.project.slug }, `Linked to "${res.data.project.name}" · slug: ${res.data.project.slug}.`);
     return;
   }
 
   // Sin argumentos: estado actual + qué proyectos hay disponibles.
   const link = readCortexLink(TARGET_CWD);
-  if (!link) console.log("Esta carpeta NO está vinculada a ningún proyecto (no hay .cortex.json).");
-  else if (link.ignore) console.log("Esta carpeta está marcada como IGNORADA para Cortex.");
-  else console.log(`Vinculada a: ${link.slug ?? link.project ?? "(vínculo incompleto)"}`);
+  if (!link) console.log("This folder is NOT linked to any project (there is no .cortex.json).");
+  else if (link.ignore) console.log("This folder is marked as IGNORED for Cortex.");
+  else console.log(`Linked to: ${link.slug ?? link.project ?? "(incomplete link)"}`);
 
   if (!readCredentials()) {
-    console.log("\nInicia sesión con `cortex auth login` para ver tus proyectos.");
+    console.log("\nSign in with `cortex auth login` to see your projects.");
     return;
   }
   const res = await listProjects();
   if (!res.ok) {
-    console.log("\nNo se pudo consultar la lista de proyectos (¿servidor en marcha?).");
+    console.log("\nCould not fetch the list of projects. Is the server running?");
     return;
   }
   const projects = res.data.projects;
   if (projects.length === 0) {
-    console.log('\nNo tienes proyectos todavía. Crea uno con: cortex link --create "<Nombre>"');
+    console.log('\nYou have no projects yet. Create one with: cortex link --create "<Name>"');
     return;
   }
-  console.log("\nProyectos a los que tienes acceso:");
+  console.log("\nProjects you can access:");
   const w = Math.max(...projects.map((p) => p.slug.length));
-  for (const p of projects) console.log(`  ${p.slug.padEnd(w)}  ${p.name}${p.visibility === "private" ? " (privado)" : ""}`);
+  for (const p of projects) console.log(`  ${p.slug.padEnd(w)}  ${p.name}${p.visibility === "private" ? " (private)" : ""}`);
 }

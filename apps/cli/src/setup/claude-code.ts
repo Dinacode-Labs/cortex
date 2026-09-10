@@ -49,7 +49,7 @@ function dropLegacyLinks(ctx: SetupCtx, report: SetupReport): void {
       const target = readlinkSync(file);
       if (!target.includes("config/skills") && !target.includes("config/commands")) continue;
       if (!ctx.dryRun) rmSync(file, { force: true });
-      report.changed.push(`symlink antiguo eliminado (${tilde(ctx, file)}): lo aporta el plugin`);
+      report.changed.push(`old symlink removed (${tilde(ctx, file)}): the plugin provides it`);
     } catch {
       /* no existe: nada que limpiar */
     }
@@ -60,11 +60,11 @@ function dropLegacyLinks(ctx: SetupCtx, report: SetupReport): void {
 function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
   const state = mcpState(ctx);
   if (state === "ok") {
-    report.skipped.push("MCP `cortex` ya registrado con `cortex mcp`");
+    report.skipped.push("MCP `cortex` already registered as `cortex mcp`");
     return;
   }
   if (state === "legacy") {
-    report.changed.push("MCP `cortex` registrado contra el repo clonado — se vuelve a registrar contra el servidor");
+    report.changed.push("MCP `cortex` pointed at the cloned repo — re-registering it against the server");
     if (!ctx.dryRun) {
       try {
         ctx.exec("claude", ["mcp", "remove", "cortex", "-s", "user"]);
@@ -79,7 +79,7 @@ function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
   try {
     ctx.exec("claude", ["mcp", "add", "cortex", "-s", "user", "--", "cortex", "mcp"]);
   } catch (e) {
-    report.warnings.push(`no se pudo registrar el MCP: ${(e as Error).message}. Hazlo con: claude mcp add cortex -s user -- cortex mcp`);
+    report.warnings.push(`could not register the MCP: ${(e as Error).message}. Do it with: claude mcp add cortex -s user -- cortex mcp`);
   }
 }
 
@@ -88,22 +88,22 @@ function writeHooks(ctx: SetupCtx, report: SetupReport, mode: "install" | "unins
   const file = settingsFile(ctx);
   const obj = readJson<HooksHolder>(file);
   if (obj === null) {
-    report.warnings.push(`${tilde(ctx, file)} no es JSON válido — no lo toco. Añade los hooks a mano o arregla el fichero.`);
+    report.warnings.push(`${tilde(ctx, file)} is not valid JSON, so it was left alone. Fix the file, or add the hooks by hand.`);
     return;
   }
   const settings: HooksHolder = obj ?? {};
   if (mode === "install") {
     const res = mergeHooks(settings, HOOK_DEFS);
-    if (res.replacedLegacy.length) report.changed.push(`${res.replacedLegacy.length} hook(s) de una versión anterior actualizados`);
+    if (res.replacedLegacy.length) report.changed.push(`${res.replacedLegacy.length} hook(s) from an older version updated`);
     if (res.changed.length === 0) {
-      report.skipped.push("hooks en settings.json ya al día");
+      report.skipped.push("hooks in settings.json already up to date");
       return;
     }
     report.changed.push(...res.changed.map((c) => `hook ${c}`));
   } else {
     const res = removeHooks(settings);
     if (res.changed.length === 0) {
-      report.skipped.push("no había hooks de Cortex en settings.json");
+      report.skipped.push("there were no Cortex hooks in settings.json");
       return;
     }
     report.changed.push(...res.changed);
@@ -119,7 +119,7 @@ function pluginInstalled(ctx: SetupCtx): boolean {
 /** Instala el plugin. Devuelve false si no se ha podido (repo privado sin acceso, CLI vieja…). */
 function tryPlugin(ctx: SetupCtx, report: SetupReport): boolean {
   if (ctx.dryRun) {
-    report.changed.push(`plugin ${PLUGIN} (marketplace ${MARKETPLACE_SOURCE}) — instalar`);
+    report.changed.push(`plugin ${PLUGIN} (marketplace ${MARKETPLACE_SOURCE}) — would install`);
     return true;
   }
   try {
@@ -130,11 +130,11 @@ function tryPlugin(ctx: SetupCtx, report: SetupReport): boolean {
       if (!/already exists|already added/i.test((e as Error).message)) throw e;
     }
     ctx.exec("claude", ["plugin", "install", PLUGIN, "--scope", "user", "--yes"]);
-    report.changed.push(`plugin ${PLUGIN} instalado (hooks, MCP, skill y /cortex-save)`);
+    report.changed.push(`plugin ${PLUGIN} installed (hooks, MCP, skill and /cortex-save)`);
     return true;
   } catch (e) {
     report.warnings.push(
-      `no se pudo instalar el plugin (${(e as Error).message.split("\n")[0]}). Configuro los hooks en settings.json; si querías el plugin, comprueba que tienes acceso a ${MARKETPLACE_SOURCE}.`,
+      `could not install the plugin (${(e as Error).message.split("\n")[0]}). Falling back to hooks in settings.json; if you wanted the plugin, check you have access to ${MARKETPLACE_SOURCE}.`,
     );
     return false;
   }
@@ -153,12 +153,12 @@ export const claudeCodeAdapter: AgentAdapter = {
       // significaría inyectar el contexto dos veces y destilar la sesión dos veces.
       writeHooks(ctx, report, "uninstall");
       if (mcpState(ctx) !== "missing") {
-        report.changed.push("MCP `cortex` de usuario eliminado: lo sirve el plugin");
+        report.changed.push("user-level MCP `cortex` removed: the plugin provides it");
         if (!ctx.dryRun) {
           try {
             ctx.exec("claude", ["mcp", "remove", "cortex", "-s", "user"]);
           } catch {
-            report.warnings.push("hay un MCP `cortex` de usuario además del plugin; quítalo con: claude mcp remove cortex -s user");
+            report.warnings.push("there is a user-level MCP `cortex` as well as the plugin; remove it with: claude mcp remove cortex -s user");
           }
         }
       }
@@ -177,20 +177,20 @@ export const claudeCodeAdapter: AgentAdapter = {
       if (!ctx.dryRun) {
         try {
           ctx.exec("claude", ["plugin", "uninstall", PLUGIN]);
-          report.changed.push(`plugin ${PLUGIN} desinstalado`);
+          report.changed.push(`plugin ${PLUGIN} uninstalled`);
         } catch (e) {
-          report.warnings.push(`no se pudo desinstalar el plugin: ${(e as Error).message}`);
+          report.warnings.push(`could not uninstall the plugin: ${(e as Error).message}`);
         }
-      } else report.changed.push(`plugin ${PLUGIN} — desinstalar`);
+      } else report.changed.push(`plugin ${PLUGIN} — would uninstall`);
     }
     writeHooks(ctx, report, "uninstall");
     if (mcpState(ctx) !== "missing") {
-      report.changed.push("MCP `cortex` eliminado");
+      report.changed.push("MCP `cortex` removed");
       if (!ctx.dryRun) {
         try {
           ctx.exec("claude", ["mcp", "remove", "cortex", "-s", "user"]);
         } catch {
-          report.warnings.push("no se pudo quitar el MCP: claude mcp remove cortex -s user");
+          report.warnings.push("could not remove the MCP: claude mcp remove cortex -s user");
         }
       }
     }
@@ -200,13 +200,13 @@ export const claudeCodeAdapter: AgentAdapter = {
   async status(ctx: SetupCtx): Promise<AgentStatus> {
     const details: string[] = [];
     const plugin = pluginInstalled(ctx);
-    if (plugin) details.push(`plugin ${PLUGIN} instalado`);
+    if (plugin) details.push(`plugin ${PLUGIN} installed`);
     const settings = readJson<HooksHolder>(settingsFile(ctx));
     const hooks = Boolean(settings && hasCortexHooks(settings));
-    if (hooks) details.push("hooks en settings.json");
+    if (hooks) details.push("hooks in settings.json");
     const mcp = mcpState(ctx);
-    details.push(mcp === "ok" ? "MCP `cortex mcp` registrado" : mcp === "legacy" ? "MCP registrado con el comando ANTIGUO" : "MCP no registrado");
-    if (plugin && hooks) details.push("⚠️ plugin y hooks a la vez: la sesión se capturaría dos veces (ejecuta `cortex setup claude-code`)");
+    details.push(mcp === "ok" ? "MCP `cortex mcp` registered" : mcp === "legacy" ? "MCP registered with the OLD command" : "MCP not registered");
+    if (plugin && hooks) details.push("⚠️ both plugin and hooks: the session would be captured twice (run `cortex setup claude-code`)");
     return { installed: plugin || hooks, details };
   },
 };

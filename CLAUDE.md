@@ -139,7 +139,11 @@ claves** (embeddings `local`, no semánticos); conecta un endpoint real
 
 ## Convenciones
 
-- Idioma: código y nombres en inglés; comentarios y docs de producto en español.
+- Idioma: **lo que ve el usuario o el agente va en inglés** (mensajes del CLI, descripciones
+  de las tools MCP, skill y comandos del plugin, errores de la API). **Los comentarios del
+  código, los ADRs, el roadmap y la investigación van en español**, y también los prompts de
+  los agentes LLM, porque el corpus que procesan es español. La UI web sigue en español de
+  momento.
 - Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
 - **Borrado de secretos**: `scrub()` vive en `@cortex/shared` (función pura, sin I/O).
   `agents` lo aplica antes de mandar nada al LLM y `core` al persistir (`saveContext`,

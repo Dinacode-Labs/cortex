@@ -99,6 +99,11 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   viejo recibe un mensaje que lo explica. Con él se va el shim de `~/.local/bin`.
 
 ### Changed
+- **La superficie de producto pasa a inglés**: las descripciones de las 8 tools MCP (las lee
+  un modelo que puede estar trabajando en cualquier idioma), los mensajes del CLI, la skill
+  `cortex-capture`, `/cortex-save` y los errores de la API que consume el CLI. Los prompts de
+  los agentes LLM siguen en español —el corpus lo es—, y también los ADRs, el roadmap y los
+  comentarios del código. La UI web se traduce más adelante.
 - **`install.sh` ya no clona el repo**: instala el CLI desde npm, inicia sesión y llama a
   `cortex setup --all`. Node no se instala por su cuenta —meterle una versión a alguien por
   detrás le rompe otros proyectos—, se exige ≥ 20 y se dan tres formas de ponerlo. Los fallos

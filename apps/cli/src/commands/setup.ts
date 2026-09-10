@@ -12,12 +12,12 @@ import { AGENT_IDS, agentBin, defaultCtx, detectAgents, getAdapter, runSetup, ty
  */
 
 function usage(): void {
-  console.log("Uso: cortex setup <agente>|--all [--dry-run] [--remove] [--no-plugin]");
-  console.log("     cortex setup --status\n");
-  console.log(`Agentes: ${AGENT_IDS.join(", ")}\n`);
-  console.log("  --dry-run     enseña lo que haría, sin escribir nada");
-  console.log("  --remove      quita la integración de Cortex (no desinstala el CLI)");
-  console.log("  --no-plugin   Claude Code: hooks en settings.json en vez del plugin");
+  console.log("Usage: cortex setup <agent>|--all [--dry-run] [--remove] [--no-plugin]");
+  console.log("       cortex setup --status\n");
+  console.log(`Agents: ${AGENT_IDS.join(", ")}\n`);
+  console.log("  --dry-run     show what it would do, without writing anything");
+  console.log("  --remove      remove the Cortex integration (the CLI stays installed)");
+  console.log("  --no-plugin   Claude Code: hooks in settings.json instead of the plugin");
 }
 
 function printReports(results: { id: string; report: { changed: string[]; skipped: string[]; warnings: string[] } }[], dryRun: boolean): boolean {
@@ -31,27 +31,27 @@ function printReports(results: { id: string; report: { changed: string[]; skippe
     for (const s of report.skipped) console.log(`  · ${s}`);
     // Los avisos no cuentan como cambio: hay agentes que siempre tienen algo que recordar.
     for (const w of report.warnings) console.log(`  ⚠️  ${w}`);
-    if (!report.changed.length && !report.skipped.length && !report.warnings.length) console.log("  · nada que hacer");
+    if (!report.changed.length && !report.skipped.length && !report.warnings.length) console.log("  · nothing to do");
   }
   return nada;
 }
 
 async function showStatus(ctx: ReturnType<typeof defaultCtx>): Promise<void> {
   const detected = detectAgents(ctx);
-  console.log(detected.length ? `Agentes detectados: ${detected.join(", ")}` : "No he detectado ningún agente en este equipo.");
+  console.log(detected.length ? `Agents found: ${detected.join(", ")}` : "No coding agents found on this machine.");
   for (const id of detected) {
     const adapter = getAdapter(id);
     console.log(`\n[${id}]`);
     if (!adapter) {
-      console.log("  · sin integración automática en esta versión");
+      console.log("  · no automatic integration in this version");
       continue;
     }
     const st = await adapter.status(ctx);
-    console.log(`  ${st.installed ? "✓ configurado" : "✗ sin configurar"}`);
+    console.log(`  ${st.installed ? "✓ configured" : "✗ not configured"}`);
     for (const d of st.details) console.log(`    - ${d}`);
   }
   const sinConfigurar = detected.filter((id) => getAdapter(id));
-  if (sinConfigurar.length) console.log(`\nPara (re)configurar: cortex setup --all`);
+  if (sinConfigurar.length) console.log(`\nTo (re)configure: cortex setup --all`);
 }
 
 export async function run(args: string[]): Promise<void> {
@@ -74,7 +74,7 @@ export async function run(args: string[]): Promise<void> {
   const named = args.filter((a) => !a.startsWith("--")) as AgentId[];
   const desconocido = named.find((a) => !AGENT_IDS.includes(a));
   if (desconocido) {
-    console.error(`Agente desconocido: "${desconocido}". Conocidos: ${AGENT_IDS.join(", ")}`);
+    console.error(`Unknown agent: "${desconocido}". Known agents: ${AGENT_IDS.join(", ")}`);
     process.exitCode = 1;
     return;
   }
@@ -84,13 +84,13 @@ export async function run(args: string[]): Promise<void> {
   if (flags.has("--all")) {
     agents = detected;
     if (agents.length === 0) {
-      console.log("No he detectado ningún agente en este equipo. Instala Claude Code, Codex, OpenCode, Hermes o Pi y vuelve a ejecutarlo.");
+      console.log("No coding agents found on this machine. Install Claude Code, Codex, OpenCode, Hermes or Pi and run this again.");
       return;
     }
   } else if (named.length) {
     agents = named;
     const ausentes = named.filter((id) => !ctx.detect(agentBin(id)));
-    for (const id of ausentes) console.log(`⚠️  No encuentro \`${agentBin(id)}\` en el PATH; configuro ${id} igualmente por si lo instalas después.`);
+    for (const id of ausentes) console.log(`⚠️  \`${agentBin(id)}\` is not on your PATH; configuring ${id} anyway, in case you install it later.`);
   } else {
     usage();
     console.log("");
@@ -98,12 +98,12 @@ export async function run(args: string[]): Promise<void> {
     return;
   }
 
-  console.log(`cortex setup ${ctx.remove ? "(DESINSTALAR)" : ctx.dryRun ? "(dry-run — no escribo nada)" : ""}`.trimEnd());
+  console.log(`cortex setup ${ctx.remove ? "(REMOVING)" : ctx.dryRun ? "(dry run — nothing will be written)" : ""}`.trimEnd());
   const results = await runSetup(agents, ctx);
   const nada = printReports(results, ctx.dryRun);
 
-  if (ctx.dryRun) console.log("\nEsto era un simulacro. Ejecuta lo mismo sin --dry-run para aplicarlo.");
-  else if (ctx.remove) console.log("\nIntegración retirada. El CLI `cortex` sigue instalado.");
-  else if (nada) console.log("\nTodo estaba ya en su sitio.");
-  else console.log("\nListo. Reinicia tus agentes para que carguen la configuración nueva.");
+  if (ctx.dryRun) console.log("\nThat was a dry run. Run the same command without --dry-run to apply it.");
+  else if (ctx.remove) console.log("\nIntegration removed. The `cortex` CLI is still installed.");
+  else if (nada) console.log("\nEverything was already in place.");
+  else console.log("\nDone. Restart your agents so they pick up the new configuration.");
 }

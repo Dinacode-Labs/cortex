@@ -35,14 +35,14 @@ authRoutes.post("/auth/verify", async (c) => {
 
 authRoutes.get("/auth/me", async (c) => {
   const user = await currentUser(c);
-  return user ? c.json({ user }) : c.json({ error: "No autenticado." }, 401);
+  return user ? c.json({ user }) : c.json({ error: "Not authenticated." }, 401);
 });
 
 // Ticket de un solo uso para abrir la UI (cortex ui). El token de CLI no viaja en la URL.
 authRoutes.post("/auth/ui-ticket", async (c) => {
   const token = bearer(c);
   const ticket = token ? await createUiTicket(token) : null;
-  return ticket ? c.json({ ticket }) : c.json({ error: "No autenticado." }, 401);
+  return ticket ? c.json({ ticket }) : c.json({ error: "Not authenticated." }, 401);
 });
 
 authRoutes.post("/auth/logout", async (c) => {

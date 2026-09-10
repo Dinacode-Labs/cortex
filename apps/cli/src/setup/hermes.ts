@@ -57,7 +57,7 @@ function upsertHook(cfg: HermesConfig, event: string, command: string): string |
   const stale = mine.filter((h) => h.command !== command);
   if (stale.length === 0) return null;
   for (const h of stale) h.command = command;
-  return `hook ${event} actualizado (venía de una versión anterior)`;
+  return `hook ${event} updated (it came from an older version)`;
 }
 
 export const hermesAdapter: AgentAdapter = {
@@ -68,16 +68,16 @@ export const hermesAdapter: AgentAdapter = {
     const report = emptyReport();
     const cfg = read(ctx);
     if (!cfg) {
-      report.warnings.push(`${tilde(ctx, CONFIG(ctx))} no es YAML válido — no lo toco.`);
+      report.warnings.push(`${tilde(ctx, CONFIG(ctx))} is not valid YAML, so it was left alone.`);
       return report;
     }
     cfg.mcp_servers ??= {};
     const want = { command: "cortex", args: ["mcp"], enabled: true };
     if (JSON.stringify(cfg.mcp_servers.cortex) === JSON.stringify(want)) {
-      report.skipped.push("MCP `cortex` ya declarado");
+      report.skipped.push("MCP `cortex` already declared");
     } else {
-      if (cfg.mcp_servers.cortex?.command === "pnpm") report.changed.push("MCP `cortex` apuntaba al repo clonado — re-declarado");
-      else report.changed.push("MCP `cortex` declarado en config.yaml");
+      if (cfg.mcp_servers.cortex?.command === "pnpm") report.changed.push("MCP `cortex` pointed at the cloned repo — re-declared");
+      else report.changed.push("MCP `cortex` declared in config.yaml");
       cfg.mcp_servers.cortex = want;
     }
 
@@ -90,8 +90,8 @@ export const hermesAdapter: AgentAdapter = {
     }
 
     if (report.changed.length) write(ctx, cfg);
-    report.warnings.push("Hermes pide permiso para los shell hooks: acéptalo dentro de Hermes la primera vez (allowlist).");
-    report.warnings.push("La captura de Hermes lee su SQLite: necesita Node ≥ 22.5.");
+    report.warnings.push("Hermes asks for permission before running shell hooks: accept it inside Hermes the first time (allowlist).");
+    report.warnings.push("Capturing Hermes sessions reads its SQLite database, which needs Node 22.5 or newer.");
     return report;
   },
 
@@ -101,12 +101,12 @@ export const hermesAdapter: AgentAdapter = {
     if (!cfg || !existsSync(CONFIG(ctx))) return report;
     if (cfg.mcp_servers?.cortex) {
       delete cfg.mcp_servers.cortex;
-      report.changed.push("MCP `cortex` fuera de config.yaml");
+      report.changed.push("MCP `cortex` removed from config.yaml");
     }
     for (const [event, hooks] of Object.entries(cfg.hooks ?? {})) {
       const kept = hooks.filter((h) => !isCortex(h.command));
       if (kept.length === hooks.length) continue;
-      report.changed.push(`hooks de Cortex fuera de ${event}`);
+      report.changed.push(`Cortex hooks removed from ${event}`);
       if (kept.length) cfg.hooks![event] = kept;
       else delete cfg.hooks![event];
     }
@@ -116,14 +116,14 @@ export const hermesAdapter: AgentAdapter = {
 
   async status(ctx: SetupCtx): Promise<AgentStatus> {
     const cfg = read(ctx);
-    if (!cfg) return { installed: false, details: ["config.yaml no parseable"] };
+    if (!cfg) return { installed: false, details: ["config.yaml could not be parsed"] };
     const mcp = cfg.mcp_servers?.cortex;
     const hooks = Object.values(cfg.hooks ?? {}).flat().filter((h) => isCortex(h.command)).length;
     return {
       installed: hooks > 0,
       details: [
-        !mcp ? "MCP no declarado" : mcp.command === "cortex" ? "MCP `cortex mcp` declarado" : "MCP con el comando ANTIGUO",
-        hooks ? `${hooks} hook(s) de Cortex` : "sin hooks de Cortex",
+        !mcp ? "MCP not declared" : mcp.command === "cortex" ? "MCP `cortex mcp` declared" : "MCP with the OLD command",
+        hooks ? `${hooks} Cortex hook(s)` : "no Cortex hooks",
       ],
     };
   },

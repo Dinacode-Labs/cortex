@@ -151,7 +151,7 @@ describe("auditToolbelt", () => {
     const rows = auditToolbelt(REGISTRY);
     const tickets = rows.find((r) => r.line.startsWith("tickets"))!;
     expect(tickets.ok).toBe(false);
-    expect(tickets.line).toContain("FALTAN");
+    expect(tickets.line).toContain("MISSING");
     expect(rows.find((r) => r.line.startsWith("wiki"))!.ok).toBe(true);
   });
 });

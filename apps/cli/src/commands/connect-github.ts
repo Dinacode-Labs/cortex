@@ -40,12 +40,12 @@ export async function run(args: string[]): Promise<void> {
   const repo = args[1];
   const max = Number(args[2] ?? "100");
   if (!slug || !repo) {
-    console.error('Uso: cortex connect-github "<slug>" <owner/repo> [maxItems]');
+    console.error('Usage: cortex connect-github "<slug>" <owner/repo> [maxItems]');
     process.exitCode = 1;
     return;
   }
 
-  console.log(`Conectando GitHub ${repo} → "${slug}" (vía API)...`);
+  console.log(`Ingesting GitHub ${repo} → "${slug}"…`);
   const prs = JSON.parse(
     gh(["pr", "list", "-R", repo, "--state", "all", "--limit", String(max),
         "--json", "number,title,body,state,mergedAt,author,labels,url"]),
@@ -54,7 +54,7 @@ export async function run(args: string[]): Promise<void> {
     gh(["issue", "list", "-R", repo, "--state", "all", "--limit", String(max),
         "--json", "number,title,body,state,labels,url"]),
   ) as Issue[];
-  console.log(`  ${prs.length} PRs, ${issues.length} issues.`);
+  console.log(`  ${prs.length} pull requests, ${issues.length} issues.`);
 
   const items: BatchItem[] = [];
   for (const pr of prs) {
@@ -85,12 +85,12 @@ export async function run(args: string[]): Promise<void> {
 
   const r = await apiPost<{ results?: { action: string }[]; error?: string }>("/capture/batch", { slug, items });
   if (!r.ok) {
-    console.error(`✗ Captura fallida (${r.status}): ${r.data.error ?? "¿cortex auth login / servidor en marcha?"}`);
+    console.error(`✗ Capture failed (${r.status}): ${r.data.error ?? "check cortex auth login and that the server is running"}`);
     process.exitCode = 1;
     return;
   }
   const added = (r.data.results ?? []).filter((x) => x.action === "added").length;
-  console.log(`Conector GitHub: ${added} nuevos, ${(r.data.results?.length ?? 0) - added} ya existían.`);
+  console.log(`GitHub: ${added} new, ${(r.data.results?.length ?? 0) - added} already known.`);
 }
 
 

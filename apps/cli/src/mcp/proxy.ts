@@ -41,7 +41,7 @@ function isConnectionError(e: unknown): boolean {
 }
 
 const AUTH_HINT =
-  "Cortex: no has iniciado sesión o el token ha caducado. Ejecuta `cortex auth login` y reinicia tu agente.";
+  "Cortex: you are not signed in, or your token expired. Run `cortex auth login` and restart your agent.";
 
 export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () => Promise<void> } {
   const log = opts.log ?? ((m: string) => console.error(`[cortex mcp] ${m}`));
@@ -79,7 +79,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
       return await fn(await upstream());
     } catch (e) {
       if (!isConnectionError(e) || isAuthError(e)) throw e;
-      log(`conexión perdida (${(e as Error).message}); reintentando…`);
+      log(`connection lost (${(e as Error).message}); retrying once…`);
       client = null;
       return fn(await upstream());
     }
@@ -94,7 +94,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
       // Devolver una lista vacía en vez de fallar: así el agente ARRANCA aunque el
       // servidor esté caído o el token haya caducado, y el usuario ve el aviso en el log
       // en lugar de un error de inicialización.
-      log(isAuthError(e) ? AUTH_HINT : `no se pudieron listar las tools: ${(e as Error).message}`);
+      log(isAuthError(e) ? AUTH_HINT : `could not list the tools: ${(e as Error).message}`);
       return { tools: [] };
     }
   });
@@ -105,7 +105,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
     } catch (e) {
       // Un error de tool se responde como resultado con `isError`, no como excepción de
       // protocolo: el agente lo enseña al usuario y sigue trabajando.
-      const text = isAuthError(e) ? AUTH_HINT : `Cortex: la herramienta falló (${(e as Error).message}).`;
+      const text = isAuthError(e) ? AUTH_HINT : `Cortex: the tool failed (${(e as Error).message}).`;
       log(text);
       return { content: [{ type: "text", text }], isError: true };
     }

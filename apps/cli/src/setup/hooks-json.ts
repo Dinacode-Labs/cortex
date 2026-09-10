@@ -85,7 +85,7 @@ export function mergeHooks(obj: HooksHolder, defs: HookDef[]): MergeResult {
       h.type ??= "command";
       if (def.timeout) h.timeout = def.timeout;
     }
-    res.changed.push(`${def.event} → actualizado (${stale.length} hook${stale.length > 1 ? "s" : ""} de una versión anterior)`);
+    res.changed.push(`${def.event} → updated (${stale.length} hook${stale.length > 1 ? "s" : ""} from an older version)`);
   }
   prune(obj);
   return res;
