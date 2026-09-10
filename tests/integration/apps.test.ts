@@ -203,6 +203,78 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     expect(bodyHtml).not.toContain(secretTok); // el título del privado ajeno NO se filtra
   });
 
+
+  it("server: GET /client-config es público y trae lo que el CLI necesita para arrancar", async () => {
+    const srv = createServerApp();
+    const res = await srv.request("/client-config"); // sin Bearer a propósito
+    expect(res.status).toBe(200);
+    const cfg = (await res.json()) as Record<string, string>;
+    // El CLI se apoya en estas cinco: sin `mcpUrl` tendría que adivinar el puerto del MCP.
+    for (const k of ["apiUrl", "mcpUrl", "webUrl", "version", "minClientVersion"]) {
+      expect(typeof cfg[k]).toBe("string");
+      expect(cfg[k]).not.toBe("");
+    }
+  });
+
+  it("server: GET /projects/:slug — 401, 404 y 403 con la lista de admins", async () => {
+    const srv = createServerApp();
+    const auth = { authorization: `Bearer ${token}` };
+
+    expect((await srv.request(`/projects/${prvOwn.slug}`)).status).toBe(401);
+    expect((await srv.request(`/projects/no-existe-${RID}`, { headers: auth })).status).toBe(404);
+
+    // Privado ajeno: 403 y, con él, a quién pedir acceso (es lo que enseña `cortex link`).
+    const forbidden = await srv.request(`/projects/${prvForeign.slug}`, { headers: auth });
+    expect(forbidden.status).toBe(403);
+    expect((await forbidden.json()) as { admins?: string[] }).toHaveProperty("admins");
+
+    const ok = await srv.request(`/projects/${prvOwn.slug}`, { headers: auth });
+    expect(ok.status).toBe(200);
+    const { project } = (await ok.json()) as { project: { slug: string; visibility: string } };
+    expect(project.slug).toBe(prvOwn.slug);
+    expect(project.visibility).toBe("private");
+  });
+
+  it("server: POST /projects crea, y repetirlo NO duplica (el slug es la identidad)", async () => {
+    const srv = createServerApp();
+    const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+    const name = `IT Proyecto API ${RID}`;
+
+    const created = await srv.request("/projects", { method: "POST", headers, body: JSON.stringify({ name }) });
+    expect(created.status).toBe(201);
+    const first = (await created.json()) as { project: { slug: string }; created: boolean };
+    expect(first.created).toBe(true);
+
+    // Segunda vez: te vincula al existente en vez de inventar un slug-2, que partiría en
+    // dos la memoria del mismo proyecto.
+    const again = await srv.request("/projects", { method: "POST", headers, body: JSON.stringify({ name }) });
+    expect(again.status).toBe(200);
+    const second = (await again.json()) as { project: { slug: string }; created: boolean };
+    expect(second.created).toBe(false);
+    expect(second.project.slug).toBe(first.project.slug);
+  });
+
+  it("server: POST /projects — un padre inexistente es 400, no 500", async () => {
+    const srv = createServerApp();
+    const res = await srv.request("/projects", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ name: `IT Huérfano ${RID}`, parentSlug: `no-existe-${RID}` }),
+    });
+    expect(res.status).toBe(400); // culpa del cliente, y el motivo va en el cuerpo
+    expect((await res.json()) as { error?: string }).toHaveProperty("error");
+  });
+
+  it("server: POST /projects a un privado ajeno → 403 sin filtrar nada más", async () => {
+    const srv = createServerApp();
+    const res = await srv.request("/projects", {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ name: prvForeign.name }),
+    });
+    expect(res.status).toBe(403);
+  });
+
   it("mcp http: POST /mcp sin Bearer → 401 (auth on por defecto)", async () => {
     const mcp = createMcpHttpApp();
     const res = await mcp.request("/mcp", {
