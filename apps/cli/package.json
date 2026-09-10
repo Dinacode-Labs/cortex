@@ -10,7 +10,9 @@
   "dependencies": {
     "@cortex/client": "workspace:*",
     "@cortex/shared": "workspace:*",
-    "yaml": "^2.9.0"
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "yaml": "^2.9.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node-cron": "^3.0.11"

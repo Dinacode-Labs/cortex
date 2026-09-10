@@ -9,6 +9,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **`cortex mcp`**: servidor MCP por stdio que hace de puente hacia el MCP HTTP del
+  servidor, autenticado con el token de `cortex auth login`. Es lo que se registra en los
+  agentes (`claude mcp add cortex -- cortex mcp`): el proceso local no toca la base de datos
+  y las tools respetan los permisos del usuario. Si no hay sesión o el token ha caducado, el
+  agente **arranca igual** (lista de tools vacía y aviso), en vez de fallar al inicializarse
+  (ADR-0025).
+- `CORTEX_HOME` sustituye a `~` al buscar `~/.cortex/credentials`, para poder usar una
+  sesión aparte en pruebas sin pisar la del usuario.
 - **`cortex-admin`**: los comandos de operador (migrate, seed, ingest, maintain, enrich,
   lint, conectores pesados y los servicios) salen del CLI a su propia app, que vive en la
   imagen de despliegue. El CLI `cortex` se queda con lo de developer y deja de depender de

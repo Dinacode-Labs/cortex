@@ -24,6 +24,7 @@ const COMMANDS: Record<string, Cmd> = {
   auth: { help: "iniciar sesión por email + OTP (login/status/logout)", load: () => import("./commands/auth.js") },
   link: { help: "vincular/crear el proyecto de esta carpeta (escribe .cortex.json)", load: () => import("./commands/link.js") },
   ui: { help: "abrir la UI web ya autenticada (sin OTP)", load: () => import("./commands/ui.js") },
+  mcp: { help: "servidor MCP por stdio para tu agente (proxy al servidor)", managed: false, load: () => import("./commands/mcp.js") },
   sync: { help: "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)", load: () => import("./commands/sync.js") },
   "connect-github": { help: "ingerir PRs/issues de un repo de GitHub (vía gh)", load: () => import("./commands/connect-github.js") },
   "connect-sessions": { help: "backfill de sesiones de un agente a un proyecto", load: () => import("./commands/connect-sessions.js") },

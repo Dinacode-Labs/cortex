@@ -1,0 +1,126 @@
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+
+/**
+ * Proxy MCP: expone por **stdio** las tools que sirve el MCP **HTTP** del servidor.
+ *
+ * Los agentes (Claude Code, Codex, OpenCode…) lanzan servidores MCP como procesos locales
+ * por stdio. El servidor de Cortex, en cambio, sirve el MCP por HTTP con autenticación
+ * Bearer, porque las tools consultan la base de datos y aplican permisos por usuario. Este
+ * proxy es el puente: el agente habla stdio con un proceso local que no sabe nada de
+ * Postgres, y ese proceso reenvía todo al servidor con el token de `cortex auth login`.
+ *
+ * Antes, la alternativa era registrar el MCP stdio del repo clonado, que hablaba con la
+ * base de datos directamente **y sin guards de permisos** (ADR-0025).
+ *
+ * Nada aquí tiene side effects: el comando (`commands/mcp.ts`) es quien conecta el stdio.
+ */
+
+export interface ProxyOptions {
+  /** Abre el transporte hacia el servidor. Se llama de nuevo si hay que reconectar. */
+  connect: () => Promise<Transport>;
+  serverInfo?: { name: string; version: string };
+  /** Los logs van a stderr: stdout es el canal del protocolo. */
+  log?: (msg: string) => void;
+}
+
+/** ¿Es un fallo de autenticación? El SDK no lo tipa, así que se mira por código y texto. */
+export function isAuthError(e: unknown): boolean {
+  const err = e as { code?: unknown; message?: unknown };
+  if (err?.code === 401) return true;
+  const msg = String(err?.message ?? e ?? "");
+  return /\b401\b|unauthorized|no autenticado/i.test(msg);
+}
+
+/** ¿Se cayó la conexión con el servidor? Entonces merece la pena reintentar una vez. */
+function isConnectionError(e: unknown): boolean {
+  const msg = String((e as { message?: unknown })?.message ?? e ?? "");
+  return /connection closed|not connected|socket hang up|ECONNRESET|ECONNREFUSED|fetch failed|session/i.test(msg);
+}
+
+const AUTH_HINT =
+  "Cortex: no has iniciado sesión o el token ha caducado. Ejecuta `cortex auth login` y reinicia tu agente.";
+
+export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () => Promise<void> } {
+  const log = opts.log ?? ((m: string) => console.error(`[cortex mcp] ${m}`));
+  const info = opts.serverInfo ?? { name: "cortex", version: "0.0.0" };
+  const server = new Server(info, { capabilities: { tools: {} } });
+
+  let client: Client | null = null;
+  let connecting: Promise<Client> | null = null;
+
+  /** Cliente hacia el servidor, creado a demanda y reutilizado. */
+  async function upstream(): Promise<Client> {
+    if (client) return client;
+    connecting ??= (async () => {
+      const c = new Client({ name: "cortex-cli-proxy", version: info.version }, { capabilities: {} });
+      c.onclose = () => {
+        // La próxima llamada reconecta sola en vez de fallar para siempre.
+        if (client === c) client = null;
+      };
+      await c.connect(await opts.connect());
+      client = c;
+      connecting = null;
+      return c;
+    })();
+    try {
+      return await connecting;
+    } catch (e) {
+      connecting = null;
+      throw e;
+    }
+  }
+
+  /** Ejecuta contra el servidor y reintenta UNA vez si la conexión se había caído. */
+  async function withRetry<T>(fn: (c: Client) => Promise<T>): Promise<T> {
+    try {
+      return await fn(await upstream());
+    } catch (e) {
+      if (!isConnectionError(e) || isAuthError(e)) throw e;
+      log(`conexión perdida (${(e as Error).message}); reintentando…`);
+      client = null;
+      return fn(await upstream());
+    }
+  }
+
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    try {
+      // El `inputSchema` viaja como JSON Schema y se reenvía tal cual: no hace falta
+      // reconstruirlo con zod ni conocer las tools de antemano.
+      return await withRetry((c) => c.listTools());
+    } catch (e) {
+      // Devolver una lista vacía en vez de fallar: así el agente ARRANCA aunque el
+      // servidor esté caído o el token haya caducado, y el usuario ve el aviso en el log
+      // en lugar de un error de inicialización.
+      log(isAuthError(e) ? AUTH_HINT : `no se pudieron listar las tools: ${(e as Error).message}`);
+      return { tools: [] };
+    }
+  });
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    try {
+      return await withRetry((c) => c.callTool(request.params));
+    } catch (e) {
+      // Un error de tool se responde como resultado con `isError`, no como excepción de
+      // protocolo: el agente lo enseña al usuario y sigue trabajando.
+      const text = isAuthError(e) ? AUTH_HINT : `Cortex: la herramienta falló (${(e as Error).message}).`;
+      log(text);
+      return { content: [{ type: "text", text }], isError: true };
+    }
+  });
+
+  return {
+    server,
+    close: async () => {
+      try {
+        await client?.close();
+      } catch {
+        /* cerrando: da igual el motivo */
+      }
+      client = null;
+      await server.close().catch(() => {});
+    },
+  };
+}

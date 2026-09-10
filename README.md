@@ -127,10 +127,24 @@ LLM + Mastra) se **inyecta** desde los entrypoints. El porqué de cada pieza est
 
 ## Tools MCP (8)
 
-Dos transportes: **stdio** (local, por proceso — `pnpm mcp`) y **HTTP autenticado**
-(Streamable HTTP — `cortex-admin mcp-http`, puerto 8788), que exige el mismo token Bearer que
-la API. Para conectar un agente al MCP por HTTP: `claude mcp add --transport http
-cortex <url>/mcp --header "Authorization: Bearer <token>"`.
+El servidor sirve las tools por **HTTP autenticado** (Streamable HTTP —
+`cortex-admin mcp-http`, puerto 8788), con el mismo token Bearer que la API, y aplica los
+permisos del usuario que llama.
+
+Los agentes, en cambio, lanzan sus MCP como procesos locales por stdio. Ese puente lo hace el
+propio CLI:
+
+```bash
+claude mcp add cortex -- cortex mcp     # o `cortex setup claude-code` cuando llegue
+```
+
+`cortex mcp` no toca la base de datos: reenvía al servidor con el token de `cortex auth login`
+y descubre la URL por `GET /client-config` (`CORTEX_MCP_URL` la fuerza). Si no hay sesión o el
+token ha caducado, el agente arranca igual —sin tools y con un aviso en el log— y las llamadas
+responden con la instrucción de volver a entrar, en vez de tumbar la sesión entera.
+
+Queda también el MCP por stdio del propio repo (`pnpm mcp`), pero habla con Postgres
+directamente y sin permisos: es para desarrollar el servidor, no para usarlo desde un agente.
 
 | Tool | Qué hace |
 | --- | --- |
