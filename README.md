@@ -31,6 +31,7 @@ Apache-2.0. Seguridad: [`SECURITY.md`](./SECURITY.md).
 ## Índice
 
 **Práctico**
+- [Probarlo en tu máquina](#probarlo-en-tu-máquina)
 - [Para developers — instalar y usar](#para-developers--instalar-y-usar)
 - [Capacidades](#capacidades) · [Arquitectura](#arquitectura)
 - [Tools MCP (8)](#tools-mcp-8) · [Cómo llega a tus agentes](#cómo-llega-cortex-a-tus-agentes) · [Conectores](#ingesta-de-fuentes-conectores)
@@ -51,6 +52,59 @@ Apache-2.0. Seguridad: [`SECURITY.md`](./SECURITY.md).
 - [Cómo evaluar Cortex — checklist](#cómo-evaluar-cortex--checklist-para-developers)
 
 ---
+
+## Probarlo en tu máquina
+
+Antes de montar nada para tu equipo, puedes tener un Cortex entero en local. Solo hace falta
+Docker.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Dinacode-Labs/cortex/main/deploy/local.yml -o cortex-local.yml
+docker compose -f cortex-local.yml up -d
+npm install -g @dinacode/cortex
+cortex auth login --server http://localhost:8787
+```
+
+El código de acceso no se envía por correo: se imprime en el log del servidor.
+
+```bash
+docker compose -f cortex-local.yml logs server | grep -oE '[0-9]{6}' | tail -1
+```
+
+Y ya:
+
+```bash
+cortex link --create "Mi Proyecto"   # en el repo que quieras
+cortex setup --all                   # conectar tus agentes
+cortex doctor                        # comprobar que todo está en su sitio
+```
+
+Todo escucha solo en `127.0.0.1`, los datos sobreviven a un reinicio, y `docker compose -f
+cortex-local.yml down -v` lo borra sin dejar rastro.
+
+**Lo que funciona sin ninguna clave:** las 8 tools MCP, guardar, buscar, el context pack, el
+lint y la UI en `localhost:8080`.
+
+**Lo que necesita un modelo:** la captura automática de sesiones. Destilar una conversación
+en piezas de conocimiento es justo lo que hace el LLM, así que sin él los hooks no producen
+nada. Dárselo no requiere tocar el fichero:
+
+```bash
+# Ollama, ya instalado en tu máquina
+LLM_PROVIDER=openai-compatible LLM_ALLOW_NO_KEY=1 LLM_MODEL=llama3.1 \
+  LLM_BASE_URL=http://host.docker.internal:11434/v1 \
+  docker compose -f cortex-local.yml up -d
+
+# o cualquier endpoint OpenAI-compatible
+LLM_PROVIDER=openai-compatible LLM_BASE_URL=https://… LLM_API_KEY=… LLM_MODEL=… \
+  docker compose -f cortex-local.yml up -d
+```
+
+Los embeddings por defecto son locales y **no** son semánticos: valen para arrancar, no para
+juzgar la calidad de la búsqueda. Para eso, apunta `EMBEDDINGS_*` a un endpoint real.
+
+Esto **no** es un despliegue de producción: no lleva TLS, ni copias de seguridad, ni límite
+de altas. Para eso está [`deploy/README.md`](./deploy/README.md).
 
 ## Para developers — instalar y usar
 

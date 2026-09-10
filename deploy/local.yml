@@ -1,0 +1,123 @@
+# Cortex en tu máquina, para probarlo. NO es un despliegue de producción: eso es
+# deploy/docker-compose.yml, que añade TLS, copias de seguridad y healthchecks.
+#
+#   docker compose -f local.yml up -d
+#   cortex auth login --server http://localhost:8787
+#
+# Todo escucha SOLO en 127.0.0.1 y no hay nada expuesto a la red. Por eso aquí se puede
+# dejar el alta abierta y una contraseña fija: nadie más puede llegar. En cuanto publiques
+# esto en una red, usa el otro compose.
+#
+# Los datos sobreviven a un reinicio (volumen `cortex-local-pgdata`), que es lo suyo: una
+# memoria de proyecto solo demuestra su valor cuando lleva semanas acumulando.
+name: cortex-local
+
+x-app: &app
+  image: ${CORTEX_IMAGE:-ghcr.io/dinacode-labs/cortex}:${CORTEX_VERSION:-latest}
+  # Si has clonado el repo y prefieres construirla tú, añade --build.
+  build:
+    context: ..
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  environment: &env
+    NODE_ENV: production
+    CORTEX_BIND_HOST: 0.0.0.0
+    DATABASE_URL: postgres://cortex:cortex-local@postgres:5432/cortex
+
+    # El código de acceso se imprime en el log del servidor en vez de enviarse por correo:
+    #   docker compose -f local.yml logs server | grep -oE '[0-9]{6}' | tail -1
+    CORTEX_EMAIL_PROVIDER: log
+    # Vacío = cualquier email puede darse de alta. Aceptable SOLO porque esto no sale de
+    # tu máquina.
+    CORTEX_AUTH_DOMAIN: ""
+
+    CORTEX_PUBLIC_URL: http://localhost:8787
+    CORTEX_SERVER_URL: http://localhost:8787
+    CORTEX_WEB_URL: http://localhost:8080
+    CORTEX_MCP_PUBLIC_URL: http://localhost:8788/mcp
+
+    # Embeddings sin claves. NO son semánticos: sirven para arrancar y para los tests, no
+    # para juzgar la calidad de la búsqueda. Para eso, apunta EMBEDDINGS_* a un endpoint real.
+    EMBEDDINGS_PROVIDER: ${EMBEDDINGS_PROVIDER:-local}
+    EMBEDDINGS_BASE_URL: ${EMBEDDINGS_BASE_URL:-}
+    EMBEDDINGS_API_KEY: ${EMBEDDINGS_API_KEY:-}
+    EMBEDDINGS_MODEL: ${EMBEDDINGS_MODEL:-}
+    EMBEDDINGS_DIM: ${EMBEDDINGS_DIM:-}
+
+    # Sin modelo, las 8 tools funcionan y puedes guardar y buscar a mano, pero la captura
+    # automática de sesiones no produce nada: destilar una conversación es lo que hace el
+    # modelo. Dos formas de dárselo, las dos sin tocar este fichero:
+    #
+    #   Ollama en tu máquina:
+    #     LLM_PROVIDER=openai-compatible LLM_ALLOW_NO_KEY=1 \
+    #     LLM_BASE_URL=http://host.docker.internal:11434/v1 LLM_MODEL=llama3.1 \
+    #     docker compose -f local.yml up -d
+    #
+    #   Cualquier endpoint OpenAI-compatible:
+    #     LLM_PROVIDER=openai-compatible LLM_BASE_URL=https://… LLM_API_KEY=… LLM_MODEL=… \
+    #     docker compose -f local.yml up -d
+    LLM_PROVIDER: ${LLM_PROVIDER:-none}
+    LLM_BASE_URL: ${LLM_BASE_URL:-}
+    LLM_API_KEY: ${LLM_API_KEY:-}
+    LLM_MODEL: ${LLM_MODEL:-}
+    LLM_ALLOW_NO_KEY: ${LLM_ALLOW_NO_KEY:-}
+  networks: [internal]
+  depends_on:
+    postgres: { condition: service_healthy }
+    migrate: { condition: service_completed_successfully }
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: cortex
+      POSTGRES_PASSWORD: cortex-local
+      POSTGRES_DB: cortex
+    volumes:
+      - cortex-local-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cortex -d cortex"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+    networks: [internal]
+
+  migrate:
+    <<: *app
+    command: node packages/database/dist/migrate-cli.js
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  server:
+    <<: *app
+    command: node apps/server/dist/index.js
+    environment:
+      <<: *env
+      HEALTH_PORT: "8787"
+    ports: ["127.0.0.1:8787:8787"]
+
+  web:
+    <<: *app
+    command: node apps/web/dist/index.js
+    environment:
+      <<: *env
+      HEALTH_PORT: "8080"
+    ports: ["127.0.0.1:8080:8080"]
+
+  mcp:
+    <<: *app
+    command: node apps/mcp-server/dist/http.js
+    environment:
+      <<: *env
+      HEALTH_PORT: "8788"
+    ports: ["127.0.0.1:8788:8788"]
+
+# Sin `worker`: el mantenimiento corre de madrugada y no aporta nada a una prueba. Sin
+# `backup`: para eso está el compose de producción.
+networks:
+  internal:
+
+volumes:
+  cortex-local-pgdata:

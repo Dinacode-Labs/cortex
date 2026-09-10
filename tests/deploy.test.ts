@@ -18,6 +18,7 @@ interface Compose {
   volumes: Record<string, unknown>;
 }
 const compose = yamlParse(read("deploy/docker-compose.yml")) as Compose;
+const local = yamlParse(read("deploy/local.yml")) as Compose;
 
 describe("docker-compose de despliegue", () => {
   it("solo Caddy publica puertos: nada más se asoma a internet", () => {
@@ -137,5 +138,42 @@ describe("deploy/.env.example", () => {
     for (const k of ["CORTEX_DOMAIN", "CORTEX_ACME_EMAIL", "POSTGRES_PASSWORD", "CORTEX_AUTH_DOMAIN", "EMBEDDINGS_DIM"]) {
       expect(env, k).toContain(k);
     }
+  });
+});
+
+/**
+ * El compose local es lo primero que ejecuta alguien que se acerca a Cortex, y corre en la
+ * máquina de esa persona. Lo que hay que garantizar es que no le abre nada a la red y que no
+ * le pide credenciales para empezar: si al primer comando le falta una variable, se va.
+ */
+describe("compose local (probarlo en tu máquina)", () => {
+  it("no publica nada fuera de 127.0.0.1", () => {
+    const publicados = Object.values(local.services).flatMap((s) => s.ports ?? []);
+    expect(publicados.length).toBeGreaterThan(0);
+    for (const p of publicados) expect(p).toMatch(/^127\.0\.0\.1:/);
+  });
+
+  it("Postgres no se publica ni siquiera en local", () => {
+    // El puerto 5432 del host suele estar ocupado por otra cosa, y no hace falta para nada.
+    expect(local.services.postgres!.ports).toBeUndefined();
+  });
+
+  it("arranca sin pedir una sola variable de entorno", () => {
+    // `${VAR:?mensaje}` aborta el compose si falta. Aquí no puede haber ninguno.
+    expect(read("deploy/local.yml")).not.toMatch(/\$\{[A-Z_]+:\?/);
+  });
+
+  it("no trae ni TLS ni copias: eso es el compose de producción", () => {
+    expect(Object.keys(local.services).sort()).toEqual(["mcp", "migrate", "postgres", "server", "web"]);
+  });
+
+  it("los datos sobreviven a un reinicio, que es de lo que va una memoria", () => {
+    expect(Object.keys(local.volumes)).toContain("cortex-local-pgdata");
+  });
+
+  it("no comparte volumen ni proyecto con el despliegue de producción", () => {
+    // Un `down -v` en la prueba local no puede llevarse los datos de nadie.
+    expect(read("deploy/local.yml")).toContain("name: cortex-local");
+    expect(Object.keys(local.volumes)).not.toContain("cortex-pgdata");
   });
 });

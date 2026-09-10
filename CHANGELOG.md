@@ -8,6 +8,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **Modo local, para probar Cortex sin desplegar nada** (`deploy/local.yml`): un compose que
+  levanta Postgres, la API, la UI y el MCP en `127.0.0.1` con un solo comando, sin dominio,
+  sin TLS, sin claves y sin pedir una sola variable de entorno. Los datos sobreviven a un
+  reinicio, porque una memoria de proyecto solo demuestra su valor cuando lleva semanas
+  acumulando. Antes, la única forma de verlo funcionando era montar el despliegue de
+  producción entero.
+
 ### Changed
 - Documentación consolidada para la v0.1.0: el roadmap deja de listar como pendiente lo que
   ya está hecho y se queda con lo que falta de verdad; el README, `CLAUDE.md` y
