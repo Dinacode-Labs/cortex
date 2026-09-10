@@ -1,18 +1,6 @@
 {
-  "$comment": "Registry MÍNIMO del producto: solo lo que Cortex reparte de sí mismo. El toolbelt de tu organización (MCPs y skills internas) vive en un registry propio y se instala con `cortex toolbelt sync <registry.json|url>` — ver docs/toolbelt-registry.md. {REPO} lo resuelve el instalador.",
-  "mcpServers": {
-    "cortex": {
-      "transport": "stdio",
-      "command": "pnpm",
-      "args": ["-C", "{REPO}", "--filter", "@cortex/mcp-server", "start"],
-      "auth": "ninguna (usa el .env del repo: BD + LLM/embeddings)",
-      "agents": ["claude", "codex", "opencode", "hermes"]
-    }
-  },
-  "skills": [
-    { "name": "cortex-capture", "auth": "ninguna (usa el MCP cortex)" }
-  ],
-  "commands": [
-    { "name": "cortex-save", "file": "cortex-save.md" }
-  ]
+  "$comment": "Registry del toolbelt de TERCEROS. Cortex ya no se reparte a sí mismo por aquí: su MCP, su skill y su comando van en el plugin (plugin/claude-code/) y los instala `cortex setup`. Lo que queda es el esquema para el registry de tu organización — ver docs/toolbelt-registry.md. {REPO} lo resuelve el instalador.",
+  "mcpServers": {},
+  "skills": [],
+  "commands": []
 }
