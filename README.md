@@ -2,13 +2,18 @@
 
 [![CI](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml)
 
-**Memoria de contexto para proyectos software.** Captura el
-conocimiento disperso de los proyectos (decisiones, restricciones, incidencias,
-convenciones, PRs, conversaciones, docs, código…), lo estructura en una capa **híbrida
-— documental + vectorial + grafo + bi-temporal —** y lo expone a personas y agentes de
-IA (Claude Code, Codex, OpenCode, Hermes) por un **MCP corporativo** y unos **hooks** que
-automatizan el bucle: tu agente arranca **sabiendo** el proyecto y, al terminar, Cortex
-**captura** lo aprendido (atribuido a tu email).
+**Memoria de contexto para proyectos software.** Captura el conocimiento disperso de los
+proyectos (decisiones, restricciones, incidencias, convenciones, PRs, conversaciones, docs,
+código…), lo estructura en una capa **híbrida — documental + vectorial + grafo +
+bi-temporal —** y lo expone a personas y a agentes de IA (Claude Code, Codex, OpenCode,
+Hermes, Pi) por un **MCP autenticado** y unos **hooks** que cierran el bucle: tu agente
+arranca **sabiendo** el proyecto y, al terminar, Cortex **captura** lo aprendido, firmado con
+tu email.
+
+Se despliega como servidor y se usa con un CLI que se instala de npm. Ningún portátil
+necesita base de datos ni claves de modelo: la destilación corre en el servidor.
+
+Apache-2.0. Seguridad: [`SECURITY.md`](./SECURITY.md).
 
 - Decisiones (ADR): [`docs/decisions.md`](./docs/decisions.md) · Roadmap: [`docs/roadmap.md`](./docs/roadmap.md)
 - Contribuir (PRs): [`CONTRIBUTING.md`](./CONTRIBUTING.md)
@@ -109,11 +114,12 @@ preguntarle a la memoria del proyecto en cualquier momento.
   En la UI (`cortex ui` → **Proyectos**) ves los proyectos a los que tienes acceso; el
   **admin** los ve todos y **añade/quita** miembros de los privados.
 - Solo necesitas que el **servidor de Cortex esté en marcha** (lo opera tu equipo de infra).
+- **Si algo no va**, `cortex doctor` dice qué pieza falla y con qué comando se arregla.
 
 ## Capacidades
 
 - **Bucle automático (hooks)** — inyección de contexto al abrir sesión + auto-captura al
-  cerrarla, en los 4 agentes. La captura **reconcilia** (estilo mem0: ADD/UPDATE/SUPERSEDE/
+  cerrarla, en los 5 agentes; se instala con `cortex setup`. La captura **reconcilia** (estilo mem0: ADD/UPDATE/SUPERSEDE/
   NOOP) y se atribuye al usuario; `maintain` auto-cura (promueve lo corroborado, decae lo muerto).
 - **Búsqueda híbrida** — vectorial (pgvector) + léxica (FTS) con Reciprocal Rank Fusion + rerank LLM opcional.
 - **Grafo de conocimiento** — entidades y relaciones (LLM) con resolución de variantes y visualización.
@@ -124,12 +130,15 @@ preguntarle a la memoria del proyecto en cualquier momento.
 - **Identidad y gobierno** — login email+OTP (sin passwords), admin(s) por env, proyectos
   públicos/privados, jerarquía cliente→subproyectos, atribución `created_by`=email.
 - **Lint** del conocimiento + **indexación de código** + **observabilidad de IA** (coste/tokens + AI tracing).
-- **MCP corporativo** (8 tools) consumible por Claude Code / Codex / OpenCode / Hermes.
+- **MCP autenticado** (8 tools) con los permisos de quien llama, consumible por cualquier
+  agente con soporte MCP; `cortex mcp` hace de puente stdio.
+- **Listo para producción** — imagen compilada, TLS, healthchecks reales y copias de
+  seguridad con restauración probada ([`deploy/README.md`](./deploy/README.md)).
 
 ## Arquitectura
 
 ```
-Claude Code / Codex / OpenCode / Hermes
+Claude Code / Codex / OpenCode / Hermes / Pi
    │ (MCP, 8 tools)   │ (hooks: inyecta contexto / auto-captura)   │ (cortex CLI)
    ▼                  ▼                                            ▼
  apps/mcp-server    apps/server (API HTTP + auth OTP)        apps/web (UI, cookie auth)
@@ -315,17 +324,20 @@ credenciales— están en [`deploy/README.md`](./deploy/README.md).
 ## Estructura del repo
 
 ```
-apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth) · cli (cortex) · admin
-packages/    core · agents · embeddings · database · client · shared
+apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth)
+             cli (@dinacode/cortex, npm) · admin (operador, vive en la imagen)
+packages/    shared · client (lado cliente) · database · embeddings · core · agents
 plugin/      claude-code/ (hooks + MCP + skill cortex-capture + /cortex-save)
+deploy/      docker-compose.yml · Caddyfile · restore.sh · README.md
 config/      toolbelt.json (esquema del registry de terceros)
-scripts/     install.sh (instalador remoto; lo sirve apps/server)
-docs/        decisions.md · roadmap.md · research/ · audit/ (jun 2026) · refactor/ (jul 2026)
+scripts/     install.sh · set-version.mjs · changelog-notes.mjs
+docs/        decisions.md (ADR) · roadmap.md · research/ · toolbelt-registry.md
 ```
 
 Las **reglas de dependencia** entre paquetes (qué puede importar qué) están en
-[`CLAUDE.md`](./CLAUDE.md); hay un **refactor por fases en curso** — antes de tocar un
-área, revisa primero las decisiones en [`docs/decisions.md`](./docs/decisions.md).
+[`CLAUDE.md`](./CLAUDE.md), y hay tests que las protegen. Antes de tocar un área, mira las
+decisiones en [`docs/decisions.md`](./docs/decisions.md): casi todo lo que parece raro está
+explicado ahí.
 
 Cómo contribuir, dónde vive cada cosa y convenciones: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
@@ -398,7 +410,7 @@ type:             constraint
 ─── trazabilidad (§5.5) ───────────────────────────────────────────────
 source_type:      meeting_transcript          ← de dónde salió
 source_reference: "Reunión kickoff 2026-01"   ← referencia al original
-created_by:       "ana@dinacode.com"           ← QUIÉN lo metió (atribución)
+created_by:       "ana@example.com"          ← QUIÉN lo metió (atribución)
 created_at:       2026-01-10                    ← CUÁNDO lo supimos
 confidence:       verified                      ← cuánto nos fiamos
 status:           validated                     ← estado en su ciclo de vida

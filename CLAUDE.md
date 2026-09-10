@@ -1,13 +1,16 @@
-# CLAUDE.md — Dinacode Cortex
+# CLAUDE.md — Cortex
 
 Guía para agentes de IA (Claude Code y similares) que trabajen en este repo.
 
 ## Qué es esto
 
-Dinacode Cortex es una **plataforma de memoria corporativa de contexto** para
-proyectos software de una consultora. Captura conocimiento (decisiones, restricciones,
-incidencias, convenciones…), lo estructura y lo expone a personas y agentes de IA vía
-un MCP corporativo. Origen: plan interno de junio de 2026 (en el repo privado `ai-toolbelt`).
+Cortex es una **memoria de contexto para proyectos software**. Captura conocimiento
+(decisiones, restricciones, incidencias, convenciones…), lo estructura y lo expone a personas
+y agentes de IA por un MCP autenticado y unos hooks que cierran el bucle: el agente arranca
+sabiendo el proyecto y, al terminar, lo aprendido vuelve a la memoria.
+
+Se despliega como servidor (Docker) y se usa con un CLI que se instala de npm. Ningún
+portátil necesita base de datos ni claves de modelo.
 
 > Todo el planteamiento es **hipótesis a validar**. Antes de dar algo por definitivo,
 > cuestiónalo y deja constancia en `docs/decisions.md`.
@@ -96,9 +99,8 @@ apps/*      → cualquier package
 - Los packages **jamás** importan de `apps/*` ni ficheros de otro paquete por ruta.
 - Side effects (`loadEnv`, wiring de hooks, `serve`, `process.exit`) **solo** en
   entrypoints, nunca al importar un módulo de librería.
-- Tras las fases A y B del refactor estas reglas **se cumplen** (la capa multimodal
-  con LLM se inyecta con `setMediaExtractor`, como classifier/reranker/reconciler).
-  No añadas violaciones nuevas.
+- Estas reglas **se cumplen** hoy: la capa multimodal con LLM se inyecta con
+  `setMediaExtractor`, igual que classifier, reranker y reconciler. No añadas excepciones.
 - **`apps/cli` solo puede depender de `client` y `shared`.** Si un comando necesita la base
   de datos, el modelo o levantar un servicio, va en `apps/admin`. Hay un test que lo
   comprueba (`tests/client-package.test.ts`).
@@ -107,14 +109,11 @@ apps/*      → cualquier package
   dependencias al portátil de cada dev (ADR-0025). Hay un test que lo comprueba
   (`tests/client-package.test.ts`), porque es una regla fácil de romper sin darse cuenta.
 
-## Refactor de arquitectura (julio 2026) — COMPLETADO
+## Disciplina
 
-El refactor por fases (A–D) está **completado** (PRs #2–#20). El informe, el plan y los
-~70 hallazgos quedan registrados en el repo privado; las decisiones (incluidas las
-aplazadas por proporcionalidad) están en `docs/decisions.md` (ADR-0017–0022). Estado
-actual del código: reglas de dependencia cumplidas, entrypoints en `apps/cli`, apps
-testeables, guards unificados, sin código muerto conocido. Disciplina para nuevos cambios:
-un PR por cambio, `typecheck` + tests en verde, sin arreglos «ya que estoy» fuera de alcance.
+Un PR por cambio, `typecheck` y tests en verde, docs actualizadas en el mismo PR, y sin
+arreglos «ya que estoy» fuera de alcance. Si te encuentras algo roto que no toca, anótalo en
+el PR y sigue.
 
 ## Comandos
 

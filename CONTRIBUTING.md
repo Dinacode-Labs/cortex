@@ -150,3 +150,13 @@ hiciste: las notas de la versión salen de ahí, no de los commits.
 Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatibles. Ya hay
 dos cosas apuntadas para retirarse en la `0.2.0`: el alias `LLM_PROVIDER=nan` y la variable
 `BREVO_SENDER`.
+
+## Abrir el código
+
+Cuando llegue el momento, el repositorio **no se abre publicando este historial**. Se abre
+desde una **instantánea limpia**: un repositorio nuevo con un commit inicial del árbol actual
+(ADR-0026). Reescribir la historia con `git filter-repo` rompe clones y referencias a PRs, y
+no aporta nada mientras el repositorio sea privado.
+
+Lo que hay que tener hecho antes: el README y la UI web en inglés, y una revisión de que no
+queda nada corporativo (el ADR-0031 dice qué se publica y qué no).

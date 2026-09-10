@@ -8,6 +8,12 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Changed
+- Documentación consolidada para la v0.1.0: el roadmap deja de listar como pendiente lo que
+  ya está hecho y se queda con lo que falta de verdad; el README, `CLAUDE.md` y
+  `CONTRIBUTING.md` describen el producto que hay hoy, no el que se clonaba. Hay tests que
+  vigilan los enlaces internos, los ADR citados y que no se cuele material corporativo.
+
 ## [0.1.0] — 2026-09-10
 
 Primera versión publicable. Cortex deja de ser un repo que se clona para convertirse en un

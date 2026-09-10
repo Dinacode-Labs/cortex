@@ -403,7 +403,7 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 ## Refactor de arquitectura por fases (revisión 2026-07)
 
 - **Decisión:** tras la revisión de arquitectura de julio 2026 (informe y ~70 hallazgos
-  en [`refactor/`](./refactor/README.md)), se ejecuta un refactor **incremental por
+  en su momento, se ejecuta un refactor **incremental por
   fases** (A: parches de riesgo y unificaciones; B: entrypoints fuera de `packages/*` y
   `core` sin LLM; C: apps testeables y split de la web; D: splits internos, config y
   poda). **No** se rediseña: el grafo de paquetes es sano y la inversión de dependencia
