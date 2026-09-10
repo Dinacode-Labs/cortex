@@ -50,7 +50,7 @@ export function createApp(deps: AppDeps = {}): Hono {
   // sin filtrar detalles internos al cliente.
   app.onError((err, c) => {
     console.error("[cortex-server] error no controlado:", err);
-    return c.json({ error: "Error interno." }, 500);
+    return c.json({ error: "Internal error." }, 500);
   });
 
   return app;

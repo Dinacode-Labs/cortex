@@ -92,7 +92,7 @@ describe("cortex setup claude-code (modo settings)", () => {
     expect(hooks.SessionStart.flatMap((g: any) => g.hooks)).toHaveLength(1);
     expect(hooks.SessionStart[0].hooks[0].command).toBe("cortex hook-context");
     expect(hooks.SessionEnd[0].hooks[0].command).toBe("cortex hook-capture");
-    expect(report.changed.join(" ")).toContain("versión anterior");
+    expect(report.changed.join(" ")).toContain("older version");
   });
 
   it("--dry-run no escribe nada ni ejecuta nada", async () => {
@@ -114,7 +114,7 @@ describe("cortex setup claude-code (modo settings)", () => {
     const report = await claudeCodeAdapter.apply(ctx);
     expect(calls).toContainEqual(["claude", "mcp", "remove", "cortex", "-s", "user"]);
     expect(calls).toContainEqual(["claude", "mcp", "add", "cortex", "-s", "user", "--", "cortex", "mcp"]);
-    expect(report.changed.join(" ")).toContain("repo clonado");
+    expect(report.changed.join(" ")).toContain("cloned repo");
   });
 
   it("si el MCP ya está bien registrado, no lo vuelve a tocar", async () => {
@@ -128,7 +128,7 @@ describe("cortex setup claude-code (modo settings)", () => {
     });
     const report = await claudeCodeAdapter.apply(ctx);
     expect(calls.some((c) => c[2] === "add")).toBe(false);
-    expect(report.skipped.join(" ")).toContain("ya registrado");
+    expect(report.skipped.join(" ")).toContain("already registered");
   });
 
   it("un settings.json roto se deja en paz y se avisa", async () => {
@@ -191,7 +191,7 @@ describe("limpieza de la instalación anterior", () => {
     const results = await runSetup(["claude-code"], ctxWith({ noPlugin: true }));
     const sistema = results.find((r) => r.id === "sistema")!;
     expect(existsSync(shim)).toBe(false);
-    expect(sistema.report.changed.join(" ")).toContain("shim antiguo");
+    expect(sistema.report.changed.join(" ")).toContain("old shim removed");
     // El clon puede tener un .env con claves: se avisa, no se borra.
     expect(existsSync(join(home, ".dinacode-cortex"))).toBe(true);
     expect(sistema.report.warnings.join(" ")).toContain(".dinacode-cortex");
@@ -223,6 +223,6 @@ describe("status", () => {
     await claudeCodeAdapter.apply(ctxWith({ noPlugin: true })); // deja hooks en settings
     const st = await claudeCodeAdapter.status(ctxWith());
     expect(st.installed).toBe(true);
-    expect(st.details.join(" ")).toContain("dos veces");
+    expect(st.details.join(" ")).toContain("captured twice");
   });
 });

@@ -36,12 +36,12 @@ export function cleanLegacy(ctx: SetupCtx, report: SetupReport): void {
   if (detectLegacyShim(ctx)) {
     const file = legacyShimPath(ctx);
     if (!ctx.dryRun) rmSync(file, { force: true });
-    report.changed.push(`shim antiguo eliminado (${tilde(ctx, file)}): lo sustituye el \`cortex\` de npm`);
+    report.changed.push(`old shim removed (${tilde(ctx, file)}): the npm \`cortex\` replaces it`);
   }
   const clone = join(ctx.home, LEGACY_CLONE);
   if (existsSync(clone)) {
     report.warnings.push(
-      `queda el clon antiguo en ${tilde(ctx, clone)} — ya no hace falta, pero bórralo tú: puede tener un .env con claves o ramas sin subir.`,
+      `the old clone is still at ${tilde(ctx, clone)}. It is no longer needed, but delete it yourself: it may hold a .env with keys, or unpushed branches.`,
     );
   }
 }

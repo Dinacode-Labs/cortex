@@ -76,7 +76,7 @@ export async function runSetup(agents: AgentId[], ctx: SetupCtx): Promise<RunRes
     const adapter = ADAPTERS[id];
     if (!adapter) {
       const report = emptyReport();
-      report.warnings.push("todavía no hay integración automática para este agente en esta versión");
+      report.warnings.push("no automatic integration for this agent in this version yet");
       out.push({ id, report });
       continue;
     }

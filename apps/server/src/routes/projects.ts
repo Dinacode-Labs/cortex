@@ -28,7 +28,7 @@ const toSummary = (p: ProjectRef): ProjectSummary => ({
 /** Proyectos visibles para el usuario (admin → todos). */
 projectRoutes.get("/projects", async (c) => {
   const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
   const projects = await listAccessibleProjects(user.email);
   return c.json({ projects: projects.map(toSummary) });
 });
@@ -40,11 +40,11 @@ projectRoutes.get("/projects", async (c) => {
  */
 projectRoutes.get("/projects/:slug", async (c) => {
   const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
   const project = await findProjectBySlug(c.req.param("slug"));
-  if (!project) return c.json({ error: "Proyecto no encontrado." }, 404);
+  if (!project) return c.json({ error: "Project not found." }, 404);
   if (!(await canAccessProject(project, user.email))) {
-    return c.json({ error: "Proyecto privado: pide acceso a un administrador.", admins: listAdmins() }, 403);
+    return c.json({ error: "This project is private. Ask an administrator for access.", admins: listAdmins() }, 403);
   }
   return c.json({ project: toSummary(project) });
 });
@@ -58,7 +58,7 @@ projectRoutes.get("/projects/:slug", async (c) => {
  */
 projectRoutes.post("/projects", async (c) => {
   const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
   const body = await parseBody(c, createProjectRequest);
   if (body instanceof Response) return body;
 

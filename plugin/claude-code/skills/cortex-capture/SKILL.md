@@ -1,64 +1,67 @@
 ---
 name: cortex-capture
 description: >-
-  Captura el contexto de la tarea actual en Dinacode Cortex (la memoria de
-  proyecto). Úsala al TERMINAR una tarea de desarrollo, o cuando el usuario diga
-  "guarda/captura en Cortex", "guarda esto en la memoria", "registra la decisión",
-  o tras un cambio relevante (decisión técnica, incidencia resuelta, workaround,
-  restricción del cliente). Cierra el bucle: trabajas → Cortex aprende.
+  Save what this task taught the project into Cortex, the project memory. Use it when you
+  FINISH a piece of development work, when the user says "save this to Cortex", "remember
+  this", "record that decision", or right after something worth remembering happened: a
+  technical decision, a resolved incident, a workaround, a constraint from the client. It
+  closes the loop: you work, the project remembers.
 ---
 
-# Capturar contexto en Cortex
+# Save context to Cortex
 
-Cuando termines una tarea o el usuario lo pida, **resume el trabajo y guárdalo** en
-la memoria del proyecto llamando a la tool MCP `mcp__cortex__save_project_context`.
+When you finish a task, or the user asks, **summarise what happened and save it** to the
+project memory with the `mcp__cortex__save_project_context` tool.
 
-## Cuándo
+## When to save
 
-- Al cerrar una tarea de desarrollo (cambios de cierto calado).
-- Cuando se tome una **decisión técnica**, aparezca una **restricción de cliente**,
-  se resuelva una **incidencia** o se aplique un **workaround**.
-- Cuando el usuario lo pida explícitamente.
+- You closed a piece of development work that changed something that matters.
+- A **technical decision** was made, a **client constraint** surfaced, an **incident** was
+  resolved, or a **workaround** went in.
+- The user asks you to.
 
-No captures ruido (cambios triviales, "ok", pruebas locales sin conclusión).
+Do not save noise: trivial edits, "ok", local experiments that concluded nothing. A memory
+full of noise is worse than an empty one, because people stop reading it.
 
-## Cómo
+## How to save
 
-1. **Identifica el proyecto.** Usa el nombre del proyecto/cliente en Cortex (p.ej.
-   "Acme Portal"). Si no está claro, pregúntalo en una frase.
-2. **Redacta un resumen estructurado** (conciso, en español), con solo las secciones
-   que apliquen:
+1. **Work out which project this is.** Use the project name as it exists in Cortex, for
+   example "Acme Portal". If it is genuinely unclear, ask in one sentence.
+
+2. **Write a structured summary.** Keep only the sections that apply, and write it in the
+   language the project uses:
 
    ```
-   Resumen: <qué se hizo / qué se decidió, en 1-3 frases>
-   Decisiones: <decisiones tomadas y por qué; alternativas descartadas>
-   Archivos: <rutas relevantes tocadas>
-   Riesgos / cuidado: <qué es sensible o puede romper>
-   Pendientes: <lo que queda>
-   Fuentes: <ticket/PR si aplica>
+   Summary:    what was done or decided, in one to three sentences
+   Decisions:  what was decided and why; what was rejected and why
+   Files:      the paths that matter
+   Risks:      what is fragile here, what could break
+   Open:       what is still pending
+   Sources:    ticket or pull request, if there is one
    ```
 
-3. **Llama a la tool**:
+3. **Call the tool:**
 
    ```
    mcp__cortex__save_project_context({
-     project: "<proyecto>",
-     content: "<el resumen estructurado>",
+     project: "<project>",
+     content: "<the structured summary>",
      type: "decision" | "incident" | "pr_summary" | "technical_debt" | "convention" | ...,
      sourceType: "claude_code",
-     sourceReference: "<id de tarea/PR si lo hay>",
+     sourceReference: "<task or PR id, if any>",
      createdBy: "claude-code"
    })
    ```
 
-   Omite `type` si no lo tienes claro: Cortex lo clasifica solo.
+   Leave `type` out if you are not sure. Cortex classifies it on its own, and a wrong label
+   is worse than no label.
 
-4. **Revisa la respuesta**: si Cortex avisa de un **duplicado** o una
-   **contradicción** con conocimiento existente, coméntaselo al usuario (no insistas
-   en duplicar; propón consolidar o validar).
+4. **Read the answer.** If Cortex flags a **duplicate** or a **contradiction** with what it
+   already knows, tell the user instead of insisting. Two entries that disagree are how a
+   project memory stops being trusted; suggest consolidating or validating one of them.
 
-## Antes de tocar algo
+## The other half
 
-Recuerda lo simétrico: **antes** de empezar una tarea sobre un módulo, consulta
-`mcp__cortex__get_project_context_pack` o `mcp__cortex__ask_project_context` para
-traer decisiones vigentes, restricciones y riesgos del proyecto.
+Before you start working on a module, ask first: `mcp__cortex__get_project_context_pack` or
+`mcp__cortex__ask_project_context` bring the current decisions, constraints and risks. Saving
+without reading is half a loop.

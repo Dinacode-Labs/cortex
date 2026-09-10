@@ -65,12 +65,12 @@ export const CortexPlugin = async ({ $, directory }) => {
 `;
 
 const COMMAND_MD = `---
-description: Guardar conocimiento del proyecto en Cortex
+description: Save project knowledge to Cortex
 ---
 
-${GENERATED_MARKER}. Usa la tool \`cortex_save_project_context\` (MCP \`cortex\`) para guardar lo
-que se acaba de decidir o descubrir en el proyecto vinculado a esta carpeta. Resume en una o
-dos frases, di de dónde sale y no inventes lo que no se haya dicho.
+${GENERATED_MARKER}. Use the \`save_project_context\` tool (MCP \`cortex\`) to save what was just
+decided or discovered in the project linked to this folder. Summarise it in a sentence or two,
+say where it came from, and do not invent anything that was not said.
 `;
 
 interface McpEntry {
@@ -96,34 +96,34 @@ export const openCodeAdapter: AgentAdapter = {
     const file = CONFIG(ctx);
     const cfg = readJson<OpenCodeConfig>(file);
     if (cfg === null) {
-      report.warnings.push(`${tilde(ctx, file)} no es JSON válido — no lo toco. Añade el MCP \`cortex\` a mano.`);
+      report.warnings.push(`${tilde(ctx, file)} is not valid JSON, so it was left alone. Add the \`cortex\` MCP by hand.`);
     } else {
       const conf: OpenCodeConfig = cfg ?? {};
       conf.$schema ??= "https://opencode.ai/config.json";
       conf.mcp ??= {};
       const actual = conf.mcp.cortex;
       if (JSON.stringify(actual) === JSON.stringify(cortexMcp())) {
-        report.skipped.push("MCP `cortex` ya declarado");
+        report.skipped.push("MCP `cortex` already declared");
       } else {
-        if (actual?.command?.includes("pnpm")) report.changed.push("MCP `cortex` apuntaba al repo clonado — re-declarado contra el servidor");
-        else report.changed.push("MCP `cortex` declarado en opencode.json");
+        if (actual?.command?.includes("pnpm")) report.changed.push("MCP `cortex` pointed at the cloned repo — re-declared against the server");
+        else report.changed.push("MCP `cortex` declared in opencode.json");
         conf.mcp.cortex = cortexMcp();
         writeJson(ctx, file, conf);
       }
     }
 
-    if (writeIfChanged(ctx, PLUGIN_FILE(ctx), PLUGIN_JS)) report.changed.push(`plugin escrito en ${tilde(ctx, PLUGIN_FILE(ctx))}`);
-    else report.skipped.push("plugin ya al día");
+    if (writeIfChanged(ctx, PLUGIN_FILE(ctx), PLUGIN_JS)) report.changed.push(`plugin written to ${tilde(ctx, PLUGIN_FILE(ctx))}`);
+    else report.skipped.push("plugin already up to date");
 
     // OpenCode carga las dos carpetas: dejar el fichero en las dos inyectaría dos veces.
     const legacy = LEGACY_PLUGIN(ctx);
     if (existsSync(legacy)) {
       if (!ctx.dryRun) rmSync(legacy, { force: true });
-      report.changed.push(`plugin duplicado eliminado (${tilde(ctx, legacy)})`);
+      report.changed.push(`duplicate plugin removed (${tilde(ctx, legacy)})`);
     }
 
-    if (writeIfChanged(ctx, COMMAND_FILE(ctx), COMMAND_MD)) report.changed.push(`comando /cortex-save en ${tilde(ctx, COMMAND_FILE(ctx))}`);
-    else report.skipped.push("comando /cortex-save ya al día");
+    if (writeIfChanged(ctx, COMMAND_FILE(ctx), COMMAND_MD)) report.changed.push(`/cortex-save command written to ${tilde(ctx, COMMAND_FILE(ctx))}`);
+    else report.skipped.push("/cortex-save already up to date");
     return report;
   },
 
@@ -134,10 +134,10 @@ export const openCodeAdapter: AgentAdapter = {
     if (cfg && cfg.mcp?.cortex) {
       delete cfg.mcp.cortex;
       writeJson(ctx, file, cfg);
-      report.changed.push("MCP `cortex` fuera de opencode.json");
+      report.changed.push("MCP `cortex` removed from opencode.json");
     }
     for (const f of [PLUGIN_FILE(ctx), LEGACY_PLUGIN(ctx), COMMAND_FILE(ctx)]) {
-      if (removeIfGenerated(ctx, f)) report.changed.push(`${tilde(ctx, f)} eliminado`);
+      if (removeIfGenerated(ctx, f)) report.changed.push(`${tilde(ctx, f)} removed`);
     }
     return report;
   },
@@ -146,10 +146,10 @@ export const openCodeAdapter: AgentAdapter = {
     const cfg = readJson<OpenCodeConfig>(CONFIG(ctx));
     const mcp = cfg?.mcp?.cortex;
     const details: string[] = [];
-    details.push(!mcp ? "MCP no declarado" : mcp.command?.includes("pnpm") ? "MCP con el comando ANTIGUO" : "MCP `cortex mcp` declarado");
+    details.push(!mcp ? "MCP not declared" : mcp.command?.includes("pnpm") ? "MCP with the OLD command" : "MCP `cortex mcp` declared");
     const plugin = existsSync(PLUGIN_FILE(ctx));
-    if (plugin) details.push("plugin instalado (contexto + captura)");
-    if (existsSync(LEGACY_PLUGIN(ctx))) details.push("⚠️ hay un plugin duplicado en plugin/ (ejecuta `cortex setup opencode`)");
+    if (plugin) details.push("plugin installed (context and capture)");
+    if (existsSync(LEGACY_PLUGIN(ctx))) details.push("⚠️ duplicate plugin in plugin/ (run `cortex setup opencode`)");
     return { installed: plugin, details };
   },
 };

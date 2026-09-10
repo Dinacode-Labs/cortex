@@ -64,12 +64,12 @@ const relateSchema = z.object({
 /** Inyección de contexto (hook SessionStart): pack del proyecto vinculado, con acceso. */
 contextRoutes.get("/context-pack", async (c) => {
   const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
   const slug = c.req.query("slug") ?? "";
-  if (!slug) return c.json({ error: "Proyecto no encontrado." }, 404);
+  if (!slug) return c.json({ error: "Project not found." }, 404);
   const access = await checkProjectAccess(user.email, { slug });
-  if (access.status === "not_found") return c.json({ error: "Proyecto no encontrado." }, 404);
-  if (access.status === "forbidden") return c.json({ error: "Sin acceso." }, 403);
+  if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
+  if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
   try {
     const text = renderContextPack(await getContextPack(project.name));
@@ -90,12 +90,12 @@ contextRoutes.get("/context-pack", async (c) => {
  *  atribución (created_by = email). Respeta permisos del proyecto. */
 contextRoutes.post("/capture", async (c) => {
   const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
   const body = await parseBody(c, captureSchema);
   if (body instanceof Response) return body;
   const access = await checkProjectAccess(user.email, { slug: body.slug });
-  if (access.status === "not_found") return c.json({ error: "Proyecto no encontrado." }, 404);
-  if (access.status === "forbidden") return c.json({ error: "Sin acceso." }, 403);
+  if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
+  if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
   // Sin try/catch: un fallo interno sube al onError (500 genérico; el mensaje
   // interno ya no se filtra al cliente — los conectores solo miran r.ok).
@@ -119,12 +119,12 @@ contextRoutes.post("/capture", async (c) => {
 /** Captura por LOTES (conectores): N items, embedding por lotes, atribución. */
 contextRoutes.post("/capture/batch", async (c) => {
   const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
   const body = await parseBody(c, captureBatchSchema);
   if (body instanceof Response) return body;
   const access = await checkProjectAccess(user.email, { slug: body.slug });
-  if (access.status === "not_found") return c.json({ error: "Proyecto no encontrado." }, 404);
-  if (access.status === "forbidden") return c.json({ error: "Sin acceso." }, 403);
+  if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
+  if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
   const results = await captureBatch(project.name, body.items, user.email);
   return c.json({ results });
@@ -133,15 +133,15 @@ contextRoutes.post("/capture/batch", async (c) => {
 /** Relación entre entradas (p.ej. adjunto belongs_to su página). Autenticado. */
 contextRoutes.post("/relate", async (c) => {
   const user = await currentUser(c);
-  if (!user) return c.json({ error: "No autenticado." }, 401);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
   const body = await parseBody(c, relateSchema);
   if (body instanceof Response) return body;
   // Permiso por entrada (no por nombre de proyecto): hay que poder acceder a AMBAS.
   // Entrada sin proyecto → se permite (no hay permisos que aplicar).
   for (const eid of [body.sourceId, body.targetId]) {
     const access = await checkEntryAccess(user.email, eid);
-    if (access.status === "not_found") return c.json({ error: "Entrada no encontrada." }, 404);
-    if (access.status === "forbidden") return c.json({ error: "Sin acceso." }, 403);
+    if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
+    if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   }
   await relateEntries(body.sourceId, body.targetId, body.relationType);
   return c.json({ ok: true });

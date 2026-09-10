@@ -31,13 +31,13 @@ interface JsonMcpFile {
 function upsertJsonMcp(ctx: SetupCtx, file: string, key: "mcpServers" | "mcp", name: string, value: unknown, report: SetupReport): void {
   const cfg = readJson<JsonMcpFile>(file);
   if (cfg === null) {
-    report.warnings.push(`${tilde(ctx, file)} no es JSON válido — ${name} no instalado`);
+    report.warnings.push(`${tilde(ctx, file)} is not valid JSON — ${name} not installed`);
     return;
   }
   const conf: JsonMcpFile = cfg ?? {};
   const bag = (conf[key] ??= {}) as Record<string, unknown>;
   if (bag[name]) {
-    report.skipped.push(`${name}: ya presente — no lo toco (puede tener auth hecha)`);
+    report.skipped.push(`${name}: already there — left alone (it may already be authenticated)`);
     return;
   }
   bag[name] = value;
@@ -52,12 +52,12 @@ function upsertYamlMcp(ctx: SetupCtx, file: string, name: string, value: unknown
   try {
     cfg = raw === null ? {} : ((yamlParse(raw) as Record<string, any>) ?? {});
   } catch {
-    report.warnings.push(`${tilde(ctx, file)} no es YAML válido — ${name} no instalado`);
+    report.warnings.push(`${tilde(ctx, file)} is not valid YAML — ${name} not installed`);
     return;
   }
   cfg.mcp_servers ??= {};
   if (cfg.mcp_servers[name]) {
-    report.skipped.push(`${name}: ya presente — no lo toco`);
+    report.skipped.push(`${name}: already there — left alone`);
     return;
   }
   cfg.mcp_servers[name] = value;
@@ -77,7 +77,7 @@ function registerViaCli(ctx: SetupCtx, bin: string, name: string, d: McpDef, arg
     }
   };
   if (!ctx.dryRun && exists()) {
-    report.skipped.push(`${name}: ya registrado — no lo toco (puede tener auth hecha)`);
+    report.skipped.push(`${name}: already registered — left alone (it may already be authenticated)`);
     return;
   }
   const scope = bin === "claude" ? ["-s", "user"] : [];
@@ -93,7 +93,7 @@ function registerViaCli(ctx: SetupCtx, bin: string, name: string, d: McpDef, arg
   try {
     ctx.exec(bin, cmd);
   } catch (e) {
-    report.warnings.push(`${name}: no se pudo registrar en ${bin} (${(e as Error).message.split("\n")[0]})`);
+    report.warnings.push(`${name}: could not register it in ${bin} (${(e as Error).message.split("\n")[0]})`);
   }
 }
 
@@ -122,12 +122,12 @@ export function installToolbelt(ctx: SetupCtx, agent: AgentId, manifest: Manifes
     if (d.agents && !d.agents.includes(agentKey)) continue;
     const missing = missingEnv(d);
     if (missing.length) {
-      report.warnings.push(`${name}: omitido, faltan variables (${missing.join(", ")}). Expórtalas y vuelve a ejecutarlo.`);
+      report.warnings.push(`${name}: skipped, missing variables (${missing.join(", ")}). Export them and run it again.`);
       continue;
     }
     const args = resolveArgs(d.args, repo);
     if (args === null) {
-      report.warnings.push(`${name}: omitido, su comando usa {REPO} y no has pasado --repo`);
+      report.warnings.push(`${name}: skipped, its command uses {REPO} and you did not pass --repo`);
       continue;
     }
     switch (agent) {
@@ -148,7 +148,7 @@ export function installToolbelt(ctx: SetupCtx, agent: AgentId, manifest: Manifes
         );
         break;
       case "pi":
-        if (d.transport === "http") report.warnings.push(`${name}: Pi no admite MCP por HTTP en mcp.json — omitido`);
+        if (d.transport === "http") report.warnings.push(`${name}: Pi does not support HTTP MCPs in mcp.json — skipped`);
         else upsertJsonMcp(ctx, homeFile(ctx, ".pi/agent/mcp.json"), "mcpServers", name, { command: d.command, args }, report);
         break;
       case "hermes":
@@ -165,7 +165,7 @@ export function installToolbelt(ctx: SetupCtx, agent: AgentId, manifest: Manifes
 
   if (!repo) {
     if (manifest.skills.length || manifest.commands.length) {
-      report.warnings.push("skills y comandos omitidos: son ficheros y necesitan --repo <checkout del registry>");
+      report.warnings.push("skills and commands skipped: they are files, and need --repo <checkout of the registry>");
     }
     return report;
   }
@@ -190,13 +190,13 @@ export function auditToolbelt(manifest: Manifest): { line: string; ok: boolean }
   const out: { line: string; ok: boolean }[] = [];
   for (const [name, d] of Object.entries(manifest.mcpServers)) {
     if (d.transport === "http") {
-      out.push({ line: `${name}: auth interactiva — ${d.auth ?? "—"}`, ok: true });
+      out.push({ line: `${name}: interactive auth — ${d.auth ?? "—"}`, ok: true });
       continue;
     }
     const missing = missingEnv(d);
     const need = d.env ?? [];
     out.push({
-      line: `${name}: ${need.length ? `env ${need.join(", ")}` : "sin env"}${missing.length ? ` — FALTAN: ${missing.join(", ")}` : ""}  (${d.auth ?? "—"})`,
+      line: `${name}: ${need.length ? `env ${need.join(", ")}` : "no env vars"}${missing.length ? ` — MISSING: ${missing.join(", ")}` : ""}  (${d.auth ?? "—"})`,
       ok: missing.length === 0,
     });
   }
