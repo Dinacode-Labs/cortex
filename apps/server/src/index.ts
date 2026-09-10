@@ -2,6 +2,7 @@ import { serve } from "@hono/node-server";
 import { closeSql } from "@cortex/database";
 import { loadEnv } from "@cortex/shared";
 import { wireLlm } from "@cortex/agents";
+import { validateEmailConfig } from "@cortex/core";
 import { createApp } from "./app.js";
 
 /**
@@ -11,6 +12,10 @@ import { createApp } from "./app.js";
  */
 loadEnv();
 wireLlm(); // hooks LLM (reconciliación en /capture) + sink de uso de embeddings
+
+// Falla pronto si el proveedor de email elegido no puede funcionar: descubrirlo cuando un
+// usuario se queda sin poder entrar es mucho peor que no arrancar.
+for (const w of validateEmailConfig()) console.warn(w);
 
 // Sin dominio permitido, cualquier email del mundo puede pedir un OTP y crearse una
 // cuenta. Es un default deliberado (el producto no conoce el dominio de quien lo

@@ -202,8 +202,9 @@ pnpm cortex maintain-worker   # mantenimiento programado (cron)
   `CORTEX_AUTH_DOMAIN` es la whitelist de dominios y **no tiene default**: vacío significa
   que cualquier email puede registrarse, así que fíjalo en producción (el servidor avisa al
   arrancar). **Admin(s):** `CORTEX_ADMIN_EMAIL` (coma-separado) ven todos los proyectos y
-  gestionan permisos. OTP por **Brevo** (`BREVO_API_KEY` + `BREVO_SENDER`); sin clave, modo
-  dev (el código se loguea, no se envía).
+  gestionan permisos. El envío del OTP es
+  enchufable con `CORTEX_EMAIL_PROVIDER`: `log` (imprime el código, no envía — default),
+  `brevo` o `smtp`. El servidor valida la config al arrancar.
 - **Marca:** lo que ve el usuario (web, emails, contexto inyectado, CLI) sale de
   `CORTEX_BRAND_NAME` (def. `Cortex`) y, opcionalmente, `CORTEX_BRAND_LOGO_FILE` /
   `CORTEX_BRAND_LOGO_SVG`. Sin logo se pinta un wordmark de texto.
