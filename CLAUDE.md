@@ -38,7 +38,7 @@ packages/
   embeddings/  # proveedor de embeddings enchufable (local | nan | openai | voyage)
   core/        # dominio: save/search/context-pack, dedup/reconciliación, lint,
                # bi-temporal, proyectos/permisos, extract, indexación de código
-  agents/      # capa LLM (Mastra + nan/OpenRouter): classifier, graph, rerank,
+  agents/      # capa LLM (Mastra sobre un endpoint OpenAI-compatible): classifier, graph, rerank,
                # synthesize, distill, reconcile, maintain
 apps/
   mcp-server/  # servidor MCP con las 8 tools (stdio + Streamable HTTP autenticado)
@@ -52,9 +52,16 @@ config/        # registry MÍNIMO del producto (MCP + cortex-capture + /cortex-s
 tests/         # unit + integration (Postgres real; ver CONTRIBUTING.md)
 docs/
   decisions.md # ADR ligero: decisiones = hipótesis a revisar
-  refactor/    # revisión de arquitectura 2026-07 + plan de refactor por fases (EN CURSO)
-  audit/       # auditoría integral (junio 2026) + backlog priorizado
+  roadmap.md   # qué falta (solo el QUÉ técnico; prioridades y responsables, fuera)
+  research/    # investigación técnica de interés general
+  toolbelt-registry.md
 ```
+
+> **Qué NO va en este repo** (ADR-0031): decisiones operativas (qué proveedor, con qué clave,
+> a qué coste), auditorías de seguridad y planes de refactor con hallazgos por fichero,
+> prioridades de negocio y responsables, y datos de clientes (ADR-0026). Todo eso vive en el
+> repo privado `Dinacode-Labs/ai-toolbelt`. Regla rápida: si ayuda a alguien de fuera a usar,
+> entender o mejorar Cortex, es público; si describe cómo lo operamos nosotros, es privado.
 
 `@cortex/core` es determinista (sin LLM). La capa de inteligencia (`@cortex/agents`,
 Mastra + LLM vía nan/OpenRouter) se inyecta desde cada entrypoint llamando a
@@ -85,7 +92,7 @@ apps/*      → cualquier package
 ## Refactor de arquitectura (julio 2026) — COMPLETADO
 
 El refactor por fases (A–D) está **completado** (PRs #2–#20). El informe, el plan y los
-~70 hallazgos quedan como registro en `docs/refactor/`; las decisiones (incluidas las
+~70 hallazgos quedan registrados en el repo privado; las decisiones (incluidas las
 aplazadas por proporcionalidad) están en `docs/decisions.md` (ADR-0017–0022). Estado
 actual del código: reglas de dependencia cumplidas, entrypoints en `apps/cli`, apps
 testeables, guards unificados, sin código muerto conocido. Disciplina para nuevos cambios:

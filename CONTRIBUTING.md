@@ -7,6 +7,12 @@ cómo está montado y dónde tocar cada cosa.
 > tareas, skills de herramientas internas y material de marca **no van aquí**: viven en un
 > repo privado aparte (ADR-0026). En la documentación, un cliente es «un cliente real» o
 > «Acme»; una tarea no lleva responsable.
+>
+> **Tampoco el proceso interno** (ADR-0031): qué proveedor usamos con qué clave y a qué
+> coste, auditorías de seguridad, planes de refactor con hallazgos por fichero y prioridades
+> de negocio. El producto documenta *cómo se configura*, no *qué configuración tiene nuestro
+> despliegue*. Regla rápida: si ayuda a alguien de fuera a usar, entender o mejorar Cortex,
+> es público; si describe cómo lo operamos nosotros, es privado. Ante la duda, privado.
 
 ## Puesta en marcha (dev)
 
@@ -39,7 +45,7 @@ La tabla completa de reglas (qué paquete puede importar qué, dónde van los si
 está en [`CLAUDE.md`](./CLAUDE.md#reglas-de-dependencia-qué-puede-importar-qué).
 
 > **Refactor en curso (julio 2026):** hay un plan por fases en
-> [`docs/refactor/README.md`](./docs/refactor/README.md). Antes de tocar un área, mira si
+> las decisiones en [`docs/decisions.md`](./docs/decisions.md). Antes de tocar un área, mira si
 > el plan la cubre; algunas rutas de esta guía (p.ej. dónde viven los conectores o los
 > subcomandos del CLI) cambiarán al ejecutarlo — cada PR del refactor actualiza esta guía.
 
