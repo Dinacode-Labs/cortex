@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
-import { apiPost } from "@cortex/shared";
+import { apiPost } from "@cortex/client";
 import { chunkDocument, extractFileText, SUPPORTED_EXTS, IGNORE_DIRS, type BatchItem } from "@cortex/core";
 import { wireLlm } from "@cortex/agents";
 

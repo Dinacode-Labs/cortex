@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@cortex/agents": "workspace:*",
+    "@cortex/client": "workspace:*",
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/embeddings": "workspace:*",

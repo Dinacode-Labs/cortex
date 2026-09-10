@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
+import { readCortexLink } from "@cortex/client";
 import { closeSql } from "@cortex/database";
-import { readCortexLink } from "@cortex/core";
 import { captureSessionViaApi, shutdownObservability, wireLlm } from "@cortex/agents";
 
 /**

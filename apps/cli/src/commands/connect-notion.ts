@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
-import { apiPost, getEnvNum } from "@cortex/shared";
+import { getEnvNum } from "@cortex/shared";
+import { apiPost } from "@cortex/client";
 import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
 import { wireLlm } from "@cortex/agents";
 
