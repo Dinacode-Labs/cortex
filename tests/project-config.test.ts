@@ -6,9 +6,9 @@ import { slugify, readCortexLink } from "../packages/core/src/project-config";
 
 describe("slugify", () => {
   it("genera slugs estables (kebab, sin acentos)", () => {
-    expect(slugify("CE Portal")).toBe("ce-portal");
-    expect(slugify("LevelUp Pasión")).toBe("levelup-pasion");
-    expect(slugify("  Boluda  API  ")).toBe("boluda-api");
+    expect(slugify("Acme Portal")).toBe("acme-portal");
+    expect(slugify("Ñandú Pasión")).toBe("nandu-pasion");
+    expect(slugify("  Acme  API  ")).toBe("acme-api");
   });
   it("vacío/sin alfanuméricos → 'proyecto'", () => {
     expect(slugify("")).toBe("proyecto");

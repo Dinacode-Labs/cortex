@@ -68,7 +68,7 @@ respuesta por los dos lados:
 
 Conclusión operativa: con nuestro pipeline (híbrido RRF + rerank LLM), el retorno
 marginal de sofisticar el chunker más allá de "estructural con parámetros sensatos" es
-**bajo**. La intuición de Rubén era correcta.
+**bajo**. La intuición inicial del equipo era correcta.
 
 > ⚠️ **Pista sin verificar** (extraída pero fuera del top-25 verificado): un paper
 > (arXiv 2604.01733) afirmaría que incluso con híbrido + reranker, el chunking movió

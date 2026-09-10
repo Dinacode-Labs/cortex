@@ -1,7 +1,12 @@
-# Contribuir a Dinacode Cortex
+# Contribuir a Cortex
 
-Producto **interno** de Dinacode. Mejoras, arreglos y nuevas capacidades llegan por **PR**
-contra este repo. Esta guía explica cómo está montado y dónde tocar cada cosa.
+Mejoras, arreglos y nuevas capacidades llegan por **PR** contra este repo. Esta guía explica
+cómo está montado y dónde tocar cada cosa.
+
+> **Nada corporativo en el repo.** Clientes por su nombre, personas como responsables de
+> tareas, skills de herramientas internas y material de marca **no van aquí**: viven en un
+> repo privado aparte (ADR-0026). En la documentación, un cliente es «un cliente real» o
+> «Acme»; una tarea no lleva responsable.
 
 ## Puesta en marcha (dev)
 
@@ -23,7 +28,7 @@ No hay build de frontend ni paso de compilación: todo se ejecuta con **tsx** (T
 | Esquema/SQL/cliente Postgres | `packages/database/` (migraciones en `migrations/`) |
 | Proveedor de embeddings | `packages/embeddings/` |
 | Servidor MCP (stdio) · UI web · API+auth · CLI | `apps/mcp-server` · `apps/web` · `apps/server` · `apps/cli` |
-| Toolbelt distribuible (MCP/skills/comandos) | `config/toolbelt.json` + `config/skills/` + `config/commands/` |
+| Toolbelt del producto (MCP + skill de captura + comando) | `config/toolbelt.json` + `config/skills/cortex-capture/` + `config/commands/` |
 | Instalador (`cortex sync`) + hooks + shim CLI | `apps/cli/src/commands/sync.ts` (+ `sync/` un adapter por agente) |
 
 **Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
@@ -40,9 +45,11 @@ está en [`CLAUDE.md`](./CLAUDE.md#reglas-de-dependencia-qué-puede-importar-qu�
 
 ## Recetas frecuentes
 
-- **Añadir un MCP / skill / comando al toolbelt** → edítalo en `config/toolbelt.json`
-  (y vendoriza la skill en `config/skills/<name>/`). `cortex sync` lo reparte. **Nunca**
-  metas credenciales: declara el `env` que requiere y se omite si falta (`--doctor` lo lista).
+- **Añadir un MCP / skill / comando al toolbelt** → si es **del producto** (lo usa
+  cualquiera que despliegue Cortex), va en `config/toolbelt.json`. Si es una herramienta
+  **de tu organización**, va en su registry externo, no aquí (ADR-0026); el esquema está en
+  `docs/toolbelt-registry.md`. **Nunca** metas credenciales: declara el `env` que requiere y
+  se omite si falta (`--doctor` lo lista).
 - **Añadir un conector de fuente** → `apps/cli/src/commands/connect-<x>.ts` (exporta
   `run(args)`). Reutiliza la capa `extract` de core (multimodal) y escribe por la API
   autenticada (`apiPost` de shared, `/capture/batch`). Incremental por

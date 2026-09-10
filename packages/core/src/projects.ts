@@ -92,7 +92,7 @@ export async function isProjectMember(projectId: string, email: string): Promise
 /**
  * ¿Puede `email` acceder al proyecto? Cascada por la jerarquía: si el proyecto O algún
  * ANCESTRO es privado → restringido; concede acceso ser admin, o dueño/miembro del
- * proyecto o de cualquier ancestro (membresía del padre "Boluda" abre los subproyectos).
+ * proyecto o de cualquier ancestro (membresía del padre "Acme" abre los subproyectos).
  */
 export async function canAccessProject(project: ProjectRef, email: string | null): Promise<boolean> {
   const chain = (await getSql()`
