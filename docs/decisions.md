@@ -720,9 +720,18 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   de paquetes que deberían ser genéricos.
 - **Consecuencias:** sin migración de datos (mismo modelo de embedding, misma dimensión). El
   coste recurrente vuelve a ser 0 para Dinacode y la observabilidad de tokens sigue midiendo
-  volumen. El proveedor `local` queda solo para tests y para arrancar sin claves. Queda
-  **pendiente de resolver con NaN** si una clave de miembro puede respaldar el servidor de
-  una empresa: la cuota es por miembro.
+  volumen. El proveedor `local` queda solo para tests y para arrancar sin claves.
+- **La clave del servidor es una membresía personal (decidido 2026-09-10).** La cuota de NaN
+  es *por miembro*, y el servidor de Cortex la consumirá para todo el equipo. Se asume a
+  sabiendas, con dos argumentos: el volumen real medido hasta ahora es pequeño frente a los
+  3B tokens/mes de `deepseek-v4-flash`, y Cortex se va a publicar como open source, lo que
+  encaja con el espíritu del cluster. **Riesgos que quedan abiertos**, y conviene tenerlos
+  presentes en vez de darlos por resueltos: (a) es una interpretación nuestra de lo que
+  NaN considerará aceptable, no algo que hayan confirmado; (b) si NaN lo objeta o cambia sus
+  condiciones, hay que poder migrar rápido — por eso importa que el proveedor sea genérico y
+  que el routing por rol se cambie solo con `.env`; (c) el consumo va contra la cuota de una
+  persona concreta, así que conviene mirar `llm_usage` de vez en cuando y no dar por hecho
+  que el margen es infinito.
 - **Revisar cuando:** NaN cambie cuotas o catálogo (verificar antes de fijar modelos en el
   `.env`); se quiera *streaming* para `glm5.3-flash` (su guardrail global de 800K tpm lo
   recomienda y `runAgent` hoy no lo usa); aparezca un cliente con requisito on-prem (probar
