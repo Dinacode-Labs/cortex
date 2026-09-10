@@ -2,20 +2,28 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Carga el .env de la raíz del repo una sola vez, sin dependencias externas
- * (Node ≥ 20.6 trae process.loadEnvFile). No pisa variables ya definidas en el
- * entorno real. Los entrypoints (migrate, seed, mcp-server) deben llamarla al
- * arrancar.
+ * Carga un `.env` una sola vez, sin dependencias externas (Node ≥ 20.6 trae
+ * `process.loadEnvFile`). No pisa variables ya definidas en el entorno real.
+ * Los entrypoints (migrate, seed, servidores) la llaman al arrancar.
+ *
+ * Busca, en este orden: `CORTEX_ENV_FILE`, el `.env` del directorio desde el que se lanzó
+ * el comando (`INIT_CWD`, que pnpm fija a la raíz del monorepo aunque `--filter` cambie el
+ * cwd) y el `.env` del cwd. **No** se resuelve relativo a este fichero: eso ataba la
+ * función a vivir en `packages/shared/src` y se rompía al compilar a `dist/` o al
+ * empaquetar (era un hallazgo conocido del refactor).
  */
 let loaded = false;
 export function loadEnv(): void {
   if (loaded) return;
   loaded = true;
-  // packages/shared/src -> raíz del repo
-  const envPath = resolve(import.meta.dirname, "../../../.env");
-  if (existsSync(envPath) && typeof process.loadEnvFile === "function") {
-    process.loadEnvFile(envPath);
-  }
+  if (typeof process.loadEnvFile !== "function") return;
+  const candidates = [
+    process.env.CORTEX_ENV_FILE,
+    process.env.INIT_CWD ? resolve(process.env.INIT_CWD, ".env") : undefined,
+    resolve(process.cwd(), ".env"),
+  ].filter((p): p is string => Boolean(p));
+  const hit = candidates.find((p) => existsSync(p));
+  if (hit) process.loadEnvFile(hit);
 }
 
 /** Devuelve una variable de entorno o lanza si falta. */

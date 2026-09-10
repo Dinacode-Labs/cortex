@@ -8,8 +8,11 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "start": "tsx src/index.ts",
-    "start:http": "tsx src/http.ts"
+    "start": "node dist/index.js",
+    "start:http": "node dist/http.js",
+    "build": "tsc -b tsconfig.build.json",
+    "dev": "node --conditions=development --import tsx src/index.ts",
+    "dev:http": "node --conditions=development --import tsx src/http.ts"
   },
   "dependencies": {
     "@cortex/agents": "workspace:*",

@@ -47,6 +47,36 @@ jobs:
       - name: Integration tests (Postgres real)
         run: pnpm test:integration
 
+      - name: Build (tsc -b)
+        run: pnpm build
+
+      # Que compile no basta: hay que comprobar que el JS de dist ARRANCA. Los fallos
+      # típicos aquí son rutas a ficheros de datos (migraciones, estáticos) que resolvían
+      # bien desde src y no desde dist, y no los detecta ni el typecheck ni los tests.
+      - name: Smoke del build
+        run: |
+          node -e "
+            const { existsSync } = require('node:fs');
+            const { resolve } = require('node:path');
+            const must = [
+              'packages/shared/dist/index.js',
+              'packages/database/dist/migrate-cli.js',
+              'apps/server/dist/index.js',
+              'apps/web/dist/index.js',
+              'apps/mcp-server/dist/http.js',
+            ];
+            for (const f of must) if (!existsSync(f)) { console.error('falta', f); process.exit(1); }
+            // Ficheros de datos que se resuelven relativos al compilado.
+            const paths = [
+              ['migraciones', resolve('packages/database/dist', '../migrations')],
+              ['estáticos web', resolve('apps/web/dist', '../public')],
+              ['install.sh', resolve('apps/server/dist/routes', '../../../../scripts/install.sh')],
+            ];
+            for (const [name, p] of paths) if (!existsSync(p)) { console.error('no resuelve desde dist:', name, p); process.exit(1); }
+            console.log('dist completo y rutas de datos correctas');
+          "
+          node -e "import('./apps/server/dist/app.js').then(m => { if (typeof m.createApp !== 'function') { console.error('createApp no exportado'); process.exit(1); } console.log('la app compilada carga'); })"
+
       # Informativo a propósito, no bloqueante: hoy hay vulnerabilidades altas TRANSITIVAS
       # en mammoth, el SDK de MCP y Mastra que no podemos arreglar hasta que publiquen. Un
       # gate que falla desde el primer día se acaba desactivando y deja de aportar nada;

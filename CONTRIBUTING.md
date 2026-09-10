@@ -20,9 +20,23 @@ cómo está montado y dónde tocar cada cosa.
 pnpm install
 cp .env.example .env          # embeddings/LLM; sin claves funciona en modo local
 pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker) + esquema
-pnpm typecheck                # comprobar tipos en todo el monorepo
+pnpm typecheck                # comprobar tipos en todo el monorepo (no requiere build)
+pnpm build                    # opcional en dev; obligatorio para Docker/producción
 ```
-No hay build de frontend ni paso de compilación: todo se ejecuta con **tsx** (TS/ESM).
+**En desarrollo no hace falta compilar**: todo se ejecuta con `tsx` sobre las fuentes
+(`pnpm cortex`, `pnpm --filter @cortex/server dev`…). Lo hace posible una condición
+`development` en los `exports` de cada paquete, que resuelve a `src/` cuando el proceso se
+lanza con `--conditions=development` (lo hacen los scripts) y a `dist/` en cualquier otro
+caso. Por eso `pnpm typecheck` y los tests funcionan sin haber compilado nunca.
+
+**En producción sí se compila**: `pnpm build` ejecuta `tsc -b` sobre las *project
+references* y deja `dist/` en cada paquete y app; el Dockerfile arranca `node dist/...`. Si
+tocas la resolución de rutas a ficheros de datos (migraciones, estáticos de la web,
+`install.sh`), compila y comprueba que siguen resolviendo: el CI tiene un smoke para eso,
+porque es el fallo típico que ni el typecheck ni los tests detectan.
+
+`apps/cli` queda fuera de `tsc -b` a propósito: se empaqueta con un bundler para poder
+distribuirlo como CLI instalable.
 
 ## Mapa del repo (dónde vive cada cosa)
 
