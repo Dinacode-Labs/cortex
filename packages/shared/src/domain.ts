@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Modelo de dominio de Dinacode Cortex.
+ * Modelo de dominio de Cortex.
  *
  * Refleja el modelo de datos hipotético del §14 del documento de planteamiento.
  * Es una propuesta mínima para la demo y debe cuestionarse (ver docs/decisions.md).

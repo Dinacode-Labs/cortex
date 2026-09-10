@@ -1,4 +1,4 @@
-import { apiGet } from "@cortex/shared";
+import { apiGet, getBrandName } from "@cortex/shared";
 import { readCortexLink } from "@cortex/core";
 
 /**
@@ -48,7 +48,7 @@ export async function run(): Promise<void> {
     const res = await apiGet<{ project: string; text: string }>(`/context-pack?slug=${encodeURIComponent(link.slug)}`);
     if (!res || !res.text.trim()) return; // sin sesión, sin servidor, sin acceso, o pack vacío
 
-    const additionalContext = `## Contexto de Dinacode Cortex — proyecto "${res.project}"\nMemoria viva del proyecto (decisiones vigentes, restricciones, riesgos). Consúltala antes de tocar un módulo y captura lo nuevo.\n\n${res.text.slice(0, MAX_CTX)}`;
+    const additionalContext = `## ${getBrandName()} context — project "${res.project}"\nLiving project memory (current decisions, constraints, risks). Check it before touching a module, and capture what is new.\n\n${res.text.slice(0, MAX_CTX)}`;
 
     if (format === "hermes") {
       process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call

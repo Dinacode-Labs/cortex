@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Instalador del toolbelt + CLI de Dinacode Cortex (macOS / Linux / WSL).
+# Instalador del toolbelt + CLI de Cortex (macOS / Linux / WSL).
 #   curl -fsSL <servidor>/install.sh | sh
 # Clona/actualiza el repo, instala el CLI `cortex` + hooks + toolbelt en tus agentes,
 # e inicia sesión (email + OTP). Variables: CORTEX_REPO, CORTEX_HOME, CORTEX_SERVER_URL.

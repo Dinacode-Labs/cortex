@@ -21,7 +21,9 @@ const tokenTtlDays = (): number => getEnvNum("CORTEX_TOKEN_TTL_DAYS", 30);
 const otpRateMax = (): number => getEnvNum("CORTEX_OTP_RATE_MAX", 5);
 const otpRateWindowMin = (): number => getEnvNum("CORTEX_OTP_RATE_WINDOW_MIN", 15);
 /** Dominios permitidos (whitelist, coma-separado). Vacío = cualquiera. Sin registro: el primer login válido crea el usuario. */
-const authDomains = (): string[] => csv(process.env.CORTEX_AUTH_DOMAIN ?? "dinacode.com");
+// Sin default: el dominio permitido depende de quién despliegue. Vacío = cualquiera puede
+// registrarse (el servidor avisa al arrancar); heredar un dominio ajeno sería peor.
+const authDomains = (): string[] => csv(process.env.CORTEX_AUTH_DOMAIN ?? "");
 /** Emails admin (coma-separado; puede haber varios). Gestionan permisos y ven todos los proyectos. */
 const adminEmails = (): string[] => csv(process.env.CORTEX_ADMIN_EMAIL);
 
