@@ -14,8 +14,9 @@ wireLlm();
 
 const app = createApp();
 const port = Number(process.env.WEB_PORT ?? 8080);
-const server = serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`[cortex-web] UI en http://localhost:${info.port}`);
+const hostname = process.env.CORTEX_BIND_HOST ?? "127.0.0.1";
+const server = serve({ fetch: app.fetch, port, hostname }, (info) => {
+  console.log(`[cortex-web] UI en http://${hostname}:${info.port}`);
 });
 
 const shutdown = async () => {

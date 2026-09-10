@@ -96,6 +96,16 @@ jobs:
           "
           cd apps/cli && npm pack --dry-run
 
+      # La imagen es la que se despliega: que compile aquí evita descubrir en el servidor
+      # que falta un fichero de datos o que una etapa del multi-stage se quedó atrás.
+      - name: Imagen Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       # Informativo a propósito, no bloqueante: hoy hay vulnerabilidades altas TRANSITIVAS
       # en mammoth, el SDK de MCP y Mastra que no podemos arreglar hasta que publiquen. Un
       # gate que falla desde el primer día se acaba desactivando y deja de aportar nada;

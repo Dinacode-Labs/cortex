@@ -31,3 +31,19 @@ export async function closeSql(): Promise<void> {
 export function toVectorLiteral(vec: readonly number[]): string {
   return `[${vec.join(",")}]`;
 }
+
+/**
+ * ¿Responde la base de datos? Con tope de tiempo, porque un `/health` que se queda colgado
+ * es peor que uno que devuelve 503: el orquestador no reinicia nada y nadie se entera.
+ */
+export async function pingDatabase(timeoutMs = 2000): Promise<boolean> {
+  try {
+    await Promise.race([
+      getSql()`select 1`,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs).unref()),
+    ]);
+    return true;
+  } catch {
+    return false;
+  }
+}
