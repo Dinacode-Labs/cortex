@@ -9,7 +9,7 @@ confundirlas:
 2. **El toolbelt de tu organización** — los MCPs y skills de las herramientas que use tu
    equipo (gestor de tickets, chat, repositorio, lo que sea). Eso **no** vive en este repo:
    se declara en un registry propio, normalmente en un repo privado, y se instala con
-   `cortex toolbelt sync <ruta-o-url>`.
+   `cortex toolbelt sync --registry <ruta-o-url>`.
 
 La separación está en el [ADR-0014](./decisions.md) (revisado), el [ADR-0026](./decisions.md) y el [ADR-0032](./decisions.md).
 
@@ -29,7 +29,7 @@ Un único JSON con tres listas. Ejemplo completo:
       "command": "uvx",
       "args": ["mi-mcp-server", "stdio"],
       "env": ["TICKETS_API_KEY", "TICKETS_BASE_URL"],  // se leen del entorno del dev
-      "auth": "token personal en TICKETS_API_KEY",     // texto para `cortex sync --doctor`
+      "auth": "token personal en TICKETS_API_KEY",     // texto para `cortex toolbelt doctor`
       "agents": ["claude", "codex", "opencode", "hermes"]
     },
     // http: servidor remoto (OAuth o cabecera). Codex no soporta este transporte.
@@ -61,5 +61,5 @@ Un único JSON con tres listas. Ejemplo completo:
   entrada que lo use no se puede instalar desde una URL remota: se omite con aviso.
 - **`agents`** acota a qué agentes va cada entrada. Útil porque no todos soportan lo mismo
   (Codex no admite MCP por HTTP, y las skills hoy solo las consume Claude Code).
-- El registry es **idempotente**: `cortex sync` sin `--apply` enseña el plan, y al aplicarlo
+- El registry es **idempotente**: `cortex toolbelt sync` sin `--apply` enseña el plan, y al aplicarlo
   respeta lo que ya esté configurado a mano (no pisa la auth existente).

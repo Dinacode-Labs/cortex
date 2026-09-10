@@ -53,7 +53,8 @@ distribuirlo como CLI instalable.
 | Comando de operador (BD, modelo, servicios) | `apps/admin/src/commands/` |
 | Lo que Cortex instala en Claude Code (hooks, MCP, skill, comando) | `plugin/claude-code/` (+ `.claude-plugin/marketplace.json` en la raíz) |
 | Integración por agente (`cortex setup`) | `apps/cli/src/setup/` — un adaptador por agente, más `hooks-json.ts` y `legacy.ts` |
-| Registry de terceros (`cortex sync`, en retirada) | `config/toolbelt.json` + `apps/cli/src/commands/sync.ts` |
+| Registry de terceros (`cortex toolbelt`) | `config/toolbelt.json` (esquema) + `apps/cli/src/toolbelt/` |
+| Diagnóstico (`cortex doctor`) | `apps/cli/src/commands/doctor.ts` |
 
 **Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
 se **inyecta**: cada entrypoint llama a `wireLlm()` (de `@cortex/agents`) tras `loadEnv()`,

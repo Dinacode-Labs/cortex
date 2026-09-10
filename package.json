@@ -19,7 +19,6 @@
     "mcp": "pnpm --filter @cortex/mcp-server run dev",
     "web": "pnpm --filter @cortex/web run dev",
     "cortex": "node --conditions=development --import tsx apps/cli/src/index.ts",
-    "cortex:sync": "node --conditions=development --import tsx apps/cli/src/index.ts sync",
     "cortex:link": "node --conditions=development --import tsx apps/cli/src/index.ts link",
     "test": "vitest run",
     "test:watch": "vitest",
