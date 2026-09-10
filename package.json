@@ -15,7 +15,7 @@
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
     "db:migrate": "pnpm --filter @cortex/database run migrate",
-    "db:seed": "node --conditions=development --import tsx apps/cli/src/index.ts seed",
+    "db:seed": "pnpm admin seed",
     "mcp": "pnpm --filter @cortex/mcp-server run dev",
     "web": "pnpm --filter @cortex/web run dev",
     "cortex": "node --conditions=development --import tsx apps/cli/src/index.ts",
@@ -24,7 +24,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run -c vitest.integration.config.ts",
-    "clean": "rm -rf packages/*/dist apps/*/dist packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo"
+    "clean": "rm -rf packages/*/dist apps/*/dist packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo",
+    "admin": "node --conditions=development --import tsx apps/admin/src/index.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

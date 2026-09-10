@@ -1,109 +1,134 @@
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { readCortexLink, readCredentials } from "@cortex/client";
-import { getSql } from "@cortex/database";
-import { canAccessProject, createProject, findProjectBySlug, listAdmins, slugify, type ProjectRef } from "@cortex/core";
-
-/** Mensaje para solicitar acceso a un proyecto privado al que no llegas. */
-function askAccessMsg(p: ProjectRef): string {
-  const admins = listAdmins();
-  return `✗ El proyecto "${p.name}" (slug "${p.slug}") existe pero es privado y no tienes acceso.\n  Pídele acceso al admin${admins.length ? ` (${admins.join(", ")})` : ""} — no se ha creado nada.`;
-}
-type Row = Record<string, unknown>;
-
-/** Email autenticado de la CLI (~/.cortex/credentials), o null. Es el dueño al crear. */
-function credsEmail(): string | null {
-  return readCredentials()?.email ?? null;
-}
+import {
+  createProject,
+  getProject,
+  listProjects,
+  readCortexLink,
+  readCredentials,
+  writeCortexLink,
+  type CortexLink,
+} from "@cortex/client";
 
 /**
- * `cortex link`: vincula la carpeta actual a un proyecto Cortex escribiendo `.cortex.json`.
- * Es el acto DELIBERADO que conecta un repo a Cortex (gate inverso: sin vínculo no fluye
- * nada). Crear ≠ vincular: `--create` crea el proyecto en Cortex y lo vincula.
+ * `cortex link`: vincula la carpeta actual a un proyecto de Cortex escribiendo
+ * `.cortex.json`. Es el acto DELIBERADO que conecta un repo (gate inverso: sin vínculo no
+ * se inyecta ni se captura nada). Crear ≠ vincular: `--create` crea el proyecto y vincula.
  *
- *   cortex:link <slug>                 vincular a un proyecto EXISTENTE
- *   cortex:link --create "<Nombre>"    crear el proyecto en Cortex y vincular
- *   cortex:link --ignore               opt-out: este repo NO usa Cortex
- *   cortex:link                        ver vínculo actual + proyectos disponibles
+ *   cortex link <slug>                 vincular a un proyecto EXISTENTE
+ *   cortex link --create "<Nombre>"    crear el proyecto y vincular
+ *   cortex link --ignore               opt-out: este repo NO usa Cortex
+ *   cortex link                        ver el vínculo actual y los proyectos disponibles
+ *
+ * Va por la API y no por la base de datos (ADR-0025): era el último comando del CLI que
+ * necesitaba Postgres, y mientras lo necesitara no se podía distribuir un cliente ligero.
  */
-// pnpm --filter cambia el cwd al paquete; INIT_CWD conserva el cwd real del usuario.
+
+// `pnpm --filter` cambia el cwd al paquete; INIT_CWD conserva el del usuario.
 const TARGET_CWD = process.env.INIT_CWD || process.cwd();
 
-function writeLink(obj: Record<string, unknown>, msg: string): void {
-  const file = join(TARGET_CWD, ".cortex.json");
-  writeFileSync(file, JSON.stringify(obj, null, 2) + "\n");
+function write(link: CortexLink, msg: string): void {
+  const file = writeCortexLink(TARGET_CWD, link);
   console.log(`✓ ${msg}\n  → ${file}`);
+}
+
+function requireSession(): boolean {
+  if (readCredentials()) return true;
+  console.error("✗ No has iniciado sesión. Ejecuta `cortex auth login` primero.");
+  process.exitCode = 1;
+  return false;
+}
+
+/** Mensaje de "existe pero es privado", con los admins a los que pedir acceso. */
+function askAccess(name: string, admins?: string[]): string {
+  const quien = admins?.length ? ` (${admins.join(", ")})` : "";
+  return `✗ El proyecto "${name}" existe pero es privado y no tienes acceso.\n  Pídele acceso a un administrador${quien} — no se ha creado nada.`;
 }
 
 export async function run(args: string[]): Promise<void> {
   const positional = args.filter((a) => !a.startsWith("--"));
 
   if (args.includes("--ignore")) {
-    writeLink({ ignore: true }, "Cortex desactivado en este repo (opt-out).");
+    write({ ignore: true }, "Cortex desactivado en este repo (opt-out).");
     return;
   }
 
   if (args.includes("--create")) {
     const name = positional.join(" ").trim();
     if (!name) {
-      console.error('Uso: cortex:link --create "<Nombre del proyecto>" [--private]');
+      console.error('Uso: cortex link --create "<Nombre del proyecto>" [--private] [--parent <slug>]');
       process.exitCode = 1;
       return;
     }
-    const owner = credsEmail();
-    // Si el slug ya existe, NO se crea otro: o te vinculas (si tienes acceso) o pides permiso.
-    const existing = await findProjectBySlug(slugify(name));
-    if (existing) {
-      if (await canAccessProject(existing, owner)) {
-        writeLink({ slug: existing.slug }, `Ya existía "${existing.name}" (${existing.visibility}); vinculado · slug: ${existing.slug}.`);
-      } else {
-        console.error(askAccessMsg(existing));
-        process.exitCode = 1;
-      }
-      return;
-    }
-    const visibility = args.includes("--private") ? "private" : "public";
-    if (visibility === "private" && !owner) {
-      console.error("✗ Para crear un proyecto privado necesitas identidad: ejecuta `cortex auth login` primero.");
-      process.exitCode = 1;
-      return;
-    }
+    if (!requireSession()) return;
     const pi = args.indexOf("--parent");
-    const parentSlug = pi >= 0 ? args[pi + 1] : null;
-    try {
-      const p = await createProject(name, { visibility, ownerEmail: owner, parentSlug });
-      writeLink({ slug: p.slug }, `Proyecto "${p.name}" (${p.visibility}${parentSlug ? `, bajo ${parentSlug}` : ""}${owner ? `, dueño ${owner}` : ""}) creado y vinculado · slug: ${p.slug}.`);
-    } catch (e) {
-      console.error(`✗ ${(e as Error).message}`);
+    const res = await createProject({
+      name,
+      visibility: args.includes("--private") ? "private" : "public",
+      ...(pi >= 0 && args[pi + 1] ? { parentSlug: args[pi + 1]! } : {}),
+    });
+    if (res.status === 403) {
+      console.error(askAccess(name, res.data.admins));
       process.exitCode = 1;
+      return;
     }
+    if (!res.ok) {
+      console.error(`✗ ${res.data.error ?? `No se pudo crear el proyecto (HTTP ${res.status}).`}`);
+      process.exitCode = 1;
+      return;
+    }
+    const { project, created } = res.data;
+    write(
+      { slug: project.slug },
+      created
+        ? `Proyecto "${project.name}" (${project.visibility}) creado y vinculado · slug: ${project.slug}.`
+        : `Ya existía "${project.name}" (${project.visibility}); vinculado · slug: ${project.slug}.`,
+    );
     return;
   }
 
   if (positional[0]) {
+    if (!requireSession()) return;
     const slug = positional[0];
-    const p = await findProjectBySlug(slug);
-    if (!p) {
-      console.error(`✗ No existe ningún proyecto con slug "${slug}" en Cortex.\n  Créalo con: cortex:link --create "<Nombre>"`);
+    const res = await getProject(slug);
+    if (res.status === 404) {
+      console.error(`✗ No existe ningún proyecto con slug "${slug}".\n  Créalo con: cortex link --create "<Nombre>"`);
       process.exitCode = 1;
       return;
     }
-    if (!(await canAccessProject(p, credsEmail()))) {
-      console.error(askAccessMsg(p));
+    if (res.status === 403) {
+      console.error(askAccess(slug, (res.data as { admins?: string[] }).admins));
       process.exitCode = 1;
       return;
     }
-    writeLink({ slug: p.slug }, `Vinculado a "${p.name}" (${p.visibility}) · slug: ${p.slug}.`);
+    if (!res.ok) {
+      console.error(`✗ No se pudo consultar el proyecto (HTTP ${res.status}).`);
+      process.exitCode = 1;
+      return;
+    }
+    write({ slug: res.data.project.slug }, `Vinculado a "${res.data.project.name}" · slug: ${res.data.project.slug}.`);
     return;
   }
 
-  // Sin argumentos: estado + proyectos disponibles.
+  // Sin argumentos: estado actual + qué proyectos hay disponibles.
   const link = readCortexLink(TARGET_CWD);
-  console.log(link ? `Vínculo actual: ${JSON.stringify(link)}` : "Sin vínculo en esta carpeta (no hay .cortex.json).");
-  const rows = (await getSql()`SELECT slug, name FROM entities WHERE type = 'project' ORDER BY name`) as unknown as Row[];
-  console.log("\nProyectos en Cortex:");
-  for (const r of rows) console.log(`  ${(r.slug as string) ?? "(sin slug)"}  —  ${r.name as string}`);
-  console.log('\nUso:\n  cortex:link <slug>               vincular a un proyecto existente\n  cortex:link --create "<Nombre>"  crear el proyecto y vincular\n  cortex:link --ignore             opt-out (no usar Cortex aquí)');
+  if (!link) console.log("Esta carpeta NO está vinculada a ningún proyecto (no hay .cortex.json).");
+  else if (link.ignore) console.log("Esta carpeta está marcada como IGNORADA para Cortex.");
+  else console.log(`Vinculada a: ${link.slug ?? link.project ?? "(vínculo incompleto)"}`);
+
+  if (!readCredentials()) {
+    console.log("\nInicia sesión con `cortex auth login` para ver tus proyectos.");
+    return;
+  }
+  const res = await listProjects();
+  if (!res.ok) {
+    console.log("\nNo se pudo consultar la lista de proyectos (¿servidor en marcha?).");
+    return;
+  }
+  const projects = res.data.projects;
+  if (projects.length === 0) {
+    console.log('\nNo tienes proyectos todavía. Crea uno con: cortex link --create "<Nombre>"');
+    return;
+  }
+  console.log("\nProyectos a los que tienes acceso:");
+  const w = Math.max(...projects.map((p) => p.slug.length));
+  for (const p of projects) console.log(`  ${p.slug.padEnd(w)}  ${p.name}${p.visibility === "private" ? " (privado)" : ""}`);
 }
-
-

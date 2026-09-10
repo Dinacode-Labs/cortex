@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
-import { walk } from "../apps/cli/src/commands/connect-docs";
+import { walk } from "../apps/admin/src/commands/connect-docs";
 
 /**
  * connect-docs recorre una carpeta e ingiere los ficheros soportados. Debe SALTAR los

@@ -4,7 +4,9 @@ import { saveContext } from "./save.js";
 import { storeEmbeddingsBatch } from "./vectors.js";
 import { findProjectIdByName } from "./projects.js";
 import { relate } from "./entities.js";
-import { type RelationType, scrub } from "@cortex/shared";
+import { type BatchItem, type RelationType, scrub } from "@cortex/shared";
+
+export type { BatchItem };
 import type { Row } from "./map.js";
 
 /**
@@ -18,15 +20,6 @@ import type { Row } from "./map.js";
  * decisiones/constraints/riesgos bien tipados), a cambio de 1 llamada LLM por item. Un
  * `type` explícito del conector (p.ej. `pr_summary`) siempre gana al LLM (precedencia).
  */
-export interface BatchItem {
-  title?: string;
-  content: string;
-  type?: string;
-  sourceType?: string;
-  sourceReference?: string;
-  confidence?: string;
-  metadata?: Record<string, unknown>;
-}
 export interface BatchItemResult {
   ref: string | null;
   id: string;

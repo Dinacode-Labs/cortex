@@ -1,0 +1,25 @@
+{
+  "name": "@cortex/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "cortex-admin": "./dist/index.js" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -b tsconfig.build.json",
+    "start": "node dist/index.js",
+    "dev": "node --conditions=development --import tsx src/index.ts"
+  },
+  "dependencies": {
+    "@cortex/agents": "workspace:*",
+    "@cortex/client": "workspace:*",
+    "@cortex/core": "workspace:*",
+    "@cortex/database": "workspace:*",
+    "@cortex/embeddings": "workspace:*",
+    "@cortex/mcp-server": "workspace:*",
+    "@cortex/server": "workspace:*",
+    "@cortex/shared": "workspace:*",
+    "node-cron": "^4.5.0"
+  },
+  "license": "Apache-2.0"
+}
