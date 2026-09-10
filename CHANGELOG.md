@@ -9,6 +9,10 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Endpoints nuevos en la API**: `GET /client-config` (público: la URL del MCP, la versión
+  y la versión mínima de cliente, para que el CLI no adivine nada), `GET /version`,
+  `GET /toolbelt.json`, `GET /projects/:slug` y `POST /projects`. Con ellos, `cortex link`
+  deja de necesitar Postgres.
 - **`@cortex/client`**: paquete nuevo con todo el lado cliente (credenciales, HTTP, cliente
   tipado de la API, `.cortex.json`, transcripts). Depende solo de `@cortex/shared`, sin
   Postgres ni Mastra, que es lo que permitirá distribuir el CLI con `npm i -g` (ADR-0025).
