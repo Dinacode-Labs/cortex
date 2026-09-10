@@ -126,3 +126,27 @@ Mantener los docs al día es parte del trabajo, no un extra:
 - **`docs/research/`** — investigación que respalda decisiones (memoria, hooks, multimodal…).
 - **`CLAUDE.md`** — guía para agentes de IA que trabajen el repo; mantenerla actualizada y
   podarla periódicamente para que no acumule ruido ni quede obsoleta.
+
+## Publicar una versión
+
+La versión es **única para todo el monorepo**. Con un solo artefacto publicable —el CLI— y
+una imagen que lleva todo lo demás dentro, versionar cada paquete por su cuenta sería
+ceremonia sin beneficio, y nadie sabría qué versión tiene desplegada.
+
+```bash
+pnpm version:set 0.2.0                       # raíz, paquetes, apps, plugin y CHANGELOG
+git commit -am "chore(release): v0.2.0"
+git tag v0.2.0 && git push origin main v0.2.0
+```
+
+El tag dispara el workflow, que verifica que el tag coincide con lo que dicen los
+`package.json` y que el CHANGELOG tiene esa sección, corre todo (typecheck, tests, build),
+publica la imagen en GHCR, publica `@dinacode/cortex` en npm y crea la Release con las notas
+del CHANGELOG.
+
+**Cada PR añade su línea a `[Unreleased]`.** Escribe qué cambia para quien lo usa, no qué
+hiciste: las notas de la versión salen de ahí, no de los commits.
+
+Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatibles. Ya hay
+dos cosas apuntadas para retirarse en la `0.2.0`: el alias `LLM_PROVIDER=nan` y la variable
+`BREVO_SENDER`.
