@@ -9,6 +9,10 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **`cortex-admin`**: los comandos de operador (migrate, seed, ingest, maintain, enrich,
+  lint, conectores pesados y los servicios) salen del CLI a su propia app, que vive en la
+  imagen de despliegue. El CLI `cortex` se queda con lo de developer y deja de depender de
+  Postgres, Mastra y la extracción documental (ADR-0025).
 - **Destilación de sesiones en el servidor** (`POST /capture/session`): los hooks mandan el
   transcript condensado y escrubado, y el servidor lo destila con su propia clave. Ningún
   portátil necesita ya credenciales de LLM. Idempotente por sesión —los hooks disparan
@@ -43,6 +47,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   propio toolbelt fuera de este repo.
 
 ### Changed
+- `cortex link` va por la API en vez de por la base de datos: era el último comando del CLI
+  que necesitaba Postgres.
 - `cortex hook-capture`, `connect-sessions` y `connect-meeting` ya no llaman al modelo: solo
   condensan y envían. El pipeline que destilaba en el cliente desaparece.
 - La documentación de **proceso interno** (auditoría de seguridad, plan de refactor,

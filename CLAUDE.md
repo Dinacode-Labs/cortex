@@ -47,7 +47,10 @@ apps/
   server/      # API HTTP + auth email/OTP (Hono) — la usan CLI, hooks y conectores
   web/         # UI web (Hono SSR, cookie de sesión): src/routes/ + views/ (hono/html,
                # autoescape) + middleware/ + public/ (estáticos)
-  cli/         # CLI `cortex` (auth, link, ui, conectores…)
+  cli/         # CLI `cortex` de DEVELOPER (auth, link, ui, sync, hooks). Ligero: solo
+               # depende de client+shared, para poder instalarlo con npm i -g
+  admin/       # `cortex-admin`: comandos de OPERADOR (migrate, maintain, ingest,
+               # conectores pesados, servicios). Vive en la imagen, no en el portátil
 scripts/       # install.sh (instalador remoto; lo sirve apps/server)
 config/        # registry MÍNIMO del producto (MCP + cortex-capture + /cortex-save).
                # El toolbelt de la organización va en un registry externo (ADR-0014/0026)
@@ -90,6 +93,9 @@ apps/*      → cualquier package
 - Tras las fases A y B del refactor estas reglas **se cumplen** (la capa multimodal
   con LLM se inyecta con `setMediaExtractor`, como classifier/reranker/reconciler).
   No añadas violaciones nuevas.
+- **`apps/cli` solo puede depender de `client` y `shared`.** Si un comando necesita la base
+  de datos, el modelo o levantar un servicio, va en `apps/admin`. Hay un test que lo
+  comprueba (`tests/client-package.test.ts`).
 - **`client` se mantiene ligero a propósito**: nada de Postgres, Mastra ni embeddings. Es lo
   que permite empaquetar el CLI y distribuirlo con `npm i -g` sin arrastrar ~95 MB de
   dependencias al portátil de cada dev (ADR-0025). Hay un test que lo comprueba
@@ -112,7 +118,9 @@ pnpm db:up              # levantar Postgres (Docker, puerto host 5433)
 pnpm db:migrate         # aplicar migraciones
 pnpm db:seed            # cargar datos de demo (proyecto ficticio Acme Portal)
 pnpm typecheck          # comprobar tipos en todos los paquetes (sin build)
-pnpm build              # tsc -b: compila packages/* y apps de servidor a dist/
+pnpm build              # tsc -b: compila packages/* y apps a dist/
+pnpm cortex <cmd>       # CLI de developer (auth, link, hooks…)
+pnpm admin <cmd>        # comandos de operador (migrate, maintain, ingest…)
 pnpm clean              # borra los dist/ y los .tsbuildinfo
 pnpm test               # tests unitarios (Vitest, sin BD)
 pnpm test:integration   # tests de integración (requiere pnpm db:up)

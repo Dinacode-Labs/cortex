@@ -24,5 +24,15 @@
     "hono": "^4.12.26",
     "zod": "^3.25.76"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "exports": {
+    "./start": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./http": {
+      "development": "./src/http.ts",
+      "import": "./dist/http.js"
+    }
+  }
 }

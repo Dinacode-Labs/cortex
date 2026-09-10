@@ -33,7 +33,7 @@ services:
   # Aplica migraciones una vez (los demás esperan a que termine OK).
   migrate:
     <<: *cortex
-    command: node packages/database/dist/migrate-cli.js
+    command: node apps/admin/dist/index.js migrate
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"
@@ -64,7 +64,7 @@ services:
 
   worker:
     <<: *cortex
-    command: pnpm cortex maintain-worker
+    command: node apps/admin/dist/index.js maintain-worker
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

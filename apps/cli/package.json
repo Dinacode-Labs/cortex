@@ -8,13 +8,8 @@
     "start": "tsx src/index.ts"
   },
   "dependencies": {
-    "@cortex/agents": "workspace:*",
     "@cortex/client": "workspace:*",
-    "@cortex/core": "workspace:*",
-    "@cortex/database": "workspace:*",
-    "@cortex/embeddings": "workspace:*",
     "@cortex/shared": "workspace:*",
-    "node-cron": "^4.5.0",
     "yaml": "^2.9.0"
   },
   "devDependencies": {

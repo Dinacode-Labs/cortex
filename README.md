@@ -128,7 +128,7 @@ LLM + Mastra) se **inyecta** desde los entrypoints. El porqué de cada pieza est
 ## Tools MCP (8)
 
 Dos transportes: **stdio** (local, por proceso — `pnpm mcp`) y **HTTP autenticado**
-(Streamable HTTP — `cortex mcp-http`, puerto 8788), que exige el mismo token Bearer que
+(Streamable HTTP — `cortex-admin mcp-http`, puerto 8788), que exige el mismo token Bearer que
 la API. Para conectar un agente al MCP por HTTP: `claude mcp add --transport http
 cortex <url>/mcp --header "Authorization: Bearer <token>"`.
 
@@ -174,7 +174,7 @@ cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes]  # b
 
 Por defecto la captura tipa los items por **heurística** (barato) y la inteligencia
 (reclasificación de tipos, grafo, reconciliación, curación) se aplica luego con
-`cortex maintain` (su paso `reclassify` re-tipa con LLM lo ingerido por heurística, sin
+`cortex-admin maintain` (su paso `reclassify` re-tipa con LLM lo ingerido por heurística, sin
 re-ingerir). Con `CORTEX_CAPTURE_LLM=1` cada item se **clasifica con el LLM** ya en la
 ingesta (tipos fiables desde el minuto uno), a cambio de 1 llamada LLM por item.
 
@@ -191,12 +191,17 @@ pnpm install
 cp .env.example .env          # proveedores, email (OTP), CORTEX_ADMIN_EMAIL, CORTEX_AUTH_DOMAIN
 pnpm build                    # compila a dist/ (en dev puedes usar los scripts `dev` con tsx)
 pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker, puerto host 5433) + esquema
-pnpm cortex server            # API HTTP + auth (8787) — sirve también /install.sh
+pnpm admin server             # API HTTP + auth (8787) — sirve también /install.sh
 pnpm web                      # UI web (8080)
-pnpm cortex mcp-http          # MCP por HTTP autenticado (Streamable HTTP, 8788)
-pnpm cortex maintain-worker   # mantenimiento programado (cron)
+pnpm admin mcp-http           # MCP por HTTP autenticado (Streamable HTTP, 8788)
+pnpm admin maintain-worker    # mantenimiento programado (cron)
 ```
 
+- **Dos binarios, a propósito.** `cortex` es el CLI de **developer** (auth, link, hooks,
+  sync): ligero, instalable, sin base de datos ni modelo. `cortex-admin` son los comandos de
+  **operador** (migrate, maintain, ingest, conectores pesados, servicios) y vive en la
+  imagen de despliegue. Mientras estuvieron juntos, instalar Cortex significaba llevarse
+  Postgres y Mastra al portátil de cualquiera que solo quisiera vincular un repo.
 - **Endpoints de la API** (`8787`). Públicos: `/health`, `/client-config` (lo que un cliente
   necesita saber antes de autenticarse, incluida la URL del MCP), `/version`,
   `/toolbelt.json`, `/install.sh` y `/auth/request|verify`. Autenticados con Bearer:
@@ -233,7 +238,7 @@ pnpm cortex maintain-worker   # mantenimiento programado (cron)
   modelo de un agente concreto y admite `proveedor:modelo` para mandar solo ese rol a otro
   sitio (p. ej. `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`). `CORTEX_LLM_CONCURRENCY`
   (def. 4) limita las llamadas en paralelo: el cupo del proveedor es por API key.
-- **Mantenimiento** (server, idempotente, con lock): `pnpm cortex maintain
+- **Mantenimiento** (server, idempotente, con lock): `pnpm admin maintain
   ["<Proyecto>"]` encadena reclassify(tipos heurísticos→LLM) → enrich(only-missing) →
   resolve → temporal → curate → reconcile → lint. El **sync de fuentes es manual** (lo
   dispara el developer); esto es

@@ -100,3 +100,20 @@ export const captureRequest = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 export type CaptureRequest = z.infer<typeof captureRequest>;
+
+// --- Captura por lotes (conectores) ---------------------------------------------------
+
+/**
+ * Un item de `POST /capture/batch`. Los campos de enumeración van como `string` a
+ * propósito: los conectores construyen items a partir de fuentes externas y el servidor es
+ * quien valida contra los enums del dominio. Así un conector no necesita importar `core`.
+ */
+export interface BatchItem {
+  title?: string;
+  content: string;
+  type?: string;
+  sourceType?: string;
+  sourceReference?: string;
+  confidence?: string;
+  metadata?: Record<string, unknown>;
+}
