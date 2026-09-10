@@ -25,6 +25,10 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   propio toolbelt fuera de este repo.
 
 ### Changed
+- La documentación de **proceso interno** (auditoría de seguridad, plan de refactor,
+  estrategia de modelos con costes y la investigación de ingesta atada a un proveedor) sale
+  del repo: abrir el código no es abrir el proceso. El criterio de qué se publica y qué no
+  está en el ADR-0031.
 - `nan` pasa a ser un **alias obsoleto** de `openai-compatible` (avisa al usarse; se retira
   en 0.2.0). Igual para `EMBEDDINGS_PROVIDER=nan`.
 - `CORTEX_AUTH_DOMAIN` y `BREVO_SENDER` pierden su valor por defecto: dependían del dominio

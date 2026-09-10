@@ -1,7 +1,11 @@
-# Roadmap — Dinacode Cortex
+# Roadmap — Cortex
 
-Producto **interno** de Dinacode. Este fichero recoge lo que queda por hacer; las
-decisiones técnicas firmes viven en [`decisions.md`](./decisions.md).
+Lo que queda por hacer en el producto. Las decisiones técnicas firmes viven en
+[`decisions.md`](./decisions.md).
+
+> Aquí solo va el **qué** técnico. Las prioridades de negocio, los responsables y la
+> configuración concreta de cada despliegue son de cada operador y no se documentan en este
+> repo (ADR-0031).
 
 ## Refactor de arquitectura — ✅ COMPLETADO (julio 2026)
 
@@ -21,7 +25,7 @@ junio quedan referenciados en su [backlog](./audit/99-backlog-priorizado.md).
   `created_by` es el origen (`session-backfill`, `notion`…). Con identidad real,
   `created_by` = el **email autenticado** → atribución sin cambiar el modelo.
 - **Auth propuesta: email + OTP (sin passwords).** El usuario **es** su correo
-  (`@dinacode.com`). Flujo tipo `gh auth login`: `cortex auth login` → email → OTP →
+  (el dominio lo fija `CORTEX_AUTH_DOMAIN`). Flujo tipo `gh auth login`: `cortex auth login` → email → OTP →
   token local (`~/.cortex/credentials`); cada save/captura viaja firmada por el email.
 - **Permisos/compartición:** sobre lo anterior — proyecto como entidad gestionada
   (dueño + miembros, read/write/share). El **gate de slug** (`resolveLinkedProject`) es
@@ -44,10 +48,7 @@ Hoy los conectores solo capturan **texto** (`.md`, tickets, chat, código). El e
 de Notion de un cliente real traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
 `.png/.jpg`, 3 `.drawio` y 2 `.mp4`** que se ignoraron. Hay conocimiento valioso ahí.
 
-> Investigación de cómo lo hacen otros + capacidades reales de nan:
-> [`research/multimodal-ingestion.md`](./research/multimodal-ingestion.md).
-> **nan tiene `whisper`** (transcripción ✅) y posible visión vía `mimo-v2.5`/`gemma4`
-> (a confirmar). **Principio:** OCR/caption/transcript son **inferencias, no hechos**
+> **Principio:** OCR/caption/transcript son **inferencias, no hechos**
 > (confianza + proveniencia, §5.5); extraer **conocimiento tipado**, no volcar texto crudo.
 
 ### 1. Captura de documentos (Word / PDF / Excel) — **hecho (v1)**
@@ -64,8 +65,8 @@ de Notion de un cliente real traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, 
 
 ### 2. Captura de imágenes y diagramas — **hecho (v1)**
 - **Implementado en `extract.ts`:** imágenes (`.png/.jpg/.jpeg/.webp/.gif`) → **caption
-  con el modelo de visión** del proveedor (verificado: **qwen3.6 y gemma4 de nan ven
-  imágenes**; el 403 era el User-Agent de Cloudflare). `.drawio` → texto de nodos/aristas
+  con el modelo de visión** del proveedor (`CORTEX_VISION_MODEL`; verificado con modelos
+  multimodales reales — un 403 inicial resultó ser el User-Agent, no el modelo). `.drawio` → texto de nodos/aristas
   del XML (maneja diagramas comprimidos con inflate), sin visión. Los conectores
   (notion, docs) los recogen solos vía `SUPPORTED_EXTS` y los enlazan a su página.
   Filtro de ruido: imágenes < 8 KB se omiten; el VLM marca `IRRELEVANTE` los iconos.
@@ -76,8 +77,8 @@ de Notion de un cliente real traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, 
 
 ### 3. Vídeo / audio (transcripción) — **hecho (v1)**
 - **Implementado en `extract.ts`:** audio (`.opus` de WhatsApp, mp3, m4a, ogg, wav,
-  flac, amr…) y vídeo (mp4, mov, mkv, webm…) → **transcripción con `whisper` de nan**
-  (`/v1/audio/transcriptions`, multipart). Vídeo y formatos no soportados se
+  flac, amr…) y vídeo (mp4, mov, mkv, webm…) → **transcripción por STT**
+  (`/v1/audio/transcriptions`, multipart; `CORTEX_STT_*`). Vídeo y formatos no soportados se
   **transcodifican con ffmpeg** a mp3 mono 16 kHz antes. Los conectores los recogen y
   enlazan a su página. Verificado: mp4 de un proyecto piloto (grabación de un bug) → transcripción
   correcta.
@@ -276,23 +277,19 @@ conclusión razonada (construir / no construir / construir acotado) **antes de t
 
 ## Estrategia de modelos LLM y chunking (dirección acordada, jul 2026)
 
-Documento completo en [`research/llm-model-strategy.md`](./research/llm-model-strategy.md):
-asignación de **modelo por rol** y arreglo del **chunking**. Contrastado con benchmarks
+Asignación de **modelo por rol** y arreglo del **chunking**. Contrastado con benchmarks
 recientes (Artificial Analysis Intelligence Index v4.1, jul 2026) y datos reales de
 `llm_usage`. **Estado:** Fase 0 (desacoplar proveedores, #29), Fase 1 (chunking v1, #30),
 Fase 2 (modelo por rol + log servido, #31) y el proveedor genérico (ADR-0024)
 **mergeadas**. Pendiente: activar el routing en el `.env` (solo config) y Contextual
 Retrieval (Fase 4, condicionado al eval set).
 
-- **✅ NaN se queda (sept 2026):** la migración forzosa no hace falta. El proveedor `nan`
-  cableado se generalizó a **`openai-compatible`** (ADR-0024), que sirve igual para NaN,
-  Ollama, vLLM o LM Studio; `nan` queda como alias obsoleto hasta 0.2.0. Seguimos con
-  `qwen3-embedding` (4096 dims), así que **no hay que recalibrar** los umbrales de dedup
-  de ADR-0009. **Decidido (sept 2026):** el servidor va con una clave de membresía personal;
-  la cuota es por miembro y se asume, apoyándose en que el volumen medido es pequeño frente
-  al límite y en que Cortex se publicará como open source. No está confirmado por NaN: si lo
-  objetan, la salida es cambiar `LLM_BASE_URL`/`LLM_API_KEY` (por eso el proveedor es
-  genérico). Conviene revisar `llm_usage` periódicamente.
+- **✅ Proveedor genérico (sept 2026):** el vendor que estaba cableado en el código se
+  generalizó a **`openai-compatible`** (ADR-0024), que vale igual para un cluster remoto o
+  para Ollama/vLLM/LM Studio en local; `nan` queda como alias obsoleto hasta 0.2.0. Qué
+  endpoint y qué modelos usa cada despliegue es decisión del operador y vive en su `.env`,
+  no aquí (ADR-0031). Conservar el mismo modelo de embedding evita recalibrar los umbrales
+  de dedup de ADR-0009; cambiarlo obliga a re-embeder.
 - **Chunking de documentos — v1 hecho (#30):** antes un doc entraba como 1 entry / 1
   vector **truncado a 8k** (perdía casi todo en silencio). Ahora `chunkDocument` trocea
   por estructura (headings → párrafos → frases) en fragmentos de ~1000 tokens con solape,
@@ -314,15 +311,9 @@ Retrieval (Fase 4, condicionado al eval set).
 - **Config de modelo por rol:** `CORTEX_MODEL_<ROLE>` con fallback al default +
   `CORTEX_VISION_MODEL` separado (hoy `media.ts` hereda el modelo de chat y se rompe con
   modelos text-only) + loguear el modelo **servido** (detecta routing de OpenRouter).
-- **Routing acordado (~$20/mes, 10 devs):** todo-OpenRouter — `deepseek-v4-flash` para
-  lo mecánico, `deepseek-v4-pro` para juicio (reconciler/merger/distiller), `grok-4.5`
-  para el retriever (visible); embeddings+STT por OpenAI (OpenRouter no los sirve).
-  **NaN/híbrida/MiniLM/Vertex descartados** (ver §4 del doc).
-- **Coste de ingesta inicial del backlog** (docs/tareas ya existentes): embeddings puros
-  decenas de $ una vez (todo el corpus); el pipeline completo de enriquecimiento es el
-  grueso pero es opcional/gradual. Detalle en §3.1 del doc.
-- **Decisión registrada:** [ADR-0023](./decisions.md) (dirección aceptada; implementación
-  por fases). Revisar precios/benchmarks (cambian rápido) antes de fijar modelos.
+- **Decisión registrada:** [ADR-0023](./decisions.md), revisada en la parte de proveedor
+  por [ADR-0024](./decisions.md). Qué modelos usa cada despliegue, con qué endpoint y a qué
+  coste, es decisión del operador (ADR-0031).
 
 ## Otros pendientes (ya en curso/acordados)
 - **Tests** (heurísticas, loops, integración MCP) y **despliegue** reproducible
