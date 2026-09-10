@@ -10,7 +10,6 @@ IA (Claude Code, Codex, OpenCode, Hermes) por un **MCP corporativo** y unos **ho
 automatizan el bucle: tu agente arranca **sabiendo** el proyecto y, al terminar, Cortex
 **captura** lo aprendido (atribuido a tu email).
 
-- Plan fundacional: [`dinacode-cortex-contexto-y-plan-demo.md`](./dinacode-cortex-contexto-y-plan-demo.md)
 - Decisiones (ADR): [`docs/decisions.md`](./docs/decisions.md) · Roadmap: [`docs/roadmap.md`](./docs/roadmap.md)
 - Contribuir (PRs): [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 - Auditoría integral (jun 2026): [`docs/audit/`](./docs/audit/README.md) · **Refactor de
@@ -31,7 +30,7 @@ automatizan el bucle: tu agente arranca **sabiendo** el proyecto y, al terminar,
 **Práctico**
 - [Para developers — instalar y usar](#para-developers--instalar-y-usar)
 - [Capacidades](#capacidades) · [Arquitectura](#arquitectura)
-- [Tools MCP (8)](#tools-mcp-8) · [Toolbelt](#toolbelt-skills-y-mcps-que-reparte-cortex-sync) · [Conectores](#ingesta-de-fuentes-conectores)
+- [Tools MCP (8)](#tools-mcp-8) · [Toolbelt](#toolbelt-lo-que-cortex-sync-instala-en-tus-agentes) · [Conectores](#ingesta-de-fuentes-conectores)
 - [Operar el servidor (infra/admin)](#operar-el-servidor-infraadmin) · [Estructura del repo](#estructura-del-repo)
 
 **[Guía formativa: cómo funciona por dentro](#guía-formativa-cómo-funciona-por-dentro)**
@@ -71,7 +70,8 @@ cortex --help                        # todos los comandos
 **Qué obtienes (sin hacer nada más):** al abrir una sesión con tu agente, Cortex
 **inyecta** el context-pack del proyecto; al cerrarla, **captura** lo aprendido
 (destilado, no en crudo) firmado con tu email. Además, el toolbelt deja tus agentes con
-MCP de Cortex + skills del ecosistema (Plane, Jira, Notion, Teams…).
+el MCP de Cortex y su skill de captura; si tu equipo tiene un registry propio, también las
+herramientas que uséis.
 
 - **Opt-in por repo:** sin `.cortex.json` no se inyecta ni captura nada. `cortex link --ignore`
   desactiva un repo concreto (p.ej. uno personal anidado).
@@ -145,35 +145,21 @@ cortex <url>/mcp --header "Authorization: Bearer <token>"`.
 | `search_project_code` | Búsqueda híbrida sobre el código indexado |
 | `lint_project_context` | Salud del conocimiento (contradicciones, duplicados, huecos…) |
 
-## Toolbelt: skills y MCPs que reparte `cortex sync`
+## Toolbelt: lo que `cortex sync` instala en tus agentes
 
-Además del MCP de Cortex, `cortex sync` instala un set de **capacidades compartidas del
-equipo** en tus agentes. Reparte **configuración, no credenciales**: cada tool necesita su
-propia auth (`cortex sync --doctor` dice qué falta). Registry **PR-able**:
-[`config/toolbelt.json`](./config/toolbelt.json) — para añadir/mejorar una skill, PR aquí.
+Cortex reparte **lo suyo**: el MCP con las 8 tools de arriba, la skill `cortex-capture`
+(capturar conocimiento con baja fricción) y el comando `/cortex-save`. El registry vive en
+[`config/toolbelt.json`](./config/toolbelt.json).
 
-**Skills** (instrucciones + scripts que el agente usa):
+Además, `cortex sync` sabe instalar el **toolbelt de tu organización** —los MCPs y skills de
+las herramientas que use tu equipo— desde un **registry externo**, normalmente en un repo
+privado. Eso no vive aquí a propósito: no es producto, es la configuración de una empresa
+concreta (ADR-0014 revisado y ADR-0026). El esquema del fichero está en
+[`docs/toolbelt-registry.md`](./docs/toolbelt-registry.md).
 
-| Skill | Qué hace | Auth |
-| --- | --- | --- |
-| `cortex-capture` | Capturar conocimiento en Cortex (decisiones, incidencias, convenciones…) con baja fricción | — (usa el MCP `cortex`) |
-| `bkt` | CLI de Bitbucket (Data Center + Cloud): repos, PRs, ramas, issues, webhooks, pipelines | token Bitbucket (keyring) |
-| `plane-api` | Helpers REST de Plane (self-hosted) para lo que el MCP no cubre: adjuntos nativos, Markdown→HTML | `PLANE_API_KEY` |
-| `google-chat` | Google Chat: listar spaces, enviar/leer mensajes, gestionar DMs | OAuth Google |
-| `agent-teams` | Microsoft Teams: enviar mensajes, leer canales, reacciones | credenciales Teams |
-| `expect` | QA de front-end: testea/valida componentes React/`.tsx`/`.css` (expect-cli), busca bugs de UI | — (CLI local) |
-
-**MCPs** (servidores de tools que se registran en el agente):
-
-| MCP | Qué da | Auth |
-| --- | --- | --- |
-| `cortex` | Las 8 tools de memoria de arriba | token Cortex (en HTTP) |
-| `plane` | Gestión de proyectos Plane (tickets, ciclos, módulos, work items…) | `PLANE_API_KEY` |
-| `atlassian` | Jira + Confluence | OAuth Atlassian |
-| `notion` | Páginas y bases de Notion | token Notion |
-| `chrome-devtools` | Inspección/automatización de Chrome (depurar front-end) | — |
-
-**Comando**: `/cortex-save` (guardar contexto desde el chat del agente).
+En ambos casos se reparte **configuración, nunca credenciales**: cada entrada documenta qué
+auth necesita y `cortex sync --doctor` dice qué falta. Las entradas cuyas variables no estén
+exportadas se omiten con un aviso, no rompen la instalación.
 
 ## Ingesta de fuentes (conectores)
 
@@ -216,8 +202,9 @@ pnpm cortex maintain-worker   # mantenimiento programado (cron)
   `CORTEX_AUTH_DOMAIN` es la whitelist de dominios y **no tiene default**: vacío significa
   que cualquier email puede registrarse, así que fíjalo en producción (el servidor avisa al
   arrancar). **Admin(s):** `CORTEX_ADMIN_EMAIL` (coma-separado) ven todos los proyectos y
-  gestionan permisos. OTP por **Brevo** (`BREVO_API_KEY` + `BREVO_SENDER`); sin clave, modo
-  dev (el código se loguea, no se envía).
+  gestionan permisos. El envío del OTP es
+  enchufable con `CORTEX_EMAIL_PROVIDER`: `log` (imprime el código, no envía — default),
+  `brevo` o `smtp`. El servidor valida la config al arrancar.
 - **Marca:** lo que ve el usuario (web, emails, contexto inyectado, CLI) sale de
   `CORTEX_BRAND_NAME` (def. `Cortex`) y, opcionalmente, `CORTEX_BRAND_LOGO_FILE` /
   `CORTEX_BRAND_LOGO_SVG`. Sin logo se pinta un wordmark de texto.
@@ -271,7 +258,7 @@ docker compose -f deploy/docker-compose.yml up -d --build
 ```
 apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth) · cli (cortex)
 packages/    core · agents · embeddings · database · shared
-config/      toolbelt.json (registry) · skills/ (vendored) · commands/
+config/      toolbelt.json (registry del producto) · skills/cortex-capture · commands/
 scripts/     install.sh (instalador remoto; lo sirve apps/server)
 docs/        decisions.md · roadmap.md · research/ · audit/ (jun 2026) · refactor/ (jul 2026)
 ```
@@ -557,7 +544,8 @@ sabíamos a fecha X?»:
 
 Por defecto, la búsqueda y el context-pack devuelven **solo lo vigente** (`valid_to IS
 NULL`); `asOf` reconstruye cualquier foto del pasado. (Verificado en un proyecto real,
-LevelUp: 266 hechos vigentes / 147 históricos; a 2026-05-28 había 182, a 06-12 había 239.)
+en un proyecto piloto real: 266 hechos vigentes / 147 históricos; a 2026-05-28 había
+182, a 06-12 había 239.)
 
 > **⚠️ Qué mirar.** La auto-invalidación cubre **supersesiones entrada→entrada** y los
 > hechos marcados «Histórico» (p.ej. legacy de Plane). Las **contradicciones entre
@@ -675,11 +663,11 @@ deuda técnica, convenciones, módulos sensibles**, y —si pasas un `area`— u
 relevante a esa área (búsqueda vectorial). Solo hechos **vigentes** por defecto; admite
 `asOf` para la foto histórica.
 
-**Herencia.** Un subproyecto **hereda el contexto de sus ancestros**. Si «Boluda» es el
-cliente y `boluda-api` un subproyecto, el pack de `boluda-api` incluye lo común de «Boluda»
-**sin** mezclar el contexto de `boluda-web`. Así se evita el *context-rot* de meterlo todo
+**Herencia.** Un subproyecto **hereda el contexto de sus ancestros**. Si «Acme» es el
+cliente y `acme-api` un subproyecto, el pack de `acme-api` incluye lo común de «Acme»
+**sin** mezclar el contexto de `acme-web`. Así se evita el *context-rot* de meterlo todo
 en un saco, y a la vez no se duplica lo compartido. Los permisos cascada igual (ser miembro
-de «Boluda» abre sus subproyectos).
+de «Acme» abre sus subproyectos).
 
 Este pack renderizado a Markdown es **exactamente lo que el hook de `SessionStart` inyecta**
 en tu agente al abrir sesión (vía la API autenticada, truncado a ~6000 caracteres).
@@ -687,7 +675,7 @@ en tu agente al abrir sesión (vía la API autenticada, truncado a ~6000 caracte
 > **⚠️ Qué mirar.** La herencia hoy aplica al **context-pack**, no a `search`/`ask` (una
 > búsqueda en el subproyecto no trae aún lo del padre). Y el pack se **trunca**: en
 > proyectos enormes, decidir *qué entra* en ese presupuesto de contexto es justo el tema que
-> Alejandro levantó (índice navegable / jerárquico) y que está **a estudiar en el roadmap**.
+> se levantó en su día (índice navegable / jerárquico) y que está **a estudiar en el roadmap**.
 
 ## 10. Lint (salud del conocimiento) y observabilidad
 

@@ -41,7 +41,7 @@ junio quedan referenciados en su [backlog](./audit/99-backlog-priorizado.md).
 ## Ingesta multimodal (captura más allá del texto)
 
 Hoy los conectores solo capturan **texto** (`.md`, tickets, chat, código). El export
-de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
+de Notion de un cliente real traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
 `.png/.jpg`, 3 `.drawio` y 2 `.mp4`** que se ignoraron. Hay conocimiento valioso ahí.
 
 > Investigación de cómo lo hacen otros + capacidades reales de nan:
@@ -55,7 +55,7 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
   directorio y extrae texto de `.docx` (mammoth), `.pdf` (unpdf) y `.xlsx` (SheetJS),
   ingiriendo cada uno como `sourceType: document` (2 fases, embeddings por lotes); el
   grafo lo añade `maintain`/`enrich`. PDF escaneado (sin capa de texto) se omite.
-  Verificado: 23 documentos de CE Portal (contratos, certificados, registros de
+  Verificado: 23 documentos de un proyecto piloto (contratos, certificados, registros de
   mantenimiento…), 0 secretos.
 - **Chunking de docs largos — hecho (#30):** ya no se trunca; `chunkDocument` trocea por
   estructura con solape (ver «Estrategia de modelos LLM y chunking» más abajo).
@@ -79,7 +79,7 @@ de Notion de CE Portal traía además **12 `.docx`, 10 `.pdf`, 1 `.xlsx`, ~300
   flac, amr…) y vídeo (mp4, mov, mkv, webm…) → **transcripción con `whisper` de nan**
   (`/v1/audio/transcriptions`, multipart). Vídeo y formatos no soportados se
   **transcodifican con ffmpeg** a mp3 mono 16 kHz antes. Los conectores los recogen y
-  enlazan a su página. Verificado: mp4 de CE Portal (grabación de un bug) → transcripción
+  enlazan a su página. Verificado: mp4 de un proyecto piloto (grabación de un bug) → transcripción
   correcta.
 - **Chunking — hecho:** los audios largos (> límite de whisper, ~24 MB) se **trocean con
   ffmpeg** (`-f segment`, segmentos mono 16 kHz de `CORTEX_AUDIO_SEGMENT_SEC`, def. 600 s)
@@ -101,19 +101,13 @@ poseer el pipeline de grabación.
   consentimiento a quien dirigió la reunión. Anunciar/registrar consentimiento en
   llamadas con cliente.
 
-## Consolidar `ai-manager` dentro de Cortex (→ Alejandro)
+## Config de IA por proyecto en el registry (pendiente)
 
-`git@github.com:Dinacode-Labs/ai-manager.git` es hoy donde Dinacode **comparte las
-configs de Claude por proyecto**. Esto **solapa directamente** con el harness de Cortex
-(`config/toolbelt.json` + `cortex sync`, que ya reparte MCPs/skills/comandos a
-Claude/Codex/OpenCode/Hermes). La idea: **Cortex se encarga de TODO** — unificar la
-distribución de config de IA (global y **por proyecto**) en un único sistema.
-
-- **Qué falta:** soportar config **por-proyecto** en el registry (hoy el toolbelt es
-  global); que `cortex sync` instale también la config específica del proyecto (CLAUDE.md,
-  permisos, hooks, MCPs/skills del proyecto) — lo que hoy vive en ai-manager.
-- **Migración:** importar lo de ai-manager al modelo de Cortex y deprecar el repo.
-- **Responsable:** **Alejandro.** (Aquí solo queda indicado.)
+Hoy el toolbelt es **global**: reparte los mismos MCPs, skills y comandos a todos los
+repos. Falta soportar config **por proyecto** en el registry (el `CLAUDE.md`, los permisos,
+los hooks y los MCPs que solo tienen sentido en un repo concreto) para que `cortex toolbelt
+sync` la instale junto con la global. Esquema del registry en
+[`toolbelt-registry.md`](./toolbelt-registry.md).
 
 ## Hooks del agente (automatizar el bucle) — **v1 hecho (Claude Code)**
 
@@ -166,7 +160,7 @@ Bucle automático sin invocación manual. Análisis + fricción:
   core, embeben por lotes, sin LLM) se reconcilian en `maintain` vía **`reconcileProject`**:
   dedup de near-idénticos del mismo `source_type` **reusando los embeddings** ya
   calculados (sin coste). **Excluye formatos imagen** (su embedding es un caption genérico
-  → agruparía imágenes distintas). Verificado en CE Portal: 11 near-dups de texto
+  → agruparía imágenes distintas). Verificado en el proyecto piloto: 11 near-dups de texto
   deduplicados, 0 imágenes tocadas.
 - **Pendiente:** `/review` opcional NO bloqueante (curado a mano), solo si hace falta;
   merge LLM (no solo dedup) en el pase de maintain.
@@ -263,42 +257,22 @@ mano), y que el cron invoque. **Recomendación:** empezar con **A** al desplegar
 evolucionar a **B** cuando queramos reintentos/observabilidad. **Depende del despliegue**
 (no hay server aún).
 
-## Índice navegable de contexto dentro de un proyecto (→ Alejandro, a estudiar)
+## Índice navegable de contexto dentro de un proyecto (a estudiar)
 
-**Propuesta (Alejandro):** dentro de **un mismo proyecto con mucha información**,
-mantener un **índice con descripciones** de los archivos (o de conjuntos de archivos
-relacionados) que el agente tenga **siempre en contexto**, para encontrar la información
-más rápido sin escanear todo. Y cuando la info escala, **no un índice plano gigante sino
-un árbol de índices** (índice de índices, coarse → fino) para que el agente sepa "por
-dónde empezar". Nota: el árbol es **intra-proyecto** (estructurar mucha info de un solo
-proyecto), no la jerarquía padre→hijo entre proyectos.
+**Propuesta:** dentro de un mismo proyecto con mucha información, un índice/mapa navegable
+(por área o módulo, con resúmenes) que el agente pueda recorrer, en vez de depender solo de
+la búsqueda semántica.
 
-**Dónde encaja hoy:** Cortex no carga un índice gigante en contexto. Lo que va como
-contexto base es el **context pack** curado y pequeño (`get_project_context_pack`:
-decisiones, restricciones, convenciones, módulos sensibles…) y el resto se recupera
-**bajo demanda por búsqueda semántica** (`search_project_context` / `search_project_code`)
-+ el **grafo de entidades y relaciones**. Es decir, hoy la respuesta a "mucha info en un
-proyecto" es **recuperación, no índice navegable siempre presente**.
+**Contraargumento a validar:** un índice siempre-en-contexto **compite por el presupuesto
+de contexto** y **se desactualiza** (hay que mantenerlo en cada cambio); el retrieval
+semántico evita ambas cosas. Habría que determinar si el índice **gana** en algún régimen
+concreto (proyectos enormes, navegación estructural, «saber qué existe» frente a «encontrar
+lo relevante»).
 
-**Hay que estudiarlo bien antes de construir nada.** Tareas de research:
-- **¿Lo hace alguien?** Mirar si herramientas de memoria/contexto de agentes y de
-  indexado de repos (claude-mem, mem0, codebase index de Cursor/Windsurf, repomix,
-  `llms.txt`, "agentic search"…) montan un **índice jerárquico con descripciones siempre
-  en contexto**, o si han **convergido a embeddings + retrieval** — y, en ese caso, **por
-  qué**.
-- **Si no se hace, entender por qué no.** Hipótesis a validar: un índice siempre-en-memoria
-  **compite por el presupuesto de contexto** y **se desactualiza** (hay que mantenerlo en
-  cada cambio); el retrieval semántico evita ambas. Determinar si el índice navegable
-  **gana** en algún régimen concreto (proyectos enormes, navegación estructural, "saber
-  qué existe" frente a "encontrar lo relevante").
-- **Diseño a evaluar (solo si el research sale a favor):** una **capa de índices con
-  resúmenes por área/módulo** encima del grafo y del code-index, **generada y mantenida en
-  `maintain`** (no a mano), con **trazabilidad** (es inferencia, no hecho; §5.5) y **coste
-  acotado**. Decidir qué porción va "siempre en contexto" frente a navegable bajo demanda.
-
-**Salida esperada:** un `research/context-index.md` con conclusión razonada
-(construir / no construir / construir acotado) **antes de tocar código**.
-**Responsable:** Alejandro. (Aquí solo queda indicado.)
+**Diseño a evaluar (solo si el research sale a favor):** una capa de índices con resúmenes
+por área generada y mantenida en `maintain` (no a mano), con trazabilidad (es inferencia, no
+hecho; §5.5) y coste acotado. **Salida esperada:** un `research/context-index.md` con
+conclusión razonada (construir / no construir / construir acotado) **antes de tocar código**.
 
 ## Estrategia de modelos LLM y chunking (dirección acordada, jul 2026)
 
@@ -314,8 +288,11 @@ Retrieval (Fase 4, condicionado al eval set).
   cableado se generalizó a **`openai-compatible`** (ADR-0024), que sirve igual para NaN,
   Ollama, vLLM o LM Studio; `nan` queda como alias obsoleto hasta 0.2.0. Seguimos con
   `qwen3-embedding` (4096 dims), así que **no hay que recalibrar** los umbrales de dedup
-  de ADR-0009. Pendiente del usuario: confirmar con NaN si una clave de miembro puede
-  respaldar el servidor de la empresa (la cuota es por miembro).
+  de ADR-0009. **Decidido (sept 2026):** el servidor va con una clave de membresía personal;
+  la cuota es por miembro y se asume, apoyándose en que el volumen medido es pequeño frente
+  al límite y en que Cortex se publicará como open source. No está confirmado por NaN: si lo
+  objetan, la salida es cambiar `LLM_BASE_URL`/`LLM_API_KEY` (por eso el proveedor es
+  genérico). Conviene revisar `llm_usage` periódicamente.
 - **Chunking de documentos — v1 hecho (#30):** antes un doc entraba como 1 entry / 1
   vector **truncado a 8k** (perdía casi todo en silencio). Ahora `chunkDocument` trocea
   por estructura (headings → párrafos → frases) en fragmentos de ~1000 tokens con solape,

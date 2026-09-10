@@ -1,7 +1,7 @@
 # Investigación — Ingesta multimodal (documentos, imágenes, vídeo, reuniones)
 
 Cómo lo resuelven otros y qué encaja en Cortex (Node/TS, Postgres+pgvector, LLM/
-embeddings por endpoint OpenAI-compatible). Motivado por el export de CE Portal, que
+embeddings por endpoint OpenAI-compatible). Motivado por el export de Notion de un cliente real, que
 traía `.docx/.pdf/.xlsx`, ~300 imágenes, `.drawio` y `.mp4` que el conector (solo
 `.md`) ignoró. Resumen de 4 investigaciones paralelas + verificación de capacidades
 de nan.
