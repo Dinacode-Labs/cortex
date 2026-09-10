@@ -305,16 +305,17 @@ proyecto" es **recuperación, no índice navegable siempre presente**.
 Documento completo en [`research/llm-model-strategy.md`](./research/llm-model-strategy.md):
 asignación de **modelo por rol** y arreglo del **chunking**. Contrastado con benchmarks
 recientes (Artificial Analysis Intelligence Index v4.1, jul 2026) y datos reales de
-`llm_usage`. **Estado:** Fase 0 (off-NaN, #29), Fase 1 (chunking v1, #30) y Fase 2
-(modelo por rol + log servido, #31) **mergeadas**. Pendiente: activar el routing en el
-`.env` (solo config), recalibrar umbrales de dedup (necesita key OpenAI) y Contextual
-Retrieval (Fase 4).
+`llm_usage`. **Estado:** Fase 0 (desacoplar proveedores, #29), Fase 1 (chunking v1, #30),
+Fase 2 (modelo por rol + log servido, #31) y el proveedor genérico (ADR-0024)
+**mergeadas**. Pendiente: activar el routing en el `.env` (solo config) y Contextual
+Retrieval (Fase 4, condicionado al eval set).
 
-- **🔴 Migrar off-NaN (urgente):** perdemos el acceso a NaN próximamente y con él
-  embeddings (`qwen3-embedding`), visión y whisper. El proveedor `local` es feature-hash
-  léxico, **no semántico** → sin NaN no hay retrieval real. Plan: `EMBEDDINGS_PROVIDER=openai`
-  (`text-embedding-3-large`) + STT/visión a OpenAI/OpenRouter + recalibrar umbrales de
-  dedup (hoy solo hay embeddings de prueba, así que no hay migración de datos).
+- **✅ NaN se queda (sept 2026):** la migración forzosa no hace falta. El proveedor `nan`
+  cableado se generalizó a **`openai-compatible`** (ADR-0024), que sirve igual para NaN,
+  Ollama, vLLM o LM Studio; `nan` queda como alias obsoleto hasta 0.2.0. Seguimos con
+  `qwen3-embedding` (4096 dims), así que **no hay que recalibrar** los umbrales de dedup
+  de ADR-0009. Pendiente del usuario: confirmar con NaN si una clave de miembro puede
+  respaldar el servidor de la empresa (la cuota es por miembro).
 - **Chunking de documentos — v1 hecho (#30):** antes un doc entraba como 1 entry / 1
   vector **truncado a 8k** (perdía casi todo en silencio). Ahora `chunkDocument` trocea
   por estructura (headings → párrafos → frases) en fragmentos de ~1000 tokens con solape,
