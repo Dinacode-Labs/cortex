@@ -29,10 +29,8 @@ function printReports(results: { id: string; report: { changed: string[]; skippe
       nada = false;
     }
     for (const s of report.skipped) console.log(`  · ${s}`);
-    for (const w of report.warnings) {
-      console.log(`  ⚠️  ${w}`);
-      nada = false;
-    }
+    // Los avisos no cuentan como cambio: hay agentes que siempre tienen algo que recordar.
+    for (const w of report.warnings) console.log(`  ⚠️  ${w}`);
     if (!report.changed.length && !report.skipped.length && !report.warnings.length) console.log("  · nada que hacer");
   }
   return nada;

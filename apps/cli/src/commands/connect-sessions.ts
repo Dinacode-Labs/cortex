@@ -5,14 +5,14 @@ import { backfillSessions, type CapturePlatformName } from "@cortex/client";
  * transcript y lo manda al servidor, que lo destila (ADR-0025): no se ingiere el crudo y
  * este comando ya no necesita clave de LLM.
  */
-const PLATAFORMAS = ["claude", "codex", "opencode", "hermes"] as const;
+const PLATAFORMAS = ["claude", "codex", "opencode", "hermes", "pi"] as const;
 
 export async function run(args: string[]): Promise<void> {
   const slug = args[0];
   const repoPath = args[1];
   const platform = (args[2] ?? "claude").toLowerCase();
   if (!slug || !repoPath) {
-    console.error('Uso: cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes]');
+    console.error('Uso: cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes|pi]');
     process.exitCode = 1;
     return;
   }

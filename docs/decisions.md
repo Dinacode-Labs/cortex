@@ -975,7 +975,13 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   captura y `/cortex-save` en un solo paquete versionado. (3) Si el plugin no se puede
   instalar —el repo es privado y no todo el mundo tiene acceso—, se cae a escribir los hooks
   en `~/.claude/settings.json` y el resultado funciona igual; `--no-plugin` fuerza ese modo.
-  (4) Cada agente se integrará con **su** mecanismo nativo, no con un común denominador.
+  (4) Cada agente se integra con **su** mecanismo nativo, no con un común denominador.
+  **Codex lee el mismo marketplace y acepta el mismo plugin** (comprobado con `codex plugin
+  list` y una instalación real), así que comparten paquete; lo único que Codex no coge de ahí
+  es el MCP, que se registra con `codex mcp add`. OpenCode se integra con un plugin JS que
+  escucha sus eventos de sesión, Pi con una extensión TypeScript, y Hermes con hooks en su
+  `config.yaml`. Como el plugin es compartido, el hook de captura **no lleva el agente
+  cableado**: lo deduce de la ruta del transcript.
   (5) Toda escritura es idempotente, hace copia (`.bak-<fecha>`) antes de tocar un fichero
   ajeno y se puede deshacer con `--remove`; `--dry-run` enseña el plan.
 - **Migración del legado, dentro del propio `setup`:** los hooks `pnpm -C <clon> cortex

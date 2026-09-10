@@ -24,8 +24,8 @@ export const PLUGIN = `cortex@${MARKETPLACE}`;
 
 const HOOK_DEFS: HookDef[] = [
   { event: "SessionStart", kind: "context", matcher: "startup|resume|clear|compact", command: "cortex hook-context", timeout: 20 },
-  { event: "SessionEnd", kind: "capture", command: "cortex hook-capture --platform claude", timeout: 30 },
-  { event: "PreCompact", kind: "capture", command: "cortex hook-capture --platform claude", timeout: 30 },
+  { event: "SessionEnd", kind: "capture", command: "cortex hook-capture", timeout: 30 },
+  { event: "PreCompact", kind: "capture", command: "cortex hook-capture", timeout: 30 },
 ];
 
 const settingsFile = (ctx: SetupCtx): string => homeFile(ctx, ".claude/settings.json");
