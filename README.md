@@ -83,6 +83,7 @@ Luego, en cualquier repo de trabajo:
 cortex link --create "Mi Proyecto"   # crea el proyecto y vincula esta carpeta (.cortex.json)
 cortex link <slug>                   # vincula a un proyecto que YA existe (si tienes acceso)
 cortex ui                            # abre la UI web ya autenticada (listado de proyectos)
+cortex doctor                        # si algo no va: dice qué pieza falla y cómo arreglarla
 cortex --help                        # todos los comandos
 ```
 
@@ -188,12 +189,18 @@ captura al terminarla.
 Aparte de eso está el **toolbelt de tu organización** —los MCPs y skills de las herramientas
 que use tu equipo—, que se instala desde un **registry externo**, normalmente en un repo
 privado. Eso no vive aquí a propósito: no es producto, es la configuración de una empresa
-concreta (ADR-0014 revisado, ADR-0026 y ADR-0032). El esquema del fichero está en
-[`docs/toolbelt-registry.md`](./docs/toolbelt-registry.md).
+concreta (ADR-0014 revisado, ADR-0026 y ADR-0032):
+
+```bash
+cortex toolbelt doctor                                  # qué auth necesita cada cosa
+cortex toolbelt sync --registry <ruta|url> --apply      # instalarlo en tus agentes
+```
+
+El esquema del fichero está en [`docs/toolbelt-registry.md`](./docs/toolbelt-registry.md).
 
 En ambos casos se reparte **configuración, nunca credenciales**: cada entrada documenta qué
-auth necesita, y las que dependan de variables sin exportar se omiten con un aviso en vez de
-romper la instalación.
+auth necesita, y las que dependan de variables sin exportar se omiten con un aviso. Un MCP
+registrado a medias es peor que uno ausente, porque el agente lo reintenta en cada arranque.
 
 ## Ingesta de fuentes (conectores)
 

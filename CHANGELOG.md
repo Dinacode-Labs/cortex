@@ -9,6 +9,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **`cortex doctor`**: comprueba de una vez Node, la sesión, el servidor, el token, el MCP, el
+  vínculo de esta carpeta y la integración de cada agente, y dice qué comando arregla cada
+  fallo. Sale con código 1 solo si algo impide de verdad que Cortex funcione.
+- **`cortex toolbelt sync|doctor`**: instala el registry de tu organización (MCPs, skills y
+  comandos de terceros) en los agentes detectados. Simulacro por defecto, `--apply` para
+  escribir. Una entrada a la que le falte su variable de entorno se omite con un aviso: un MCP
+  registrado y roto es peor que uno ausente.
 - **`cortex setup` cubre los cinco agentes**: Claude Code y Codex comparten plugin (Codex lee
   el mismo marketplace; solo su MCP se registra aparte), OpenCode recibe un plugin JS que
   inyecta el contexto y captura al quedarse la sesión inactiva, Pi una extensión que inyecta
@@ -78,6 +85,11 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   Dependabot (ADR-0029).
 - `docs/toolbelt-registry.md`: esquema del registry para que una organización declare su
   propio toolbelt fuera de este repo.
+
+### Removed
+- **`cortex sync`**. Hacía dos cosas a la vez: instalar Cortex y repartir las herramientas de
+  la empresa. Ahora son `cortex setup` y `cortex toolbelt sync`, y quien escriba el comando
+  viejo recibe un mensaje que lo explica. Con él se va el shim de `~/.local/bin`.
 
 ### Changed
 - `cortex link` va por la API en vez de por la base de datos: era el último comando del CLI
