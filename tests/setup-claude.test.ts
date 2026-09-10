@@ -61,9 +61,9 @@ describe("cortex setup claude-code (modo settings)", () => {
     expect(Object.keys(hooks)).toEqual(["SessionStart", "SessionEnd", "PreCompact"]);
     expect(hooks.SessionStart[0].matcher).toBe("startup|resume|clear|compact");
     expect(hooks.SessionStart[0].hooks[0].command).toBe("cortex hook-context");
-    expect(hooks.SessionEnd[0].hooks[0].command).toBe("cortex hook-capture --platform claude");
+    expect(hooks.SessionEnd[0].hooks[0].command).toBe("cortex hook-capture");
     // PreCompact además de SessionEnd: el SessionEnd de Claude tiene timeout y a veces no llega.
-    expect(hooks.PreCompact[0].hooks[0].command).toBe("cortex hook-capture --platform claude");
+    expect(hooks.PreCompact[0].hooks[0].command).toBe("cortex hook-capture");
 
     expect(calls).toContainEqual(["claude", "mcp", "add", "cortex", "-s", "user", "--", "cortex", "mcp"]);
     expect(report.warnings).toHaveLength(0);
@@ -91,7 +91,7 @@ describe("cortex setup claude-code (modo settings)", () => {
     const hooks = readSettings().hooks;
     expect(hooks.SessionStart.flatMap((g: any) => g.hooks)).toHaveLength(1);
     expect(hooks.SessionStart[0].hooks[0].command).toBe("cortex hook-context");
-    expect(hooks.SessionEnd[0].hooks[0].command).toBe("cortex hook-capture --platform claude");
+    expect(hooks.SessionEnd[0].hooks[0].command).toBe("cortex hook-capture");
     expect(report.changed.join(" ")).toContain("versión anterior");
   });
 

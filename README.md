@@ -64,10 +64,18 @@ cortex setup --status    # qué hay instalado y dónde
 cortex setup --dry-run   # enseña el plan sin escribir
 ```
 
-En Claude Code eso instala el plugin `cortex`, que trae los hooks, el MCP con las 8 tools, la
-skill de captura y `/cortex-save`. Si vienes de la instalación antigua (la del clon del repo),
-`setup` la migra: sustituye los hooks viejos, vuelve a registrar el MCP contra el servidor y
-retira el shim del PATH.
+Qué hace en cada uno:
+
+| Agente | Cómo se integra | Contexto al empezar | Captura al terminar |
+| --- | --- | --- | --- |
+| Claude Code | plugin `cortex` (o hooks en `settings.json` si no puedes instalarlo) | ✓ | ✓ |
+| Codex | el mismo plugin, más `codex mcp add` | ✓ | ✓ |
+| OpenCode | plugin JS + MCP en `opencode.json` | ✓ | ✓ |
+| Pi | extensión en `~/.pi/agent/extensions` + MCP | ✓ | ✓ |
+| Hermes | hooks y MCP en `config.yaml` | ✓ | ✓ |
+
+Si vienes de la instalación antigua (la del clon del repo), `setup` la migra: sustituye los
+hooks viejos, vuelve a registrar el MCP contra el servidor y retira el shim del PATH.
 
 Luego, en cualquier repo de trabajo:
 

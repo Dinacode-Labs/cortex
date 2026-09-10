@@ -9,6 +9,17 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **`cortex setup` cubre los cinco agentes**: Claude Code y Codex comparten plugin (Codex lee
+  el mismo marketplace; solo su MCP se registra aparte), OpenCode recibe un plugin JS que
+  inyecta el contexto y captura al quedarse la sesión inactiva, Pi una extensión que inyecta
+  el contexto como mensaje de sesión y captura al cerrarla, y Hermes sus hooks y su MCP en
+  `config.yaml`. Todos con copia de seguridad, idempotencia y `--remove`.
+- **`cortex hook-capture --platform`** con detección automática: como el plugin es el mismo
+  para varios agentes, el hook deduce cuál es por la ruta del transcript. Acepta `--session`
+  (id o ruta) y `--cwd`, y en Codex, si el evento no trae ninguno de los dos, usa la sesión
+  más reciente de ese repo.
+- **Lectores de sesión por agente**: Pi (nuevo), y las variantes «una sola sesión» de Codex,
+  OpenCode y Hermes que necesita el hook. `cortex connect-sessions` acepta ya `pi`.
 - **`cortex setup <agente>|--all`**: instala la integración de Cortex en los agentes de tu
   equipo con el mecanismo nativo de cada uno. Idempotente, con copia de seguridad antes de
   tocar nada, `--dry-run`, `--remove` y `--status`. Instalar el CLI y configurar los agentes
