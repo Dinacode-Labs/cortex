@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const cortexAlias = Object.fromEntries(
-  ["shared", "database", "embeddings", "core", "agents"].map((p) => [`@cortex/${p}`, join(root, "packages", p, "src/index.ts")]),
+  ["shared", "client", "database", "embeddings", "core", "agents"].map((p) => [`@cortex/${p}`, join(root, "packages", p, "src/index.ts")]),
 );
 
 /**

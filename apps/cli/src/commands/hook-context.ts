@@ -1,5 +1,5 @@
-import { apiGet, getBrandName } from "@cortex/shared";
-import { readCortexLink } from "@cortex/core";
+import { getBrandName } from "@cortex/shared";
+import { apiGet, readCortexLink } from "@cortex/client";
 
 /**
  * Hook de INYECCIÓN DE CONTEXTO (SessionStart de Claude Code, y equivalentes). Lee el

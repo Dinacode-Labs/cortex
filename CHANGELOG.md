@@ -9,6 +9,11 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **`@cortex/client`**: paquete nuevo con todo el lado cliente (credenciales, HTTP, cliente
+  tipado de la API, `.cortex.json`, transcripts). Depende solo de `@cortex/shared`, sin
+  Postgres ni Mastra, que es lo que permitirá distribuir el CLI con `npm i -g` (ADR-0025).
+  Los contratos de la API pasan a `shared/api-contract.ts`, compartidos por servidor y
+  cliente para que no se desincronicen.
 - **Build compilado**: `pnpm build` (`tsc -b` con project references) genera `dist/` en cada
   paquete y app de servidor, y Docker arranca `node dist/...` en vez de transpilar con `tsx`
   en cada arranque. Desarrollar sigue sin requerir build gracias a una condición

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { apiPost } from "@cortex/shared";
+import { apiPost } from "@cortex/client";
 import type { BatchItem } from "@cortex/core";
 
 /**

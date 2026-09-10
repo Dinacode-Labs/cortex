@@ -26,6 +26,9 @@ importers:
       '@cortex/agents':
         specifier: workspace:*
         version: link:../../packages/agents
+      '@cortex/client':
+        specifier: workspace:*
+        version: link:../../packages/client
       '@cortex/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -126,6 +129,9 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^2.0.51
         version: 2.0.51(zod@4.4.3)
+      '@cortex/client':
+        specifier: workspace:*
+        version: link:../client
       '@cortex/core':
         specifier: workspace:*
         version: link:../core
@@ -151,8 +157,17 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
+  packages/client:
+    dependencies:
+      '@cortex/shared':
+        specifier: workspace:*
+        version: link:../shared
+
   packages/core:
     dependencies:
+      '@cortex/client':
+        specifier: workspace:*
+        version: link:../client
       '@cortex/database':
         specifier: workspace:*
         version: link:../database

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { slugify, readCortexLink } from "../packages/core/src/project-config";
+import { readCortexLink } from "../packages/client/src/project-config";
+import { slugify } from "../packages/core/src/project-config";
 
 describe("slugify", () => {
   it("genera slugs estables (kebab, sin acentos)", () => {
