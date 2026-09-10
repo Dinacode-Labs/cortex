@@ -294,23 +294,23 @@ pnpm admin maintain-worker    # mantenimiento programado (cron)
   dispara el developer); esto es
   solo mantenimiento.
 
-### Despliegue (docker-compose)
+### Despliegue
 
-Stack completo en contenedores: Postgres (pgvector) + migraciones + servidor (API/auth) +
-UI web + MCP HTTP + worker de mantenimiento. Una sola imagen, un comando por servicio.
+Un host con Docker. Caddy delante con TLS automático, y detrás la API, la UI, el MCP,
+Postgres, el worker de mantenimiento y copias de seguridad diarias (ADR-0027).
 
 ```bash
-cp deploy/.env.example deploy/.env     # edita: POSTGRES_PASSWORD, DATABASE_URL, dominio,
-                                       # CORTEX_ADMIN_EMAIL, BREVO_API_KEY, proveedores
-docker compose -f deploy/docker-compose.yml up -d --build
+cp deploy/.env.example deploy/.env     # dominio, contraseñas, email, proveedores
+chmod 600 deploy/.env
+docker compose -f deploy/docker-compose.yml up -d
 ```
 
-- `migrate` aplica el esquema antes de arrancar el resto (`service_completed_successfully`).
-- Puertos: servidor `8787`, UI `8080`, MCP HTTP `8788`. Ponlos tras un proxy/HTTPS y fija
-  `CORTEX_PUBLIC_URL`/`CORTEX_SERVER_URL`/`CORTEX_WEB_URL` al dominio. El servidor sirve
-  `/install.sh` con esa URL inyectada → los devs hacen `curl -fsSL <dominio>/install.sh | sh`.
-- El `DATABASE_URL` apunta al servicio interno `postgres` (su contraseña debe coincidir con
-  `POSTGRES_PASSWORD`).
+Todo cuelga de un solo dominio: `/` la web, `/api/*` la API, `/mcp` el MCP y `/install.sh`
+el instalador, que se sirve con la URL pública ya inyectada. Solo Caddy publica puertos;
+Postgres no se asoma a internet. La imagen se descarga de GHCR, no se compila en el servidor.
+
+Los procedimientos —primer despliegue, actualizar, copias, restaurar (con simulacro), rotar
+credenciales— están en [`deploy/README.md`](./deploy/README.md).
 
 ## Estructura del repo
 

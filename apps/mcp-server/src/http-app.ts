@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { Hono, type Context } from "hono";
+import { secureHeaders } from "hono/secure-headers";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { pingDatabase } from "@cortex/database";
 import { validateToken, type AuthUser } from "@cortex/core";
 import { buildMcpServer } from "./server.js";
 
@@ -58,7 +60,11 @@ export function createMcpHttpApp(): Hono {
   }, 60_000).unref();
 
   const app = new Hono();
-  app.get("/health", (c) => c.json({ ok: true, service: "cortex-mcp" }));
+  app.use("*", secureHeaders());
+  app.get("/health", async (c) => {
+    const db = await pingDatabase();
+    return c.json({ ok: db, service: "cortex-mcp", db: db ? "ok" : "down" }, db ? 200 : 503);
+  });
 
   async function handleMcp(c: Context): Promise<Response> {
     const { user, invalidToken } = await authUser(c);

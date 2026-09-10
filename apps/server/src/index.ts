@@ -29,8 +29,11 @@ if (!process.env.CORTEX_AUTH_DOMAIN?.trim()) {
 
 const app = createApp();
 const port = Number(process.env.CORTEX_SERVER_PORT ?? "8787");
-const server = serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`Cortex server escuchando en http://localhost:${info.port}`);
+// Por defecto solo escucha en local: exponerse a la red es una decisión del que despliega,
+// no un default. En el contenedor se pone a 0.0.0.0 y quien publica puertos es Caddy.
+const hostname = process.env.CORTEX_BIND_HOST ?? "127.0.0.1";
+const server = serve({ fetch: app.fetch, port, hostname }, (info) => {
+  console.log(`Cortex server escuchando en http://${hostname}:${info.port}`);
 });
 
 async function shutdown(): Promise<void> {

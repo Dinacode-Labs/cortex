@@ -16,8 +16,9 @@ wireLlm();
 const app = createMcpHttpApp();
 const requireAuth = process.env.CORTEX_MCP_AUTH !== "off"; // solo para el log (la app lo lee al construirse)
 const port = Number(process.env.CORTEX_MCP_PORT ?? "8788");
-serve({ fetch: app.fetch, port }, (info) => {
-  console.error(`[cortex-mcp] HTTP en http://localhost:${info.port}/mcp (auth: ${requireAuth ? "on" : "off"}, LLM: ${isLlmEnabled() ? "on" : "off"})`);
+const hostname = process.env.CORTEX_BIND_HOST ?? "127.0.0.1";
+serve({ fetch: app.fetch, port, hostname }, (info) => {
+  console.error(`[cortex-mcp] HTTP en http://${hostname}:${info.port}/mcp (auth: ${requireAuth ? "on" : "off"}, LLM: ${isLlmEnabled() ? "on" : "off"})`);
 });
 
 const shutdown = async () => {

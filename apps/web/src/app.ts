@@ -1,5 +1,7 @@
 import { resolve } from "node:path";
 import { Hono } from "hono";
+import { secureHeaders } from "hono/secure-headers";
+import { pingDatabase } from "@cortex/database";
 import { html } from "hono/html";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { sessionGate, type WebEnv } from "./middleware/session.js";
@@ -35,6 +37,13 @@ const PUBLIC_DIR = resolve(import.meta.dirname, "../public");
 /** Construye la app web completa (estáticos + middleware de sesión + rutas). Sin side effects. */
 export function createApp(): Hono<WebEnv> {
   const app = new Hono<WebEnv>();
+  app.use("*", secureHeaders());
+
+  // Antes del gate de sesión, o el healthcheck del contenedor recibiría un redirect a login.
+  app.get("/health", async (c) => {
+    const db = await pingDatabase();
+    return c.json({ ok: db, service: "cortex-web", db: db ? "ok" : "down" }, db ? 200 : 503);
+  });
 
   // Estáticos (styles.css, graph.js): accesibles SIN sesión — la propia página de
   // login enlaza /styles.css. Si el fichero no existe, serveStatic hace next().
