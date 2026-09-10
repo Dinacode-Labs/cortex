@@ -1,6 +1,12 @@
-import { runSessionsBackfill, shutdownObservability, wireLlm } from "@cortex/agents";
+import { backfillSessions, type CapturePlatformName } from "@cortex/client";
 
-/** Backfill de sesiones de un agente a un proyecto (destila, no ingiere en crudo). */
+/**
+ * Backfill retroactivo de las sesiones de un agente hacia un proyecto. Condensa cada
+ * transcript y lo manda al servidor, que lo destila (ADR-0025): no se ingiere el crudo y
+ * este comando ya no necesita clave de LLM.
+ */
+const PLATAFORMAS = ["claude", "codex", "opencode", "hermes"] as const;
+
 export async function run(args: string[]): Promise<void> {
   const slug = args[0];
   const repoPath = args[1];
@@ -10,15 +16,11 @@ export async function run(args: string[]): Promise<void> {
     process.exitCode = 1;
     return;
   }
-  if (!["claude", "codex", "opencode", "hermes"].includes(platform)) {
-    console.error(`Plataforma "${platform}" no soportada (claude|codex|opencode|hermes).`);
+  if (!(PLATAFORMAS as readonly string[]).includes(platform)) {
+    console.error(`Plataforma "${platform}" no soportada (${PLATAFORMAS.join("|")}).`);
     process.exitCode = 1;
     return;
   }
-  wireLlm();
-  try {
-    await runSessionsBackfill(slug, repoPath, platform);
-  } finally {
-    await shutdownObservability();
-  }
+  const limit = process.env.CORTEX_SESSIONS_LIMIT ? Number(process.env.CORTEX_SESSIONS_LIMIT) : undefined;
+  await backfillSessions(slug, repoPath, platform as CapturePlatformName, { limit });
 }

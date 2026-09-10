@@ -9,6 +9,11 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Destilación de sesiones en el servidor** (`POST /capture/session`): los hooks mandan el
+  transcript condensado y escrubado, y el servidor lo destila con su propia clave. Ningún
+  portátil necesita ya credenciales de LLM. Idempotente por sesión —los hooks disparan
+  varias veces sobre la misma— y si la sesión creció solo se destila la parte nueva
+  (ADR-0025).
 - **Endpoints nuevos en la API**: `GET /client-config` (público: la URL del MCP, la versión
   y la versión mínima de cliente, para que el CLI no adivine nada), `GET /version`,
   `GET /toolbelt.json`, `GET /projects/:slug` y `POST /projects`. Con ellos, `cortex link`
@@ -38,6 +43,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   propio toolbelt fuera de este repo.
 
 ### Changed
+- `cortex hook-capture`, `connect-sessions` y `connect-meeting` ya no llaman al modelo: solo
+  condensan y envían. El pipeline que destilaba en el cliente desaparece.
 - La documentación de **proceso interno** (auditoría de seguridad, plan de refactor,
   estrategia de modelos con costes y la investigación de ingesta atada a un proveedor) sale
   del repo: abrir el código no es abrir el proceso. El criterio de qué se publica y qué no
