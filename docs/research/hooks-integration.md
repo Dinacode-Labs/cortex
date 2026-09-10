@@ -3,7 +3,7 @@
 Cómo aprovechar los **hooks** del agente para automatizar el bucle de Cortex
 ("trabajas → Cortex recuerda/aprende") sin que el dev tenga que invocar nada, cómo lo
 hacen otros proyectos, y la **fricción** de que no todas las plataformas los tengan
-igual. Complementa al harness (`cortex sync`) y a la skill `cortex-capture`.
+igual. Complementa al plugin (`cortex setup`) y a la skill `cortex-capture`.
 
 ## Qué ganaríamos con hooks (los 2 bucles clave)
 

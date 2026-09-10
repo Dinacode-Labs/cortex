@@ -26,7 +26,8 @@ const COMMANDS: Record<string, Cmd> = {
   ui: { help: "abrir la UI web ya autenticada (sin OTP)", load: () => import("./commands/ui.js") },
   setup: { help: "configurar tus agentes (Claude Code, Codex…) para que usen Cortex", load: () => import("./commands/setup.js") },
   mcp: { help: "servidor MCP por stdio para tu agente (proxy al servidor)", managed: false, load: () => import("./commands/mcp.js") },
-  sync: { help: "instalar/actualizar el toolbelt en tus agentes (MCP, skills, hooks)", load: () => import("./commands/sync.js") },
+  toolbelt: { help: "instalar el toolbelt de tu organización (MCPs y skills de terceros)", load: () => import("./commands/toolbelt.js") },
+  doctor: { help: "comprobar que todo está en su sitio (y decir qué falta)", load: () => import("./commands/doctor.js") },
   "connect-github": { help: "ingerir PRs/issues de un repo de GitHub (vía gh)", load: () => import("./commands/connect-github.js") },
   "connect-sessions": { help: "backfill de sesiones de un agente a un proyecto", load: () => import("./commands/connect-sessions.js") },
   "hook-context": { help: "hook SessionStart: emite el context-pack del proyecto vinculado", managed: false, load: () => import("./commands/hook-context.js") },
@@ -48,6 +49,13 @@ async function main(): Promise<void> {
   if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
     usage();
     return;
+  }
+  if (sub === "sync") {
+    // `cortex sync` hacía dos cosas distintas a la vez; ahora son dos comandos (ADR-0032).
+    console.error("`cortex sync` ya no existe. Ahora son dos cosas distintas:\n");
+    console.error("  cortex setup --all        instalar Cortex en tus agentes (hooks, MCP, skill)");
+    console.error("  cortex toolbelt sync      instalar los MCPs y skills de tu organización");
+    process.exit(1);
   }
   const cmd = COMMANDS[sub];
   if (!cmd) {

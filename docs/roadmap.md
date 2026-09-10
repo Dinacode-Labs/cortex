@@ -122,13 +122,13 @@ Bucle automático sin invocación manual. Análisis + fricción:
 > - **SessionEnd → auto-captura** (`cortex hook-capture`): destila la sesión
 >   actual (reutiliza `connect-sessions`/`distiller`) y la guarda en Cortex. Silencioso,
 >   idempotente.
-> - **Distribución:** `cortex sync` los instala/actualiza en `~/.claude/settings.json`
+> - **Distribución:** `cortex setup` los instala/actualiza (hoy vía plugin; antes en `settings.json`)
 >   (preserva lo existente). Verificado: inyección OK, captura idempotente.
 
 - **Hallazgo:** los hooks ya **no son solo de Claude** (Codex, OpenCode plugins TS,
   Hermes también) — la fricción es de **forma**, no de ausencia.
 
-> **Adaptadores de inyección de contexto — hechos (los 4 agentes), distribuidos por `cortex sync`:**
+> **Adaptadores de inyección de contexto — hechos (los 5 agentes), distribuidos por `cortex setup`:**
 > - **Codex**: `[[hooks.SessionStart]]` en `config.toml` → `cortex hook-context` (mismo
 >   `additionalContext` que Claude, contrato idéntico).
 > - **OpenCode**: plugin TS generado (`~/.config/opencode/plugin/cortex.js`) que en
@@ -322,4 +322,4 @@ Retrieval (Fase 4, condicionado al eval set).
   remoto) y para el deploy.
 - **Aislamiento de datos por cliente** (permisos) — necesario al ser producto interno
   con datos sensibles de varios clientes; aparcado hasta tras consolidar la base.
-- Ampliar el harness: `cortex sync --remove`, prompts/políticas corporativas.
+- Ampliar el harness: prompts y políticas corporativas en el registry externo.
