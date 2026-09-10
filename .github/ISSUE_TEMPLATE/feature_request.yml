@@ -1,0 +1,22 @@
+name: Propuesta
+description: Sugerir una capacidad o un cambio
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué problema resuelve
+      description: Empieza por el problema, no por la solución. Qué intentabas hacer y con qué te chocaste.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Qué propones
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas que has considerado
+      description: Incluido "no hacer nada". Ayuda a valorar si compensa.

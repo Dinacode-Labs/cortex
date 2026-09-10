@@ -88,7 +88,7 @@
 | 76 | P3 | DX y onboarding | CONTRIBUTING afirma "incremental por sourceReference" (engañoso: la extracción IA cara se re-ejecuta). Matizar: guardado idempotente pero extracción no incremental; añadir caché/manifiesto. | low | S |
 | 77 | P3 | DX y onboarding | Comentarios de código desfasados ("cuando migren…" ya migrado; stdout vs stderr de OTP). Poda de comentarios/TODO resueltos en `apps/cli` y `packages/core`. | low | S |
 | 78 | P3 | DX y onboarding | `git pull --ff-only \|\| true` en el instalador silencia fallos de actualización. Avisar cuando el pull falla (cambios locales/divergencia) en vez de tragarlo. | low | S |
-| 79 | P3 | DX y onboarding | Sin LICENSE ni plantillas de PR/issue. Añadir `.github/PULL_REQUEST_TEMPLATE.md` con el checklist de CONTRIBUTING; LICENSE/NOTICE interno. | low | S |
+| 79 | P3 | DX y onboarding | ✅ **HECHO** (2026-09). LICENSE Apache-2.0 + NOTICE, SECURITY.md, código de conducta, plantillas de issue/PR con el checklist de CONTRIBUTING, Dependabot y CHANGELOG (ADR-0029). | low | S |
 | 80 | P3 | Tests y operación | Migraciones sin rollback, checksums ni lock. `pg_advisory_lock`, checksums, forward-only y backup pre-migración. | low | M |
 | 81 | P3 | Arquitectura | `recordUsage` (INSERT) en el camino caliente y serializado de cada generación LLM. Hacerlo fire-and-forget o bufferizar uso/trazas y flush por lotes; flush en el shutdown. | low | M |
 | 82 | P3 | Arquitectura | `fs` síncrono en walkRepo/chunkFile y carga completa de relations/transcripts en memoria. Migrar a `fs/promises`+streaming; filtrar relations por proyecto en SQL; cota de tamaño. | low | M |
