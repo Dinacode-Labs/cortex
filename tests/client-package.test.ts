@@ -46,9 +46,14 @@ describe("el CLI `cortex` se mantiene instalable", () => {
   it("no depende de los paquetes pesados: van en cortex-admin", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "apps/cli/package.json"), "utf8")) as {
       dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
     };
-    const internas = Object.keys(pkg.dependencies ?? {}).filter((d) => d.startsWith("@cortex/"));
+    // Los dos paquetes internos se bundlean, así que están declarados como devDependencies:
+    // si estuvieran en `dependencies`, npm intentaría descargarlos al instalar el CLI.
+    const todas = { ...pkg.dependencies, ...pkg.devDependencies };
+    const internas = Object.keys(todas).filter((d) => d.startsWith("@cortex/"));
     expect(internas.sort()).toEqual(["@cortex/client", "@cortex/shared"]);
+    expect(Object.keys(pkg.dependencies ?? {}).filter((d) => d.startsWith("@cortex/"))).toEqual([]);
   });
 
   it("ningún comando del CLI importa Postgres, core, agents ni embeddings", () => {

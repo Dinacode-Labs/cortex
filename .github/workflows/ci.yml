@@ -77,6 +77,25 @@ jobs:
           "
           node -e "import('./apps/server/dist/app.js').then(m => { if (typeof m.createApp !== 'function') { console.error('createApp no exportado'); process.exit(1); } console.log('la app compilada carga'); })"
 
+      # El CLI se publica en npm como un bundle, no con `tsc`, así que su build es aparte.
+      # Lo que se comprueba es lo que rompe una publicación: que arranca, que no se ha colado
+      # `import.meta.dirname` (el bundle es plano y no resuelve rutas del repo), que no ha
+      # entrado Postgres ni Mastra por un import descuidado, y que `npm pack` no se queja.
+      - name: Empaquetado del CLI
+        run: |
+          pnpm --filter @dinacode/cortex build
+          node apps/cli/dist/cortex.js --help > /dev/null
+          test "$(node apps/cli/dist/cortex.js --version)" = "$(node -p "require('./apps/cli/package.json').version")"
+          ! grep -q "import.meta.dirname" apps/cli/dist/cortex.js
+          ! grep -qE '"postgres"|@mastra/|mammoth' apps/cli/dist/cortex.js
+          node -e "
+            const { statSync } = require('node:fs');
+            const kb = statSync('apps/cli/dist/cortex.js').size / 1024;
+            console.log('bundle: ' + kb.toFixed(0) + ' KB');
+            if (kb > 1024) { console.error('el bundle ha pasado de 1 MB: algo pesado se ha colado'); process.exit(1); }
+          "
+          cd apps/cli && npm pack --dry-run
+
       # Informativo a propósito, no bloqueante: hoy hay vulnerabilidades altas TRANSITIVAS
       # en mammoth, el SDK de MCP y Mastra que no podemos arreglar hasta que publiquen. Un
       # gate que falla desde el primer día se acaba desactivando y deja de aportar nada;

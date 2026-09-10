@@ -9,6 +9,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **El CLI se publica en npm como `@dinacode/cortex`**: un solo fichero de ~110 KB con
+  `@cortex/client` y `@cortex/shared` dentro, y solo tres dependencias públicas fuera (el SDK
+  de MCP, zod y yaml). Instalado global ocupa 24 MB, frente a los ~235 MB del clon del
+  monorepo que hacía falta antes.
+- **`cortex version`** (y `--version`): la versión del CLI, la del servidor y la versión
+  mínima de cliente que el servidor exige. **`cortex upgrade`** instala la última publicada y
+  recuerda pasar `cortex setup --all` después.
 - **`cortex doctor`**: comprueba de una vez Node, la sesión, el servidor, el token, el MCP, el
   vínculo de esta carpeta y la integración de cada agente, y dice qué comando arregla cada
   fallo. Sale con código 1 solo si algo impide de verdad que Cortex funcione.
