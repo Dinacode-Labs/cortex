@@ -9,7 +9,7 @@ import { hasCortexHooks, mergeHooks, removeHooks, type HookDef, type HooksHolder
  */
 const DEFS: HookDef[] = [
   { event: "SessionStart", kind: "context", matcher: "startup|resume", command: "cortex hook-context", timeout: 20 },
-  { event: "SessionEnd", kind: "capture", command: "cortex hook-capture --platform claude", timeout: 30 },
+  { event: "SessionEnd", kind: "capture", command: "cortex hook-capture", timeout: 30 },
 ];
 
 const ajeno = (): HooksHolder => ({

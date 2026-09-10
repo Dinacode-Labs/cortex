@@ -18,9 +18,14 @@ function stamp(d: Date): string {
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-/** Copia `file` a `file.bak-<fecha>` la primera vez que se escribe en él. */
+/**
+ * Copia `file` a `file.bak-<fecha>` la primera vez que se escribe en él. Los ficheros que
+ * generamos nosotros no se respaldan: la copia solo tiene valor si lo que hay dentro lo
+ * escribió una persona.
+ */
 export function backupOnce(ctx: SetupCtx, file: string): string | null {
   if (!existsSync(file)) return null;
+  if ((readText(file) ?? "").includes(GENERATED_MARKER)) return null;
   let seen = backedUp.get(ctx);
   if (!seen) backedUp.set(ctx, (seen = new Set()));
   if (seen.has(file)) return null;
@@ -36,6 +41,17 @@ export function readText(file: string): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * Escribe solo si el contenido cambia. `cortex setup` está pensado para ejecutarse muchas
+ * veces, y reescribir un fichero idéntico ensucia el informe y deja copias de seguridad que
+ * no protegen de nada.
+ */
+export function writeIfChanged(ctx: SetupCtx, file: string, content: string): boolean {
+  if (readText(file) === content) return false;
+  writeText(ctx, file, content);
+  return true;
 }
 
 export function writeText(ctx: SetupCtx, file: string, content: string): void {

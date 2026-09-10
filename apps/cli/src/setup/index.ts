@@ -2,18 +2,23 @@ import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { cleanLegacy } from "./legacy.js";
 import { claudeCodeAdapter } from "./claude-code.js";
+import { codexAdapter } from "./codex.js";
+import { hermesAdapter } from "./hermes.js";
+import { openCodeAdapter } from "./opencode.js";
+import { piAdapter } from "./pi.js";
 import { AGENT_IDS, emptyReport, type AgentAdapter, type AgentId, type SetupCtx, type SetupReport } from "./types.js";
 
 /**
  * Orquestador de `cortex setup`: elige adaptadores, los ejecuta y limpia el legado una sola
  * vez al final (el shim viejo no es de ningún agente en concreto).
- *
- * Los adaptadores que faltan (opencode, codex, hermes, pi) llegan en el PR siguiente; aquí ya
- * se declara la lista completa para que `--status` diga la verdad sobre lo que hay detectado.
  */
 
 const ADAPTERS: Partial<Record<AgentId, AgentAdapter>> = {
   "claude-code": claudeCodeAdapter,
+  codex: codexAdapter,
+  opencode: openCodeAdapter,
+  hermes: hermesAdapter,
+  pi: piAdapter,
 };
 
 /** Binario que delata a cada agente, también para los que aún no tienen adaptador. */
