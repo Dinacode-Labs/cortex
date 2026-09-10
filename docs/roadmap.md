@@ -314,8 +314,11 @@ Retrieval (Fase 4, condicionado al eval set).
   cableado se generalizó a **`openai-compatible`** (ADR-0024), que sirve igual para NaN,
   Ollama, vLLM o LM Studio; `nan` queda como alias obsoleto hasta 0.2.0. Seguimos con
   `qwen3-embedding` (4096 dims), así que **no hay que recalibrar** los umbrales de dedup
-  de ADR-0009. Pendiente del usuario: confirmar con NaN si una clave de miembro puede
-  respaldar el servidor de la empresa (la cuota es por miembro).
+  de ADR-0009. **Decidido (sept 2026):** el servidor va con una clave de membresía personal;
+  la cuota es por miembro y se asume, apoyándose en que el volumen medido es pequeño frente
+  al límite y en que Cortex se publicará como open source. No está confirmado por NaN: si lo
+  objetan, la salida es cambiar `LLM_BASE_URL`/`LLM_API_KEY` (por eso el proveedor es
+  genérico). Conviene revisar `llm_usage` periódicamente.
 - **Chunking de documentos — v1 hecho (#30):** antes un doc entraba como 1 entry / 1
   vector **truncado a 8k** (perdía casi todo en silencio). Ahora `chunkDocument` trocea
   por estructura (headings → párrafos → frases) en fragmentos de ~1000 tokens con solape,
