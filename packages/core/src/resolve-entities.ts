@@ -7,9 +7,14 @@ import { canonicalize } from "./text.js";
  * (p.ej. "Acme"/"Acme Corp"/"acme.com") en una canónica, re-apuntando enlaces
  * (context_entry_entities) y relaciones, y deduplicando. Solo BD, sin LLM.
  *
- * Agrupa por nombre normalizado (sin acentos/puntuación, minúsculas) entre todos
- * los tipos salvo `project` (nunca se fusiona/borra un proyecto). La canónica es
- * la entidad con más enlaces (desempate: nombre más descriptivo).
+ * Agrupa por TIPO + nombre normalizado (sin acentos/puntuación, minúsculas), excluyendo
+ * `project` (nunca se fusiona/borra un proyecto). El tipo forma parte de la clave a
+ * propósito: dos entidades homónimas de tipos distintos son cosas distintas (el `vendor`
+ * "Stripe" y el `service` "Stripe" no deben colapsar en una sola).
+ *
+ * La canónica es la entidad con más enlaces; desempates: nombre más descriptivo (más
+ * largo) y, si aún empatan, el `id` menor — para que el resultado sea DETERMINISTA y no
+ * dependa del orden en que Postgres devuelva las filas.
  */
 
 // Normalización sobre la base canónica compartida (NFD + sin diacríticos +
@@ -32,11 +37,12 @@ export async function resolveEntities(): Promise<ResolveResult> {
     linkCounts.set(r.entity_id, Number(r.n));
   }
 
-  // Agrupar por nombre normalizado.
+  // Agrupar por tipo + nombre normalizado.
   const groups = new Map<string, Row[]>();
   for (const e of entities) {
-    const key = norm(e.name);
-    if (key.length < 3) continue;
+    const normalized = norm(e.name);
+    if (normalized.length < 3) continue;
+    const key = `${e.type}:${normalized}`;
     let bucket = groups.get(key);
     if (!bucket) {
       bucket = [];
@@ -49,10 +55,15 @@ export async function resolveEntities(): Promise<ResolveResult> {
   let groupsMerged = 0;
   for (const [, group] of groups) {
     if (group.length < 2) continue;
-    // Canónica: más enlaces, desempate por nombre más largo (más descriptivo).
+    // Canónica: más enlaces; desempates por nombre más largo (más descriptivo) y, en
+    // último término, por id — sin este último el ganador depende del orden de filas
+    // que devuelva Postgres y la fusión deja de ser reproducible.
     group.sort((a, b) => {
-      const d = (linkCounts.get(b.id) ?? 0) - (linkCounts.get(a.id) ?? 0);
-      return d !== 0 ? d : b.name.length - a.name.length;
+      const byLinks = (linkCounts.get(b.id) ?? 0) - (linkCounts.get(a.id) ?? 0);
+      if (byLinks !== 0) return byLinks;
+      const byLength = b.name.length - a.name.length;
+      if (byLength !== 0) return byLength;
+      return String(a.id).localeCompare(String(b.id));
     });
     const canonical = group[0]!;
     const losers = group.slice(1);

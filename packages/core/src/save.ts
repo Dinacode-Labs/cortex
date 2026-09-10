@@ -6,6 +6,7 @@ import {
   type EntityType,
   type SaveContextInput,
   saveContextInput,
+  scrub,
 } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "./entities.js";
 import { rowToContextEntry, type Row } from "./map.js";
@@ -79,7 +80,16 @@ export async function saveContext(
   input: SaveContextInput,
   opts: SaveContextOptions = {},
 ): Promise<SaveContextResult> {
-  const parsed = saveContextInput.parse(input);
+  const raw = saveContextInput.parse(input);
+  // Última línea de defensa: el servidor NO confía en que el cliente haya escrubado
+  // (los hooks y conectores lo hacen, pero la API es pública para cualquier cliente
+  // autenticado). Se limpia ANTES de clasificar con el LLM, generar el embedding y
+  // persistir, así que ninguna de las tres rutas ve el secreto.
+  const parsed = {
+    ...raw,
+    content: scrub(raw.content),
+    title: raw.title ? scrub(raw.title) : raw.title,
+  };
   const sql = getSql();
   const provider = getEmbeddingProvider();
 

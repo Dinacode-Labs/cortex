@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { getEnvNum } from "@cortex/shared";
+import { getEnvNum, scrub } from "@cortex/shared";
 
 /**
  * Utilidades de transcript (puras / de lectura) compartidas por la destilación y el
@@ -14,20 +14,10 @@ const MAX_WINDOWS = getEnvNum("CORTEX_SESSIONS_MAX_WINDOWS", 8);
 const WINDOW_CHARS = getEnvNum("CORTEX_SESSIONS_WINDOW_CHARS", 9000);
 const TURN_CHARS = getEnvNum("CORTEX_SESSIONS_TURN_CHARS", 2500);
 
-/** Borra secretos antes de mandar al LLM o de guardar (best-effort, amplio). */
-export function scrub(s: string): string {
-  return s
-    .replace(/-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+PRIVATE KEY-----/g, "[REDACTED_KEY]")
-    .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{6,}/g, "[REDACTED_JWT]")
-    .replace(/sk-[A-Za-z0-9_-]{12,}/g, "[REDACTED]")
-    .replace(/(?:ghp|gho|ghs|github_pat)_[A-Za-z0-9_]{20,}/g, "[REDACTED]")
-    .replace(/xox[baprs]-[A-Za-z0-9-]{10,}/g, "[REDACTED]")
-    .replace(/AKIA[0-9A-Z]{16}/g, "[REDACTED]")
-    .replace(/GOCSPX-[A-Za-z0-9_-]{10,}/g, "[REDACTED]")
-    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
-    .replace(/\bBearer\s+[A-Za-z0-9._-]{16,}/g, "Bearer [REDACTED]")
-    .replace(/\b(api[_-]?key|apikey|token|secret|password|passwd|pwd|access[_-]?token)\b\s*[:=]\s*["']?[A-Za-z0-9._\-\/+]{12,}["']?/gi, "$1=[REDACTED]");
-}
+// `scrub` vive en @cortex/shared (lo usan también core al persistir y los conectores).
+// Se re-exporta aquí porque este módulo es el punto de entrada histórico para la capa
+// de destilación y los tests.
+export { scrub } from "@cortex/shared";
 
 function clean(text: string): string {
   return text

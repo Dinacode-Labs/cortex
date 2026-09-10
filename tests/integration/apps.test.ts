@@ -119,6 +119,28 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     expect(saved!.createdBy).toBe(USER);
   });
 
+  it("server: POST /capture — el servidor escruba lo que recibe (no confía en el cliente)", async () => {
+    const srv = createServerApp();
+    const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
+
+    // Un cliente (o un conector de terceros) manda secretos sin limpiar: no deben persistirse.
+    const marker = `Incidencia de despliegue ${RID}`;
+    const content = `${marker}: el worker fallaba con token sk-abcDEF123456ghiJKL789 contra postgres://cortex:s3cr3tP4ss@db.internal/cortex.`;
+    const res = await srv.request("/capture", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ slug: prvOwn.slug, content, type: "incident", confidence: "medium" }),
+    });
+    expect(res.status).toBe(200);
+
+    const saved = (await listEntries({ project: prvOwn.name })).find((e) => e.content.includes(marker));
+    expect(saved).toBeDefined();
+    expect(saved!.content).not.toContain("sk-abcDEF123456ghiJKL789");
+    expect(saved!.content).not.toContain("s3cr3tP4ss");
+    expect(saved!.content).toContain("[REDACTED]");
+    expect(saved!.content).toContain("db.internal"); // el contexto útil sobrevive
+  });
+
   it("web: autoescape real — contenido con <script> se muestra escapado en /entry/:id", async () => {
     const web = createWebApp();
     // Contenido malicioso: si el autoescape de hono/html no funcionara, esto sería XSS.

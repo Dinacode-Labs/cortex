@@ -4,7 +4,7 @@ import { saveContext } from "./save.js";
 import { storeEmbeddingsBatch } from "./vectors.js";
 import { findProjectIdByName } from "./projects.js";
 import { relate } from "./entities.js";
-import type { RelationType } from "@cortex/shared";
+import { type RelationType, scrub } from "@cortex/shared";
 import type { Row } from "./map.js";
 
 /**
@@ -41,7 +41,14 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
 
   const results: BatchItemResult[] = [];
   const toEmbed: { contextEntryId: string; text: string }[] = [];
-  for (const it of items) {
+  for (const rawItem of items) {
+    // Escrubado aquí y no solo dentro de `saveContext` porque el texto del embedding
+    // (`toEmbed`) se construye a partir del item, no de la entrada persistida.
+    const it = {
+      ...rawItem,
+      content: scrub(rawItem.content),
+      title: rawItem.title ? scrub(rawItem.title) : rawItem.title,
+    };
     if (it.sourceReference) {
       const ex = (await sql`SELECT id FROM context_entries WHERE project_id = ${projectId} AND source_reference = ${it.sourceReference} LIMIT 1`) as unknown as Row[];
       if (ex[0]) {
