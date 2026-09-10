@@ -8,6 +8,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-09-10
+
+Primera versión publicable. Cortex deja de ser un repo que se clona para convertirse en un
+servidor que se despliega y un CLI que se instala: `npm i -g @dinacode/cortex`, `cortex auth
+login`, `cortex setup --all`, y los agentes de ese portátil ya leen y escriben en la memoria
+del proyecto, sin claves de modelo y sin base de datos en local.
+
 ### Added
 - **Despliegue de producción completo** (ADR-0027): imagen de tres etapas sin
   devDependencies ni fuentes, corriendo como usuario `node`; Caddy delante con TLS

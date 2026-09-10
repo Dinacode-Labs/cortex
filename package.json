@@ -1,6 +1,6 @@
 {
   "name": "cortex",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Cortex: memoria de contexto para proyectos software (documental + vectorial + grafo + bi-temporal), con MCP para agentes de IA",
   "type": "module",
@@ -9,22 +9,24 @@
     "node": ">=20"
   },
   "scripts": {
-    "typecheck": "pnpm -r --if-present run typecheck",
+    "admin": "node --conditions=development --import tsx apps/admin/src/index.ts",
     "build": "tsc -b tsconfig.build.json",
-    "db:up": "docker compose up -d postgres",
+    "clean": "rm -rf packages/*/dist apps/*/dist packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo",
+    "cortex": "node --conditions=development --import tsx apps/cli/src/index.ts",
+    "cortex:link": "node --conditions=development --import tsx apps/cli/src/index.ts link",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
     "db:migrate": "pnpm --filter @cortex/database run migrate",
     "db:seed": "pnpm admin seed",
+    "db:up": "docker compose up -d postgres",
     "mcp": "pnpm --filter @cortex/mcp-server run dev",
-    "web": "pnpm --filter @cortex/web run dev",
-    "cortex": "node --conditions=development --import tsx apps/cli/src/index.ts",
-    "cortex:link": "node --conditions=development --import tsx apps/cli/src/index.ts link",
+    "release:notes": "node scripts/changelog-notes.mjs",
     "test": "vitest run",
-    "test:watch": "vitest",
     "test:integration": "vitest run -c vitest.integration.config.ts",
-    "clean": "rm -rf packages/*/dist apps/*/dist packages/*/*.tsbuildinfo apps/*/*.tsbuildinfo",
-    "admin": "node --conditions=development --import tsx apps/admin/src/index.ts"
+    "test:watch": "vitest",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "version:set": "node scripts/set-version.mjs",
+    "web": "pnpm --filter @cortex/web run dev"
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
