@@ -98,6 +98,11 @@ jobs:
 
       # La imagen es la que se despliega: que compile aquí evita descubrir en el servidor
       # que falta un fichero de datos o que una etapa del multi-stage se quedó atrás.
+      # La caché de GitHub Actions solo funciona con el driver docker-container, que es lo
+      # que instala setup-buildx-action; sin esto, buildx falla con "Cache export is not
+      # supported for the docker driver".
+      - uses: docker/setup-buildx-action@v3
+
       - name: Imagen Docker
         uses: docker/build-push-action@v6
         with:
