@@ -104,6 +104,11 @@ quieras calidad real.
 
 - Idioma: código y nombres en inglés; comentarios y docs de producto en español.
 - Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
+- **Borrado de secretos**: `scrub()` vive en `@cortex/shared` (función pura, sin I/O).
+  `agents` lo aplica antes de mandar nada al LLM y `core` al persistir (`saveContext`,
+  `captureBatch`): el servidor no confía en que el cliente haya limpiado. Es idempotente,
+  así que aplicarlo en varias capas es seguro. Si añades una vía de entrada de texto,
+  pasa por uno de esos dos puntos.
 - Cada unidad de conocimiento conserva **fuente, fecha, autor, confianza, estado y
   vigencia** (principio de trazabilidad, §5.5). No conviertas inferencias en hechos.
 
