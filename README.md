@@ -1,8 +1,8 @@
-# Dinacode Cortex
+# Cortex
 
 [![CI](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml)
 
-**Memoria corporativa de contexto** — **producto interno de Dinacode**. Captura el
+**Memoria de contexto para proyectos software.** Captura el
 conocimiento disperso de los proyectos (decisiones, restricciones, incidencias,
 convenciones, PRs, conversaciones, docs, código…), lo estructura en una capa **híbrida
 — documental + vectorial + grafo + bi-temporal —** y lo expone a personas y agentes de
@@ -729,3 +729,13 @@ dónde mejorarlo. Cuando lo pruebes, mira sobre todo esto:
 Todo lo de arriba es **hipótesis a validar**. Si encuentras un punto flojo, anótalo: las
 decisiones vivas están en [`docs/decisions.md`](./docs/decisions.md) y lo pendiente/ideas en
 [`docs/roadmap.md`](./docs/roadmap.md). Cómo contribuir: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+---
+
+## Licencia y seguridad
+
+Cortex se publica bajo la [Licencia Apache 2.0](./LICENSE) (ver también [`NOTICE`](./NOTICE)).
+
+¿Has encontrado una vulnerabilidad? No abras un issue público: sigue
+[`SECURITY.md`](./SECURITY.md). Para contribuir, [`CONTRIBUTING.md`](./CONTRIBUTING.md); las
+normas de convivencia están en el [código de conducta](./CODE_OF_CONDUCT.md).

@@ -20,5 +20,6 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "hono": "^4.12.26",
     "zod": "^3.25.76"
-  }
+  },
+  "license": "Apache-2.0"
 }

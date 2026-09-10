@@ -11,5 +11,6 @@
   },
   "dependencies": {
     "@cortex/shared": "workspace:*"
-  }
+  },
+  "license": "Apache-2.0"
 }
