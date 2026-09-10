@@ -47,8 +47,10 @@ apps/
   server/      # API HTTP + auth email/OTP (Hono) — la usan CLI, hooks y conectores
   web/         # UI web (Hono SSR, cookie de sesión): src/routes/ + views/ (hono/html,
                # autoescape) + middleware/ + public/ (estáticos)
-  cli/         # CLI `cortex` de DEVELOPER (auth, link, ui, sync, hooks). Ligero: solo
-               # depende de client+shared, para poder instalarlo con npm i -g
+  cli/         # CLI `cortex` de DEVELOPER (auth, link, ui, sync, hooks, `mcp`). Ligero:
+               # solo depende de client+shared, para poder instalarlo con npm i -g.
+               # `cortex mcp` (src/mcp/) hace de proxy stdio → MCP HTTP del servidor: es
+               # así como los agentes usan las tools con los permisos del usuario
   admin/       # `cortex-admin`: comandos de OPERADOR (migrate, maintain, ingest,
                # conectores pesados, servicios). Vive en la imagen, no en el portátil
 scripts/       # install.sh (instalador remoto; lo sirve apps/server)
