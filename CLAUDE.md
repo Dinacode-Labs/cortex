@@ -54,8 +54,11 @@ apps/
   admin/       # `cortex-admin`: comandos de OPERADOR (migrate, maintain, ingest,
                # conectores pesados, servicios). Vive en la imagen, no en el portátil
 scripts/       # install.sh (instalador remoto; lo sirve apps/server)
-config/        # registry MÍNIMO del producto (MCP + cortex-capture + /cortex-save).
-               # El toolbelt de la organización va en un registry externo (ADR-0014/0026)
+plugin/        # claude-code/: lo que Cortex instala en Claude Code (hooks, MCP, skill
+               # cortex-capture, /cortex-save). El marketplace se declara en
+               # .claude-plugin/marketplace.json, en la raíz (ADR-0032)
+config/        # solo el esquema del registry de TERCEROS (toolbelt de la organización,
+               # ADR-0014/0026). Lo del producto ya no vive aquí: está en plugin/
 tests/         # unit + integration (Postgres real; ver CONTRIBUTING.md)
 docs/
   decisions.md # ADR ligero: decisiones = hipótesis a revisar

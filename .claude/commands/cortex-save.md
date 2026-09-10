@@ -1,1 +1,1 @@
-../../config/commands/cortex-save.md
+../../plugin/claude-code/commands/cortex-save.md

@@ -955,3 +955,45 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** el CLI se publique de verdad y se mida el tamaño real del bundle, o si
   alguna vez hace falta un cliente para navegador (entonces habría que separar lo que usa
   `node:fs`).
+
+## ADR-0032 · Integración por agente: plugin de Claude Code y `cortex setup`, en vez de un instalador único
+
+- **Estado:** aceptada (2026-09-10). Sustituye el modelo de instalación de `cortex sync`
+  (symlinks al clon + hooks escritos a mano + shim en `~/.local/bin`).
+- **Contexto:** hasta ahora conectar un agente a Cortex era un efecto secundario de
+  `cortex sync`: clonabas el monorepo, y el instalador dejaba symlinks apuntando al clon,
+  hooks con `pnpm -C <ruta-del-clon>` y un shim de `tsx` en el PATH. Todo eso se rompe en
+  cuanto el clon se mueve, se borra o se queda atrás, y no hay forma de arreglarlo sin
+  volver a pasar por el clon. Además Claude Code ya tiene un mecanismo propio para esto
+  —los plugins— que el usuario puede ver, actualizar y desactivar desde `/plugin`, y que
+  nosotros no estábamos usando.
+- **Decisión:** (1) **Instalar el paquete y configurar los agentes son dos operaciones
+  distintas.** `npm i -g` deja el CLI; `cortex setup <agente>|--all` toca las
+  configuraciones, tantas veces como haga falta y sin reinstalar nada. (2) Cortex se reparte
+  a sí mismo en Claude Code como **plugin** (`plugin/claude-code/`, con el marketplace
+  declarado en `.claude-plugin/marketplace.json` de este mismo repo): hooks, MCP, skill de
+  captura y `/cortex-save` en un solo paquete versionado. (3) Si el plugin no se puede
+  instalar —el repo es privado y no todo el mundo tiene acceso—, se cae a escribir los hooks
+  en `~/.claude/settings.json` y el resultado funciona igual; `--no-plugin` fuerza ese modo.
+  (4) Cada agente se integrará con **su** mecanismo nativo, no con un común denominador.
+  (5) Toda escritura es idempotente, hace copia (`.bak-<fecha>`) antes de tocar un fichero
+  ajeno y se puede deshacer con `--remove`; `--dry-run` enseña el plan.
+- **Migración del legado, dentro del propio `setup`:** los hooks `pnpm -C <clon> cortex
+  hook-*` se **sustituyen en su sitio** (añadir otro al lado significaría destilar la sesión
+  dos veces), el MCP registrado como `pnpm --filter @cortex/mcp-server` se vuelve a registrar
+  como `cortex mcp` —el viejo hablaba con Postgres directamente y sin permisos—, los symlinks
+  que apuntaban a `config/` se borran porque los aporta el plugin, y el shim de
+  `~/.local/bin/cortex` se elimina para que no le gane al binario de npm. El clon en
+  `~/.dinacode-cortex` **no** se borra: puede tener un `.env` con claves y ramas sin subir.
+- **Alternativas:** *seguir con `cortex sync`* — es lo que estamos quitando: ata la
+  instalación a un clon del repo. *Solo plugin* — deja fuera a quien no tenga acceso al repo
+  privado, y hoy son todos los que no están en Dinacode-Labs. *Solo hooks en settings* —
+  funciona, pero es invisible para el usuario y no se actualiza solo. *Un formato propio de
+  config para todos los agentes* — ninguno lo leería.
+- **Consecuencias:** `config/` se queda solo con el esquema del registry de terceros. El
+  plugin lleva su propia versión, que hay que subir con la del producto (lo hará el script de
+  release). Un dev que tenga plugin y hooks a la vez capturaría dos veces: `setup` lo evita y
+  `--status` lo detecta y avisa.
+- **Revisar cuando:** el repo se abra (el marketplace pasa a ser público y el fallback pierde
+  sentido), Claude Code cambie el formato de plugins, o algún otro agente publique un
+  mecanismo equivalente que permita retirar su adaptador.
