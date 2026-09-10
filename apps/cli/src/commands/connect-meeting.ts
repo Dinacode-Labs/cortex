@@ -1,7 +1,8 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { extractFileText } from "@cortex/core";
-import { captureCondensedViaApi, shutdownObservability, wireLlm } from "@cortex/agents";
+import { sendCondensedSession } from "@cortex/client";
+import { shutdownObservability, wireLlm } from "@cortex/agents";
 
 /**
  * Conector de REUNIONES: transcribe grabaciones (audio/vídeo, vía `extract`) y, en vez de
@@ -54,12 +55,21 @@ async function runMeeting(slug: string | undefined, path: string | undefined): P
       console.log(`  ${basename(file)}: sin transcripción útil`);
       continue;
     }
-    const r = await captureCondensedViaApi(slug, ex.text, basename(file), "meeting", "meeting_transcript");
-    saved += r.saved;
-    updated += r.updated;
-    superseded += r.superseded;
-    failed += r.failed;
-    console.log(`  ${basename(file)}: +${r.saved} nuevas, ~${r.updated} fusionadas, ⊘${r.superseded} superadas${r.failed ? `, ${r.failed} fallos` : ""}`);
+    // El servidor destila (ADR-0025); aquí se espera porque el usuario mira los contadores.
+    const r = await sendCondensedSession({
+      slug,
+      condensed: ex.text,
+      sessionId: basename(file),
+      platform: "meeting",
+      sourceType: "meeting_transcript",
+      wait: true,
+    });
+    const c = r.counters ?? { saved: 0, updated: 0, superseded: 0, noop: 0, failed: 0, windows: 0 };
+    saved += c.saved;
+    updated += c.updated;
+    superseded += c.superseded;
+    failed += c.failed;
+    console.log(`  ${basename(file)}: +${c.saved} nuevas, ~${c.updated} fusionadas, ⊘${c.superseded} superadas${c.failed ? `, ${c.failed} fallos` : ""}`);
   }
   console.log(`Reuniones: +${saved} nuevas, ~${updated} UPDATE, ⊘${superseded} SUPERSEDE${failed ? `, ${failed} fallos (¿cortex auth login / servidor?)` : ""}.`);
 }

@@ -1,4 +1,8 @@
 import { Hono } from "hono";
+import { getEnvNum } from "@cortex/shared";
+import { distillSession, type DistillSessionFn } from "@cortex/agents";
+import { createCaptureQueue } from "./capture-queue.js";
+import { captureSessionRoutes, makeCaptureRunner, type CaptureJob } from "./routes/capture-session.js";
 import { authRoutes } from "./routes/auth.js";
 import { contextRoutes } from "./routes/context.js";
 import { installRoutes } from "./routes/install.js";
@@ -17,9 +21,21 @@ import { projectRoutes } from "./routes/projects.js";
  * las rutas con `app.request()` sin levantar un servidor.
  */
 
-/** Construye la API HTTP completa (auth + contexto). Sin side effects. */
-export function createApp(): Hono {
+export interface AppDeps {
+  /** Inyectable para poder testear las rutas de captura sin llamar a un modelo real. */
+  distill?: DistillSessionFn;
+  /** Llamadas al modelo en paralelo. Baja porque el proveedor limita por API key. */
+  captureConcurrency?: number;
+}
+
+/** Construye la API HTTP completa (auth + contexto + captura). Sin side effects. */
+export function createApp(deps: AppDeps = {}): Hono {
   const app = new Hono();
+  const distill = deps.distill ?? distillSession;
+  const captureQueue = createCaptureQueue<CaptureJob>({
+    concurrency: deps.captureConcurrency ?? getEnvNum("CORTEX_CAPTURE_CONCURRENCY", 1),
+    run: makeCaptureRunner(distill),
+  });
 
   app.get("/health", (c) => c.json({ ok: true, service: "cortex-server" }));
 
@@ -28,6 +44,7 @@ export function createApp(): Hono {
   app.route("/", authRoutes);
   app.route("/", contextRoutes);
   app.route("/", projectRoutes);
+  app.route("/", captureSessionRoutes({ distill, queue: captureQueue }));
 
   // Errores no controlados: log completo en servidor + 500 JSON genérico,
   // sin filtrar detalles internos al cliente.
