@@ -2,7 +2,8 @@
 
 > Cada decisión aquí es una **hipótesis de trabajo para la demo**, no una elección
 > definitiva. El documento de planteamiento
-> (`dinacode-cortex-contexto-y-plan-demo.md`) insiste en cuestionar y validar todo.
+> (el plan interno de junio de 2026, hoy en el repo privado `ai-toolbelt`) insiste en
+> cuestionar y validar todo.
 > Este fichero registra qué hemos elegido *de momento*, por qué, y qué alternativas
 > quedan pendientes de evaluar.
 
@@ -172,7 +173,7 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   ventana. Retrieval/context-pack devuelven **solo vigentes por defecto**; soportan
   consultas **point-in-time** (`asOf`) en web (`/pack`), MCP (`get_project_context_pack`)
   y core. Backfill de fechas reales desde Plane (creación/archivado) y chat.
-- **Resultado (LevelUp):** 266 vigentes / 147 históricos; point-in-time real
+- **Resultado (proyecto piloto):** 266 vigentes / 147 históricos; point-in-time real
   (a 2026-05-28: 182 hechos; a 06-12: 239; ahora: 266).
 - **Limitación:** las contradicciones entre entidades no se auto-invalidan (no hay
   "ganador" claro) — el lint las reporta para revisión humana.
@@ -205,32 +206,31 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** un segundo operador pida colores propios (entonces sí,
   `CORTEX_BRAND_PRIMARY` y compañía), o la UI cambie de stack.
 
-## ADR-0014 · Harness de IA distribuible (config/) y multi-agente
+## ADR-0014 · El producto reparte SU harness; el toolbelt de la organización es un registry externo (revisado 2026-09)
 
-- **Estado:** aceptada (estructura); instalador pendiente.
-- **Contexto:** §13. El valor está en que cualquier developer conecte SUS agentes a
-  Cortex desde cualquier proyecto. El MCP ya es global (scope user); faltaba un
-  bundle versionado y un plan de distribución multi-agente.
-- **Decisión:** `config/` es la **fuente única versionada** del harness, separando
-  lo compartido (`mcp/cortex.json`, `skills/`, `commands/`) de las instrucciones
-  por agente (en `config/README.md`). Las capacidades viven como **tools MCP**
-  (`mcp__cortex__*`), portables a cualquier agente con MCP; solo cambia el registro
-  del MCP y el formato de skill/comando. Instalación **manual documentada** para
-  **Claude Code, Codex y OpenCode**. Skills/comandos se activan por symlink desde
-  `config/` a `~/.claude/` (global) o `.claude/` (proyecto).
-- **Registry PR-able:** `config/toolbelt.json` es la fuente única del toolbelt de
-  Dinacode (MCPs + skills + comandos). Se amplía/mejora **por PR** y se reparte con
-  `cortex sync`. Cortex reparte **configuración, nunca credenciales** (cada entrada
-  documenta su `auth`). Skills propias **vendorizadas** en `config/skills/`
-  (excluyendo secretos); MCPs **declarados** por comando/URL (uvx/npx/http, sin copiar).
-- **Instalador:** `cortex sync` (`scripts/cortex-sync.ts`, `pnpm cortex:sync`) —
-  data-driven desde el manifiesto, idempotente, dry-run por defecto, `--apply`,
-  `--doctor` (estado de auth por tool), `--agents`. **Preserva** lo ya configurado
-  (no machaca auth existente) y **omite** MCPs sin su env. Detecta Claude/Codex/OpenCode/Hermes (Hermes: escribe mcp_servers en
-  ~/.hermes/config.yaml en YAML, preservando lo existente).
-  Skills por symlink → `git pull` actualiza; re-`--apply` re-registra. OpenCode best-effort.
-- **Revisar cuando:** añadamos prompts/políticas corporativas, un `--remove`, o
-  separemos el harness a un repo propio (`dinacode-ai-config`).
+- **Estado:** **revisada** (2026-09-10). Antes: «Harness de IA distribuible (config/) y
+  multi-agente», donde `config/toolbelt.json` era «la fuente única del toolbelt de Dinacode».
+- **Contexto:** `config/` mezclaba dos cosas de naturaleza distinta. Por un lado el harness
+  **del producto**: el MCP de Cortex, la skill `cortex-capture` y el comando `/cortex-save`.
+  Por otro, las herramientas **de Dinacode**: Plane, Atlassian, Notion, Bitbucket, MS Teams,
+  Google Chat y sus skills vendorizadas con scripts propios. Lo segundo no puede vivir en un
+  repo que va a abrirse, y tampoco tiene por qué: no es producto, es la configuración de una
+  empresa concreta.
+- **Decisión:** el repo de Cortex reparte **solo lo suyo** (`config/toolbelt.json` queda
+  mínimo: MCP de Cortex, `cortex-capture`, `/cortex-save`). El toolbelt de una organización
+  se declara en un **registry propio** con el mismo esquema y se instala con
+  `cortex toolbelt sync <registry.json|url>`; el de Dinacode vive en
+  `Dinacode-Labs/ai-toolbelt` (privado, ADR-0026). El esquema del registry se documenta en
+  [`toolbelt-registry.md`](./toolbelt-registry.md) como parte del producto.
+- **Lo que NO cambia:** `cortex sync` sigue siendo data-driven desde el manifiesto,
+  idempotente, dry-run por defecto con `--apply`, con `--doctor` y `--agents`; preserva lo
+  ya configurado (no machaca auth existente) y omite las entradas sin su env. Detecta Claude
+  Code, Codex, OpenCode y Hermes. Sigue repartiendo **configuración, nunca credenciales**.
+- **Alternativas:** dejar el toolbelt corporativo en el repo y filtrarlo al publicar
+  (frágil: basta un despiste para filtrar rutas y nombres internos); eliminar la feature de
+  toolbelt (perdería lo que ya funciona y es útil para cualquier equipo, no solo Dinacode).
+- **Revisar cuando:** el plugin de Claude Code absorba el reparto de skills y comandos
+  (entonces `config/` podría desaparecer del todo), o se quiera registry por proyecto.
 
 ## ADR-0015 · Capa de agentes con Mastra (Agents reales)
 
@@ -331,21 +331,21 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 ## Jerarquía de proyectos: padre/cliente con herencia y cascada
 
 - **Decisión:** un proyecto puede tener un **padre** (`entities.parent_id`). Caso típico:
-  un cliente "Boluda" con subproyectos `boluda-api`, `boluda-web`. Cada subproyecto es un
+  un cliente "Acme" con subproyectos `acme-api`, `acme-web`. Cada subproyecto es un
   **proyecto real** (slug, vínculo `.cortex.json`, permisos y recuperación propios →
   precisión), y el padre **agrupa y guarda el contexto compartido**.
 - **Herencia de contexto:** `getContextPack(sub)` incluye las entradas del subproyecto
-  **+ las de sus ancestros** (CTE recursiva sobre `parent_id`). Así "lo común de Boluda"
+  **+ las de sus ancestros** (CTE recursiva sobre `parent_id`). Así "lo común de Acme"
   llega a cada subproyecto sin mezclar el contexto de los subproyectos entre sí (evita el
   context-rot del modelo "todo en un proyecto").
 - **Cascada de permisos:** `canAccessProject` recorre la cadena de ancestros: si el
   proyecto O algún ancestro es privado → restringido; concede acceso ser admin o
-  dueño/miembro del proyecto o de **cualquier ancestro** (ser miembro de "Boluda" abre
+  dueño/miembro del proyecto o de **cualquier ancestro** (ser miembro de "Acme" abre
   sus subproyectos).
-- **Por qué no "Boluda = 1 proyecto con subcarpetas":** perdería precisión de
-  recuperación (una sesión de `boluda-api` traería contexto de `boluda-web`), vínculo por
+- **Por qué no "el cliente = 1 proyecto con subcarpetas":** perdería precisión de
+  recuperación (una sesión de `acme-api` traería contexto de `acme-web`), vínculo por
   repo y permisos finos. Por qué no plano: lo común se silaría/duplicaría.
-- **Uso:** `cortex link --create "Boluda API" --parent boluda`.
+- **Uso:** `cortex link --create "Acme API" --parent acme`.
 - **Revisar cuando:** queramos herencia también en `search`/`ask` (hoy solo en el pack),
   límites de profundidad, o mover contexto compartido a un tipo "client" del grafo.
 
@@ -727,3 +727,40 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   `.env`); se quiera *streaming* para `glm5.3-flash` (su guardrail global de 800K tpm lo
   recomienda y `runAgent` hoy no lo usa); aparezca un cliente con requisito on-prem (probar
   Ollama/vLLM con este mismo proveedor); o toque retirar el alias `nan` (0.2.0).
+
+---
+
+## ADR-0026 · Separación producto/empresa: el material corporativo a un repo privado, sin reescribir la historia
+
+- **Estado:** aceptada (2026-09-10).
+- **Contexto:** el repo contenía cosas que no son producto: el plan fundacional (marcado
+  como confidencial, con estrategia de negocio), un workshop interno con sus assets, el
+  wordmark de Dinacode, las skills de las herramientas internas (Plane, Bitbucket, MS
+  Teams, Google Chat) y, repartidas por la documentación, referencias a clientes reales por
+  su nombre y a compañeros del equipo como responsables de tareas. Cortex va a abrirse como
+  open source y a operarlo gente de fuera.
+- **Decisión:**
+  1. Todo lo corporativo se mueve a **`Dinacode-Labs/ai-toolbelt`** (privado): registry
+     completo, skills internas, `docs/internal/` (plan fundacional, workshop, assets,
+     branding y el roadmap con responsables) y los valores de despliegue de Dinacode.
+  2. En Cortex se **neutralizan** las referencias a clientes y personas: «un cliente real»,
+     «el proyecto piloto», «Acme». Se conserva el dato técnico (las cifras de bi-temporal
+     siguen siendo las medidas de verdad) y se pierde solo quién era el cliente. Las dos
+     migraciones ya aplicadas que citan nombres en un comentario **no se tocan**: editar una
+     migración aplicada es peor práctica que el comentario que arregla.
+  3. **No se reescribe el historial** (`git filter-repo`). El repo sigue siendo privado, así
+     que el material solo es visible para quien ya tiene acceso; reescribir invalidaría todos
+     los clones y rompería las referencias a PRs que hay en `docs/refactor` y en los propios
+     ADR. La apertura se hará desde una **instantánea limpia** —repo público nuevo con un
+     commit inicial— y no publicando este historial. Si algún día hiciera falta limpiarlo:
+     `git filter-repo --invert-paths --path <fichero>` en un clon fresco, force-push, todos
+     re-clonan y se pide a GitHub que purgue los objetos cacheados.
+  4. `.gitignore` bloquea las rutas del material interno para que no vuelva por descuido.
+- **Alternativas:** filtrar al publicar en vez de separar ahora (frágil: basta un despiste);
+  una carpeta `private/` dentro del monorepo (se acaba filtrando y no resuelve el problema
+  de que el instalador clona el repo entero en la máquina de cada dev).
+- **Consecuencias:** quien trabaje en Cortex y necesite el plan fundacional lo busca en el
+  repo privado. El despliegue de Dinacode monta su logo con `CORTEX_BRAND_LOGO_FILE`
+  (ADR-0013 revisado) en vez de tenerlo incrustado en el código.
+- **Revisar cuando:** se fije la fecha de apertura (el procedimiento de instantánea limpia
+  debe quedar escrito en `CONTRIBUTING.md` antes), o se detecte otro dato sensible.

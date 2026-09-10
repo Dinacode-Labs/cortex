@@ -7,10 +7,14 @@ Guía para agentes de IA (Claude Code y similares) que trabajen en este repo.
 Dinacode Cortex es una **plataforma de memoria corporativa de contexto** para
 proyectos software de una consultora. Captura conocimiento (decisiones, restricciones,
 incidencias, convenciones…), lo estructura y lo expone a personas y agentes de IA vía
-un MCP corporativo. Documento fundacional: `dinacode-cortex-contexto-y-plan-demo.md`.
+un MCP corporativo. Origen: plan interno de junio de 2026 (en el repo privado `ai-toolbelt`).
 
 > Todo el planteamiento es **hipótesis a validar**. Antes de dar algo por definitivo,
 > cuestiónalo y deja constancia en `docs/decisions.md`.
+>
+> **Nada corporativo en este repo** (ADR-0026): ni clientes por su nombre, ni personas como
+> responsables, ni skills de herramientas internas, ni marca. Eso vive en el repo privado
+> `Dinacode-Labs/ai-toolbelt`.
 
 ## Stack (ver `docs/decisions.md` para el porqué)
 
@@ -43,7 +47,8 @@ apps/
                # autoescape) + middleware/ + public/ (estáticos)
   cli/         # CLI `cortex` (auth, link, ui, conectores…)
 scripts/       # install.sh (instalador remoto; lo sirve apps/server)
-config/        # toolbelt distribuible (MCP + skills + comandos) — ver config/README.md
+config/        # registry MÍNIMO del producto (MCP + cortex-capture + /cortex-save).
+               # El toolbelt de la organización va en un registry externo (ADR-0014/0026)
 tests/         # unit + integration (Postgres real; ver CONTRIBUTING.md)
 docs/
   decisions.md # ADR ligero: decisiones = hipótesis a revisar

@@ -1,8 +1,8 @@
 # Cortex — config IA (harness para agentes)
 
 Bundle **versionado** para que cualquier developer conecte sus agentes de IA a
-Cortex (consultar y capturar contexto). Es el *registry de config IA* del §13 del
-plan. De momento la instalación es **manual** (abajo); el objetivo es un instalador
+Cortex (consultar y capturar contexto). Es el *registry de config IA* del plan
+fundacional. De momento la instalación es **manual** (abajo); el objetivo es un instalador
 único **`cortex sync`** compatible con **Claude Code, Codex, OpenCode y Hermes**
 (Hermes Agent de Nous Research).
 
@@ -14,11 +14,17 @@ plan. De momento la instalación es **manual** (abajo); el objetivo es un instal
 
 ```
 config/
-  mcp/cortex.json                 # definición del servidor MCP (compartida)
+  toolbelt.json                   # registry MÍNIMO: solo lo que Cortex reparte de sí mismo
   skills/cortex-capture/SKILL.md  # skill de captura (formato Claude; cuerpo reutilizable)
   commands/cortex-save.md         # comando/prompt /cortex-save (reutilizable)
   README.md                       # esta guía
 ```
+
+> **Aquí solo vive lo del producto.** El toolbelt de tu organización (los MCPs y skills de
+> tus herramientas internas) se declara en un **registry propio**, normalmente en un repo
+> privado, y se instala con `cortex toolbelt sync <ruta-o-url>`. Esquema en
+> [`docs/toolbelt-registry.md`](../docs/toolbelt-registry.md); el porqué, en el ADR-0014
+> revisado y el ADR-0026.
 
 ## Requisitos
 
@@ -31,14 +37,15 @@ pnpm db:migrate
 Copia `.env.example` a `.env` (LLM/embeddings). El comando del MCP usa
 `pnpm -C <ruta-al-repo-cortex> --filter @cortex/mcp-server start`.
 
-## Registry (`config/toolbelt.json`) — PR-able
+## Registry (`config/toolbelt.json`)
 
-`config/toolbelt.json` es la **fuente única** del toolbelt de Dinacode: qué MCPs y
-skills debe tener un dev. **Añade/mejora una skill o MCP con un PR** a este repo;
-con `cortex sync` (tras `git pull`) se reparte/actualiza. Cortex reparte
-**configuración, nunca credenciales**: cada entrada documenta en `auth` qué debe
-configurar el dev por su cuenta. Las skills propias se vendorizan en
-`config/skills/`; los MCPs se declaran por comando/URL (uvx/npx/http) — no se copian.
+Declara qué MCPs, skills y comandos debe tener un dev, y `cortex sync` los instala de forma
+idempotente en cada agente detectado. El de este repo es **mínimo a propósito**: solo el MCP
+de Cortex, la skill `cortex-capture` y el comando `/cortex-save`.
+
+Se reparte **configuración, nunca credenciales**: cada entrada documenta en `auth` qué tiene
+que configurar el dev por su cuenta, y una entrada cuyas variables no estén exportadas se
+omite con un aviso en vez de fallar.
 
 ## Instalación con `cortex sync` (recomendado)
 
@@ -160,13 +167,12 @@ Capturar tras una tarea (skill `cortex-capture` / `/cortex-save`):
 > Guarda en Cortex (<Proyecto>) la decisión: "Se añadió caché en X para evitar
 > timeouts en Y."
 
-## Skills vendorizadas
-`config/skills/` contiene copias curadas para distribución interna de Dinacode
-(cortex-capture es propia; plane-api/google-chat/bkt/expect son herramientas de uso
-interno). Se excluyen secretos: la auth de cada skill vive en keyring/env/config del
-dev, nunca en el repo.
+## Skills
+`config/skills/` solo contiene `cortex-capture`, que es del producto. Las skills de
+herramientas internas se movieron al registry externo (ADR-0026). En ningún caso se guardan
+secretos: la auth de cada skill vive en el keyring/env del dev.
 
 ## A futuro
-- Ampliar el registry con **prompts/políticas corporativas** (§13) y un
-  **`--remove`** (desinstalar).
-- Empaquetar `cortex sync` como bin `cortex` (hoy `pnpm cortex:sync`).
+- `cortex toolbelt sync <registry.json|url>` para instalar el registry de una organización
+  desde fuera del repo, y `--remove` para desinstalar.
+- Empaquetar el CLI como binario instalable (hoy `pnpm cortex:sync` sobre el checkout).

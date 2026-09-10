@@ -185,7 +185,7 @@ Escenarios (tokens = contenido total del corpus a ingerir):
 
 | Escenario | Tokens aprox | Solo embeddings (3-large) | + Pipeline completo (flash/pro) | Total one-time |
 |---|---|---|---|---|
-| 1 proyecto piloto (tipo CE Portal) | ~1M | ~$0.13 | ~$1–2 | **< $3** |
+| 1 proyecto piloto | ~1M | ~$0.13 | ~$1–2 | **< $3** |
 | Backlog moderado (~10 proyectos) | ~15M | ~$2 | ~$5–8 | **~$10** |
 | Todo, agresivo (~30 proyectos, mucho doc+código) | ~100M | ~$13 | ~$35–50 | **~$50–65** |
 

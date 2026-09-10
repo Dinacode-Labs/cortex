@@ -25,7 +25,7 @@ No captures ruido (cambios triviales, "ok", pruebas locales sin conclusión).
 ## Cómo
 
 1. **Identifica el proyecto.** Usa el nombre del proyecto/cliente en Cortex (p.ej.
-   "LevelUp Pasión"). Si no está claro, pregúntalo en una frase.
+   "Acme Portal"). Si no está claro, pregúntalo en una frase.
 2. **Redacta un resumen estructurado** (conciso, en español), con solo las secciones
    que apliquen:
 
