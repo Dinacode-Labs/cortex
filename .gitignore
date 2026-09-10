@@ -30,3 +30,13 @@ pnpm-debug.log*
 
 # Mastra
 .mastra/
+
+# Material corporativo / interno: vive en Dinacode-Labs/ai-toolbelt (privado), nunca aquí.
+# Ver ADR-0026. Estas reglas existen para que no vuelva por accidente.
+.od-skills/
+docs/assets/
+docs/internal/
+docs/workshop-*
+*.artifact.json
+dinacode-*.md
+config/skills/*/*.zip

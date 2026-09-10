@@ -33,8 +33,8 @@ describe("persistencia y búsqueda (BD real, embeddings local)", () => {
   });
 
   it("context-pack hereda del proyecto padre (jerarquía)", async () => {
-    const parent = await createProject(`IT Boluda ${RID}`);
-    const child = await createProject(`IT Boluda API ${RID}`, { parentSlug: parent.slug! });
+    const parent = await createProject(`IT Acme ${RID}`);
+    const child = await createProject(`IT Acme API ${RID}`, { parentSlug: parent.slug! });
     await saveContext({ content: "Convención: todas las APIs usan OAuth2 corporativo.", project: parent.name, type: "convention", confidence: "high" });
     await saveContext({ content: "Decisión: el endpoint de facturas usa paginación cursor.", project: child.name, type: "decision", confidence: "high" });
     const pack = await getContextPack(child.name);
