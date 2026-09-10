@@ -5,9 +5,10 @@ import { join } from "node:path";
 /**
  * ÚNICA lectura/escritura de `~/.cortex/credentials` (las escribe `cortex auth login`).
  * Antes había 4 copias del parser (cli/auth, cli/ui, core/api-client, core/link) con
- * 3 interfaces Creds distintas. Módulo con I/O en shared: excepción pragmática
- * documentada en docs/decisions.md (shared es el único paquete visible desde core,
- * agents y apps a la vez).
+ * 3 interfaces Creds distintas.
+ *
+ * `CORTEX_HOME` sustituye a `~` para que los tests y las pruebas end-to-end puedan usar
+ * una sesión aparte sin pisar la del usuario (ADR-0025).
  */
 export interface Credentials {
   server: string;
@@ -15,8 +16,13 @@ export interface Credentials {
   email: string;
 }
 
+/** Raíz donde vive `.cortex/`: `CORTEX_HOME` si está definida, si no el home del usuario. */
+export function credentialsHome(): string {
+  return process.env.CORTEX_HOME?.trim() || homedir();
+}
+
 export function credentialsPath(): string {
-  return join(homedir(), ".cortex", "credentials");
+  return join(credentialsHome(), ".cortex", "credentials");
 }
 
 export function readCredentials(): Credentials | null {
@@ -31,7 +37,7 @@ export function readCredentials(): Credentials | null {
 
 export function writeCredentials(c: Credentials): void {
   const f = credentialsPath();
-  mkdirSync(join(homedir(), ".cortex"), { recursive: true });
+  mkdirSync(join(credentialsHome(), ".cortex"), { recursive: true });
   writeFileSync(f, JSON.stringify(c, null, 2) + "\n");
   chmodSync(f, 0o600);
 }
