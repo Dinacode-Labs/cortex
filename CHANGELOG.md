@@ -9,6 +9,20 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **`cortex setup <agente>|--all`**: instala la integración de Cortex en los agentes de tu
+  equipo con el mecanismo nativo de cada uno. Idempotente, con copia de seguridad antes de
+  tocar nada, `--dry-run`, `--remove` y `--status`. Instalar el CLI y configurar los agentes
+  pasan a ser dos cosas distintas: se puede reconfigurar sin reinstalar (ADR-0032).
+- **Plugin de Claude Code** (`plugin/claude-code/`, marketplace `dinacode-cortex` declarado
+  en este mismo repo): hooks de contexto y captura, el MCP `cortex mcp`, la skill
+  `cortex-capture` y `/cortex-save` en un solo paquete que el usuario ve y controla desde
+  `/plugin`. Si no se puede instalar (repo privado sin acceso), `setup` cae a hooks en
+  `~/.claude/settings.json` y funciona igual.
+- **Migración desde la instalación anterior**, dentro del propio `cortex setup`: los hooks
+  `pnpm -C <clon> cortex hook-*` se sustituyen en su sitio en vez de duplicarse, el MCP que
+  apuntaba al repo clonado se vuelve a registrar contra el servidor, los symlinks a `config/`
+  se retiran y el shim de `~/.local/bin/cortex` se borra. El clon en `~/.dinacode-cortex` se
+  avisa pero no se toca: puede tener un `.env` con claves.
 - **`cortex mcp`**: servidor MCP por stdio que hace de puente hacia el MCP HTTP del
   servidor, autenticado con el token de `cortex auth login`. Es lo que se registra en los
   agentes (`claude mcp add cortex -- cortex mcp`): el proceso local no toca la base de datos

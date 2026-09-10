@@ -51,8 +51,9 @@ distribuirlo como CLI instalable.
 | Lado cliente (HTTP, credenciales, `.cortex.json`, transcripts) | `packages/client/` — **sin** Postgres ni LLM |
 | Comando de developer (auth, link, hooks) | `apps/cli/src/commands/` — solo `client` + `shared` |
 | Comando de operador (BD, modelo, servicios) | `apps/admin/src/commands/` |
-| Toolbelt del producto (MCP + skill de captura + comando) | `config/toolbelt.json` + `config/skills/cortex-capture/` + `config/commands/` |
-| Instalador (`cortex sync`) + hooks + shim CLI | `apps/cli/src/commands/sync.ts` (+ `sync/` un adapter por agente) |
+| Lo que Cortex instala en Claude Code (hooks, MCP, skill, comando) | `plugin/claude-code/` (+ `.claude-plugin/marketplace.json` en la raíz) |
+| Integración por agente (`cortex setup`) | `apps/cli/src/setup/` — un adaptador por agente, más `hooks-json.ts` y `legacy.ts` |
+| Registry de terceros (`cortex sync`, en retirada) | `config/toolbelt.json` + `apps/cli/src/commands/sync.ts` |
 
 **Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
 se **inyecta**: cada entrypoint llama a `wireLlm()` (de `@cortex/agents`) tras `loadEnv()`,

@@ -1,0 +1,39 @@
+{
+  "description": "Cortex hooks. They need the `cortex` CLI on your PATH (npm i -g @dinacode/cortex) and a linked project (cortex link). Everything is guarded so a missing CLI never breaks your session.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v cortex >/dev/null 2>&1 && cortex hook-context || true",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v cortex >/dev/null 2>&1 && cortex hook-capture --platform claude || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v cortex >/dev/null 2>&1 && cortex hook-capture --platform claude || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}

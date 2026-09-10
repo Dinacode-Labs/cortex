@@ -4,14 +4,14 @@ Cortex reparte a los agentes de cada developer dos cosas distintas, y conviene n
 confundirlas:
 
 1. **Lo suyo** — el MCP de Cortex, la skill `cortex-capture` y el comando `/cortex-save`.
-   Eso lo instala `cortex sync` (y, más adelante, el plugin de Claude Code) sin que haya
-   que configurar nada.
+   Eso lo instala `cortex setup`, en Claude Code a través del plugin `plugin/claude-code/`,
+   sin que haya que declarar nada en ningún registry.
 2. **El toolbelt de tu organización** — los MCPs y skills de las herramientas que use tu
    equipo (gestor de tickets, chat, repositorio, lo que sea). Eso **no** vive en este repo:
    se declara en un registry propio, normalmente en un repo privado, y se instala con
    `cortex toolbelt sync <ruta-o-url>`.
 
-La separación está en el [ADR-0014](./decisions.md) (revisado) y el [ADR-0026](./decisions.md).
+La separación está en el [ADR-0014](./decisions.md) (revisado), el [ADR-0026](./decisions.md) y el [ADR-0032](./decisions.md).
 
 ## Formato
 

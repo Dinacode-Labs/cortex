@@ -28,7 +28,7 @@ automatizan el bucle: tu agente arranca **sabiendo** el proyecto y, al terminar,
 **Práctico**
 - [Para developers — instalar y usar](#para-developers--instalar-y-usar)
 - [Capacidades](#capacidades) · [Arquitectura](#arquitectura)
-- [Tools MCP (8)](#tools-mcp-8) · [Toolbelt](#toolbelt-lo-que-cortex-sync-instala-en-tus-agentes) · [Conectores](#ingesta-de-fuentes-conectores)
+- [Tools MCP (8)](#tools-mcp-8) · [Cómo llega a tus agentes](#cómo-llega-cortex-a-tus-agentes) · [Conectores](#ingesta-de-fuentes-conectores)
 - [Operar el servidor (infra/admin)](#operar-el-servidor-infraadmin) · [Estructura del repo](#estructura-del-repo)
 
 **[Guía formativa: cómo funciona por dentro](#guía-formativa-cómo-funciona-por-dentro)**
@@ -49,12 +49,25 @@ automatizan el bucle: tu agente arranca **sabiendo** el proyecto y, al terminar,
 
 ## Para developers — instalar y usar
 
-Un comando instala el CLI `cortex`, el **toolbelt** (MCP + skills + comandos) y los
-**hooks** en tus agentes, e inicia sesión (email + OTP):
+Un comando instala el CLI `cortex` e inicia sesión (email + OTP):
 
 ```bash
 curl -fsSL https://<servidor-cortex>/install.sh | sh
 ```
+
+Después, configura tus agentes. Es un paso aparte a propósito: puedes repetirlo cuando
+quieras sin reinstalar nada.
+
+```bash
+cortex setup --all       # Claude Code, Codex, OpenCode, Hermes, Pi (los que tengas)
+cortex setup --status    # qué hay instalado y dónde
+cortex setup --dry-run   # enseña el plan sin escribir
+```
+
+En Claude Code eso instala el plugin `cortex`, que trae los hooks, el MCP con las 8 tools, la
+skill de captura y `/cortex-save`. Si vienes de la instalación antigua (la del clon del repo),
+`setup` la migra: sustituye los hooks viejos, vuelve a registrar el MCP contra el servidor y
+retira el shim del PATH.
 
 Luego, en cualquier repo de trabajo:
 
@@ -67,9 +80,8 @@ cortex --help                        # todos los comandos
 
 **Qué obtienes (sin hacer nada más):** al abrir una sesión con tu agente, Cortex
 **inyecta** el context-pack del proyecto; al cerrarla, **captura** lo aprendido
-(destilado, no en crudo) firmado con tu email. Además, el toolbelt deja tus agentes con
-el MCP de Cortex y su skill de captura; si tu equipo tiene un registry propio, también las
-herramientas que uséis.
+(destilado, no en crudo) firmado con tu email. Las 8 tools quedan disponibles para
+preguntarle a la memoria del proyecto en cualquier momento.
 
 - **Opt-in por repo:** sin `.cortex.json` no se inyecta ni captura nada. `cortex link --ignore`
   desactiva un repo concreto (p.ej. uno personal anidado).
@@ -157,21 +169,23 @@ directamente y sin permisos: es para desarrollar el servidor, no para usarlo des
 | `search_project_code` | Búsqueda híbrida sobre el código indexado |
 | `lint_project_context` | Salud del conocimiento (contradicciones, duplicados, huecos…) |
 
-## Toolbelt: lo que `cortex sync` instala en tus agentes
+## Cómo llega Cortex a tus agentes
 
-Cortex reparte **lo suyo**: el MCP con las 8 tools de arriba, la skill `cortex-capture`
-(capturar conocimiento con baja fricción) y el comando `/cortex-save`. El registry vive en
-[`config/toolbelt.json`](./config/toolbelt.json).
+Lo suyo —el MCP con las 8 tools, la skill `cortex-capture` y el comando `/cortex-save`— lo
+reparte Cortex en el **plugin de Claude Code** ([`plugin/claude-code/`](./plugin/claude-code)),
+que instala `cortex setup`. Los demás agentes se configuran con su mecanismo nativo desde el
+mismo comando. El plugin trae también los dos hooks del bucle: contexto al empezar la sesión,
+captura al terminarla.
 
-Además, `cortex sync` sabe instalar el **toolbelt de tu organización** —los MCPs y skills de
-las herramientas que use tu equipo— desde un **registry externo**, normalmente en un repo
+Aparte de eso está el **toolbelt de tu organización** —los MCPs y skills de las herramientas
+que use tu equipo—, que se instala desde un **registry externo**, normalmente en un repo
 privado. Eso no vive aquí a propósito: no es producto, es la configuración de una empresa
-concreta (ADR-0014 revisado y ADR-0026). El esquema del fichero está en
+concreta (ADR-0014 revisado, ADR-0026 y ADR-0032). El esquema del fichero está en
 [`docs/toolbelt-registry.md`](./docs/toolbelt-registry.md).
 
 En ambos casos se reparte **configuración, nunca credenciales**: cada entrada documenta qué
-auth necesita y `cortex sync --doctor` dice qué falta. Las entradas cuyas variables no estén
-exportadas se omiten con un aviso, no rompen la instalación.
+auth necesita, y las que dependan de variables sin exportar se omiten con un aviso en vez de
+romper la instalación.
 
 ## Ingesta de fuentes (conectores)
 
@@ -279,9 +293,10 @@ docker compose -f deploy/docker-compose.yml up -d --build
 ## Estructura del repo
 
 ```
-apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth) · cli (cortex)
-packages/    core · agents · embeddings · database · shared
-config/      toolbelt.json (registry del producto) · skills/cortex-capture · commands/
+apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth) · cli (cortex) · admin
+packages/    core · agents · embeddings · database · client · shared
+plugin/      claude-code/ (hooks + MCP + skill cortex-capture + /cortex-save)
+config/      toolbelt.json (esquema del registry de terceros)
 scripts/     install.sh (instalador remoto; lo sirve apps/server)
 docs/        decisions.md · roadmap.md · research/ · audit/ (jun 2026) · refactor/ (jul 2026)
 ```
