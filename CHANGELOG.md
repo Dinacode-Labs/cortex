@@ -99,6 +99,10 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   viejo recibe un mensaje que lo explica. Con él se va el shim de `~/.local/bin`.
 
 ### Changed
+- **`install.sh` ya no clona el repo**: instala el CLI desde npm, inicia sesión y llama a
+  `cortex setup --all`. Node no se instala por su cuenta —meterle una versión a alguien por
+  detrás le rompe otros proyectos—, se exige ≥ 20 y se dan tres formas de ponerlo. Los fallos
+  típicos (npm sin permisos, `cortex` fuera del PATH) traen el comando exacto que los arregla.
 - `cortex link` va por la API en vez de por la base de datos: era el último comando del CLI
   que necesitaba Postgres.
 - `cortex hook-capture`, `connect-sessions` y `connect-meeting` ya no llaman al modelo: solo
