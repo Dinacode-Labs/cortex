@@ -11,7 +11,10 @@ export { storeEmbeddingsBatch } from "./vectors.js";
 export { recordUsage, registerUsageSink, getUsageSummary, getRecentTraces, estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./usage.js";
 export { resolveEntity, relate, linkEntryToEntity } from "./entities.js";
 export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
-export { readCortexLink, slugify, type CortexLink } from "./project-config.js";
+// `readCortexLink` vive en @cortex/client (es código de lado cliente, sin SQL); se
+// re-exporta aquí porque core lo usa para resolver el proyecto de un repo.
+export { readCortexLink, type CortexLink } from "@cortex/client";
+export { slugify } from "./project-config.js";
 export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects.js";
 export {
   isNearDuplicate,

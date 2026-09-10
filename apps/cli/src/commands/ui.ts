@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { platform } from "node:os";
-import { getEnv, readCredentials } from "@cortex/shared";
+import { getEnv } from "@cortex/shared";
+import { readCredentials } from "@cortex/client";
 
 /**
  * `cortex ui` — abre la UI web YA AUTENTICADA. Pide al servidor un **ticket de un solo

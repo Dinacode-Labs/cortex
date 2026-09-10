@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readCodexSessions, readOpenCodeSessions, readHermesSessions } from "../packages/agents/src/session-readers";
+import { readCodexSessions, readOpenCodeSessions, readHermesSessions } from "../packages/client/src/session-readers";
 
 const REPO = "/tmp/fake-repo-cortex";
 const tmps: string[] = [];

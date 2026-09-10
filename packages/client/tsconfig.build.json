@@ -8,21 +8,8 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": [
-    "src/**/*.ts"
-  ],
+  "include": ["src/**/*.ts"],
   "references": [
-    {
-      "path": "../client/tsconfig.build.json"
-    },
-    {
-      "path": "../core/tsconfig.build.json"
-    },
-    {
-      "path": "../database/tsconfig.build.json"
-    },
-    {
-      "path": "../shared/tsconfig.build.json"
-    }
+    { "path": "../shared/tsconfig.build.json" }
   ]
 }

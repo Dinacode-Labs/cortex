@@ -13,6 +13,9 @@
   ],
   "references": [
     {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
       "path": "../database/tsconfig.build.json"
     },
     {

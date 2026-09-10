@@ -468,21 +468,18 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 
 ## Credenciales y api-client únicos en `shared` (excepción de I/O consciente)
 
-- **Decisión:** la lectura/escritura de `~/.cortex/credentials` y el cliente HTTP de la
-  API (`apiGet`/`apiPost`) viven en `@cortex/shared` (`credentials.ts`, `api-client.ts`)
-  como ÚNICA copia. Antes: 4 parsers de credenciales con 3 interfaces `Creds` distintas
-  (cli/auth, cli/ui, core/api-client, core/link) y el cliente HTTP DENTRO de core
-  (dirección de dependencia opuesta al resto del paquete). El default de
-  `CORTEX_SERVER_URL` queda unificado (`DEFAULT_SERVER_URL`), y `cortex auth`/`cortex ui`
-  leen env vía `getEnv` (antes ignoraban el `.env` del repo). Se elimina
-  `isAuthenticated` (muerto, sin consumidores).
-- **Por qué en shared y no en un paquete `client`:** shared es el único paquete visible
-  a la vez desde core (conectores), agents (connect-sessions) y apps/cli; un paquete
-  nuevo para 2 ficheros sería sobreingeniería (regla "máximo un paquete nuevo" del plan,
-  reservada para `auth`). Es una excepción CONSCIENTE a "shared sin I/O": si crece
-  (más módulos cliente), extraer `packages/client` es mover 2 ficheros.
-- **Revisar cuando:** los conectores se muden a `apps/cli` (fase B-1) — quizá entonces
-  el único consumidor fuera del CLI sea agents y convenga reubicar.
+- **Estado:** **sustituida** (2026-09) por el paquete `@cortex/client` (ADR-0025). Lo que
+  aquí se decidió —una sola copia del parser de credenciales y del cliente HTTP, en vez de
+  cuatro repartidas— sigue siendo válido; lo que cambia es **dónde** vive.
+- **Contexto original:** había 4 parsers de credenciales con 3 interfaces `Creds` distintas
+  (cli/auth, cli/ui, core/api-client, core/link) y el cliente HTTP dentro de `core`, con la
+  dirección de dependencia opuesta al resto del paquete. Se unificó en `shared` asumiendo
+  a conciencia una excepción a «shared sin I/O», con la nota de que si crecía habría que
+  extraer `packages/client`.
+- **Qué pasó:** creció. Al preparar el CLI distribuible hacían falta ahí también los
+  transcripts de sesión y el `.cortex.json`, y `shared` es un paquete que importa **todo**
+  el mundo, incluido el servidor. Se extrajo `@cortex/client` y `shared` vuelve a ser lo
+  que debía: tipos, contratos y utilidades puras, sin I/O.
 
 ## Extracción multimodal vía hook `setMediaExtractor` (core sin LLM de verdad)
 
@@ -919,3 +916,42 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   compilado y que la app carga. Es un fallo que ni el typecheck ni los tests detectan.
 - **Revisar cuando:** se quiera una imagen multi-stage sin devDependencies (viene en el PR de
   deploy), o alguna dependencia pase a ser ESM-only y obligue a revisar la resolución.
+
+---
+
+## ADR-0025 · `@cortex/client`: separar el lado cliente para poder distribuir el CLI
+
+- **Estado:** aceptada (2026-09-10). Sustituye a «Credenciales y api-client únicos en
+  `shared`». Es la primera pieza del cliente ligero; el empaquetado npm y la destilación
+  server-side llegan en PRs posteriores del mismo hilo.
+- **Contexto:** instalar Cortex en el portátil de un dev significaba clonar el monorepo
+  entero por SSH y ejecutar un shim de `tsx` sobre él. El `cortex` del PATH arrastraba
+  Postgres, Mastra y la capa de extracción documental —del orden de 95 MB de dependencias—
+  para hacer, en la práctica, dos cosas: un `fetch` autenticado y leer un fichero JSON. El
+  código de lado cliente estaba repartido entre `shared` (credenciales, HTTP), `core`
+  (`.cortex.json`) y `agents` (transcripts y lectores de sesión), y cada uno de esos
+  paquetes trae consigo algo pesado.
+- **Decisión:** un paquete nuevo, `@cortex/client`, que depende **solo** de `@cortex/shared`
+  y reúne todo lo que necesita un cliente: credenciales (`~/.cortex/credentials`),
+  transporte HTTP, el cliente tipado de la API, el `.cortex.json` de un repo y la lectura de
+  transcripts de los agentes. Los contratos de la API (schemas zod compartidos por servidor
+  y cliente) van a `shared/api-contract.ts`, que es lo que evita que se desincronicen.
+  `shared` recupera su invariante: tipos y utilidades puras, sin I/O.
+- **Qué NO se movió:** `slugify` se queda en `core` porque comparte la normalización
+  canónica con el resto del dominio; `readCortexLink` sí se movió y `core` lo re-exporta,
+  para no obligar a nadie a cambiar sus imports.
+- **La regla del paquete —nada de Postgres, Mastra ni embeddings— está protegida por un
+  test** (`tests/client-package.test.ts`) que revisa las dependencias declaradas y los
+  imports de cada fichero. Es una regla fácil de romper sin querer: basta con importar algo
+  «que ya estaba ahí» y el CLI vuelve a pesar 95 MB.
+- **Alternativas:** *dejarlo en `shared`* — lo intentamos, y el propio ADR anterior avisaba
+  de que si crecía había que extraerlo; `shared` lo importa todo el mundo, incluido el
+  servidor, así que meterle I/O de cliente contamina a todos los consumidores. *No separar y
+  empaquetar el CLI con tree-shaking* — frágil: un solo import transitivo arrastra el driver
+  de Postgres, y el fallo se descubre al publicar.
+- **Consecuencias:** `core` y `agents` dependen ahora de `client` (solo para
+  `.cortex.json` y transcripts, nada de red). La dirección sigue siendo sana porque `client`
+  no depende de ninguno de los dos.
+- **Revisar cuando:** el CLI se publique de verdad y se mida el tamaño real del bundle, o si
+  alguna vez hace falta un cliente para navegador (entonces habría que separar lo que usa
+  `node:fs`).

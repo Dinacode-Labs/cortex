@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scrub } from "../packages/agents/src/transcript-utils";
+import { scrub } from "../packages/client/src/transcript-utils";
 
 /**
  * scrub() es código de SEGURIDAD: redacta secretos del transcript de una sesión ANTES

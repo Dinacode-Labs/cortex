@@ -1,10 +1,9 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { apiPost } from "@cortex/shared";
-import { condenseSession, scrub, windows } from "./transcript-utils.js";
+import { apiPost, condenseSession, readSessions, scrub, windows } from "@cortex/client";
+
 import { distill, type Item } from "./distill.js";
-import { readSessions } from "./session-readers.js";
 
 /**
  * Backfill de conversaciones de agente → Cortex, DEPURADAS (roadmap). Lee las sesiones

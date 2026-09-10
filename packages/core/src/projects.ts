@@ -1,7 +1,8 @@
 import { getSql, type Sql } from "@cortex/database";
 import { resolveEntity } from "./entities.js";
 import { isAdmin } from "./auth.js";
-import { readCortexLink, slugify } from "./project-config.js";
+import { readCortexLink } from "@cortex/client";
+import { slugify } from "./project-config.js";
 import { canonicalize } from "./text.js";
 import type { Row } from "./map.js";
 

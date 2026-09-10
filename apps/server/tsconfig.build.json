@@ -13,6 +13,9 @@
   ],
   "references": [
     {
+      "path": "../../packages/client/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/agents/tsconfig.build.json"
     },
     {

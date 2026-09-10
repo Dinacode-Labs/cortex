@@ -1,8 +1,8 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readCredentials } from "@cortex/shared";
+import { readCortexLink, readCredentials } from "@cortex/client";
 import { getSql } from "@cortex/database";
-import { canAccessProject, createProject, findProjectBySlug, listAdmins, readCortexLink, slugify, type ProjectRef } from "@cortex/core";
+import { canAccessProject, createProject, findProjectBySlug, listAdmins, slugify, type ProjectRef } from "@cortex/core";
 
 /** Mensaje para solicitar acceso a un proyecto privado al que no llegas. */
 function askAccessMsg(p: ProjectRef): string {

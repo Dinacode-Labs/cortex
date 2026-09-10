@@ -1,12 +1,12 @@
 import { createInterface } from "node:readline/promises";
+import { getEnv } from "@cortex/shared";
 import {
   DEFAULT_SERVER_URL,
   clearCredentials,
   credentialsPath,
-  getEnv,
   readCredentials,
   writeCredentials,
-} from "@cortex/shared";
+} from "@cortex/client";
 
 /**
  * `cortex auth` — login por email + OTP contra el servidor de Cortex. Guarda el token en

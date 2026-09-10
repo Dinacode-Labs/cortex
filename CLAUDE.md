@@ -34,9 +34,10 @@ un MCP corporativo. Origen: plan interno de junio de 2026 (en el repo privado `a
 
 ```
 packages/
-  shared/      # tipos del dominio, enums, schemas zod v3 + env (modelo §14 del plan)
+  shared/      # tipos del dominio, enums, schemas zod v3, contratos de la API, env, marca
+  client/      # lado cliente: HTTP + credenciales + .cortex.json + transcripts (solo → shared)
   database/    # esquema SQL + migraciones + cliente Postgres
-  embeddings/  # proveedor de embeddings enchufable (local | nan | openai | voyage)
+  embeddings/  # proveedor enchufable (local | openai-compatible | openai | voyage)
   core/        # dominio: save/search/context-pack, dedup/reconciliación, lint,
                # bi-temporal, proyectos/permisos, extract, indexación de código
   agents/      # capa LLM (Mastra sobre un endpoint OpenAI-compatible): classifier, graph, rerank,
@@ -65,7 +66,7 @@ docs/
 > entender o mejorar Cortex, es público; si describe cómo lo operamos nosotros, es privado.
 
 `@cortex/core` es determinista (sin LLM). La capa de inteligencia (`@cortex/agents`,
-Mastra + LLM vía nan/OpenRouter) se inyecta desde cada entrypoint llamando a
+Mastra sobre un endpoint OpenAI-compatible) se inyecta desde cada entrypoint llamando a
 `wireLlm()` tras `loadEnv()` (cablea `setClassifier`/`setReranker`/`setReconciler` y
 el sink de uso de embeddings; sin `LLM_PROVIDER`, core cae a heurísticas). MCP, API,
 UI y CLI consumen `core`. Nota: `agents` usa zod v4 (lo exige Mastra), aislado del
@@ -74,11 +75,12 @@ zod v3 del resto del repo; no cruzar schemas entre ambos.
 ## Reglas de dependencia (qué puede importar qué)
 
 ```
-shared      → (ninguna dependencia interna)
+shared      → (ninguna dependencia interna)   # tipos, contratos de la API, utilidades puras
+client      → shared                          # lado cliente: HTTP, credenciales, transcripts
 database    → shared
 embeddings  → shared
-core        → database, embeddings, shared   # sin LLM ni HTTP saliente
-agents      → core, database, shared         # implementa los hooks LLM de core
+core        → client, database, embeddings, shared   # sin LLM; de client solo .cortex.json
+agents      → client, core, database, shared         # implementa los hooks LLM de core
 apps/*      → cualquier package
 ```
 
@@ -87,8 +89,11 @@ apps/*      → cualquier package
   entrypoints, nunca al importar un módulo de librería.
 - Tras las fases A y B del refactor estas reglas **se cumplen** (la capa multimodal
   con LLM se inyecta con `setMediaExtractor`, como classifier/reranker/reconciler).
-  Excepción documentada: `shared` contiene credentials/api-client/llm-config (I/O
-  consciente, ver ADR). No añadas violaciones nuevas.
+  No añadas violaciones nuevas.
+- **`client` se mantiene ligero a propósito**: nada de Postgres, Mastra ni embeddings. Es lo
+  que permite empaquetar el CLI y distribuirlo con `npm i -g` sin arrastrar ~95 MB de
+  dependencias al portátil de cada dev (ADR-0025). Hay un test que lo comprueba
+  (`tests/client-package.test.ts`), porque es una regla fácil de romper sin darse cuenta.
 
 ## Refactor de arquitectura (julio 2026) — COMPLETADO
 
