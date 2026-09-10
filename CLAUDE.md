@@ -130,6 +130,7 @@ pnpm admin <cmd>        # comandos de operador (migrate, maintain, ingest…)
 pnpm clean              # borra los dist/ y los .tsbuildinfo
 pnpm test               # tests unitarios (Vitest, sin BD)
 pnpm test:integration   # tests de integración (requiere pnpm db:up)
+pnpm --filter @dinacode/cortex build   # bundle del CLI (tsup) → apps/cli/dist/cortex.js
 ```
 
 Copia `.env.example` a `.env` antes de empezar. Por defecto todo funciona **sin

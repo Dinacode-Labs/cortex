@@ -55,6 +55,13 @@ Un comando instala el CLI `cortex` e inicia sesión (email + OTP):
 curl -fsSL https://<servidor-cortex>/install.sh | sh
 ```
 
+O directamente, si ya tienes Node ≥ 20:
+
+```bash
+npm install -g @dinacode/cortex
+cortex auth login --server https://<servidor-cortex>
+```
+
 Después, configura tus agentes. Es un paso aparte a propósito: puedes repetirlo cuando
 quieras sin reinstalar nada.
 

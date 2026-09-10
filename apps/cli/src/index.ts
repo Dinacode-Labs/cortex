@@ -1,4 +1,5 @@
 import { getBrandName } from "@cortex/shared";
+import { CLI_VERSION } from "./version.js";
 
 /**
  * CLI `cortex` — dispatcher único (estilo `gh`). Cada subcomando vive en
@@ -27,6 +28,8 @@ const COMMANDS: Record<string, Cmd> = {
   setup: { help: "configurar tus agentes (Claude Code, Codex…) para que usen Cortex", load: () => import("./commands/setup.js") },
   mcp: { help: "servidor MCP por stdio para tu agente (proxy al servidor)", managed: false, load: () => import("./commands/mcp.js") },
   toolbelt: { help: "instalar el toolbelt de tu organización (MCPs y skills de terceros)", load: () => import("./commands/toolbelt.js") },
+  version: { help: "versión de este CLI y la del servidor", load: () => import("./commands/version.js") },
+  upgrade: { help: "instalar la última versión publicada del CLI", load: () => import("./commands/upgrade.js") },
   doctor: { help: "comprobar que todo está en su sitio (y decir qué falta)", load: () => import("./commands/doctor.js") },
   "connect-github": { help: "ingerir PRs/issues de un repo de GitHub (vía gh)", load: () => import("./commands/connect-github.js") },
   "connect-sessions": { help: "backfill de sesiones de un agente a un proyecto", load: () => import("./commands/connect-sessions.js") },
@@ -35,7 +38,7 @@ const COMMANDS: Record<string, Cmd> = {
 };
 
 function usage(): void {
-  console.log(`cortex — ${getBrandName()}: memoria de contexto de proyectos software\n`);
+  console.log(`cortex ${CLI_VERSION} — ${getBrandName()}: memoria de contexto de proyectos software\n`);
   console.log("Uso: cortex <comando> [args]\n");
   console.log("Comandos:");
   const w = Math.max(...Object.keys(COMMANDS).map((k) => k.length));
@@ -48,6 +51,10 @@ async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
   if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
     usage();
+    return;
+  }
+  if (sub === "--version" || sub === "-v") {
+    console.log(CLI_VERSION);
     return;
   }
   if (sub === "sync") {
