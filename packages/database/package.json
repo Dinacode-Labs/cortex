@@ -4,15 +4,25 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "development": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "migrate": "tsx src/migrate.ts"
+    "migrate": "node --conditions=development --import tsx src/migrate-cli.ts",
+    "build": "tsc -b tsconfig.build.json",
+    "migrate:dist": "node dist/migrate-cli.js"
   },
   "dependencies": {
     "@cortex/shared": "workspace:*",
     "postgres": "^3.4.5"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "migrations"
+  ]
 }

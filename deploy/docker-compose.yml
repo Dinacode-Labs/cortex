@@ -33,14 +33,14 @@ services:
   # Aplica migraciones una vez (los demás esperan a que termine OK).
   migrate:
     <<: *cortex
-    command: pnpm db:migrate
+    command: node packages/database/dist/migrate-cli.js
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"
 
   server:
     <<: *cortex
-    command: pnpm --filter @cortex/server start
+    command: node apps/server/dist/index.js
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
@@ -48,7 +48,7 @@ services:
 
   web:
     <<: *cortex
-    command: pnpm --filter @cortex/web start
+    command: node apps/web/dist/index.js
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
@@ -56,7 +56,7 @@ services:
 
   mcp:
     <<: *cortex
-    command: pnpm --filter @cortex/mcp-server run start:http
+    command: node apps/mcp-server/dist/http.js
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }

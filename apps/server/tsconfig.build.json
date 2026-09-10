@@ -1,0 +1,28 @@
+{
+  "$comment": "Build real (tsc -b). El tsconfig.json de al lado sigue siendo solo typecheck (--noEmit): separarlos evita el TS6305 de las project references.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../../packages/agents/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/core/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/database/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/shared/tsconfig.build.json"
+    }
+  ]
+}
