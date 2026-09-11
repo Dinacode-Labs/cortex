@@ -4,11 +4,11 @@ import { CLI_VERSION } from "../version.js";
 /**
  * `cortex upgrade` — instala la última versión publicada.
  *
- * Es un atajo a `npm i -g @dinacode/cortex@latest`, que es lo que la gente no se acuerda de
+ * Es un atajo a `npm i -g @dinacodelabs/cortex@latest`, que es lo que la gente no se acuerda de
  * escribir. Después recuerda `cortex setup --all`: una versión nueva puede traer hooks o
  * plugin nuevos, y el CLI por sí solo no reconfigura los agentes.
  */
-const PACKAGE = process.env.CORTEX_NPM_PACKAGE || "@dinacode/cortex";
+const PACKAGE = process.env.CORTEX_NPM_PACKAGE || "@dinacodelabs/cortex";
 
 export async function run(args: string[] = []): Promise<void> {
   if (CLI_VERSION === "dev") {

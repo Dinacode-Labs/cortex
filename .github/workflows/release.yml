@@ -57,7 +57,7 @@ jobs:
       - run: pnpm test
       - run: pnpm test:integration
       - run: pnpm build
-      - run: pnpm --filter @dinacode/cortex build
+      - run: pnpm --filter @dinacodelabs/cortex build
 
   image:
     needs: verify
@@ -103,9 +103,9 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
-      - name: Publicar @dinacode/cortex
+      - name: Publicar @dinacodelabs/cortex
         if: ${{ env.NODE_AUTH_TOKEN != '' }}
-        run: pnpm --filter @dinacode/cortex publish --access public --no-git-checks --provenance
+        run: pnpm --filter @dinacodelabs/cortex publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - name: Aviso si falta el token

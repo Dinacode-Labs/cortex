@@ -141,7 +141,7 @@ git tag v0.2.0 && git push origin main v0.2.0
 
 El tag dispara el workflow, que verifica que el tag coincide con lo que dicen los
 `package.json` y que el CHANGELOG tiene esa sección, corre todo (typecheck, tests, build),
-publica la imagen en GHCR, publica `@dinacode/cortex` en npm y crea la Release con las notas
+publica la imagen en GHCR, publica `@dinacodelabs/cortex` en npm y crea la Release con las notas
 del CHANGELOG.
 
 **Cada PR añade su línea a `[Unreleased]`.** Escribe qué cambia para quien lo usa, no qué

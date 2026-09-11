@@ -44,7 +44,7 @@ Docker.
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Dinacode-Labs/cortex/main/deploy/local.yml -o cortex-local.yml
 docker compose -f cortex-local.yml up -d
-npm install -g @dinacode/cortex
+npm install -g @dinacodelabs/cortex
 cortex auth login --server http://localhost:8787
 ```
 
@@ -100,7 +100,7 @@ curl -fsSL https://<your-cortex-server>/install.sh | sh
 Or directly, if you already have Node 20 or newer:
 
 ```bash
-npm install -g @dinacode/cortex
+npm install -g @dinacodelabs/cortex
 cortex auth login --server https://<your-cortex-server>
 ```
 
@@ -184,7 +184,7 @@ step it cannot do for you.
 Set up Cortex on this machine. Run the commands, do not explain them to me.
 
 1. Check that Node is 20 or newer. If it is not, stop and tell me how to upgrade it.
-2. Install the CLI:  npm install -g @dinacode/cortex
+2. Install the CLI:  npm install -g @dinacodelabs/cortex
 3. Sign me in:  cortex auth login --server <SERVER URL>
    It asks for my work email and then a code that arrives by email. You cannot read my
    inbox, so print the prompt and wait for me to type the code.
@@ -448,7 +448,7 @@ credentials, are in [`deploy/README.md`](./deploy/README.md).
 
 ```
 apps/        mcp-server (MCP stdio + HTTP) · web (UI) · server (API + auth)
-             cli (@dinacode/cortex, published to npm) · admin (operator, lives in the image)
+             cli (@dinacodelabs/cortex, published to npm) · admin (operator, lives in the image)
 packages/    shared · client (client side) · database · embeddings · core · agents
 plugin/      claude-code/ (hooks + MCP + cortex-capture skill + /cortex-save)
 deploy/      docker-compose.yml · local.yml · Caddyfile · restore.sh · README.md
