@@ -43,17 +43,20 @@ export function renderDecisions(entries: ContextEntry[]): string {
 
 export function renderContextPack(pack: ContextPack): string {
   // Aviso de conflicto pegado a CADA entrada implicada, no en una sección aparte: si va al
-  // final, el agente ya se ha creído la entrada cuando llega al aviso.
-  const avisos = new Map<string, string[]>();
+  // final, el agente ya se ha creído la entrada cuando llega el aviso.
+  const avisos = new Map<string, string>();
   for (const c of pack.conflicts ?? []) {
-    const nota = (yo: string, otro: string, otroTitulo: string): string =>
-      `  ⚠️ Conflicts with "${otroTitulo}" (${c.newerId === yo ? "recorded earlier" : "recorded later"}). Both are still recorded as current: check which one holds before relying on this.`;
-    avisos.set(c.aId, [...(avisos.get(c.aId) ?? []), nota(c.aId, c.bId, c.bTitle)]);
-    avisos.set(c.bId, [...(avisos.get(c.bId) ?? []), nota(c.bId, c.aId, c.aTitle)]);
+    const con = c.with
+      .map((w) => `"${w.label}"${w.recordedLater === undefined ? "" : w.recordedLater ? " (recorded later)" : " (recorded earlier)"}`)
+      .join(", ");
+    avisos.set(
+      c.entryId,
+      `  ⚠️ Conflicts with ${con}. Both sides are still recorded as current: check which one holds before relying on this.`,
+    );
   }
   const linea = (e: ContextEntry): string => {
     const aviso = avisos.get(e.id);
-    return aviso ? `${entryLine(e)}\n${aviso.join("\n")}` : entryLine(e);
+    return aviso ? `${entryLine(e)}\n${aviso}` : entryLine(e);
   };
 
   const section = (title: string, entries: ContextEntry[]) =>

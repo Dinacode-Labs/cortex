@@ -106,7 +106,7 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     });
 
     const pack = await getContextPack(p.name);
-    expect(pack.conflicts).toHaveLength(1);
+    expect(pack.conflicts).toHaveLength(2); // una por cada lado: las dos reciben el aviso
 
     const texto = renderContextPack(pack);
     // Las DOS siguen en el pack: no se ha invalidado nada.
@@ -118,6 +118,29 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     const iNueva = lineas.findIndex((l) => l.includes("**Backoff exponencial con tope**"));
     expect(lineas.slice(iVieja, iVieja + 3).join(" ")).toContain('Conflicts with "Backoff exponencial con tope" (recorded later)');
     expect(lineas.slice(iNueva, iNueva + 3).join(" ")).toContain('Conflicts with "Backoff fijo de 30s" (recorded earlier)');
+  });
+
+  /**
+   * El caso que de verdad ocurre: `maintain` no relaciona entradas entre sí, relaciona
+   * ENTIDADES del grafo ("README" contradice "src/webhook.js"). El aviso tiene que bajar a las
+   * entradas colgadas de cada entidad, que es lo que el agente está leyendo.
+   */
+  it("avisa también cuando la contradicción está entre entidades del grafo", async () => {
+    const p = await createProject(`IT Conflicto Grafo ${RID}`);
+    const opts = { useClassifier: false } as const;
+    const entrada = await saveContext(
+      { content: "El README dice que no hay idempotencia de webhooks.", project: p.name, title: "README sobre idempotencia", type: "decision" },
+      opts,
+    );
+    const sql = getSql();
+    const readme = await resolveEntity(sql, `README ${RID}`, "module");
+    const webhook = await resolveEntity(sql, `src/webhook.js ${RID}`, "module");
+    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entrada.entry.id}, ${readme.id}) ON CONFLICT DO NOTHING`;
+    await relate(sql, { sourceId: readme.id, sourceType: "entity", targetId: webhook.id, targetType: "entity", relationType: "contradicts" });
+
+    const texto = renderContextPack(await getContextPack(p.name));
+    expect(texto).toContain("README sobre idempotencia");
+    expect(texto).toContain(`Conflicts with "src/webhook.js ${RID}"`);
   });
 
   it("saveWithReconciliation hace NOOP de un near-duplicate idéntico", async () => {
