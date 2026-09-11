@@ -8,6 +8,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **Pi ya recibe contexto y captura al cerrar.** Los hooks se colgaban leyendo `stdin`: Claude
+  Code escribe su JSON y **cierra** la tubería, pero Pi llama al CLI con `execFile`, que la deja
+  abierta y muda. El `for await` sobre `process.stdin` no terminaba nunca, el hook moría por
+  timeout y el agente arrancaba sin saber nada del proyecto, en silencio. Ahora la lectura tiene
+  tope de tiempo y se salta entera cuando quien llama ya lo ha dicho todo por argumentos
+  (`--cwd`, `--session`). La extensión de Pi, además, cierra `stdin` del hijo, usa el `cwd` de la
+  sesión en vez del del proceso y **espera** a que el contexto llegue antes de inyectarlo.
+
 ### Added
 - **Prompts para que lo instale tu agente.** Dos bloques en el README, listos para pegar en
   Claude Code, Codex o el que sea: uno instala y configura la máquina entera, otro conecta un

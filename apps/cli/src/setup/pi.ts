@@ -11,11 +11,16 @@ import { GENERATED_MARKER, emptyReport, type AgentAdapter, type AgentStatus, typ
  * nunca: el agente arrancaba sin saber nada del proyecto. El encadenado del system prompt es
  * lo que usa la otra extensión de memoria que funciona en esta versión de Pi.
  *
- * Se inyecta una sola vez por sesión, porque el evento salta en cada turno.
+ * Se inyecta una sola vez por sesión, porque el evento salta en cada turno. Y se **espera** a
+ * que el contexto haya llegado en vez de comprobar una variable: nada garantiza que Pi aguarde
+ * al handler de `session_start` antes de arrancar el primer turno.
+ *
+ * El directorio sale de `ctx.cwd`, no de `process.cwd()`: el proceso de Pi no tiene por qué
+ * estar en el repo de la sesión, y equivocarse ahí es quedarse sin proyecto en silencio.
  *
  * La captura sale de `session_shutdown` (y de la compactación automática, que es cuando una
- * sesión larga pierde su principio). `ctx.sessionManager.getSessionFile()` da la ruta del
- * JSONL, que es lo que el hook sabe leer.
+ * sesión larga pierde su principio). La ruta del JSONL viene en `event.targetSessionFile` o en
+ * `ctx.sessionManager.getSessionFile()`, que es lo que el hook sabe leer.
  */
 
 const EXT_FILE = (ctx: SetupCtx): string => homeFile(ctx, ".pi/agent/extensions/cortex.ts");
@@ -24,44 +29,53 @@ const MCP_FILE = (ctx: SetupCtx): string => homeFile(ctx, ".pi/agent/mcp.json");
 const EXTENSION_TS = `// ${GENERATED_MARKER} — no edites este fichero (se regenera con \`cortex setup pi\`).
 import { execFile } from "node:child_process";
 
-const run = (args: string[]): Promise<string> =>
+const run = (args: string[], cwd: string): Promise<string> =>
   new Promise((resolve) => {
-    execFile("cortex", args, { cwd: process.cwd(), timeout: 20000 }, (err, stdout) => {
+    // stdin cerrado a propósito: el CLI lee el JSON del hook de ahí, y una tubería abierta y
+    // muda lo dejaba esperando hasta el timeout. Aquí todo va por argumentos.
+    const hijo = execFile("cortex", args, { cwd, timeout: 20000 }, (err, stdout) => {
       // Un fallo aquí dejaba al agente sin contexto sin decir nada. Va a stderr, que en Pi
       // no ensucia la conversación pero sí se puede mirar.
       if (err) console.error(\`[cortex] \${args[0]} falló: \${err.message}\`);
       resolve(String(stdout ?? ""));
     });
+    hijo.stdin?.end();
   });
 
-const sessionFile = (ctx: any): string | null => {
-  const f = ctx?.sessionManager?.getSessionFile?.();
+const cwdDe = (ctx: any): string => (typeof ctx?.cwd === "string" && ctx.cwd ? ctx.cwd : process.cwd());
+
+const sessionFile = (event: any, ctx: any): string | null => {
+  const f = event?.targetSessionFile ?? ctx?.sessionManager?.getSessionFile?.();
   return typeof f === "string" && f ? f : null;
 };
 
 export default function (pi: any) {
-  let context: string | null = null;
-  let injected = false;
+  let contexto: Promise<string | null> = Promise.resolve(null);
+  let inyectado = false;
 
-  pi.on("session_start", async () => {
-    injected = false;
-    const out = (await run(["hook-context", "--format", "text", "--cwd", process.cwd()])).trim();
-    context = out || null;
+  pi.on("session_start", (_event: unknown, ctx: any) => {
+    inyectado = false;
+    const cwd = cwdDe(ctx);
+    contexto = run(["hook-context", "--format", "text", "--cwd", cwd], cwd).then((out) => out.trim() || null);
+    return contexto.then(() => undefined);
   });
 
   // before_agent_start salta en CADA turno: el contexto se inyecta una vez y ya.
   pi.on("before_agent_start", async (event: any) => {
-    if (!context || injected) return;
-    injected = true;
-    return { systemPrompt: \`\${event?.systemPrompt ?? ""}\\n\\n\${context}\` };
+    if (inyectado) return;
+    const texto = await contexto;
+    if (!texto) return;
+    inyectado = true;
+    return { systemPrompt: \`\${event?.systemPrompt ?? ""}\n\n\${texto}\` };
   });
 
-  const capture = async (ctx: any): Promise<void> => {
-    const f = sessionFile(ctx);
-    if (f) await run(["hook-capture", "--platform", "pi", "--session", f, "--cwd", process.cwd()]);
+  const capture = async (event: any, ctx: any): Promise<void> => {
+    const f = sessionFile(event, ctx);
+    const cwd = cwdDe(ctx);
+    if (f) await run(["hook-capture", "--platform", "pi", "--session", f, "--cwd", cwd], cwd);
   };
-  pi.on("session_shutdown", async (_event: unknown, ctx: any) => capture(ctx));
-  pi.on("auto_compaction_start", async (_event: unknown, ctx: any) => capture(ctx));
+  pi.on("session_shutdown", async (event: any, ctx: any) => capture(event, ctx));
+  pi.on("auto_compaction_start", async (event: any, ctx: any) => capture(event, ctx));
 }
 `;
 

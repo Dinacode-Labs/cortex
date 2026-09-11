@@ -40,3 +40,5 @@ docs/workshop-*
 *.artifact.json
 dinacode-*.md
 config/skills/*/*.zip
+# Local Pi runtime state
+.atl/
