@@ -32,7 +32,7 @@ dashboardRoutes.get("/", async (c) => {
   }
 
   const projectPills = [
-    html`<a class="pill ${!project ? "active" : ""}" href="/">Todos</a>`,
+    html`<a class="pill ${!project ? "active" : ""}" href="/">All</a>`,
     ...projects.map(
       (p) =>
         html`<a class="pill ${project === p.name ? "active" : ""}" href="/?project=${encodeURIComponent(p.name)}">${p.name} (${p.entryCount})</a>`,
@@ -40,7 +40,7 @@ dashboardRoutes.get("/", async (c) => {
   ];
 
   const typePills = [
-    html`<a class="pill ${!type ? "active" : ""}" href="/${project ? `?project=${encodeURIComponent(project)}` : ""}">Todos los tipos</a>`,
+    html`<a class="pill ${!type ? "active" : ""}" href="/${project ? `?project=${encodeURIComponent(project)}` : ""}">All types</a>`,
     ...contextEntryType.options.map((t) => {
       const qs = new URLSearchParams();
       if (project) qs.set("project", project);
@@ -51,16 +51,16 @@ dashboardRoutes.get("/", async (c) => {
 
   const captureForm = showCapture
     ? html`<div class="panel">
-        <h2>Capturar contexto</h2>
+        <h2>Capture context</h2>
         <form method="post" action="/save">
-          <textarea name="content" placeholder="Escribe el conocimiento a guardar (decisión, restricción, incidencia...)" required></textarea>
+          <textarea name="content" placeholder="What should Cortex remember? A decision, a constraint, an incident…" required></textarea>
           <div class="row" style="margin-top:8px">
-            <input type="text" name="project" placeholder="Proyecto" value="${project ?? ""}">
+            <input type="text" name="project" placeholder="Project" value="${project ?? ""}">
             <select name="type">
-              <option value="">(clasificar automáticamente)</option>
+              <option value="">(classify automatically)</option>
               ${contextEntryType.options.map((t) => html`<option value="${t}">${t}</option>`)}
             </select>
-            <button type="submit">Guardar en Cortex</button>
+            <button type="submit">Save to Cortex</button>
           </div>
         </form>
       </div>`
@@ -72,15 +72,15 @@ dashboardRoutes.get("/", async (c) => {
     : html``;
 
   const body = html`
-    <h1>Memoria de contexto</h1>
+    <h1>Project memory</h1>
     <p class="sub">${entries.length} entradas · ${projects.length} proyectos</p>
 
     <div class="panel">
       <form class="row" method="get" action="/search">
-        <input type="text" name="q" placeholder="Buscar semánticamente en Cortex..." required>
+        <input type="text" name="q" placeholder="Search Cortex by meaning…" required>
         ${project ? html`<input type="hidden" name="project" value="${project}">` : ""}
-        <button type="submit">Buscar</button>
-        <a href="/?capture=1${project ? `&project=${encodeURIComponent(project)}` : ""}"><button type="button" class="secondary">+ Capturar</button></a>
+        <button type="submit">Search</button>
+        <a href="/?capture=1${project ? `&project=${encodeURIComponent(project)}` : ""}"><button type="button" class="secondary">+ Capture</button></a>
       </form>
     </div>
 
@@ -92,7 +92,7 @@ dashboardRoutes.get("/", async (c) => {
       ${project ? html`<div style="margin-top:8px">${packLink}</div>` : ""}
     </div>
 
-    ${entries.length ? html`<div class="grid">${entries.map(entryCard)}</div>` : html`<div class="empty">No hay entradas con estos filtros.</div>`}
+    ${entries.length ? html`<div class="grid">${entries.map(entryCard)}</div>` : html`<div class="empty">No entries match these filters.</div>`}
   `;
-  return c.html(layout("Inicio", body, c.get("user")));
+  return c.html(layout("Home", body, c.get("user")));
 });

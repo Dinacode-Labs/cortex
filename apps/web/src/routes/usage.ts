@@ -30,7 +30,7 @@ usageRoutes.get("/usage", async (c) => {
     (r) => html`<tr><td ${td}><span class="sub">${r.createdAt.replace("T", " ").slice(0, 19)}</span></td><td ${td}>${r.operation}</td><td ${td}>${r.model}</td><td ${tdr}>${num(r.totalTokens)}</td><td ${tdr}>${money(r.costUsd)}</td></tr>`,
   );
   const table = (head: Html, rows: Html[]) =>
-    html`<table style="width:100%;border-collapse:collapse">${head}${rows.length ? rows : html`<tr><td ${td} colspan="5"><span class="sub">Sin datos todavía.</span></td></tr>`}</table>`;
+    html`<table style="width:100%;border-collapse:collapse">${head}${rows.length ? rows : html`<tr><td ${td} colspan="5"><span class="sub">No data yet.</span></td></tr>`}</table>`;
 
   const spanRow = (s: (typeof traces)[number]["spans"][number]) => {
     const indent = s.parentSpanId ? 18 : 0;
@@ -49,22 +49,22 @@ usageRoutes.get("/usage", async (c) => {
             <span class="sub" style="font-weight:400"> · ${num(t.totalDurationMs)}ms · ${num(t.totalTokens)} tok · ${t.startedAt.replace("T", " ").slice(0, 19)}</span></h2>
             ${t.spans.map(spanRow)}</div>`,
       )}`
-    : html`<div class="panel"><span class="sub">Sin trazas todavía. Ejecuta una operación con LLM (ask, enrich…).</span></div>`;
+    : html`<div class="panel"><span class="sub">No traces yet. Run something that uses the LLM (ask, enrich…).</span></div>`;
 
   const body = html`
-    <p><a class="back" href="/">← Inicio</a></p>
-    <h1>Coste / uso de IA</h1>
-    <p class="sub">Observabilidad de tokens y coste por operación y modelo (ADR-0016). El coste se estima con precios públicos por modelo; <b>nan = gratis</b>, por eso $0 hoy.</p>
+    <p><a class="back" href="/">← Home</a></p>
+    <h1>AI cost and usage</h1>
+    <p class="sub">Tokens and estimated cost per operation and model (ADR-0016). Prices come from a table you can override with <code>CORTEX_PRICING_JSON</code>, so a model priced at zero shows up as zero.</p>
     <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
-      ${stat("Llamadas", num(u.totals.calls))}
+      ${stat("Calls", num(u.totals.calls))}
       ${stat("Tokens (total)", num(u.totals.totalTokens))}
       ${stat("Tokens in / out", `${num(u.totals.inputTokens)} / ${num(u.totals.outputTokens)}`)}
-      ${stat("Coste estimado", money(u.totals.costUsd))}
+      ${stat("Estimated cost", money(u.totals.costUsd))}
     </div>
-    <div class="panel"><h2>Por operación / agente</h2>${table(html`<tr><th ${th}>Operación</th><th ${th} style="text-align:right">Llamadas</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, opRows)}</div>
-    <div class="panel"><h2>Por modelo</h2>${table(html`<tr><th ${th}>Modelo</th><th ${th} style="text-align:right">Llamadas</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, modelRows)}</div>
-    <div class="panel"><h2>Últimas llamadas</h2>${table(html`<tr><th ${th}>Fecha</th><th ${th}>Operación</th><th ${th}>Modelo</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Coste</th></tr>`, recentRows)}</div>
-    <h2 style="margin-top:28px">Trazas recientes <span class="sub">· AI tracing de Mastra (árbol de spans)</span></h2>
+    <div class="panel"><h2>By operation and agent</h2>${table(html`<tr><th ${th}>Operation</th><th ${th} style="text-align:right">Calls</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Cost</th></tr>`, opRows)}</div>
+    <div class="panel"><h2>By model</h2>${table(html`<tr><th ${th}>Model</th><th ${th} style="text-align:right">Calls</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Cost</th></tr>`, modelRows)}</div>
+    <div class="panel"><h2>Latest calls</h2>${table(html`<tr><th ${th}>Date</th><th ${th}>Operation</th><th ${th}>Model</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Cost</th></tr>`, recentRows)}</div>
+    <h2 style="margin-top:28px">Recent traces <span class="sub">· AI tracing, as a span tree</span></h2>
     ${tracesHtml}`;
-  return c.html(layout("Coste IA", body, c.get("user")));
+  return c.html(layout("AI cost", body, c.get("user")));
 });

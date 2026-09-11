@@ -11,14 +11,14 @@ export type WebEnv = { Variables: { user: AuthUser | null } };
 /** Página de login: la respuesta del gate sin sesión (y de /auth/cli y /logout). */
 export function loginPage(msg = ""): Html {
   return layout(
-    "Iniciar sesión",
+    "Sign in",
     html`<div class="empty" style="max-width:560px;margin:48px auto;text-align:center">
        <h1>${getBrandName()}</h1>
-       <p>Necesitas iniciar sesión para ver el contexto.</p>
+       <p>You need to sign in to see the project memory.</p>
        ${msg ? html`<p style="color:#c0392b">${msg}</p>` : ""}
-       <p style="margin-top:16px">Desde tu terminal:</p>
-       <pre style="text-align:left;display:inline-block">cortex auth login   # una vez por equipo (email + OTP)
-cortex ui           # abre esta UI ya autenticada</pre>
+       <p style="margin-top:16px">From your terminal:</p>
+       <pre style="text-align:left;display:inline-block">cortex auth login   # once per machine
+cortex ui           # opens this UI, already signed in</pre>
      </div>`,
   );
 }
