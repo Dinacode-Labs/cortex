@@ -19,9 +19,9 @@ const pkg = JSON.parse(readFileSync(resolve(import.meta.dirname, "../apps/cli/pa
   files: string[];
 };
 
-describe("paquete @dinacode/cortex", () => {
+describe("paquete @dinacodelabs/cortex", () => {
   it("se publica con un solo binario y solo lo que hace falta", () => {
-    expect(pkg.name).toBe("@dinacode/cortex");
+    expect(pkg.name).toBe("@dinacodelabs/cortex");
     expect(pkg.bin).toEqual({ cortex: "./dist/cortex.js" });
     expect(pkg.files).toContain("dist");
   });

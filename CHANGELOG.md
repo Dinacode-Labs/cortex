@@ -23,6 +23,16 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   lo llama desde código. Es también el puente que usan las tools de Pi, para que la resolución
   del servidor y del token siga viviendo en un solo sitio.
 
+### Changed
+- **El paquete de npm pasa a llamarse `@dinacodelabs/cortex`.** El scope `@dinacode` ya está
+  cogido en npm por una organización ajena, así que el nombre que declaraba el repo no se podía
+  publicar: el release habría fallado con un 403 aunque el token fuera correcto. Cambia el
+  nombre en todas partes —instalador, plugin, workflows, `cortex upgrade` y docs—; el comando
+  para instalarlo pasa a ser `npm i -g @dinacodelabs/cortex`. `CORTEX_NPM_PACKAGE` sigue
+  sirviendo para apuntar a otro paquete. Como la `0.1.0` nunca llegó a publicarse, no hay nada
+  que redirigir ni nadie a quien avisar.
+
+### Fixed
 - Un id de entrada mal formado llegaba a Postgres y salía un 500. Es entrada de usuario: ahora
   responde lo mismo que un id que no existe.
 - **Pi ya recibe contexto y captura al cerrar.** Los hooks se colgaban leyendo `stdin`: Claude
@@ -78,7 +88,7 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [0.1.0] — 2026-09-10
 
 Primera versión publicable. Cortex deja de ser un repo que se clona para convertirse en un
-servidor que se despliega y un CLI que se instala: `npm i -g @dinacode/cortex`, `cortex auth
+servidor que se despliega y un CLI que se instala: `npm i -g @dinacodelabs/cortex`, `cortex auth
 login`, `cortex setup --all`, y los agentes de ese portátil ya leen y escriben en la memoria
 del proyecto, sin claves de modelo y sin base de datos en local.
 
@@ -95,7 +105,7 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   latido que el compose vigila.
 - Cabeceras de seguridad en las tres apps y `CORTEX_BIND_HOST` para elegir en qué interfaz
   escuchan. Por defecto, solo local: asomarse a la red es una decisión de quien despliega.
-- **El CLI se publica en npm como `@dinacode/cortex`**: un solo fichero de ~110 KB con
+- **El CLI se publica en npm como `@dinacodelabs/cortex`**: un solo fichero de ~110 KB con
   `@cortex/client` y `@cortex/shared` dentro, y solo tres dependencias públicas fuera (el SDK
   de MCP, zod y yaml). Instalado global ocupa 24 MB, frente a los ~235 MB del clon del
   monorepo que hacía falta antes.

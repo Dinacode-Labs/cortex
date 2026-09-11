@@ -83,7 +83,7 @@ jobs:
       # entrado Postgres ni Mastra por un import descuidado, y que `npm pack` no se queja.
       - name: Empaquetado del CLI
         run: |
-          pnpm --filter @dinacode/cortex build
+          pnpm --filter @dinacodelabs/cortex build
           node apps/cli/dist/cortex.js --help > /dev/null
           test "$(node apps/cli/dist/cortex.js --version)" = "$(node -p "require('./apps/cli/package.json').version")"
           ! grep -q "import.meta.dirname" apps/cli/dist/cortex.js

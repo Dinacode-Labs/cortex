@@ -12,7 +12,7 @@ set -e
 
 SERVER_URL="${CORTEX_SERVER_URL:-__CORTEX_SERVER_URL__}"
 # Se usa tal cual: así CORTEX_NPM_PACKAGE puede ser otra versión, un tag o un tarball local.
-PKG="${CORTEX_NPM_PACKAGE:-@dinacode/cortex@latest}"
+PKG="${CORTEX_NPM_PACKAGE:-@dinacodelabs/cortex@latest}"
 
 say()  { printf '\033[36m→ %s\033[0m\n' "$1"; }
 fail() { printf '\033[31m✗ %s\033[0m\n' "$1" >&2; exit 1; }
