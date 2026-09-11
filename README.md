@@ -120,14 +120,8 @@ What it does in each one:
 | Claude Code | the `cortex` plugin, or hooks in `settings.json` if you cannot install it | ✓ | ✓ |
 | Codex | the same plugin, plus `codex mcp add` | ✓ | ✓ |
 | OpenCode | a JS plugin and an MCP entry in `opencode.json` | ✓ | ✓ |
-| Pi | an extension in `~/.pi/agent/extensions`, plus MCP | ✗ | ✗ |
+| Pi | an extension in `~/.pi/agent/extensions`, plus MCP | ✓ | ✓ |
 | Hermes | hooks and MCP in `config.yaml` | ✓ | ✓ |
-
-**Pi is not working yet.** The extension installs and Pi loads it, but neither the context
-injection nor the capture takes effect. Verified against a live session: the CLI is on Pi's
-PATH, the working directory is right, and the command the extension runs returns the context
-correctly on its own. Both documented ways of injecting were tried. The MCP tools do work in
-Pi, so you can query the memory by hand. Tracked as CORTEX-11.
 
 If you are coming from the old install, the one that cloned the repository, `setup` migrates
 it: old hooks are replaced in place, the MCP is re-registered against the server, and the

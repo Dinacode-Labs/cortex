@@ -113,8 +113,13 @@ describe("pi", () => {
     const ext = readFileSync(join(home, ".pi/agent/extensions/cortex.ts"), "utf8");
     // El contexto se inyecta UNA vez: before_agent_start salta en cada turno.
     expect(ext).toContain("before_agent_start");
-    expect(ext).toContain("injected");
+    expect(ext).toContain("inyectado = true");
     expect(ext).toContain("session_shutdown");
+    // stdin del hijo cerrado: con la tubería abierta y muda el hook se colgaba y Pi se
+    // quedaba sin contexto en silencio. Es la razón de que Pi estuviera roto.
+    expect(ext).toContain("stdin?.end()");
+    // El directorio sale de la sesión, no del proceso de Pi.
+    expect(ext).toContain("ctx?.cwd");
     expect(readJson(MCP).mcpServers.cortex).toEqual({ command: "cortex", args: ["mcp"] });
     expect(readJson(MCP).mcpServers.context7).toBeDefined();
   });
