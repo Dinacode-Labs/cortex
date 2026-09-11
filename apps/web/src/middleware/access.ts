@@ -6,7 +6,7 @@ import type { WebEnv } from "./session.js";
 
 /** Página de denegación de acceso a un proyecto privado (403). */
 export const deniedPage = (user: AuthUser | null): Html =>
-  layout("Sin acceso", html`<p><a class="back" href="/">← Inicio</a></p><div class="empty">No tienes acceso a este proyecto (privado). Pide al admin que te añada.</div>`, user);
+  layout("No access", html`<p><a class="back" href="/">← Home</a></p><div class="empty">You do not have access to this project. Ask an administrator to add you.</div>`, user);
 
 /** Gate de acceso por nombre de proyecto (política única, checkProjectAccess):
  *  `null` = puede continuar; `Response` = denegación ya renderizada. Proyecto
@@ -16,7 +16,7 @@ export async function requireProject(c: Context<WebEnv>, name: string | undefine
   if (!name) return null;
   const access = await checkProjectAccess(c.get("user")?.email ?? null, { name });
   if (access.status === "not_found")
-    return c.html(layout("No encontrado", html`<p><a class="back" href="/">← Inicio</a></p><div class="empty">Proyecto no encontrado.</div>`, c.get("user")), 404);
+    return c.html(layout("Not found", html`<p><a class="back" href="/">← Home</a></p><div class="empty">Project not found.</div>`, c.get("user")), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   return null;
 }

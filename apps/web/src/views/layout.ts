@@ -22,7 +22,7 @@ function brandMark(): Html {
 /** Documento completo: <head> (estilos en /styles.css estático) + header de marca + main. */
 export function layout(title: string, body: Html, user?: { email: string; admin: boolean } | null): Html {
   return html`<!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -35,15 +35,15 @@ export function layout(title: string, body: Html, user?: { email: string; admin:
   <header>
     <span class="brand">${brandMark()}</span>
     <nav>
-      <a href="/">Inicio</a>
-      <a href="/projects">Proyectos</a>
-      <a href="/ask">Preguntar</a>
-      <a href="/graph">Grafo</a>
-      <a href="/code">Código</a>
+      <a href="/">Home</a>
+      <a href="/projects">Projects</a>
+      <a href="/ask">Ask</a>
+      <a href="/graph">Graph</a>
+      <a href="/code">Code</a>
       <a href="/lint">Lint</a>
-      <a href="/usage">Coste IA</a>
-      <a href="/?capture=1">Capturar</a>
-      ${user ? html`<span style="margin-left:12px;color:var(--color-text-muted)">${user.email}${user.admin ? html` <span class="pill" style="padding:1px 6px">admin</span>` : ""}</span> <a href="/logout">Salir</a>` : ""}
+      <a href="/usage">AI cost</a>
+      <a href="/?capture=1">Capture</a>
+      ${user ? html`<span style="margin-left:12px;color:var(--color-text-muted)">${user.email}${user.admin ? html` <span class="pill" style="padding:1px 6px">admin</span>` : ""}</span> <a href="/logout">Sign out</a>` : ""}
     </nav>
   </header>
   <main>${body}</main>

@@ -17,6 +17,9 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   producción entero.
 
 ### Changed
+- **La UI web, en inglés.** Con esto, todo lo que ve alguien de fuera lo está: CLI, tools
+  MCP, lo que devuelven, el plugin, el README y la web. Los ADRs, el roadmap y los
+  comentarios del código siguen en español, que es el registro de trabajo del equipo.
 - **El texto que devuelven las tools MCP, en inglés.** En el pase anterior se tradujeron las
   descripciones de las tools pero no lo que devuelven, que es justo lo que el agente lee y a
   menudo repite al usuario: el context pack, los resultados de búsqueda, el informe de lint y

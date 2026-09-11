@@ -33,12 +33,12 @@ searchRoutes.get("/search", async (c) => {
             <p>${h.entry.summary ?? h.entry.content}</p>
           </a>`,
       )}</div>`
-    : html`<div class="empty">${q ? "Sin resultados relevantes." : "Escribe una consulta."}</div>`;
+    : html`<div class="empty">${q ? "Nothing relevant found." : "Type a query."}</div>`;
 
   const body = html`
-    <p><a class="back" href="/">← Inicio</a></p>
-    <h1>Resultados para "${q}"</h1>
-    <p class="sub">${hits.length} resultados${project ? html` · proyecto ${project}` : ""} · ordenados por similitud</p>
+    <p><a class="back" href="/">← Home</a></p>
+    <h1>Results for "${q}"</h1>
+    <p class="sub">${hits.length} results${project ? html` · project ${project}` : ""} · ranked by similarity</p>
     ${results}`;
-  return c.html(layout(`Búsqueda: ${q}`, body, c.get("user")));
+  return c.html(layout(`Search: ${q}`, body, c.get("user")));
 });
