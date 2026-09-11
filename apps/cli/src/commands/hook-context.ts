@@ -1,5 +1,6 @@
 import { getBrandName } from "@cortex/shared";
 import { apiGet, useProjectServer } from "@cortex/client";
+import { readHookStdin } from "../hook-stdin.js";
 
 /**
  * Hook de INYECCIÓN DE CONTEXTO (SessionStart de Claude Code, y equivalentes). Lee el
@@ -13,12 +14,6 @@ import { apiGet, useProjectServer } from "@cortex/client";
  */
 
 const MAX_CTX = Number(process.env.CORTEX_HOOK_CTX_CHARS ?? "6000");
-
-async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const c of process.stdin) chunks.push(c as Buffer);
-  return Buffer.concat(chunks).toString("utf8");
-}
 
 function argOf(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -34,11 +29,15 @@ export async function run(): Promise<void> {
   try {
     // Formato de salida por agente: claude/codex (additionalContext) | hermes ({context}) | text.
     const format = (argOf("--format") || "claude").toLowerCase();
+    // Quien pasa `--cwd` (Pi, OpenCode) ya lo ha dicho todo: leer stdin solo puede colgarlo,
+    // porque `execFile` deja la tubería abierta y muda. Ver `readHookStdin`.
     let input: { cwd?: string; hook_event_name?: string } = {};
-    try {
-      input = JSON.parse((await readStdin()) || "{}");
-    } catch {
-      /* sin stdin (p.ej. OpenCode pasa --cwd) */
+    if (!argOf("--cwd")) {
+      try {
+        input = JSON.parse((await readHookStdin()) || "{}");
+      } catch {
+        /* stdin vacío o a medias: se sigue con los valores por defecto */
+      }
     }
     const cwd = argOf("--cwd") || input.cwd || process.cwd();
     const link = useProjectServer(cwd);

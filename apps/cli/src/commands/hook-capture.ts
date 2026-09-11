@@ -8,6 +8,7 @@ import {
   sendCondensedSession,
   type CaptureAgent,
 } from "@cortex/client";
+import { readHookStdin } from "../hook-stdin.js";
 
 /**
  * Hook de AUTO-CAPTURA (fin de sesión, y pre-compactación). Resuelve el proyecto por el
@@ -28,13 +29,6 @@ import {
 
 const PLATFORMS: CaptureAgent[] = ["claude", "codex", "opencode", "hermes", "pi"];
 
-async function readStdin(): Promise<string> {
-  if (process.stdin.isTTY) return "";
-  const chunks: Buffer[] = [];
-  for await (const c of process.stdin) chunks.push(c as Buffer);
-  return Buffer.concat(chunks).toString("utf8");
-}
-
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
   if (i >= 0 && args[i + 1] && !args[i + 1]!.startsWith("--")) return args[i + 1];
@@ -53,11 +47,15 @@ export function detectPlatform(transcript: string | undefined): CaptureAgent {
 
 export async function run(args: string[] = []): Promise<void> {
   try {
+    // Con `--session` no hace falta stdin, y leerlo puede colgar el hook: quien invoca con
+    // `execFile` (Pi, OpenCode) deja la tubería abierta y muda. Ver `readHookStdin`.
     let input: { cwd?: string; session_id?: string; sessionId?: string; transcript_path?: string } = {};
-    try {
-      input = JSON.parse((await readStdin()) || "{}");
-    } catch {
-      input = {};
+    if (!flag(args, "session")) {
+      try {
+        input = JSON.parse((await readHookStdin()) || "{}");
+      } catch {
+        input = {};
+      }
     }
 
     const cwd = flag(args, "cwd") || input.cwd || process.cwd();
