@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parse as yamlParse } from "yaml";
@@ -7,6 +7,7 @@ import { codexAdapter } from "../apps/cli/src/setup/codex.js";
 import { hermesAdapter } from "../apps/cli/src/setup/hermes.js";
 import { openCodeAdapter } from "../apps/cli/src/setup/opencode.js";
 import { piAdapter } from "../apps/cli/src/setup/pi.js";
+import { writeText } from "../apps/cli/src/setup/fs.js";
 import type { SetupCtx } from "../apps/cli/src/setup/types.js";
 
 /**
@@ -224,5 +225,40 @@ describe("codex", () => {
     const report = await codexAdapter.apply(ctx);
     expect(report.warnings.join(" ")).toContain("plugin");
     expect(calls).toContainEqual(["codex", "mcp", "add", "cortex", "--", "cortex", "mcp"]);
+  });
+});
+
+/**
+ * La instalación anterior dejaba symlinks apuntando al repo clonado. Al mover la skill y el
+ * comando dentro del plugin, esos enlaces quedaron ROTOS, y escribir a través de uno falla
+ * con ENOENT. Pasó de verdad migrando una máquina: `cortex setup --all` se cayó entero.
+ */
+describe("symlinks que dejó la instalación anterior", () => {
+  it("un enlace roto se sustituye por un fichero, sin reventar", async () => {
+    const dest = join(home, ".config/opencode/command/cortex-save.md");
+    mkdirSync(dirname(dest), { recursive: true });
+    symlinkSync(join(home, "repo-que-ya-no-existe/config/commands/cortex-save.md"), dest);
+    expect(existsSync(dest)).toBe(false); // roto: existsSync sigue el enlace
+
+    await openCodeAdapter.apply(ctxWith());
+
+    expect(lstatSync(dest).isSymbolicLink()).toBe(false);
+    expect(readFileSync(dest, "utf8")).toContain("save_project_context");
+  });
+
+  it("un enlace VIVO tampoco se escribe a través: se escribiría en el repo de otro", () => {
+    const repo = join(home, "otro-repo");
+    mkdirSync(repo, { recursive: true });
+    const original = join(repo, "cortex-save.md");
+    writeFileSync(original, "contenido original del repo");
+    const dest = join(home, ".config/opencode/command/cortex-save.md");
+    mkdirSync(dirname(dest), { recursive: true });
+    symlinkSync(original, dest);
+
+    writeText(ctxWith(), dest, "contenido nuevo");
+
+    expect(readFileSync(original, "utf8")).toBe("contenido original del repo");
+    expect(readFileSync(dest, "utf8")).toBe("contenido nuevo");
+    expect(lstatSync(dest).isSymbolicLink()).toBe(false);
   });
 });
