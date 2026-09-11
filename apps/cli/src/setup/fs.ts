@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { GENERATED_MARKER, type SetupCtx } from "./types.js";
 
@@ -58,6 +58,14 @@ export function writeText(ctx: SetupCtx, file: string, content: string): void {
   backupOnce(ctx, file);
   if (ctx.dryRun) return;
   mkdirSync(dirname(file), { recursive: true });
+  // La instalación anterior dejaba symlinks al repo clonado. Escribir a través de uno
+  // fallaría si está roto (ENOENT al abrir el destino) y, si NO lo está, sería peor: se
+  // escribiría dentro del repo de otro. Se quita el enlace y se escribe un fichero de verdad.
+  try {
+    if (lstatSync(file).isSymbolicLink()) rmSync(file, { force: true });
+  } catch {
+    /* no existe: nada que deshacer */
+  }
   writeFileSync(file, content);
 }
 
