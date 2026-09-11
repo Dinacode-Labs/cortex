@@ -1048,3 +1048,39 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   tiene sitio natural (un plugin de Caddy o el CDN).
 - **Revisar cuando:** haya más de un nodo (las sesiones del MCP viven en memoria), se quiera
   recuperación a un punto en el tiempo, o el tamaño de la imagen justifique una por servicio.
+
+## ADR-0033 · Varios Cortex a la vez: el servidor es propiedad del repo
+
+- **Estado:** aceptada (2026-09-11).
+- **Contexto:** el cliente solo sabía hablar con un servidor. `~/.cortex/credentials` era un
+  único `{server, token, email}`, y todo lo demás salía de ahí. Para quien trabaja con una
+  sola organización es lo correcto y lo sigue siendo. Pero un freelance con dos clientes, o
+  alguien de una consultora cuyo cliente monte su propio Cortex, necesita los dos en la misma
+  máquina y a la vez. Cambiar la sesión a mano entre uno y otro no es una solución: es
+  exactamente la forma de acabar mandándole el conocimiento de un cliente al servidor de otro.
+- **Decisión:** el servidor es una **propiedad del repositorio**, no un modo global que se
+  enciende y se apaga. (1) `.cortex.json` admite un campo `server`; ausente significa el de
+  por defecto, que es el caso de casi todo el mundo. (2) Las credenciales pasan a ser un mapa
+  por servidor, leyendo el formato anterior sin obligar a nadie a volver a entrar. (3) Los
+  hooks, el CLI y el proxy MCP resuelven el servidor desde el `cwd` antes de tocar la API
+  (`useProjectServer`). (4) El token se busca **por servidor**: mandar el de otro sería un 401
+  incomprensible en el mejor caso y una petición a quien no toca en el peor. (5) Con más de
+  una sesión, `cortex link --create` **exige** decir en cuál, porque es el único punto del
+  flujo donde se puede crear el proyecto de un cliente en el servidor de otro sin que nadie
+  se entere después.
+- **Por qué el repo y no un modo global:** la escritura es lo que no puede equivocarse, y
+  quien escribe siempre conoce el `cwd`. Un modo global depende de que la persona recuerde en
+  cuál está; el repo no depende de nadie. Además el `.cortex.json` ya era el gate de opt-in,
+  así que no se añade un concepto nuevo, se le da otro campo al que ya existía.
+- **Alternativas:** *un `CORTEX_HOME` por cliente* — ya se podía hacer y no sirve, porque los
+  hooks los lanza el agente sin esa variable y la captura seguiría yendo al servidor por
+  defecto. *Multi-tenancy en el servidor* — resuelve otro problema, cuesta un orden de
+  magnitud más y no ayuda a quien tiene clientes con servidores ajenos.
+- **Consecuencias:** fuera de un repo vinculado, el MCP se conecta al servidor por defecto.
+  Las tools siguen pidiendo el proyecto por su nombre y los permisos siguen aplicando, así que
+  como mucho es una consulta a la memoria equivocada, nunca una escritura. `cortex doctor` y
+  `cortex auth status` comprueban **todos** los servidores: saber que uno responde no dice
+  nada del otro.
+- **Revisar cuando:** alguien necesite dos proyectos de servidores distintos en la misma
+  carpeta (hoy imposible por diseño, y probablemente deba seguir siéndolo), o cuando el
+  servidor gane organizaciones de verdad y esto se pueda simplificar.

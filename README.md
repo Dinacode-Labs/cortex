@@ -154,6 +154,24 @@ at any point in between.
 - All you need is a **Cortex server running somewhere**. Whoever handles your infrastructure
   runs it.
 
+### Working with more than one Cortex
+
+If you work for several organisations, each with its own Cortex, you can be signed in to all
+of them at once. **The server is a property of the repository**, so you never have to remember
+which one you are in: you decided it when you linked the folder.
+
+```bash
+cortex auth login --server https://cortex.client-a.com    # signing in to one does not sign you out of the other
+cortex link --create "Their Project" --server https://cortex.client-a.com
+cortex auth status                                        # every session, checked against its own server
+cortex auth use https://cortex.client-a.com               # change which one is the default
+```
+
+The server lands in that repository's `.cortex.json`, and from then on the hooks, the CLI and
+the MCP all follow it. With more than one session, `cortex link --create` **refuses** to run
+without `--server`. Creating a client's project on another client's server is not the kind of
+mistake you notice later.
+
 ## What it does
 
 - **The automatic loop.** Context injected when a session opens, capture when it closes,

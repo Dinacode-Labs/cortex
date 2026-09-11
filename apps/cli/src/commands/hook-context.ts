@@ -1,5 +1,5 @@
 import { getBrandName } from "@cortex/shared";
-import { apiGet, readCortexLink } from "@cortex/client";
+import { apiGet, useProjectServer } from "@cortex/client";
 
 /**
  * Hook de INYECCIÓN DE CONTEXTO (SessionStart de Claude Code, y equivalentes). Lee el
@@ -41,7 +41,7 @@ export async function run(): Promise<void> {
       /* sin stdin (p.ej. OpenCode pasa --cwd) */
     }
     const cwd = argOf("--cwd") || input.cwd || process.cwd();
-    const link = readCortexLink(cwd);
+    const link = useProjectServer(cwd);
     if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
 
     // Vía API autenticada (no toca la BD): respeta permisos y no expone proyectos sin acceso.

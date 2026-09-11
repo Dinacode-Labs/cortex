@@ -1,4 +1,4 @@
-import { getClientConfig, readCortexLink, readCredentials, whoami } from "@cortex/client";
+import { getClientConfig, listCredentials, useProjectServer } from "@cortex/client";
 import { defaultCtx, detectAgents, getAdapter } from "../setup/index.js";
 import type { SetupCtx } from "../setup/types.js";
 import { CLI_VERSION, isOlderThan } from "../version.js";
@@ -65,53 +65,57 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
   }
 
   // --- Sesión y servidor ----------------------------------------------------
-  const creds = readCredentials();
-  if (!creds) {
+  // Se comprueban TODOS los servidores en los que hay sesión (ADR-0033): con varios, saber
+  // que uno va no dice nada del otro, y el repo en el que estés puede apuntar a cualquiera.
+  const sesiones = listCredentials();
+  if (sesiones.length === 0) {
     checks.push({ nombre: "Session", nivel: "error", detalle: "not signed in", arreglo: "cortex auth login" });
-  } else {
-    checks.push({ nombre: "Session", nivel: "ok", detalle: `${creds.email} on ${creds.server}` });
+  }
+  for (const creds of sesiones) {
+    const varios = sesiones.length > 1;
+    const et = (n: string): string => (varios ? `${n} · ${creds.server.replace(/^https?:\/\//, "")}` : n);
+    checks.push({ nombre: et("Session"), nivel: "ok", detalle: `${creds.email} on ${creds.server}` });
 
     const health = await ping(`${creds.server.replace(/\/$/, "")}/health`);
     checks.push({
-      nombre: "Server",
+      nombre: et("Server"),
       nivel: health.ok ? "ok" : "error",
       detalle: health.ok ? creds.server : `not responding (${health.error ?? `HTTP ${health.status}`})`,
       ...(health.ok ? {} : { arreglo: "Check the URL, or ask whoever runs the server." }),
     });
+    if (!health.ok) continue;
 
-    if (health.ok) {
-      const me = await whoami();
+    const me = await ping(`${creds.server.replace(/\/$/, "")}/auth/me`, { token: creds.token });
+    checks.push({
+      nombre: et("Token"),
+      nivel: me.ok ? "ok" : "error",
+      detalle: me.ok ? "valid" : `rejected (HTTP ${me.status})`,
+      ...(me.ok ? {} : { arreglo: `cortex auth login --server ${creds.server}` }),
+    });
+
+    const cfg = await getClientConfig(creds.server);
+    if (cfg?.mcpUrl) {
+      // El MCP sin token responde 401: eso YA demuestra que está vivo y pidiendo auth.
+      const mcp = await ping(cfg.mcpUrl);
+      const vivo = mcp.ok || mcp.status === 401 || mcp.status === 405 || mcp.status === 406;
       checks.push({
-        nombre: "Token",
-        nivel: me.ok ? "ok" : "error",
-        detalle: me.ok ? "valid" : `rejected (HTTP ${me.status})`,
-        ...(me.ok ? {} : { arreglo: "cortex auth login" }),
+        nombre: et("MCP"),
+        nivel: vivo ? "ok" : "error",
+        detalle: vivo ? cfg.mcpUrl : `not responding (${mcp.error ?? `HTTP ${mcp.status}`})`,
+        ...(vivo ? {} : { arreglo: "The MCP server is not running; tell whoever runs it." }),
       });
+    } else {
+      checks.push({ nombre: et("MCP"), nivel: "aviso", detalle: "the server does not publish its URL", arreglo: "Older server: the URL will be guessed from the port." });
+    }
 
-      const cfg = await getClientConfig(creds.server);
-      if (cfg?.mcpUrl) {
-        // El MCP sin token responde 401: eso YA demuestra que está vivo y pidiendo auth.
-        const mcp = await ping(cfg.mcpUrl);
-        const vivo = mcp.ok || mcp.status === 401 || mcp.status === 405 || mcp.status === 406;
-        checks.push({
-          nombre: "MCP",
-          nivel: vivo ? "ok" : "error",
-          detalle: vivo ? cfg.mcpUrl : `not responding (${mcp.error ?? `HTTP ${mcp.status}`})`,
-          ...(vivo ? {} : { arreglo: "The MCP server is not running; tell whoever runs it." }),
-        });
-      } else {
-        checks.push({ nombre: "MCP", nivel: "aviso", detalle: "the server does not publish its URL", arreglo: "Older server: the URL will be guessed from the port." });
-      }
-
-      const min = cfg?.minClientVersion;
-      if (min && isOlderThan(CLI_VERSION, min)) {
-        checks.push({ nombre: "CLI version", nivel: "aviso", detalle: `you have ${CLI_VERSION}, the server asks for ${min}`, arreglo: "cortex upgrade" });
-      }
+    const min = cfg?.minClientVersion;
+    if (min && isOlderThan(CLI_VERSION, min)) {
+      checks.push({ nombre: et("CLI version"), nivel: "aviso", detalle: `you have ${CLI_VERSION}, the server asks for ${min}`, arreglo: "cortex upgrade" });
     }
   }
 
   // --- Este repo ------------------------------------------------------------
-  const link = readCortexLink(cwd);
+  const link = useProjectServer(cwd);
   if (!link) {
     checks.push({
       nombre: "This folder",
@@ -122,7 +126,8 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
   } else if (link.ignore) {
     checks.push({ nombre: "This folder", nivel: "ok", detalle: "marked as ignored (a deliberate opt-out)" });
   } else {
-    checks.push({ nombre: "This folder", nivel: "ok", detalle: `linked to "${link.slug ?? link.project}"` });
+    const dondeVa = sesiones.length > 1 ? ` · on ${link.server ?? "the default server"}` : "";
+    checks.push({ nombre: "This folder", nivel: "ok", detalle: `linked to "${link.slug ?? link.project}"${dondeVa}` });
   }
 
   // --- Agentes --------------------------------------------------------------

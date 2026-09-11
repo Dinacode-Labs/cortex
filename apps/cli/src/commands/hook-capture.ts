@@ -3,7 +3,7 @@ import { basename } from "node:path";
 import {
   condenseSession,
   latestCodexRollout,
-  readCortexLink,
+  useProjectServer,
   readSessionByRef,
   sendCondensedSession,
   type CaptureAgent,
@@ -61,7 +61,7 @@ export async function run(args: string[] = []): Promise<void> {
     }
 
     const cwd = flag(args, "cwd") || input.cwd || process.cwd();
-    const link = readCortexLink(cwd);
+    const link = useProjectServer(cwd);
     if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
 
     const asked = flag(args, "platform") as CaptureAgent | undefined;
