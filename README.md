@@ -2,60 +2,42 @@
 
 [![CI](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml)
 
-**Memoria de contexto para proyectos software.** Captura el conocimiento disperso de los
-proyectos (decisiones, restricciones, incidencias, convenciones, PRs, conversaciones, docs,
-código…), lo estructura en una capa **híbrida — documental + vectorial + grafo +
-bi-temporal —** y lo expone a personas y a agentes de IA (Claude Code, Codex, OpenCode,
-Hermes, Pi) por un **MCP autenticado** y unos **hooks** que cierran el bucle: tu agente
-arranca **sabiendo** el proyecto y, al terminar, Cortex **captura** lo aprendido, firmado con
-tu email.
+**Project memory for software teams.** Cortex captures the knowledge that gets scattered
+across a project, the decisions, constraints, incidents, conventions, pull requests,
+conversations, docs and code, structures it in a hybrid layer that is at once documental,
+vectorial, a graph and bi-temporal, and serves it to people and to AI coding agents.
 
-Se despliega como servidor y se usa con un CLI que se instala de npm. Ningún portátil
-necesita base de datos ni claves de modelo: la destilación corre en el servidor.
+The agents get it through an authenticated MCP server and a pair of hooks that close the
+loop: your agent **starts** a session already knowing the project, and when the session ends
+Cortex **captures** what was learned, signed with your email.
 
-Apache-2.0. Seguridad: [`SECURITY.md`](./SECURITY.md).
+You deploy a server and install a CLI from npm. No laptop needs a database or a model key:
+the distillation runs on the server.
 
-- Decisiones (ADR): [`docs/decisions.md`](./docs/decisions.md) · Roadmap: [`docs/roadmap.md`](./docs/roadmap.md)
-- Contribuir (PRs): [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+Apache-2.0. Found a vulnerability? See [`SECURITY.md`](./SECURITY.md).
 
-> **Cómo leer este README.** Tiene dos partes. La **práctica** (instalar, usar, operar)
-> es referencia rápida. La **[guía formativa](#guía-formativa-cómo-funciona-por-dentro)**
-> explica *desde cero* cómo funciona la tripa: qué es un embedding, qué es el RAG, qué es
-> un grafo de conocimiento, qué hace cada agente de IA… No hace falta experiencia previa.
-> El objetivo de esa parte es que **entiendas lo suficiente para juzgar si Cortex funciona
-> bien y dónde hay que mejorarlo** — por eso cada concepto lleva un recuadro «⚠️ Qué mirar»
-> con sus límites reales.
+- Decisions (ADRs): [`docs/decisions.md`](./docs/decisions.md) · Roadmap: [`docs/roadmap.md`](./docs/roadmap.md)
+- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- **[How Cortex works](./docs/how-it-works.md)**, a guide to the internals from first
+  principles. What an embedding is, what RAG is, what a knowledge graph buys you, what each
+  AI agent does. No prior experience needed. It is written so that you can judge whether
+  Cortex works well and where it should be improved, so every concept comes with its real
+  limits, not a sales pitch.
 
 ---
 
-## Índice
+## Contents
 
-**Práctico**
-- [Probarlo en tu máquina](#probarlo-en-tu-máquina)
-- [Para developers — instalar y usar](#para-developers--instalar-y-usar)
-- [Capacidades](#capacidades) · [Arquitectura](#arquitectura)
-- [Tools MCP (8)](#tools-mcp-8) · [Cómo llega a tus agentes](#cómo-llega-cortex-a-tus-agentes) · [Conectores](#ingesta-de-fuentes-conectores)
-- [Operar el servidor (infra/admin)](#operar-el-servidor-infraadmin) · [Estructura del repo](#estructura-del-repo)
-
-**[Guía formativa: cómo funciona por dentro](#guía-formativa-cómo-funciona-por-dentro)**
-- [0. El problema y la idea](#0-el-problema-y-la-idea-en-una-imagen)
-- [1. La unidad de conocimiento (y la trazabilidad)](#1-la-unidad-de-conocimiento-y-la-trazabilidad)
-- [2. Embeddings y búsqueda vectorial — la base del RAG](#2-embeddings-y-búsqueda-vectorial--la-base-del-rag)
-- [3. Búsqueda léxica y búsqueda híbrida (RRF)](#3-búsqueda-léxica-y-búsqueda-híbrida-rrf)
-- [4. Rerank: una segunda opinión del LLM](#4-rerank-una-segunda-opinión-del-llm)
-- [5. El grafo de conocimiento (entidades y relaciones)](#5-el-grafo-de-conocimiento-entidades-y-relaciones)
-- [6. Bi-temporal: el tiempo, e «invalidar ≠ borrar»](#6-bi-temporal-el-tiempo-e-invalidar--borrar)
-- [7. Los agentes de IA, uno a uno (con ejemplos)](#7-los-agentes-de-ia-uno-a-uno-con-ejemplos)
-- [8. El bucle de captura y reconciliación (estilo mem0)](#8-el-bucle-de-captura-y-reconciliación-estilo-mem0)
-- [9. El context pack y la herencia](#9-el-context-pack-y-la-herencia)
-- [10. Lint y observabilidad](#10-lint-salud-del-conocimiento-y-observabilidad)
-- [Cómo evaluar Cortex — checklist](#cómo-evaluar-cortex--checklist-para-developers)
+- [Try it on your machine](#try-it-on-your-machine)
+- [For developers](#for-developers) · [What it does](#what-it-does) · [Architecture](#architecture)
+- [The 8 MCP tools](#the-8-mcp-tools) · [How Cortex reaches your agents](#how-cortex-reaches-your-agents) · [Connectors](#ingesting-sources-connectors)
+- [Running the server](#running-the-server) · [Repository layout](#repository-layout)
 
 ---
 
-## Probarlo en tu máquina
+## Try it on your machine
 
-Antes de montar nada para tu equipo, puedes tener un Cortex entero en local. Solo hace falta
+Before setting anything up for your team, you can run a whole Cortex locally. All you need is
 Docker.
 
 ```bash
@@ -65,808 +47,360 @@ npm install -g @dinacode/cortex
 cortex auth login --server http://localhost:8787
 ```
 
-El código de acceso no se envía por correo: se imprime en el log del servidor.
+The sign-in code is not emailed anywhere. It is printed to the server log:
 
 ```bash
 docker compose -f cortex-local.yml logs server | grep -oE '[0-9]{6}' | tail -1
 ```
 
-Y ya:
+That is it:
 
 ```bash
-cortex link --create "Mi Proyecto"   # en el repo que quieras
-cortex setup --all                   # conectar tus agentes
-cortex doctor                        # comprobar que todo está en su sitio
+cortex link --create "My Project"   # in whatever repository you like
+cortex setup --all                  # wire up your agents
+cortex doctor                       # check every piece is in place
 ```
 
-Todo escucha solo en `127.0.0.1`, los datos sobreviven a un reinicio, y `docker compose -f
-cortex-local.yml down -v` lo borra sin dejar rastro.
+Everything listens on `127.0.0.1` only, the data survives a restart, and
+`docker compose -f cortex-local.yml down -v` removes it without a trace.
 
-**Lo que funciona sin ninguna clave:** las 8 tools MCP, guardar, buscar, el context pack, el
-lint y la UI en `localhost:8080`.
+**What works with no keys at all:** the 8 MCP tools, saving, searching, context packs, lint,
+and the web UI on `localhost:8080`.
 
-**Lo que necesita un modelo:** la captura automática de sesiones. Destilar una conversación
-en piezas de conocimiento es justo lo que hace el LLM, así que sin él los hooks no producen
-nada. Dárselo no requiere tocar el fichero:
+**What needs a model:** automatic session capture. Distilling a conversation into pieces of
+knowledge is exactly the job of the LLM, so without one the hooks produce nothing. Giving it
+a model does not mean editing the file:
 
 ```bash
-# Ollama, ya instalado en tu máquina
+# Ollama, already running on your machine
 LLM_PROVIDER=openai-compatible LLM_ALLOW_NO_KEY=1 LLM_MODEL=llama3.1 \
   LLM_BASE_URL=http://host.docker.internal:11434/v1 \
   docker compose -f cortex-local.yml up -d
 
-# o cualquier endpoint OpenAI-compatible
+# or any OpenAI-compatible endpoint
 LLM_PROVIDER=openai-compatible LLM_BASE_URL=https://… LLM_API_KEY=… LLM_MODEL=… \
   docker compose -f cortex-local.yml up -d
 ```
 
-Los embeddings por defecto son locales y **no** son semánticos: valen para arrancar, no para
-juzgar la calidad de la búsqueda. Para eso, apunta `EMBEDDINGS_*` a un endpoint real.
+The default embeddings are local and **not** semantic. They exist so the thing starts without
+keys, not so you can judge search quality. For that, point `EMBEDDINGS_*` at a real endpoint.
 
-Esto **no** es un despliegue de producción: no lleva TLS, ni copias de seguridad, ni límite
-de altas. Para eso está [`deploy/README.md`](./deploy/README.md).
+This is **not** a production deployment. No TLS, no backups, no limit on who can sign up.
+That is [`deploy/README.md`](./deploy/README.md).
 
-## Para developers — instalar y usar
+## For developers
 
-Un comando instala el CLI `cortex` e inicia sesión (email + OTP):
+One command installs the `cortex` CLI and signs you in with an email and a code:
 
 ```bash
-curl -fsSL https://<servidor-cortex>/install.sh | sh
+curl -fsSL https://<your-cortex-server>/install.sh | sh
 ```
 
-O directamente, si ya tienes Node ≥ 20:
+Or directly, if you already have Node 20 or newer:
 
 ```bash
 npm install -g @dinacode/cortex
-cortex auth login --server https://<servidor-cortex>
+cortex auth login --server https://<your-cortex-server>
 ```
 
-Después, configura tus agentes. Es un paso aparte a propósito: puedes repetirlo cuando
-quieras sin reinstalar nada.
+Then wire up your agents. This is a separate step on purpose: you can repeat it whenever you
+like without reinstalling anything.
 
 ```bash
-cortex setup --all       # Claude Code, Codex, OpenCode, Hermes, Pi (los que tengas)
-cortex setup --status    # qué hay instalado y dónde
-cortex setup --dry-run   # enseña el plan sin escribir
+cortex setup --all       # Claude Code, Codex, OpenCode, Hermes, Pi, whichever you have
+cortex setup --status    # what is installed, and where
+cortex setup --dry-run   # show the plan without writing
 ```
 
-Qué hace en cada uno:
+What it does in each one:
 
-| Agente | Cómo se integra | Contexto al empezar | Captura al terminar |
+| Agent | How it integrates | Context on start | Capture on end |
 | --- | --- | --- | --- |
-| Claude Code | plugin `cortex` (o hooks en `settings.json` si no puedes instalarlo) | ✓ | ✓ |
-| Codex | el mismo plugin, más `codex mcp add` | ✓ | ✓ |
-| OpenCode | plugin JS + MCP en `opencode.json` | ✓ | ✓ |
-| Pi | extensión en `~/.pi/agent/extensions` + MCP | ✓ | ✓ |
-| Hermes | hooks y MCP en `config.yaml` | ✓ | ✓ |
+| Claude Code | the `cortex` plugin, or hooks in `settings.json` if you cannot install it | ✓ | ✓ |
+| Codex | the same plugin, plus `codex mcp add` | ✓ | ✓ |
+| OpenCode | a JS plugin and an MCP entry in `opencode.json` | ✓ | ✓ |
+| Pi | an extension in `~/.pi/agent/extensions`, plus MCP | ✓ | ✓ |
+| Hermes | hooks and MCP in `config.yaml` | ✓ | ✓ |
 
-Si vienes de la instalación antigua (la del clon del repo), `setup` la migra: sustituye los
-hooks viejos, vuelve a registrar el MCP contra el servidor y retira el shim del PATH.
+If you are coming from the old install, the one that cloned the repository, `setup` migrates
+it: old hooks are replaced in place, the MCP is re-registered against the server, and the
+shim is removed from your PATH.
 
-Luego, en cualquier repo de trabajo:
+Then, in any repository you work in:
 
 ```bash
-cortex link --create "Mi Proyecto"   # crea el proyecto y vincula esta carpeta (.cortex.json)
-cortex link <slug>                   # vincula a un proyecto que YA existe (si tienes acceso)
-cortex ui                            # abre la UI web ya autenticada (listado de proyectos)
-cortex doctor                        # si algo no va: dice qué pieza falla y cómo arreglarla
-cortex --help                        # todos los comandos
+cortex link --create "My Project"   # create the project and link this folder (.cortex.json)
+cortex link <slug>                  # link to a project that ALREADY exists, if you have access
+cortex ui                           # open the web UI, already signed in
+cortex doctor                       # when something is off: which piece failed, and how to fix it
+cortex --help                       # every command
 ```
 
-**Qué obtienes (sin hacer nada más):** al abrir una sesión con tu agente, Cortex
-**inyecta** el context-pack del proyecto; al cerrarla, **captura** lo aprendido
-(destilado, no en crudo) firmado con tu email. Las 8 tools quedan disponibles para
-preguntarle a la memoria del proyecto en cualquier momento.
+**What you get without doing anything else:** when you open a session, Cortex **injects** the
+project's context pack. When you close it, Cortex **captures** what was learned, distilled
+rather than raw, signed with your email. The 8 tools are there to query the project's memory
+at any point in between.
 
-- **Opt-in por repo:** sin `.cortex.json` no se inyecta ni captura nada. `cortex link --ignore`
-  desactiva un repo concreto (p.ej. uno personal anidado).
-- **Vincular a algo existente:** el slug es la identidad. Si haces `--create` y el slug ya
-  existe, **no se crea un duplicado**: te vinculas (si tienes acceso) o, si es privado, se
-  te avisa para **pedir acceso al admin** (sin crear nada).
-- **Permisos:** los proyectos son **públicos** por defecto; `--private` los restringe a su
-  dueño + miembros; `--parent <slug>` los cuelga de un cliente (heredan contexto y permisos).
-  En la UI (`cortex ui` → **Proyectos**) ves los proyectos a los que tienes acceso; el
-  **admin** los ve todos y **añade/quita** miembros de los privados.
-- Solo necesitas que el **servidor de Cortex esté en marcha** (lo opera tu equipo de infra).
-- **Si algo no va**, `cortex doctor` dice qué pieza falla y con qué comando se arregla.
+- **Opt-in per repository.** With no `.cortex.json`, nothing is injected and nothing is
+  captured. `cortex link --ignore` switches off one specific repository, a personal one
+  nested inside a linked tree, for instance.
+- **Linking to something that exists.** The slug is the identity. If you run `--create` and
+  the slug is taken, **no duplicate is created**: you get linked if you have access, or told
+  to ask an administrator if the project is private. Nothing is created either way.
+- **Permissions.** Projects are **public** by default. `--private` restricts one to its owner
+  and members. `--parent <slug>` hangs it under a client, inheriting context and permissions.
+  In the UI you see the projects you can reach; an **admin** sees them all and manages
+  membership of the private ones.
+- All you need is a **Cortex server running somewhere**. Whoever handles your infrastructure
+  runs it.
 
-## Capacidades
+## What it does
 
-- **Bucle automático (hooks)** — inyección de contexto al abrir sesión + auto-captura al
-  cerrarla, en los 5 agentes; se instala con `cortex setup`. La captura **reconcilia** (estilo mem0: ADD/UPDATE/SUPERSEDE/
-  NOOP) y se atribuye al usuario; `maintain` auto-cura (promueve lo corroborado, decae lo muerto).
-- **Búsqueda híbrida** — vectorial (pgvector) + léxica (FTS) con Reciprocal Rank Fusion + rerank LLM opcional.
-- **Grafo de conocimiento** — entidades y relaciones (LLM) con resolución de variantes y visualización.
-- **Bi-temporal** — cada hecho tiene vigencia; lo obsoleto se **invalida, no se borra** (consultas *point-in-time*).
-- **Context packs y Q&A** — paquete por proyecto/área + respuestas con citas; **herencia** del padre en la jerarquía.
-- **Ingesta multimodal** — capa `extract` única: texto/Markdown, Word/PDF/Excel, `.drawio`,
-  imágenes (caption por visión), audio/vídeo (whisper + ffmpeg).
-- **Identidad y gobierno** — login email+OTP (sin passwords), admin(s) por env, proyectos
-  públicos/privados, jerarquía cliente→subproyectos, atribución `created_by`=email.
-- **Lint** del conocimiento + **indexación de código** + **observabilidad de IA** (coste/tokens + AI tracing).
-- **MCP autenticado** (8 tools) con los permisos de quien llama, consumible por cualquier
-  agente con soporte MCP; `cortex mcp` hace de puente stdio.
-- **Listo para producción** — imagen compilada, TLS, healthchecks reales y copias de
-  seguridad con restauración probada ([`deploy/README.md`](./deploy/README.md)).
+- **The automatic loop.** Context injected when a session opens, capture when it closes,
+  across five agents, installed by `cortex setup`. Capture **reconciles** rather than appends,
+  in the style of mem0: add, update, supersede or no-op. Everything is attributed to a person,
+  and `maintain` heals the memory over time, promoting what gets corroborated and letting
+  what is dead decay.
+- **Hybrid search.** Vector similarity with pgvector plus lexical full-text search, fused with
+  Reciprocal Rank Fusion, with an optional LLM rerank on top.
+- **A knowledge graph.** Entities and relations extracted by an LLM, with variant resolution
+  and a visualisation.
+- **Bi-temporal.** Every fact has a validity period. What becomes obsolete is **invalidated,
+  not deleted**, so you can ask what the project knew on a given date.
+- **Context packs and Q&A.** A briefing per project or area, and answers with citations.
+  Sub-projects **inherit** from their parent.
+- **Multimodal ingestion.** One `extract` layer for plain text and Markdown, Word, PDF and
+  Excel, `.drawio` diagrams, images captioned by a vision model, and audio and video
+  transcribed with whisper and ffmpeg.
+- **Identity and governance.** Sign-in by email and one-time code, no passwords. Admins by
+  environment variable, public and private projects, a client to sub-project hierarchy, and
+  `created_by` on every entry.
+- **Knowledge lint**, **code indexing**, and **AI observability** with cost, tokens and
+  tracing.
+- **An authenticated MCP** with 8 tools that apply the caller's permissions, usable from any
+  agent that speaks MCP. `cortex mcp` bridges stdio to it.
+- **Ready for production.** A compiled image, TLS, real healthchecks, and backups whose
+  restore path has actually been tested ([`deploy/README.md`](./deploy/README.md)).
 
-## Arquitectura
+## Architecture
 
 ```
 Claude Code / Codex / OpenCode / Hermes / Pi
-   │ (MCP, 8 tools)   │ (hooks: inyecta contexto / auto-captura)   │ (cortex CLI)
-   ▼                  ▼                                            ▼
- apps/mcp-server    apps/server (API HTTP + auth OTP)        apps/web (UI, cookie auth)
-        │                 │   ▲  los hooks/conectores escriben por la API autenticada
-        └────────┬────────┘   │  (atribución + permisos); ya no tocan la BD directa
+   │ (MCP, 8 tools)   │ (hooks: inject context / auto-capture)    │ (cortex CLI)
+   ▼                  ▼                                           ▼
+ apps/mcp-server    apps/server (HTTP API + email/OTP auth)  apps/web (UI, cookie auth)
+        │                 │   ▲  hooks and connectors write through the authenticated
+        └────────┬────────┘   │  API (attribution + permissions), never straight to the DB
                  ▼            api-client
-        packages/core  (@cortex/core)   ── dominio determinista: captura, búsqueda híbrida,
-                 │   ▲                       context-pack, lint, bi-temporal, reconciliación,
-                 │   │ setClassifier/        proyectos/slug/permisos/jerarquía, auth (OTP),
-                 │   │ setReranker/          extract multimodal, captureBatch
+        packages/core  (@cortex/core)   ── deterministic domain: capture, hybrid search,
+                 │   ▲                       context packs, lint, bi-temporal, reconciliation,
+                 │   │ setClassifier/        projects, slugs, permissions, hierarchy, auth,
+                 │   │ setReranker/          multimodal extract, batch capture
                  │   │ setReconciler
-                 │   └── packages/agents (@cortex/agents) ── Agents de Mastra (classifier,
-                 │           graph, reranker, retriever, distiller, merger, reconciler) + maintain
-                 ├── packages/embeddings (local|nan|openai|voyage)
-                 └── packages/database (Postgres + pgvector + FTS + migraciones)
-        packages/shared  ── modelo de dominio (zod)
+                 │   └── packages/agents (@cortex/agents) ── Mastra agents: classifier,
+                 │           graph, reranker, retriever, distiller, merger, reconciler, maintain
+                 ├── packages/embeddings (local | openai-compatible | openai | voyage)
+                 └── packages/database (Postgres + pgvector + FTS + migrations)
+        packages/shared  ── domain model (zod) + API contracts
 ```
 
-`@cortex/core` es **determinista** y funciona sin claves; la inteligencia (`@cortex/agents`,
-LLM + Mastra) se **inyecta** desde los entrypoints. El porqué de cada pieza está en
-[`docs/decisions.md`](./docs/decisions.md); el **cómo funciona** se explica en la
-[guía formativa](#guía-formativa-cómo-funciona-por-dentro).
+`@cortex/core` is **deterministic** and works with no keys. The intelligence, `@cortex/agents`
+on top of an LLM, is **injected** from the entrypoints. Why each piece is the way it is lives
+in [`docs/decisions.md`](./docs/decisions.md). How it actually works is explained in
+[How Cortex works](./docs/how-it-works.md).
 
-## Tools MCP (8)
+## The 8 MCP tools
 
-El servidor sirve las tools por **HTTP autenticado** (Streamable HTTP —
-`cortex-admin mcp-http`, puerto 8788), con el mismo token Bearer que la API, y aplica los
-permisos del usuario que llama.
+The server serves the tools over **authenticated Streamable HTTP** on port 8788, with the
+same Bearer token as the API, and applies the calling user's permissions.
 
-Los agentes, en cambio, lanzan sus MCP como procesos locales por stdio. Ese puente lo hace el
-propio CLI:
+Agents, on the other hand, launch their MCP servers as local stdio processes. The CLI is the
+bridge:
 
 ```bash
-claude mcp add cortex -- cortex mcp     # o `cortex setup claude-code` cuando llegue
+cortex setup claude-code                # the usual way
+claude mcp add cortex -- cortex mcp     # or by hand
 ```
 
-`cortex mcp` no toca la base de datos: reenvía al servidor con el token de `cortex auth login`
-y descubre la URL por `GET /client-config` (`CORTEX_MCP_URL` la fuerza). Si no hay sesión o el
-token ha caducado, el agente arranca igual —sin tools y con un aviso en el log— y las llamadas
-responden con la instrucción de volver a entrar, en vez de tumbar la sesión entera.
+`cortex mcp` never touches the database. It forwards to the server using the token from
+`cortex auth login`, and discovers the URL from `GET /client-config`, which `CORTEX_MCP_URL`
+can override. If there is no session, or the token expired, **your agent still starts**, with
+no tools and a warning in its log, and calls come back telling you to sign in again. A tool
+server that fails to initialise takes the whole session with it, which is worse than having
+no memory.
 
-Queda también el MCP por stdio del propio repo (`pnpm mcp`), pero habla con Postgres
-directamente y sin permisos: es para desarrollar el servidor, no para usarlo desde un agente.
+There is also a stdio MCP inside the repository (`pnpm mcp`), but it talks to Postgres
+directly and applies no permissions. It is for developing the server, not for daily use.
 
-| Tool | Qué hace |
+| Tool | What it does |
 | --- | --- |
-| `save_project_context` | Guarda conocimiento (clasifica, resume, detecta duplicados/contradicciones) |
-| `search_project_context` | Búsqueda híbrida (vector + léxico + rerank) |
-| `get_project_context_pack` | Paquete de contexto del proyecto/área; admite `asOf` (point-in-time) |
-| `list_project_decisions` | Decisiones vigentes |
-| `validate_context_entry` | Validar / rechazar / marcar obsoleta |
-| `ask_project_context` | Pregunta en lenguaje natural → respuesta sintetizada con fuentes |
-| `search_project_code` | Búsqueda híbrida sobre el código indexado |
-| `lint_project_context` | Salud del conocimiento (contradicciones, duplicados, huecos…) |
+| `save_project_context` | Save knowledge: classifies, summarises, flags duplicates and contradictions |
+| `search_project_context` | Hybrid search, vector plus lexical, with optional rerank |
+| `get_project_context_pack` | A briefing for a project or area; `asOf` gives a point-in-time view |
+| `list_project_decisions` | The decisions currently in force |
+| `validate_context_entry` | Validate, reject, or mark obsolete |
+| `ask_project_context` | A question in plain language, answered from the memory with sources |
+| `search_project_code` | Hybrid search over the project's indexed code |
+| `lint_project_context` | Health of the memory: contradictions, duplicates, gaps |
 
-## Cómo llega Cortex a tus agentes
+## How Cortex reaches your agents
 
-Lo suyo —el MCP con las 8 tools, la skill `cortex-capture` y el comando `/cortex-save`— lo
-reparte Cortex en el **plugin de Claude Code** ([`plugin/claude-code/`](./plugin/claude-code)),
-que instala `cortex setup`. Los demás agentes se configuran con su mecanismo nativo desde el
-mismo comando. El plugin trae también los dos hooks del bucle: contexto al empezar la sesión,
-captura al terminarla.
+Cortex ships **its own** pieces, the MCP with the 8 tools, the `cortex-capture` skill and the
+`/cortex-save` command, in the [Claude Code plugin](./plugin/claude-code), which
+`cortex setup` installs. Codex reads the same marketplace and takes the same plugin. The
+other agents are configured through their own native mechanism by the same command. The
+plugin also carries the two hooks that close the loop.
 
-Aparte de eso está el **toolbelt de tu organización** —los MCPs y skills de las herramientas
-que use tu equipo—, que se instala desde un **registry externo**, normalmente en un repo
-privado. Eso no vive aquí a propósito: no es producto, es la configuración de una empresa
-concreta (ADR-0014 revisado, ADR-0026 y ADR-0032):
-
-```bash
-cortex toolbelt doctor                                  # qué auth necesita cada cosa
-cortex toolbelt sync --registry <ruta|url> --apply      # instalarlo en tus agentes
-```
-
-El esquema del fichero está en [`docs/toolbelt-registry.md`](./docs/toolbelt-registry.md).
-
-En ambos casos se reparte **configuración, nunca credenciales**: cada entrada documenta qué
-auth necesita, y las que dependan de variables sin exportar se omiten con un aviso. Un MCP
-registrado a medias es peor que uno ausente, porque el agente lo reintenta en cada arranque.
-
-## Ingesta de fuentes (conectores)
-
-Se ejecutan con el CLI y escriben **por la API autenticada** (atribución + permisos +
-embedding por lotes). Requieren `cortex auth login` y el servidor en marcha. El primer
-argumento es el **slug** del proyecto (de `cortex link`):
+Separately there is **your organisation's toolbelt**, the MCPs and skills for whatever tools
+your team uses. That installs from an **external registry**, usually in a private repository.
+It deliberately does not live here: it is not product, it is one company's configuration
+(ADR-0014 revised, ADR-0026 and ADR-0032).
 
 ```bash
-cortex connect-github   "<slug>" <owner/repo>     # PRs/issues (vía gh)
-cortex connect-docs     "<slug>" <ruta-dir>       # carpeta multimodal (docs/imágenes/audio/vídeo)
-cortex connect-notion   "<slug>" <ruta-export>    # export de Notion (páginas + adjuntos, enlazados)
-cortex connect-sessions "<slug>" <ruta-repo> [claude|codex|opencode|hermes]  # backfill de sesiones
+cortex toolbelt doctor                                # what each entry needs to authenticate
+cortex toolbelt sync --registry <path|url> --apply    # install it into your agents
 ```
 
-Por defecto la captura tipa los items por **heurística** (barato) y la inteligencia
-(reclasificación de tipos, grafo, reconciliación, curación) se aplica luego con
-`cortex-admin maintain` (su paso `reclassify` re-tipa con LLM lo ingerido por heurística, sin
-re-ingerir). Con `CORTEX_CAPTURE_LLM=1` cada item se **clasifica con el LLM** ya en la
-ingesta (tipos fiables desde el minuto uno), a cambio de 1 llamada LLM por item.
+The file format is documented in [`docs/toolbelt-registry.md`](./docs/toolbelt-registry.md).
 
-La **indexación de código** (`cortex index-code`) y `cortex lint` / `resolve-entities` /
-`temporal` sueltos son tareas de servidor (acceso directo a BD) — ver `cortex --help` y CONTRIBUTING.
+Either way, what gets distributed is **configuration, never credentials**. Every entry
+declares what authentication it needs, and entries whose variables are not exported are
+skipped with a warning. A half-registered MCP is worse than an absent one, because the agent
+retries it on every start.
 
-## Operar el servidor (infra/admin)
+## Ingesting sources (connectors)
 
-Requisitos: Node ≥ 20, pnpm, Docker.
+Connectors run from the CLI and write **through the authenticated API**, so they get
+attribution, permissions and batched embedding. They need `cortex auth login` and a running
+server. The first argument is the project **slug** from `cortex link`:
+
+```bash
+cortex connect-github   "<slug>" <owner/repo>   # pull requests and issues, via gh
+cortex-admin connect-docs    "<slug>" <dir>     # a folder: documents, images, audio, video
+cortex-admin connect-notion  "<slug>" <export>  # a Notion export, pages and attachments linked
+cortex connect-sessions "<slug>" <repo-path> [claude|codex|opencode|hermes|pi]
+```
+
+By default capture types each item **heuristically**, which is cheap, and the intelligence,
+re-typing with an LLM, the graph, reconciliation and curation, is applied afterwards by
+`cortex-admin maintain`. With `CORTEX_CAPTURE_LLM=1` each item is classified by the LLM at
+ingestion time instead, which gives you reliable types from minute one at the cost of one LLM
+call per item.
+
+Code indexing and the standalone maintenance passes are operator commands, so they live in
+`cortex-admin`. See `cortex-admin --help`.
+
+## Running the server
+
+You need Node 20 or newer, pnpm and Docker.
 
 ```bash
 git clone git@github.com:Dinacode-Labs/cortex.git && cd cortex
 pnpm install
-cp .env.example .env          # proveedores, email (OTP), CORTEX_ADMIN_EMAIL, CORTEX_AUTH_DOMAIN
-pnpm build                    # compila a dist/ (en dev puedes usar los scripts `dev` con tsx)
-pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker, puerto host 5433) + esquema
-pnpm admin server             # API HTTP + auth (8787) — sirve también /install.sh
-pnpm web                      # UI web (8080)
-pnpm admin mcp-http           # MCP por HTTP autenticado (Streamable HTTP, 8788)
-pnpm admin maintain-worker    # mantenimiento programado (cron)
+cp .env.example .env          # providers, email for the sign-in code, admin, allowed domain
+pnpm build                    # compile to dist/; in dev the `dev` scripts run from source
+pnpm db:up && pnpm db:migrate # Postgres + pgvector on host port 5433, plus the schema
+pnpm admin server             # HTTP API and auth on 8787; also serves /install.sh
+pnpm web                      # web UI on 8080
+pnpm admin mcp-http           # authenticated MCP over HTTP on 8788
+pnpm admin maintain-worker    # scheduled maintenance
 ```
 
-- **Dos binarios, a propósito.** `cortex` es el CLI de **developer** (auth, link, hooks,
-  sync): ligero, instalable, sin base de datos ni modelo. `cortex-admin` son los comandos de
-  **operador** (migrate, maintain, ingest, conectores pesados, servicios) y vive en la
-  imagen de despliegue. Mientras estuvieron juntos, instalar Cortex significaba llevarse
-  Postgres y Mastra al portátil de cualquiera que solo quisiera vincular un repo.
-- **Endpoints de la API** (`8787`). Públicos: `/health`, `/client-config` (lo que un cliente
-  necesita saber antes de autenticarse, incluida la URL del MCP), `/version`,
-  `/toolbelt.json`, `/install.sh` y `/auth/request|verify`. Autenticados con Bearer:
-  `/auth/me`, `/auth/logout`, `/auth/ui-ticket`, `/context-pack`, `/capture`,
-  `/capture/batch`, `/relate`, `/projects` (listar y crear) y `/projects/:slug`.
-- **Auth:** login **email + OTP** sin passwords; el usuario **es su correo**.
-  `CORTEX_AUTH_DOMAIN` es la whitelist de dominios y **no tiene default**: vacío significa
-  que cualquier email puede registrarse, así que fíjalo en producción (el servidor avisa al
-  arrancar). **Admin(s):** `CORTEX_ADMIN_EMAIL` (coma-separado) ven todos los proyectos y
-  gestionan permisos. El envío del OTP es
-  enchufable con `CORTEX_EMAIL_PROVIDER`: `log` (imprime el código, no envía — default),
-  `brevo` o `smtp`. El servidor valida la config al arrancar.
-- **Marca:** lo que ve el usuario (web, emails, contexto inyectado, CLI) sale de
-  `CORTEX_BRAND_NAME` (def. `Cortex`) y, opcionalmente, `CORTEX_BRAND_LOGO_FILE` /
-  `CORTEX_BRAND_LOGO_SVG`. Sin logo se pinta un wordmark de texto.
-- **Proveedores** (`.env`, por defecto `local`/`none` sin claves). Todo endpoint soportado
-  habla el dialecto OpenAI, así que un solo proveedor genérico sirve para NaN, Ollama,
-  vLLM o LM Studio (ADR-0024). Ejemplo con NaN:
+- **Two binaries, deliberately.** `cortex` is the **developer** CLI: auth, link, setup,
+  toolbelt, doctor and the hooks. It is light and installable, with no database and no model.
+  `cortex-admin` holds the **operator** commands, migrations, maintenance, ingestion, the
+  heavy connectors and the services, and lives in the deployment image. While they were one
+  binary, installing Cortex meant dragging Postgres and Mastra onto the laptop of anyone who
+  just wanted to link a repository.
+- **API endpoints** on 8787. Public: `/health`, `/client-config`, which is what a client needs
+  to know before authenticating including the MCP URL, `/version`, `/toolbelt.json`,
+  `/install.sh` and `/auth/request|verify`. Bearer-authenticated: `/auth/me`, `/auth/logout`,
+  `/auth/ui-ticket`, `/context-pack`, `/capture`, `/capture/batch`, `/capture/session` and
+  `/capture/session/:id`, `/relate`, `/projects` and `/projects/:slug`.
+- **Auth.** Sign-in by email and one-time code, no passwords. A user **is** their email
+  address. `CORTEX_AUTH_DOMAIN` is the allowed-domains list and **has no default**: empty
+  means anyone in the world can sign up, so set it in production. The server warns on start if
+  you have not. Admins come from `CORTEX_ADMIN_EMAIL`, comma-separated, and see every project.
+  Delivery of the code is pluggable through `CORTEX_EMAIL_PROVIDER`: `log` prints it and sends
+  nothing, which is the default, or `brevo` or `smtp`. The configuration is validated at boot.
+- **Branding.** Everything a user sees, the web UI, the emails, the injected context and the
+  CLI, takes its name from `CORTEX_BRAND_NAME`, default `Cortex`, and optionally a logo from
+  `CORTEX_BRAND_LOGO_FILE` or `CORTEX_BRAND_LOGO_SVG`. With no logo you get a text wordmark.
+- **Providers**, configured in `.env`, defaulting to `local` and `none` so nothing needs a key.
+  Every endpoint worth supporting speaks the OpenAI dialect, so one generic provider covers a
+  hosted cluster, Ollama, vLLM or LM Studio alike (ADR-0024):
   ```bash
   LLM_PROVIDER=openai-compatible
-  LLM_BASE_URL=https://api.nan.builders/v1
+  LLM_BASE_URL=https://api.example.com/v1
   LLM_API_KEY=...
-  LLM_MODEL=deepseek-v4-flash            # 1M ctx, visión, tool calling
-  CORTEX_VISION_MODEL=deepseek-v4-flash  # el de chat puede ser text-only
+  LLM_MODEL=...
+  CORTEX_VISION_MODEL=...                # the chat model may well be text-only
 
   EMBEDDINGS_PROVIDER=openai-compatible  # local | openai-compatible | openai | voyage
-  EMBEDDINGS_BASE_URL=https://api.nan.builders/v1
+  EMBEDDINGS_BASE_URL=https://api.example.com/v1
   EMBEDDINGS_API_KEY=...
-  EMBEDDINGS_MODEL=qwen3-embedding
-  EMBEDDINGS_DIM=4096                    # obligatorio: fija el esquema vectorial
+  EMBEDDINGS_MODEL=...
+  EMBEDDINGS_DIM=4096                    # required: it fixes the vector schema
   ```
-  `local` no es semántico (solo arranque sin claves); al cambiar de proveedor de
-  embeddings hay que reindexar (cambian las dimensiones). `CORTEX_MODEL_<ROL>` cambia el
-  modelo de un agente concreto y admite `proveedor:modelo` para mandar solo ese rol a otro
-  sitio (p. ej. `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`). `CORTEX_LLM_CONCURRENCY`
-  (def. 4) limita las llamadas en paralelo: el cupo del proveedor es por API key.
-- **Mantenimiento** (server, idempotente, con lock): `pnpm admin maintain
-  ["<Proyecto>"]` encadena reclassify(tipos heurísticos→LLM) → enrich(only-missing) →
-  resolve → temporal → curate → reconcile → lint. El **sync de fuentes es manual** (lo
-  dispara el developer); esto es
-  solo mantenimiento.
+  `local` is not semantic, it only exists so the thing starts without keys. Changing embedding
+  provider means reindexing, because the dimensions change. `CORTEX_MODEL_<ROLE>` overrides the
+  model for one agent and accepts `provider:model` to send a single role somewhere else, for
+  example `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`. `CORTEX_LLM_CONCURRENCY`,
+  default 4, caps parallel calls, because providers meter per API key rather than per endpoint.
+- **Maintenance** runs on the server, is idempotent and takes a lock:
+  `pnpm admin maintain ["<Project>"]` chains reclassify, enrich, resolve, temporal, curate,
+  reconcile and lint. Syncing sources is **manual**, triggered by a developer. This is
+  maintenance only.
 
-### Despliegue
+### Deployment
 
-Un host con Docker. Caddy delante con TLS automático, y detrás la API, la UI, el MCP,
-Postgres, el worker de mantenimiento y copias de seguridad diarias (ADR-0027).
+One host with Docker. Caddy in front with automatic TLS, and behind it the API, the UI, the
+MCP, Postgres, the maintenance worker and daily backups (ADR-0027).
 
 ```bash
-cp deploy/.env.example deploy/.env     # dominio, contraseñas, email, proveedores
+cp deploy/.env.example deploy/.env     # domain, passwords, email, providers
 chmod 600 deploy/.env
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-Todo cuelga de un solo dominio: `/` la web, `/api/*` la API, `/mcp` el MCP y `/install.sh`
-el instalador, que se sirve con la URL pública ya inyectada. Solo Caddy publica puertos;
-Postgres no se asoma a internet. La imagen se descarga de GHCR, no se compila en el servidor.
+Everything hangs off a single domain: `/` the web UI, `/api/*` the API, `/mcp` the MCP and
+`/install.sh` the installer, served with the public URL already injected. Only Caddy publishes
+ports; Postgres never faces the internet. The image is pulled from the registry, not built on
+the server.
 
-Los procedimientos —primer despliegue, actualizar, copias, restaurar (con simulacro), rotar
-credenciales— están en [`deploy/README.md`](./deploy/README.md).
+The procedures, first deployment, upgrading, backups, restoring with a dry run, and rotating
+credentials, are in [`deploy/README.md`](./deploy/README.md).
 
-## Estructura del repo
+## Repository layout
 
 ```
-apps/        mcp-server (MCP stdio+HTTP) · web (UI) · server (API + auth)
-             cli (@dinacode/cortex, npm) · admin (operador, vive en la imagen)
-packages/    shared · client (lado cliente) · database · embeddings · core · agents
-plugin/      claude-code/ (hooks + MCP + skill cortex-capture + /cortex-save)
-deploy/      docker-compose.yml · Caddyfile · restore.sh · README.md
-config/      toolbelt.json (esquema del registry de terceros)
+apps/        mcp-server (MCP stdio + HTTP) · web (UI) · server (API + auth)
+             cli (@dinacode/cortex, published to npm) · admin (operator, lives in the image)
+packages/    shared · client (client side) · database · embeddings · core · agents
+plugin/      claude-code/ (hooks + MCP + cortex-capture skill + /cortex-save)
+deploy/      docker-compose.yml · local.yml · Caddyfile · restore.sh · README.md
+config/      toolbelt.json (schema for third-party registries)
 scripts/     install.sh · set-version.mjs · changelog-notes.mjs
-docs/        decisions.md (ADR) · roadmap.md · research/ · toolbelt-registry.md
+docs/        how-it-works.md · decisions.md (ADRs) · roadmap.md · research/
 ```
 
-Las **reglas de dependencia** entre paquetes (qué puede importar qué) están en
-[`CLAUDE.md`](./CLAUDE.md), y hay tests que las protegen. Antes de tocar un área, mira las
-decisiones en [`docs/decisions.md`](./docs/decisions.md): casi todo lo que parece raro está
-explicado ahí.
+The **dependency rules** between packages, which one may import which, are in
+[`CLAUDE.md`](./CLAUDE.md), and there are tests that enforce them. Before touching an area,
+read the decisions in [`docs/decisions.md`](./docs/decisions.md). Almost everything that looks
+odd is explained there.
 
-Cómo contribuir, dónde vive cada cosa y convenciones: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+> The ADRs, the roadmap and the research notes are written in Spanish. They are the team's
+> working record rather than product documentation, and translating them would freeze what is
+> meant to stay alive. Everything a user or an agent sees is in English.
+
+How to contribute, where each thing lives, and the conventions: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ---
 
-# Guía formativa: cómo funciona por dentro
+## License and security
 
-> Esta parte está pensada para **entender Cortex de verdad sin haber tocado antes RAG,
-> embeddings ni grafos de conocimiento**. Vamos de lo simple a lo complejo, siempre con
-> **un mismo ejemplo** (un proyecto ficticio, *Acme Portal*, con su *módulo de
-> facturación*). Cada sección termina con un recuadro **«⚠️ Qué mirar»**: dónde están los
-> límites reales, qué es solo «de demo» y qué podríamos mejorar. Léelo con espíritu
-> crítico — todo el planteamiento de Cortex es **hipótesis a validar**.
+Cortex is published under the [Apache License 2.0](./LICENSE). See also [`NOTICE`](./NOTICE).
 
-## 0. El problema y la idea, en una imagen
-
-**El problema.** En una consultora, el conocimiento de cada proyecto vive desperdigado:
-en la cabeza de quien lo hizo, en un ticket de Plane, en un hilo de chat, en un PR, en un
-PDF del cliente. Cuando entra alguien nuevo —o cuando un **agente de IA** abre una
-sesión— empieza «a ciegas»: no sabe que *este* cliente prohíbe la nube pública, ni que
-*ese* módulo ya petó dos veces por timeouts. Repite errores y vuelve a preguntar lo de
-siempre.
-
-**La idea.** Cortex es una **memoria de proyecto** que:
-
-```
-   CAPTURA            ESTRUCTURA                 RECUPERA              SIRVE
- (de muchas      (clasifica, vincula en      (búsqueda híbrida   (a personas por la UI;
-  fuentes:        un grafo, fecha y marca   + grafo + filtro     a agentes de IA por el
-  chat, PRs,      la vigencia de cada        temporal)            MCP y los hooks)
-  docs, código,   hecho)
-  sesiones IA)
-```
-
-El **bucle** que lo hace automático: cuando abres una sesión con tu agente, un *hook*
-le **inyecta** lo que Cortex sabe del proyecto; cuando la cierras, otro *hook* manda la
-conversación —condensada y sin secretos— al servidor, que **destila** lo aprendido y lo
-**guarda**. Trabajas → Cortex aprende → el siguiente arranca sabiendo más.
-
-Destilar ocurre en el **servidor**, no en tu máquina: es la parte que necesita un modelo de
-lenguaje, y así ningún portátil necesita credenciales de IA. Tu equipo solo instala el CLI e
-inicia sesión.
-
-**Una decisión de diseño que conviene tener clara desde ya:** Cortex está partido en dos.
-
-- **`@cortex/core` es determinista**: guarda, busca, deduplica y vincula **sin usar ningún
-  LLM**. Funciona sin claves de API.
-- **`@cortex/agents` es la inteligencia**: envuelve llamadas a un LLM (clasificar, extraer
-  el grafo, rerankear, sintetizar respuestas) y se **inyecta** en el core al arrancar
-  (`setClassifier`, `setReranker`, `setReconciler`). Si no hay LLM, el core **cae a
-  heurísticas** y sigue funcionando.
-- **Precedencia siempre:** *input explícito > LLM > heurística*. La IA **aumenta**; nunca
-  es un punto único de fallo.
-
-## 1. La unidad de conocimiento (y la trazabilidad)
-
-Todo lo que Cortex sabe son **entradas de contexto** (`context_entries`). Cada entrada es
-**un hecho**: una decisión, una restricción, una incidencia, una convención… Hay **14
-tipos** (`decision`, `constraint`, `incident`, `architecture`, `module_note`,
-`technical_debt`, `convention`, `business_rule`, `integration_note`, `risk`, `how_to`,
-`meeting_summary`, `pr_summary`, `ticket_resolution`).
-
-Lo que diferencia a Cortex de «un cajón de notas» es que **cada hecho arrastra su
-procedencia** (el principio de trazabilidad, §5.5 del plan). Una entrada de ejemplo:
-
-```
-title:            "El cliente Acme Corp no permite servicios cloud públicos"
-content:          "La solución debe desplegarse en infraestructura propia (on-prem)."
-type:             constraint
-─── trazabilidad (§5.5) ───────────────────────────────────────────────
-source_type:      meeting_transcript          ← de dónde salió
-source_reference: "Reunión kickoff 2026-01"   ← referencia al original
-created_by:       "ana@example.com"          ← QUIÉN lo metió (atribución)
-created_at:       2026-01-10                    ← CUÁNDO lo supimos
-confidence:       verified                      ← cuánto nos fiamos
-status:           validated                     ← estado en su ciclo de vida
-validity:         current                       ← ¿sigue vigente?
-valid_from/_to:   2026-01-10 / NULL             ← ventana temporal (ver §6)
-```
-
-- **`confidence`** (`low` < `medium` < `high` < `verified`): una nota auto-capturada de una
-  sesión entra como `low`; algo confirmado contra una fuente real puede ser `verified`. El
-  lint cuenta cuántas entradas de baja confianza hay.
-- **`status`** (ciclo de vida): `draft → pending_validation → validated / rejected /
-  obsolete / superseded`. El context-pack y la lista de decisiones **excluyen** lo
-  `rejected`/`obsolete`.
-- **`validity`** + **`valid_from`/`valid_to`**: la vigencia en el tiempo (sección 6).
-
-> **💡 Por qué importa.** «No conviertas inferencias en hechos.» Si el caption de una
-> imagen o el resumen de un LLM se guardan, se guardan **como inferencia** (con su
-> confianza y su origen), no como verdad absoluta. Así un humano puede luego validar,
-> rechazar o corregir, y siempre se sabe de dónde vino cada cosa.
-
-> **⚠️ Qué mirar.** El `status` por defecto es `pending_validation`: hoy **nadie valida a
-> mano de forma sistemática** (sería demasiada fricción), así que la calidad sube sola por
-> la auto-curación (§8), no por revisión humana. Si para un cliente concreto necesitas
-> garantías más fuertes, ese flujo de validación todavía no existe (está en el roadmap).
-
-## 2. Embeddings y búsqueda vectorial — la base del RAG
-
-**RAG** = *Retrieval-Augmented Generation*. En cristiano: en vez de pedirle al LLM que
-conteste «de memoria», primero **recuperamos** los trozos de conocimiento relevantes y se
-los damos como contexto. La pregunta del millón es: *¿cómo encontramos «lo relevante»?*
-
-**Embedding (la pieza clave).** Un embedding convierte un texto en una **lista de números**
-(un vector), de forma que **textos con significado parecido caen cerca** en ese espacio.
-Imagina un mapa donde «caída del checkout» y «error al pagar» quedan casi pegados aunque
-**no compartan ni una palabra**. Eso es lo que un embedding *semántico* captura.
-
-**Búsqueda vectorial.** Para buscar, convertimos también **la pregunta** en un vector y
-medimos qué entradas tienen el vector más «cercano». Cortex usa Postgres con la extensión
-**pgvector** y mide la cercanía con la **distancia coseno** (operador `<=>`): cuanto menor
-la distancia, más parecido. Devuelve las entradas ordenadas de más a menos cercanas.
-
-**Los proveedores de embeddings son enchufables** (variable `EMBEDDINGS_PROVIDER`):
-
-| Proveedor | Modelo | Dimensiones | ¿Semántico? |
-| --- | --- | --- | --- |
-| `local` (por defecto) | feature-hashing | 256 | **NO** — solo solape de palabras |
-| `openai-compatible` | el que sirva el endpoint (p. ej. `qwen3-embedding` en NaN) | la que declares en `EMBEDDINGS_DIM` | Sí |
-| `openai` | `text-embedding-3-large` | 3072 | Sí |
-| `voyage` | `voyage-3` | 1024 | Sí |
-
-> **⚠️ Qué mirar — esto es importante para no llevarte una falsa impresión:**
-> - **`local` NO es semántico.** No es una red neuronal: hashea cada palabra a una de 256
->   «casillas» (el *hashing trick*). Dos textos se parecen **solo si comparten palabras
->   literales**; «coche» y «automóvil» caen en casillas distintas. Existe **solo para
->   arrancar sin claves** y probar el cableado. **Para evaluar la calidad real de búsqueda,
->   configura `nan`/`openai`/`voyage`** — con `local` el sistema *parece* tonto y no es
->   culpa del diseño.
-> - **No hay índice ANN** (tipo HNSW/IVFFlat): la búsqueda vectorial es un **escaneo
->   exacto** sobre las filas filtradas. Correcto y simple, pero **O(n)** — escalará mal con
->   cientos de miles de entradas. Es una elección «de demo» consciente.
-> - **Cambiar de proveedor obliga a reindexar.** Cada vector guarda su `embedding_model` y
->   sus dimensiones; la búsqueda solo compara contra vectores **del modelo activo**. Si
->   pasas de `local` (256) a `openai` (1536) sin re-embeber, la rama vectorial encuentra
->   **cero filas** (en silencio) y la búsqueda degrada a solo-léxico.
-> - **Las entradas no se trocean** (una entrada = un vector). Una entrada larguísima se
->   embebe entera; no hay *chunking* de entradas (el código sí se trocea, ver §código).
-
-## 3. Búsqueda léxica y búsqueda híbrida (RRF)
-
-La búsqueda vectorial es genial para el **significado**, pero floja para lo **literal**:
-si buscas `TICKET-4821` o `OAuth2 PKCE`, quieres ese token **exacto**, y el vector puede no
-clavarlo. Para eso está la **búsqueda léxica** (FTS, *full-text search*): Postgres mantiene
-un índice de las palabras de cada entrada (con *stemming* en español: «facturación»,
-«facturar» y «factura» comparten raíz) y encuentra coincidencias de términos.
-
-- **Vectorial** → capta *sentido* (paráfrasis, sinónimos).
-- **Léxica** → capta *precisión* (IDs, nombres propios, jerga, acrónimos).
-
-Cortex hace **búsqueda híbrida**: lanza **las dos** y **fusiona** los rankings. El problema
-de fusionar es que sus puntuaciones no son comparables (la distancia coseno va de 0 a 1; el
-score léxico es otra escala). La solución es **Reciprocal Rank Fusion (RRF)**, que ignora
-las puntuaciones y usa solo la **posición** de cada resultado en cada lista:
-
-```
-puntuación_RRF(doc) = Σ   1 / (K + posición)        con K = 60
-                   (sumando por cada lista — vectorial y léxica — donde aparece el doc)
-```
-
-**Intuición para no-iniciados:** estar el **1.º** de una lista vale un pelín más que estar
-el 2.º, y mucho más que estar el 10.º, pero con rendimientos decrecientes (la `K=60`
-suaviza la curva). Y lo más importante: si un documento aparece **en las dos listas**, sus
-contribuciones **se suman** → sube arriba del todo. Es decir, **premia lo que es a la vez
-semánticamente relevante y coincide en palabras**, que es justo lo que quieres.
-
-**Ejemplo.** Pregunta: *«¿cómo desplegamos el módulo de facturación?»*
-
-```
-Rama VECTORIAL (por sentido)      Rama LÉXICA (por palabras)
- 1. A  How-to: desplegar fact.     1. B  Constraint: facturación on-prem
- 2. C  Decisión: elegimos Stripe   2. A  How-to: desplegar facturación
- 3. B  Constraint: on-prem
- 4. D  Incidencia: checkout
-
-RRF fusiona →  A y B aparecen en AMBAS listas  →  suben a lo más alto
-Resultado:  A , B , C , D     (A y B se separan claramente de C y D)
-```
-
-> **⚠️ Qué mirar.**
-> - El **número que se muestra** como «score» de cada resultado **no es el valor RRF**: el
->   *orden* lo decide RRF, pero el score visible es la **similitud coseno** (para hits que
->   tocaron la rama vectorial) o el RRF normalizado (para los solo-léxicos). No ordenes
->   mentalmente por ese número.
-> - El léxico usa `ts_rank` de Postgres (parecido a BM25, no idéntico). Para BM25 «de
->   verdad» habría que mirar `pg_search`/ParadeDB — anotado en las decisiones.
-
-## 4. Rerank: una segunda opinión del LLM
-
-La híbrida + RRF da un buen montón de candidatos, pero ordenados por una fórmula mecánica.
-El **rerank** es un paso opcional: se cogen los ~15 mejores candidatos y se le pide a un
-**LLM** que los reordene «de más a menos relevante» **para esta pregunta concreta** y
-descarte el ruido. Es la diferencia entre «coincide» y «de verdad responde».
-
-- Se activa solo si hay LLM configurado (y no `CORTEX_RERANK=off`). Se inyecta con
-  `setReranker`; el core por sí solo no llama a ningún LLM.
-- Es **a prueba de fallos**: si el LLM se cae, hay ≤1 candidato o la respuesta no parsea,
-  se devuelve el orden híbrido **sin romper nada**. Nunca «pierde» resultados: los que el
-  LLM no menciona se añaden al final.
-
-> **⚠️ Qué mirar.** El *reranker dedicado* de nan (un modelo especializado) dio resultados
-> **poco fiables** en pruebas (llegó a rankear una «receta de tortilla» por encima de docs
-> de pagos), así que se usa el **LLM de chat** como reranker. Funciona, pero es **más caro
-> y lento** que un reranker dedicado bueno (Cohere/Voyage) — punto claro a re-evaluar.
-
-## 5. El grafo de conocimiento (entidades y relaciones)
-
-Una búsqueda te da textos sueltos. Un **grafo de conocimiento** te da **cómo se relacionan
-las cosas**. La idea, en simple:
-
-- **Nodos (entidades):** las «cosas» del proyecto — un cliente, un módulo, una tecnología,
-  un servicio, una persona, una integración… (hay **11 tipos** de entidad).
-- **Aristas (relaciones):** conexiones **con tipo** entre nodos — «el módulo de facturación
-  *depends_on* la integración con el ERP», «la incidencia X *caused_by* Stripe» (hay **10
-  tipos** de relación: `depends_on`, `affects`, `caused_by`, `resolved_by`, `supersedes`,
-  `contradicts`, `belongs_to`, `implemented_by`, `discussed_in`, `related_to`).
-
-Un detalle elegante: **la propia entrada puede ser un nodo**. Cuando el extractor de grafo
-encuentra una relación cuyo origen es la entrada misma, usa la palabra clave `"ENTRADA"`.
-Así una incidencia se conecta directamente a lo que afecta:
-
-```
-[entrada: "El PDF de facturación falla con cargas grandes por timeouts"]
-        │ affects
-        ▼
-[módulo: facturación] ──belongs_to──▶ [proyecto: Acme Portal] ──belongs_to──▶ [cliente: Acme Corp]
-```
-
-**Resolución de variantes (dedup).** «Acme», «Acme Corp» y «acme.com» son el mismo cliente.
-Cortex normaliza los nombres (minúsculas, sin acentos) y mantiene **un nodo canónico por
-(tipo, nombre normalizado)**. Un paso de mantenimiento (`resolveEntities`) fusiona además
-las variantes que no se normalizan igual, re-apuntando sus enlaces y relaciones al nodo
-ganador (el más conectado). Determinista, sin LLM.
-
-**Qué preguntas te deja responder el grafo** (que la búsqueda por texto no puede):
-- «¿Qué toca el módulo de facturación? ¿Qué se rompe si lo cambio?» → caminas las aristas.
-- «¿Cuáles son los módulos sensibles del proyecto?» → entidades `module` del proyecto.
-- «¿Dónde hay contradicciones?» → aristas `contradicts`.
-- «¿Qué áreas petan pero no tienen ninguna decisión documentada?» (huecos) → ver lint (§10).
-
-> **⚠️ Qué mirar.**
-> - El «grafo» son **dos tablas en Postgres** (`entities` + `relations`), no una base de
->   datos de grafos (Neo4j). Va bien para expansión de 1 salto; **travesías profundas
->   multi-salto** serían incómodas con SQL.
-> - La extracción de relaciones la hace un **LLM** (el agente `graph`): puede inventar o
->   perderse aristas. Hay un filtro de integridad (una relación solo sobrevive si sus dos
->   extremos son entidades conocidas), pero **no hay extracción de grafo sin LLM** — sin LLM
->   solo se detectan entidades por diccionario, no relaciones ricas.
-> - Las **contradicciones entre entidades no se resuelven solas** (no hay «ganador» claro):
->   el lint las reporta para que un humano decida.
-
-## 6. Bi-temporal: el tiempo, e «invalidar ≠ borrar»
-
-Los hechos **cambian**. En enero decidimos «mantener el módulo legacy de facturación»; en
-junio decidimos «migrarlo». Un sistema ingenuo **sobrescribe** el hecho viejo — y entonces
-ya no puedes responder «¿qué creíamos en marzo?». Cortex es **bi-temporal**: nunca borra,
-guarda *cuándo fue verdad cada cosa*.
-
-Cada hecho lleva **dos ejes de tiempo**:
-- **`valid_from` / `valid_to`** → la **ventana de vigencia**: desde cuándo y hasta cuándo
-  fue verdad en el mundo real. **`valid_to = NULL` significa «vigente ahora mismo».**
-- **`observed_at`** → cuándo lo **afirmó la fuente** (la fecha de la reunión, del ticket…).
-- **`created_at`** → cuándo lo **ingirió Cortex** (el eje del sistema).
-
-**El principio: invalidar ≠ borrar.** Para «retirar» un hecho no se borra la fila: se
-**cierra su ventana** (se le pone `valid_to`). La fila sigue ahí, consultable. Una nueva
-decisión que reemplaza a otra crea una arista `supersedes` y cierra la ventana de la vieja.
-
-**Consultas *point-in-time* (`asOf`).** Como la historia se conserva, puedes preguntar «¿qué
-sabíamos a fecha X?»:
-
-```
-2026-01-10  Decisión A: "mantener el módulo legacy"      → valid_from=01-10, valid_to=NULL
-2026-06-01  Decisión B: "migrar el módulo legacy"         → B supersedes A
-            (al invalidar)  A: valid_to=06-01, superseded_by=B, validity=superseded
-
-  Consulta asOf = 2026-03-15  → devuelve A ("mantener")   ← lo que creíamos entonces
-  Consulta asOf = 2026-06-10 (o sin asOf) → devuelve B ("migrar")  ← lo vigente
-```
-
-Por defecto, la búsqueda y el context-pack devuelven **solo lo vigente** (`valid_to IS
-NULL`); `asOf` reconstruye cualquier foto del pasado. (Verificado en un proyecto real,
-en un proyecto piloto real: 266 hechos vigentes / 147 históricos; a 2026-05-28 había
-182, a 06-12 había 239.)
-
-> **⚠️ Qué mirar.** La auto-invalidación cubre **supersesiones entrada→entrada** y los
-> hechos marcados «Histórico» (p.ej. legacy de Plane). Las **contradicciones entre
-> entidades del grafo no se auto-invalidan** (las reporta el lint). Y no hay aún *decay*
-> adaptativo por «volatilidad» del tema — el envejecimiento es por reglas fijas.
-
-## 7. Los agentes de IA, uno a uno (con ejemplos)
-
-Aquí «agente» **no** significa un robot autónomo que razona en bucle y usa herramientas.
-Significa **un rol con una sola llamada a un LLM** (un *system prompt* + un *prompt* + parseo
-del resultado + un *fallback* si falla). Hay siete, más un par de orquestadores. Todos pasan
-por una función común (`runAgent`) que además **registra los tokens** gastados (observabilidad).
-
-| Agente | Qué hace | Si no hay LLM |
-| --- | --- | --- |
-| `classifier` | Clasifica un texto y extrae entidades | heurísticas del core |
-| `graph` | Extrae entidades **y relaciones** (el grafo) | no hay (solo entidades por diccionario) |
-| `reranker` | Reordena los resultados de búsqueda | orden híbrido original |
-| `retriever` | Redacta la respuesta en prosa citando el contexto | muestra los fragmentos en crudo |
-| `distiller` | Destila una sesión/reunión a conocimiento tipado | no hay |
-| `reconciler` | Decide noop / update / supersede ante un casi-duplicado | dedup determinista (solo noop) |
-| `merger` | Fusiona dos piezas sobre lo mismo en una | conserva la existente |
-
-**Ejemplos concretos de cada transformación:**
-
-**`classifier`** — texto suelto → entrada tipada:
-```
-IN : "Decidimos introducir RabbitMQ para procesar las exportaciones de
-      facturación de forma asíncrona y evitar timeouts."
-OUT: { type: "decision",
-       title: "Cola RabbitMQ para exportaciones de facturación asíncronas",
-       summary: "Se introduce RabbitMQ para exportar facturación async y evitar timeouts.",
-       entities: [ { name: "RabbitMQ", type: "technology" } ] }
-```
-
-**`graph`** — texto → entidades + relaciones:
-```
-IN : "La pasarela Stripe devolvió 500 en producción; lo causó un cambio de
-      versión de la API de Stripe. Se resolvió fijando la versión."
-OUT: { entities:  [ { name: "Stripe", type: "integration" } ],
-       relations: [ { source: "ENTRADA", target: "Stripe", type: "caused_by" } ] }
-```
-
-**`reconciler` + `merger`** — info nueva que refina a la vieja:
-```
-EXISTENTE: "Se usa RabbitMQ para exportaciones asíncronas."
-NUEVA    : "Las exportaciones de facturación ahora van por RabbitMQ con reintentos y DLQ."
-reconciler → "update"   (refina, no contradice)
-merger     → "Cola de exportaciones con RabbitMQ
-              Las exportaciones de facturación se procesan async con RabbitMQ,
-              con reintentos y dead-letter queue."   → reemplaza y re-embebe la vieja
-```
-
-**`retriever`** — pregunta + fragmentos → respuesta con prosa (clásico paso de
-«generation» del RAG): redacta **solo** a partir del contexto recuperado y, si no basta,
-lo dice.
-
-> **⚠️ Qué mirar.**
-> - **Modelos por defecto:** `qwen3.6` (vía nan, gratis) o `deepseek-v4-pro` (vía
->   OpenRouter). La calidad de clasificación, grafo y reconciliación **depende del modelo**;
->   evalúa con el que vayáis a usar en serio.
-> - **Salida estructurada «a mano»:** los modelos no respetan de forma fiable el
->   `structuredOutput` de Mastra, así que se les fuerza `response_format: json_object` y se
->   **valida el JSON manualmente** (descartando claves/enlikes inválidos). Funciona y es
->   rápido, pero es un *workaround*.
-> - **Cada agente es UNA llamada**, no un bucle de razonamiento con herramientas: simple y
->   barato, pero no «se lo piensa» ni se autocorrige.
-> - **Detalle técnico:** `@cortex/agents` usa **zod v4** (lo exige Mastra), aislado del
->   **zod v3** del resto del repo. No se cruzan schemas entre ambos lados; la frontera se
->   cruza con tipos TypeScript planos.
-
-## 8. El bucle de captura y reconciliación (estilo mem0)
-
-Cuando entra conocimiento nuevo (al guardar, o al cerrar una sesión), no se vuelca «a lo
-bruto». El paso clave es la **reconciliación** (inspirada en [mem0](https://github.com/mem0ai/mem0)):
-por cada pieza nueva se busca la más parecida que ya existe y se decide **qué hacer**:
-
-```
-similitud ≥ 0.95  y misma fuente   → NOOP        (es casi idéntica, no añade nada)
-similitud 0.82–0.95 (hay reconciler):
-        reconciler dice "update"     → MERGE      (fusiona y re-embebe)   [solo auto-capturado]
-        reconciler dice "supersede"  → INVALIDA   (cierra ventana de la vieja, ver §6)
-                                       o, si la vieja es de FUENTE/CURADA → marca "contradicts"
-        reconciler dice "noop"       → se queda la vieja
-similitud < 0.82                    → ADD         (entra como hecho nuevo, confianza low)
-```
-
-**Guardarraíl crítico:** Cortex **nunca reescribe ni invalida automáticamente** conocimiento
-de **fuente o curado por humanos**. Solo las entradas **auto-capturadas** (`agent_session`)
-se fusionan o se superan solas; si una nota nueva contradice algo curado, se anota un
-`contradicts` para que **lo revise una persona**. La IA no pisa lo que un humano dio por bueno.
-
-**Auto-curación (sin humano en el bucle).** La captura escribe ya, con confianza baja. Luego
-`maintain` ejecuta `autoCurate`, que **promueve** a confianza media lo que se ha
-**corroborado** (volvió a salir en otra sesión) y **decae** (saca de búsqueda) lo viejo que
-nunca se corroboró. La calidad sube sola con el tiempo, sin frenar la captura.
-
-**Secretos.** Antes de que el LLM vea nada —y otra vez antes de guardar— se **borran
-secretos** (claves PEM, JWT, `sk-…`, tokens de GitHub/Slack/AWS/Google, `Bearer …`/`Basic …`,
-`api_key=…`, contraseñas dentro de connection strings y cabeceras `Cookie`). El borrado se
-aplica en dos capas independientes: en la destilación, sea cual sea el agente de origen, y en
-el guardado del servidor, que **no confía** en que el cliente haya limpiado. Las sesiones de
-trabajo son logs personales: se destila el conocimiento, no se guarda el transcript crudo.
-
-> **⚠️ Qué mirar.** Los umbrales (`0.95`, `0.82`) son **parámetros a calibrar**: muy altos
-> → duplicados; muy bajos → fusiona cosas distintas. El reconciler, ante la duda (error del
-> LLM), tira a **"update"** («no invalidar a la ligera»). Evalúa con datos reales si la
-> reconciliación está fusionando lo que debe.
-
-## 9. El context pack y la herencia
-
-El **context pack** es «lo que un agente debería saber siempre» de un proyecto, en pequeño y
-curado. `get_project_context_pack` arma: **decisiones vigentes, restricciones, riesgos,
-deuda técnica, convenciones, módulos sensibles**, y —si pasas un `area`— un top-5 de lo más
-relevante a esa área (búsqueda vectorial). Solo hechos **vigentes** por defecto; admite
-`asOf` para la foto histórica.
-
-**Herencia.** Un subproyecto **hereda el contexto de sus ancestros**. Si «Acme» es el
-cliente y `acme-api` un subproyecto, el pack de `acme-api` incluye lo común de «Acme»
-**sin** mezclar el contexto de `acme-web`. Así se evita el *context-rot* de meterlo todo
-en un saco, y a la vez no se duplica lo compartido. Los permisos cascada igual (ser miembro
-de «Acme» abre sus subproyectos).
-
-Este pack renderizado a Markdown es **exactamente lo que el hook de `SessionStart` inyecta**
-en tu agente al abrir sesión (vía la API autenticada, truncado a ~6000 caracteres).
-
-> **⚠️ Qué mirar.** La herencia hoy aplica al **context-pack**, no a `search`/`ask` (una
-> búsqueda en el subproyecto no trae aún lo del padre). Y el pack se **trunca**: en
-> proyectos enormes, decidir *qué entra* en ese presupuesto de contexto es justo el tema que
-> se levantó en su día (índice navegable / jerárquico) y que está **a estudiar en el roadmap**.
-
-## 10. Lint (salud del conocimiento) y observabilidad
-
-**Lint.** Igual que un linter de código, `lint_project_context` revisa la **salud del
-conocimiento** (un paso que casi ningún producto del mercado hace). Comprueba:
-1. **Contradicciones** (aristas `contradicts` del grafo).
-2. **Posibles duplicados** (pares con similitud vectorial > 0.88).
-3. **Entidades huérfanas** (un nodo enlazado a una sola entrada y sin relaciones).
-4. **Baja confianza** (cuántas entradas `low`).
-5. **Histórico/obsoleto** (cuánto hay envejecido).
-6. **Huecos** (la estrella): áreas con **≥2 incidencias y 0 decisiones** documentadas —
-   módulos que petan y nadie ha dejado constancia de qué hacer.
-
-Hay un planificador (`lint-act`) que convierte eso en acciones propuestas (abrir tarea para
-un hueco, consolidar duplicados), pero **es dry-run**: imprime el plan y **no escribe nada**
-en sistemas externos. Actuar (crear tareas reales) es un paso supervisado aparte.
-
-**Observabilidad.** Cada llamada a IA (LLM + embeddings) registra sus **tokens** en la tabla
-`llm_usage`, con una tabla de precios para **estimar coste** (con nan el coste es 0, pero
-queremos poder estimar si se cambia a OpenAI/Anthropic). Además, cada ejecución de agente
-emite un **árbol de trazas** (`agent_run → model_generation → …`) a la tabla `ai_traces`. La
-UI `/usage` muestra coste por operación/agente/modelo y el árbol de trazas.
-
-> **⚠️ Qué mirar.** El lint es **deterministico y barato**, pero sus umbrales y reglas (qué
-> es «duplicado», qué es «hueco») son heurísticos: úsalos como señal, no como verdad. Y de
-> momento **reporta**, no corrige (por diseño).
-
----
-
-## Cómo evaluar Cortex — checklist para developers
-
-El objetivo de toda esta guía es que puedas **juzgar con criterio** si Cortex funciona y
-dónde mejorarlo. Cuando lo pruebes, mira sobre todo esto:
-
-1. **¿Con qué proveedor de embeddings estás probando?** Con `local` la búsqueda **no es
-   semántica** — no saques conclusiones de calidad. Configura `nan`/`openai`/`voyage`.
-2. **¿La búsqueda híbrida trae lo relevante?** Prueba consultas por **significado** (deben
-   funcionar por vector) y por **ID/jerga** (deben funcionar por léxico). Si algo evidente
-   no sale, mira si está indexado y con qué confianza/vigencia.
-3. **¿El grafo conecta bien las cosas?** Revisa entidades duplicadas (¿hace falta pasar
-   `resolve`?) y relaciones inventadas o ausentes (las pone un LLM).
-4. **¿La reconciliación fusiona lo que debe?** ¿Aparecen duplicados (umbral alto) o se mezcla
-   lo que no debería (umbral bajo)? ¿Respeta lo curado por humanos?
-5. **¿Lo temporal cuadra?** Marca algo como superado y comprueba que `asOf` devuelve la foto
-   correcta y que lo vigente excluye lo viejo.
-6. **¿La auto-captura destila bien?** Cierra una sesión y mira qué guardó: ¿conocimiento
-   útil y tipado, o ruido? ¿Coló algún secreto (no debería)?
-7. **Coste/latencia:** mira `/usage`. ¿Cuántos tokens cuesta clasificar/rerankear/destilar?
-   ¿Compensa el LLM frente a las heurísticas para vuestro caso?
-
-Todo lo de arriba es **hipótesis a validar**. Si encuentras un punto flojo, anótalo: las
-decisiones vivas están en [`docs/decisions.md`](./docs/decisions.md) y lo pendiente/ideas en
-[`docs/roadmap.md`](./docs/roadmap.md). Cómo contribuir: [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-
----
-
-## Licencia y seguridad
-
-Cortex se publica bajo la [Licencia Apache 2.0](./LICENSE) (ver también [`NOTICE`](./NOTICE)).
-
-¿Has encontrado una vulnerabilidad? No abras un issue público: sigue
-[`SECURITY.md`](./SECURITY.md). Para contribuir, [`CONTRIBUTING.md`](./CONTRIBUTING.md); las
-normas de convivencia están en el [código de conducta](./CODE_OF_CONDUCT.md).
+Found a vulnerability? Do not open a public issue. Follow [`SECURITY.md`](./SECURITY.md).
+To contribute, see [`CONTRIBUTING.md`](./CONTRIBUTING.md); how we treat each other is in the
+[code of conduct](./CODE_OF_CONDUCT.md).

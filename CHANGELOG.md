@@ -17,6 +17,12 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   producción entero.
 
 ### Changed
+- **README en inglés y la guía de interioridades como página propia**
+  (`docs/how-it-works.md`, 498 líneas). El README pasa de 872 líneas a 407 y se queda con lo
+  práctico; la guía que explica embeddings, RAG, el grafo y los siete agentes desde cero vale
+  más como pieza enlazable que enterrada en la línea 400 de un README. Se corrigieron siete
+  afirmaciones que ya no eran ciertas, verificadas contra el código: modelos por defecto,
+  proveedores, troceado de documentos, dimensiones de embedding y umbrales configurables.
 - Documentación consolidada para la v0.1.0: el roadmap deja de listar como pendiente lo que
   ya está hecho y se queda con lo que falta de verdad; el README, `CLAUDE.md` y
   `CONTRIBUTING.md` describen el producto que hay hoy, no el que se clonaba. Hay tests que
