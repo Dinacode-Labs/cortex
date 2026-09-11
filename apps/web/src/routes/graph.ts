@@ -14,7 +14,7 @@ graphRoutes.get("/api/graph", async (c) => {
   if (project) {
     const access = await checkProjectAccess(c.get("user")?.email ?? null, { name: project });
     if (access.status === "not_found") return c.json({ error: "proyecto no encontrado" }, 404);
-    if (access.status === "forbidden") return c.json({ error: "sin acceso" }, 403);
+    if (access.status === "forbidden") return c.json({ error: "no access" }, 403);
   }
   const includeEntries = c.req.query("entries") !== "0";
   const graph = await getProjectGraph(project, { includeEntries });
@@ -32,8 +32,8 @@ graphRoutes.get("/graph", async (c) => {
   );
 
   const body = html`
-    <p><a class="back" href="/">← Inicio</a></p>
-    <h1>Grafo de conocimiento</h1>
+    <p><a class="back" href="/">← Home</a></p>
+    <h1>Knowledge graph</h1>
     <p class="sub">Entidades (círculos por tipo) y entradas, unidas por relaciones y menciones. Arrastra, haz zoom, clic en una entrada para abrirla.</p>
     <div class="panel">
       <form class="row" method="get" action="/graph">
@@ -41,12 +41,12 @@ graphRoutes.get("/graph", async (c) => {
         <label style="display:flex;align-items:center;gap:6px;font-size:14px">
           <input type="checkbox" name="entries" value="1" ${includeEntries ? "checked" : ""}> incluir entradas
         </label>
-        <button type="submit">Ver</button>
+        <button type="submit">Show</button>
       </form>
       <div id="legend" style="margin-top:10px;font-size:12px;color:var(--color-text-muted)"></div>
     </div>
     <div id="net" style="height:72vh;background:var(--brand-ink);border:1px solid var(--color-border);border-radius:10px"></div>
     <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
     <script src="/graph.js"></script>`;
-  return c.html(layout("Grafo", body, c.get("user")));
+  return c.html(layout("Graph", body, c.get("user")));
 });

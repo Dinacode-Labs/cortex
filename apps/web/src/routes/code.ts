@@ -27,20 +27,20 @@ codeRoutes.get("/code", async (c) => {
           const body = h.content.startsWith("// ") ? h.content.slice(h.content.indexOf("\n") + 1) : h.content;
           return html`<div class="panel"><div class="card-head">${badge(h.score.toFixed(2), "#0099ff")} <b>${h.path}</b> <span class="sub">:${h.startLine}-${h.endLine} · ${h.language ?? ""}</span></div><pre class="content-block" style="overflow:auto"><code>${body}</code></pre></div>`;
         })}`
-      : html`<div class="empty">Sin resultados. ¿Has indexado el repo? (pnpm --filter @cortex/core index-code)</div>`;
+      : html`<div class="empty">No results. Has the repository been indexed? (cortex-admin index-code)</div>`;
   }
 
   const body = html`
-    <p><a class="back" href="/">← Inicio</a></p>
-    <h1>Búsqueda de código</h1>
-    <p class="sub">Búsqueda híbrida (semántica + léxica) sobre el código indexado del proyecto.</p>
+    <p><a class="back" href="/">← Home</a></p>
+    <h1>Code search</h1>
+    <p class="sub">Hybrid search, semantic and lexical, over the project's indexed code.</p>
     <div class="panel">
       <form class="row" method="get" action="/code">
-        <input type="text" name="q" placeholder="p.ej. dónde se verifica el teléfono del usuario" value="${q}" required>
+        <input type="text" name="q" placeholder="e.g. where is the user\u2019s phone number verified" value="${q}" required>
         <select name="project">${projectOptions}</select>
-        <button type="submit">Buscar</button>
+        <button type="submit">Search</button>
       </form>
     </div>
     ${q ? html`<h2 style="font-size:16px">"${q}"</h2>${results}` : ""}`;
-  return c.html(layout("Código", body, c.get("user")));
+  return c.html(layout("Code", body, c.get("user")));
 });

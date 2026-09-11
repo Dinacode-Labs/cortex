@@ -16,12 +16,12 @@ entriesRoutes.get("/entry/:id", async (c) => {
   const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const detail = access.status === "ok" ? await getEntryDetail(id) : null;
-  if (!detail) return c.html(layout("No encontrado", html`<p><a class="back" href="/">← Inicio</a></p><div class="empty">Entrada no encontrada.</div>`), 404);
+  if (!detail) return c.html(layout("Not found", html`<p><a class="back" href="/">← Home</a></p><div class="empty">Entry not found.</div>`), 404);
   const { entry, source, entities, projectName } = detail;
 
   const entityTags = entities.length
     ? html`<div class="tags">${entities.map((e) => html`<a href="/search?q=${encodeURIComponent(e.name)}">#${e.name} <small>(${e.type})</small></a>`)}</div>`
-    : html`<span class="sub">Sin entidades enlazadas.</span>`;
+    : html`<span class="sub">No linked entities.</span>`;
 
   const validateForm = (status: ContextEntryStatus, label: string) =>
     html`<form method="post" action="/entry/${entry.id}/validate" style="display:inline">
@@ -31,40 +31,40 @@ entriesRoutes.get("/entry/:id", async (c) => {
 
   const iso = (d: unknown) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? "").slice(0, 10));
   const temporalBadge = entry.validTo
-    ? badge(`no vigente desde ${iso(entry.validTo)}`, "#cf222e")
-    : badge("vigente", "#1a7f37");
+    ? badge(`no longer in force since ${iso(entry.validTo)}`, "#cf222e")
+    : badge("in force", "#1a7f37");
 
   const body = html`
-    <p><a class="back" href="/">← Inicio</a></p>
+    <p><a class="back" href="/">← Home</a></p>
     <div class="card-head" style="margin-bottom:8px">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)} ${temporalBadge}</div>
     <h1>${entry.title}</h1>
 
     <div class="content-block">${entry.content}</div>
 
     <div class="panel" style="margin-top:18px">
-      <h2>Metadatos</h2>
+      <h2>Metadata</h2>
       <dl class="meta">
-        <dt>Proyecto</dt><dd>${projectName ?? "—"}</dd>
-        <dt>Tipo</dt><dd>${entry.type}</dd>
-        <dt>Estado</dt><dd>${statusBadge(entry.status)}</dd>
-        <dt>Confianza</dt><dd>${entry.confidence}</dd>
-        <dt>Fuente</dt><dd>${entry.sourceType}${entry.sourceReference ? html` · ${entry.sourceReference}` : ""}</dd>
-        <dt>Autor</dt><dd>${entry.createdBy ?? "—"}</dd>
-        <dt>Vigencia</dt><dd>${entry.validTo ? html`cerrada el ${iso(entry.validTo)} (${entry.validity})` : "vigente"}</dd>
-        <dt>Válida desde</dt><dd>${iso(entry.validFrom)}</dd>
-        <dt>Creada</dt><dd>${entry.createdAt instanceof Date ? entry.createdAt.toISOString() : entry.createdAt}</dd>
+        <dt>Project</dt><dd>${projectName ?? "—"}</dd>
+        <dt>Type</dt><dd>${entry.type}</dd>
+        <dt>Status</dt><dd>${statusBadge(entry.status)}</dd>
+        <dt>Confidence</dt><dd>${entry.confidence}</dd>
+        <dt>Source</dt><dd>${entry.sourceType}${entry.sourceReference ? html` · ${entry.sourceReference}` : ""}</dd>
+        <dt>Author</dt><dd>${entry.createdBy ?? "—"}</dd>
+        <dt>Validity</dt><dd>${entry.validTo ? html`closed on ${iso(entry.validTo)} (${entry.validity})` : "in force"}</dd>
+        <dt>Valid from</dt><dd>${iso(entry.validFrom)}</dd>
+        <dt>Created</dt><dd>${entry.createdAt instanceof Date ? entry.createdAt.toISOString() : entry.createdAt}</dd>
       </dl>
     </div>
 
     <div class="panel">
-      <h2>Entidades relacionadas</h2>
+      <h2>Related entities</h2>
       ${entityTags}
     </div>
 
-    ${source?.rawContent ? html`<div class="panel"><h2>Fuente original</h2><div class="content-block">${source.rawContent}</div></div>` : ""}
+    ${source?.rawContent ? html`<div class="panel"><h2>Original source</h2><div class="content-block">${source.rawContent}</div></div>` : ""}
 
     <div class="panel">
-      <h2>Validación</h2>
+      <h2>Validation</h2>
       ${validateForm("validated", "✅ Validar")}
       ${validateForm("rejected", "✖ Rechazar")}
       ${validateForm("obsolete", "🗄 Marcar obsoleta")}
@@ -77,7 +77,7 @@ entriesRoutes.post("/entry/:id/validate", async (c) => {
   // Mismo gate que la vista de detalle (GET /entry/:id): sin acceso al proyecto de la
   // entrada no se permite cambiar su estado.
   const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
-  if (access.status === "not_found") return c.html(layout("No encontrado", html`<p><a class="back" href="/">← Inicio</a></p><div class="empty">Entrada no encontrada.</div>`), 404);
+  if (access.status === "not_found") return c.html(layout("Not found", html`<p><a class="back" href="/">← Home</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const form = await c.req.parseBody();
   const status = String(form.status) as "validated" | "rejected" | "obsolete";
@@ -110,11 +110,11 @@ entriesRoutes.post("/save", async (c) => {
   );
 
   const body = html`
-    <p><a class="back" href="/">← Inicio</a></p>
-    <h1>Guardado en Cortex</h1>
-    <p class="sub">Clasificado como ${typeBadge(entry.type)} · estado ${statusBadge(entry.status)}</p>
-    ${warnings.length ? warnHtml : html`<p class="sub">Sin señales del loop de mejora.</p>`}
-    <p style="margin-top:16px"><a href="/entry/${entry.id}"><button>Ver entrada</button></a>
-    <a href="/?capture=1"><button class="secondary">Capturar otra</button></a></p>`;
-  return c.html(layout("Guardado", body, c.get("user")));
+    <p><a class="back" href="/">← Home</a></p>
+    <h1>Saved to Cortex</h1>
+    <p class="sub">Classified as ${typeBadge(entry.type)} · estado ${statusBadge(entry.status)}</p>
+    ${warnings.length ? warnHtml : html`<p class="sub">Nothing worth flagging.</p>`}
+    <p style="margin-top:16px"><a href="/entry/${entry.id}"><button>View entry</button></a>
+    <a href="/?capture=1"><button class="secondary">Capture another</button></a></p>`;
+  return c.html(layout("Saved", body, c.get("user")));
 });

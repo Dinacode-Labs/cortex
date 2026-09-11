@@ -13,7 +13,7 @@ export const authRoutes = new Hono<WebEnv>();
 authRoutes.get("/auth/cli", async (c) => {
   const ticket = c.req.query("ticket");
   const session = ticket ? ((await redeemUiTicket(ticket))?.token ?? null) : null;
-  if (!session) return c.html(loginPage("Enlace inválido o caducado. Ejecuta `cortex ui` de nuevo."), 401);
+  if (!session) return c.html(loginPage("That link is invalid or expired. Run `cortex ui` again."), 401);
   setCookie(c, "cortex_session", session, {
     httpOnly: true,
     sameSite: "Lax",
@@ -26,5 +26,5 @@ authRoutes.get("/auth/cli", async (c) => {
 
 authRoutes.get("/logout", (c) => {
   deleteCookie(c, "cortex_session", { path: "/" });
-  return c.html(loginPage("Sesión cerrada."));
+  return c.html(loginPage("Signed out."));
 });

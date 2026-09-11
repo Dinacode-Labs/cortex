@@ -77,8 +77,6 @@ no hecho.
 ### Producto
 
 - **Registry de toolbelt por proyecto**, además del de la organización.
-- **UI web en inglés.** El producto ya lo está; la web se quedó fuera a propósito para no
-  mezclar dos cambios grandes.
 - **Config de IA por proyecto** (qué modelos y qué fuentes usa cada proyecto), en el registry
   externo.
 
@@ -87,7 +85,9 @@ no hecho.
 1. **Instantánea limpia.** El repositorio no se abre publicando este historial: se abre desde
    un commit inicial en un repositorio nuevo (ADR-0026). El procedimiento va en
    `CONTRIBUTING.md`.
-2. **README en inglés**, y la UI web con él.
+2. **Los ADRs, el roadmap y la investigación siguen en español.** Son el registro de
+   trabajo del equipo. Decidir si se traducen es una decisión aparte: traducirlos congela lo
+   que está pensado para seguir vivo.
 3. **Binario compilado y Homebrew.** Hoy el CLI exige Node ≥ 20; un binario evita ese
    requisito, a cambio de firma, notarización y cuatro objetivos de compilación. Se pospuso a
    propósito hasta tener el producto en manos de alguien (ADR-0025).

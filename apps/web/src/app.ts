@@ -72,7 +72,7 @@ export function createApp(): Hono<WebEnv> {
   app.onError((err, c) => {
     console.error("[cortex-web] error no controlado:", err);
     return c.html(
-      layout("Error", html`<p><a class="back" href="/">← Inicio</a></p><div class="empty">Ha ocurrido un error inesperado. Inténtalo de nuevo.</div>`, c.get("user") ?? null),
+      layout("Error", html`<p><a class="back" href="/">← Home</a></p><div class="empty">Something went wrong. Try again.</div>`, c.get("user") ?? null),
       500,
     );
   });

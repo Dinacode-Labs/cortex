@@ -13,8 +13,8 @@ projectsRoutes.get("/projects", async (c) => {
   const projects = await listAccessibleProjects(user.email); // admin → todos
   const cards = await Promise.all(
     projects.map(async (p) => {
-      const vis = p.visibility === "private" ? html`<span class="pill" style="background:#fde">privado</span>` : html`<span class="pill">público</span>`;
-      const owner = p.ownerEmail ? html` · dueño <code>${p.ownerEmail}</code>` : "";
+      const vis = p.visibility === "private" ? html`<span class="pill" style="background:#fde">private</span>` : html`<span class="pill">public</span>`;
+      const owner = p.ownerEmail ? html` · owner <code>${p.ownerEmail}</code>` : "";
       let members: Html = html``;
       if (user.admin && p.visibility === "private" && p.slug) {
         const list = await listProjectMembers(p.slug);
@@ -22,15 +22,15 @@ projectsRoutes.get("/projects", async (c) => {
           (m) =>
             html`<form method="post" action="/projects/${p.slug!}/members/remove" style="display:inline">
                    <input type="hidden" name="email" value="${m}">
-                   <span class="pill">${m} <button type="submit" title="quitar" style="border:0;background:none;cursor:pointer;color:#c0392b">×</button></span>
+                   <span class="pill">${m} <button type="submit" title="remove" style="border:0;background:none;cursor:pointer;color:#c0392b">×</button></span>
                  </form>`,
         );
         members = html`<div style="margin-top:8px">
           <form method="post" action="/projects/${p.slug}/members" class="row" style="margin-bottom:6px">
-            <input type="email" name="email" placeholder="añadir email…" required>
-            <button type="submit">Añadir miembro</button>
+            <input type="email" name="email" placeholder="add an email…" required>
+            <button type="submit">Add member</button>
           </form>
-          ${chips.length ? joinHtml(chips, " ") : html`<span class="sub">Sin miembros (solo dueño y admins).</span>`}
+          ${chips.length ? joinHtml(chips, " ") : html`<span class="sub">No members yet. Only the owner and admins.</span>`}
         </div>`;
       }
       return html`<div class="panel">
@@ -40,16 +40,16 @@ projectsRoutes.get("/projects", async (c) => {
       </div>`;
     }),
   );
-  const body = html`<p><a class="back" href="/">← Inicio</a></p>
-    <h1>Proyectos</h1>
-    <p class="sub">${user.admin ? "Eres admin: ves todos y gestionas el acceso a los privados." : "Proyectos a los que tienes acceso."}</p>
-    ${cards.length ? cards : html`<div class="empty">No tienes acceso a ningún proyecto todavía.</div>`}`;
-  return c.html(layout("Proyectos", body, user));
+  const body = html`<p><a class="back" href="/">← Home</a></p>
+    <h1>Projects</h1>
+    <p class="sub">${user.admin ? "You are an admin: you see every project and manage access to the private ones." : "The projects you can access."}</p>
+    ${cards.length ? cards : html`<div class="empty">You do not have access to any project yet.</div>`}`;
+  return c.html(layout("Projects", body, user));
 });
 
 projectsRoutes.post("/projects/:slug/members", async (c) => {
   const user = c.get("user")!;
-  if (!user.admin) return c.html(layout("Sin permiso", html`<div class="empty">Solo un admin gestiona miembros.</div>`, user), 403);
+  if (!user.admin) return c.html(layout("Not allowed", html`<div class="empty">Only an admin can manage members.</div>`, user), 403);
   const email = String((await c.req.parseBody()).email ?? "").trim();
   if (email) await addProjectMember(c.req.param("slug"), email);
   return c.redirect("/projects");
@@ -57,7 +57,7 @@ projectsRoutes.post("/projects/:slug/members", async (c) => {
 
 projectsRoutes.post("/projects/:slug/members/remove", async (c) => {
   const user = c.get("user")!;
-  if (!user.admin) return c.html(layout("Sin permiso", html`<div class="empty">Solo un admin gestiona miembros.</div>`, user), 403);
+  if (!user.admin) return c.html(layout("Not allowed", html`<div class="empty">Only an admin can manage members.</div>`, user), 403);
   const email = String((await c.req.parseBody()).email ?? "").trim();
   if (email) await removeProjectMember(c.req.param("slug"), email);
   return c.redirect("/projects");

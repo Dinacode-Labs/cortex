@@ -26,31 +26,31 @@ askRoutes.get("/ask", async (c) => {
       restrictToAccessibleOf: c.get("user")?.email ?? null,
     });
     const sources = hits.length
-      ? html`<div class="panel"><h2>Fuentes consultadas</h2>${hits.map(
+      ? html`<div class="panel"><h2>Sources used</h2>${hits.map(
           (h) => html`<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#0099ff")} <a href="/entry/${h.entry.id}">${h.entry.title}</a></div>`,
         )}</div>`
-      : html`<div class="empty">Sin contexto relevante.</div>`;
+      : html`<div class="empty">No relevant context.</div>`;
     answerHtml = answer
       ? html`<div class="answer">${mdLite(answer)}</div>${sources}`
-      : html`<div class="warn">⚠️ LLM no configurado (LLM_PROVIDER=openrouter). Mostrando solo la búsqueda.</div>${sources}`;
+      : html`<div class="warn">⚠️ No LLM configured. Showing search results only.</div>${sources}`;
   }
 
   const projectOptions = [
-    html`<option value="">(todos los proyectos)</option>`,
+    html`<option value="">(all projects)</option>`,
     ...projects.map((p) => html`<option value="${p.name}" ${project === p.name ? "selected" : ""}>${p.name}</option>`),
   ];
 
   const body = html`
-    <p><a class="back" href="/">← Inicio</a></p>
-    <h1>Preguntar a Cortex</h1>
-    <p class="sub">El agente de recuperación (Mastra) responde fundamentándose en el contexto guardado.</p>
+    <p><a class="back" href="/">← Home</a></p>
+    <h1>Ask Cortex</h1>
+    <p class="sub">The retrieval agent answers from the saved context, and cites what it used.</p>
     <div class="panel">
       <form class="row" method="get" action="/ask">
-        <input type="text" name="q" placeholder="p.ej. ¿qué cuidados con el módulo de facturación?" value="${q}" required>
+        <input type="text" name="q" placeholder="e.g. what should I watch out for in the billing module?" value="${q}" required>
         <select name="project">${projectOptions}</select>
-        <button type="submit">Preguntar</button>
+        <button type="submit">Ask</button>
       </form>
     </div>
     ${q ? html`<h2 style="font-size:17px">${q}</h2>${answerHtml}` : ""}`;
-  return c.html(layout("Preguntar", body, c.get("user")));
+  return c.html(layout("Ask", body, c.get("user")));
 });
