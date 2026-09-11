@@ -9,6 +9,11 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Prompts para que lo instale tu agente.** Dos bloques en el README, listos para pegar en
+  Claude Code, Codex o el que sea: uno instala y configura la máquina entera, otro conecta un
+  repositorio más. Son explícitos con lo único que un agente no puede hacer por ti, que es
+  leer el código que te llega por correo, y con que pare si algo falla en vez de buscarse la
+  vida.
 - **Varios Cortex a la vez** (ADR-0033). El servidor es una propiedad del repositorio:
   `.cortex.json` admite un campo `server` y las credenciales guardan una sesión por servidor,
   leyendo el formato anterior sin obligar a volver a entrar. Los hooks, el CLI y el proxy MCP
@@ -184,6 +189,8 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   está abandonada con dos CVE sin corregir.
 
 ### Fixed
+- Si el comando que la extensión de Pi ejecuta falla, ahora lo dice por stderr. Antes se lo
+  tragaba y el agente arrancaba sin contexto sin que nada lo indicara.
 - **La memoria dejaba de reconocer lo que ya sabía si venía de otro sitio.** El NOOP de la
   reconciliación exigía que coincidiera el `sourceType`, así que una entrada destilada de una
   sesión nunca se comparaba con la misma información capturada a mano. El efecto, visto
