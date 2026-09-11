@@ -108,15 +108,15 @@ export async function lintProject(project: string): Promise<LintReport> {
 
 /** Render del informe a Markdown (para CLI/MCP). */
 export function renderLintReport(r: LintReport): string {
-  const L: string[] = [`# Lint — ${r.project}`, `_${r.totalEntries} entradas_`, ""];
-  L.push(`## ⚠️ Contradicciones (${r.contradictions.length})`);
-  L.push(...(r.contradictions.length ? r.contradictions.map((c) => `- ${c.a}  ⟷  ${c.b}`) : ["- (ninguna)"]));
-  L.push("", `## 🔁 Posibles duplicados (${r.duplicates.length})`);
-  L.push(...(r.duplicates.length ? r.duplicates.map((d) => `- (${d.score.toFixed(2)}) ${d.a}  ≈  ${d.b}`) : ["- (ninguno)"]));
-  L.push("", `## 🕳️ Huecos: áreas con incidencias sin decisiones (${r.gaps.length})`);
-  L.push(...(r.gaps.length ? r.gaps.map((g) => `- ${g.area} (${g.type}): ${g.incidents} incidencias, 0 decisiones`) : ["- (ninguno)"]));
-  L.push("", `## 🧩 Entidades huérfanas (${r.orphanEntities.length})`);
-  L.push(...(r.orphanEntities.length ? r.orphanEntities.slice(0, 20).map((e) => `- ${e.type}: ${e.name}`) : ["- (ninguna)"]));
-  L.push("", `## 📉 Otros`, `- Baja confianza: ${r.lowConfidence}`, `- Histórico/obsoleto: ${r.staleHistorical}`);
+  const L: string[] = [`# Lint — ${r.project}`, `_${r.totalEntries} ${r.totalEntries === 1 ? "entry" : "entries"}_`, ""];
+  L.push(`## ⚠️ Contradictions (${r.contradictions.length})`);
+  L.push(...(r.contradictions.length ? r.contradictions.map((c) => `- ${c.a}  ⟷  ${c.b}`) : ["- (none)"]));
+  L.push("", `## 🔁 Likely duplicates (${r.duplicates.length})`);
+  L.push(...(r.duplicates.length ? r.duplicates.map((d) => `- (${d.score.toFixed(2)}) ${d.a}  ≈  ${d.b}`) : ["- (none)"]));
+  L.push("", `## 🕳️ Gaps: areas with incidents but no decisions (${r.gaps.length})`);
+  L.push(...(r.gaps.length ? r.gaps.map((g) => `- ${g.area} (${g.type}): ${g.incidents} incidents, 0 decisions`) : ["- (none)"]));
+  L.push("", `## 🧩 Orphan entities (${r.orphanEntities.length})`);
+  L.push(...(r.orphanEntities.length ? r.orphanEntities.slice(0, 20).map((e) => `- ${e.type}: ${e.name}`) : ["- (none)"]));
+  L.push("", `## 📉 Other`, `- Low confidence: ${r.lowConfidence}`, `- Superseded or obsolete: ${r.staleHistorical}`);
   return L.join("\n");
 }
