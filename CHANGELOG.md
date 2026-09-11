@@ -24,6 +24,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   producción entero.
 
 ### Changed
+- El correo del código de acceso, en inglés. Es el único texto del producto que le llega a
+  alguien fuera de la aplicación, y se había quedado atrás.
 - **La UI web, en inglés.** Con esto, todo lo que ve alguien de fuera lo está: CLI, tools
   MCP, lo que devuelven, el plugin, el README y la web. Los ADRs, el roadmap y los
   comentarios del código siguen en español, que es el registro de trabajo del equipo.
