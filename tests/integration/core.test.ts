@@ -17,6 +17,7 @@ import {
   lintProject,
   invalidateEntry,
   reclassifyProject,
+  renderContextPack,
 } from "@cortex/core";
 
 const RID = Date.now().toString(36); // sufijo único → aísla cada ejecución
@@ -83,6 +84,40 @@ describe("captura por lotes + reconciliación (BD real)", () => {
       delete process.env.CORTEX_CAPTURE_LLM;
       setClassifier(null);
     }
+  });
+
+  /**
+   * Dos decisiones vigentes que se contradicen: el pack entregaba las dos como buenas sin
+   * decir nada, y el agente decidía a ciegas. No se invalida ninguna —cuál sobra no se puede
+   * juzgar en automático sin arriesgarse a borrar la buena—, pero se avisa al lado de cada una.
+   */
+  it("el context-pack avisa de las decisiones que se contradicen, sin invalidar ninguna", async () => {
+    const p = await createProject(`IT Conflicto ${RID}`);
+    const opts = { useClassifier: false } as const;
+    const vieja = await saveContext({ content: "Los reintentos usan backoff fijo de 30 segundos.", project: p.name, title: "Backoff fijo de 30s", type: "decision" }, opts);
+    const nueva = await saveContext({ content: "Los reintentos usan backoff exponencial con tope de 60 segundos.", project: p.name, title: "Backoff exponencial con tope", type: "decision" }, opts);
+
+    await relate(getSql(), {
+      sourceId: nueva.entry.id,
+      sourceType: "context_entry",
+      targetId: vieja.entry.id,
+      targetType: "context_entry",
+      relationType: "contradicts",
+    });
+
+    const pack = await getContextPack(p.name);
+    expect(pack.conflicts).toHaveLength(1);
+
+    const texto = renderContextPack(pack);
+    // Las DOS siguen en el pack: no se ha invalidado nada.
+    expect(texto).toContain("Backoff fijo de 30s");
+    expect(texto).toContain("Backoff exponencial con tope");
+    // Y cada una avisa de la otra, con la dirección correcta.
+    const lineas = texto.split("\n");
+    const iVieja = lineas.findIndex((l) => l.includes("**Backoff fijo de 30s**"));
+    const iNueva = lineas.findIndex((l) => l.includes("**Backoff exponencial con tope**"));
+    expect(lineas.slice(iVieja, iVieja + 3).join(" ")).toContain('Conflicts with "Backoff exponencial con tope" (recorded later)');
+    expect(lineas.slice(iNueva, iNueva + 3).join(" ")).toContain('Conflicts with "Backoff fijo de 30s" (recorded earlier)');
   });
 
   it("saveWithReconciliation hace NOOP de un near-duplicate idéntico", async () => {

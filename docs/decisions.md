@@ -1125,3 +1125,29 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   delicada porque recorre varios proyectos.
 - **Revisar cuando:** Pi avise de las colisiones en vez de tragárselas (entonces el prefijo sería
   opcional); gentle-pi deje de duck-typear; o la búsqueda por API necesite paginación.
+
+## ADR-0035 · Las contradicciones se avisan en el context-pack, no se resuelven solas
+
+- **Estado:** aceptada (2026-09).
+- **Contexto:** probando con cuatro agentes a la vez sobre un mismo proyecto, dos registraron
+  decisiones incompatibles sobre lo mismo (backoff fijo de 30 s contra exponencial con tope),
+  porque uno leyó el código antes de que el otro lo cambiara. `maintain` detecta la
+  contradicción y el lint la reporta, pero nadie invalida nada: el context-pack seguía
+  entregando las dos como vigentes, sin decir que chocaban. Dos agentes distintos lo detectaron
+  por su cuenta al arrancar y lo dijeron sin que nadie preguntara — señal de que el aviso hacía
+  falta y de que, sin él, cada agente gasta razonamiento en resolver lo mismo.
+- **Decisión:** el pack incluye los pares de entradas vigentes relacionadas por `contradicts` y
+  el render pega el aviso **a cada una de las dos**, con cuál se registró antes. No se invalida
+  ninguna ni se elige ganadora: cuál sobra es un juicio que en automático se equivoca, y el
+  coste de borrar la buena es mucho mayor que el de leer un aviso. La antigüedad se da como
+  dato, no como veredicto: ser más nueva no la hace cierta.
+- **Alternativas:** invalidar la más antigua automáticamente (lo que hace `supersede` cuando la
+  fuente es una sesión de agente) — aquí no vale, porque la contradicción la detecta un LLM a
+  posteriori y puede equivocarse, y porque una de las dos puede venir de una fuente curada.
+  Esconder del pack el lado más antiguo: lo mismo, pero además en silencio. Dejarlo solo en el
+  lint: no lo lee nadie en el momento de trabajar, que es cuando importa.
+- **Consecuencias:** el pack crece un poco cuando hay conflictos, que es exactamente cuando
+  merece la pena. Sigue haciendo falta que alguien —persona o `maintain`— cierre el conflicto;
+  el aviso es para que no se decida a ciegas mientras tanto.
+- **Revisar cuando:** el reconciliador sea fiable resolviendo contradicciones (entonces podría
+  proponer una ganadora y marcarla), o el pack se quede corto de espacio y haya que priorizar.
