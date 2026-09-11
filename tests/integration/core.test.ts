@@ -140,7 +140,14 @@ describe("captura por lotes + reconciliación (BD real)", () => {
 
     const texto = renderContextPack(await getContextPack(p.name));
     expect(texto).toContain("README sobre idempotencia");
-    expect(texto).toContain(`Conflicts with "src/webhook.js ${RID}"`);
+    // No dice "esta entrada contradice X" —no es verdad—, dice que la zona está en disputa.
+    expect(texto).toContain(`Touches "README ${RID}", which is recorded as contradicting "src/webhook.js ${RID}"`);
+
+    // Y no se avisa a una entrada de que choca consigo misma: si está colgada de los DOS
+    // lados de la disputa, no está en medio de la discusión, es la discusión.
+    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entrada.entry.id}, ${webhook.id}) ON CONFLICT DO NOTHING`;
+    const pack2 = await getContextPack(p.name);
+    expect(pack2.conflicts.find((c) => c.entryId === entrada.entry.id)?.areas ?? []).toHaveLength(0);
   });
 
   it("saveWithReconciliation hace NOOP de un near-duplicate idéntico", async () => {

@@ -42,17 +42,19 @@ export function renderDecisions(entries: ContextEntry[]): string {
 }
 
 export function renderContextPack(pack: ContextPack): string {
-  // Aviso de conflicto pegado a CADA entrada implicada, no en una sección aparte: si va al
-  // final, el agente ya se ha creído la entrada cuando llega el aviso.
+  // Aviso pegado a CADA entrada implicada, no en una sección aparte: si va al final, el
+  // agente ya se ha creído la entrada cuando llega el aviso.
   const avisos = new Map<string, string>();
   for (const c of pack.conflicts ?? []) {
-    const con = c.with
-      .map((w) => `"${w.label}"${w.recordedLater === undefined ? "" : w.recordedLater ? " (recorded later)" : " (recorded earlier)"}`)
-      .join(", ");
-    avisos.set(
-      c.entryId,
-      `  ⚠️ Conflicts with ${con}. Both sides are still recorded as current: check which one holds before relying on this.`,
-    );
+    const lineas: string[] = [];
+    if (c.entries.length > 0) {
+      const con = c.entries.map((e) => `"${e.label}" (recorded ${e.recordedLater ? "later" : "earlier"})`).join(", ");
+      lineas.push(`  ⚠️ Conflicts with ${con}. Both are still recorded as current: check which one holds before relying on this.`);
+    }
+    for (const a of c.areas) {
+      lineas.push(`  ⚠️ Touches "${a.entity}", which is recorded as contradicting ${a.against.map((x) => `"${x}"`).join(", ")}. That corner is disputed: check it before relying on this.`);
+    }
+    if (lineas.length > 0) avisos.set(c.entryId, lineas.join("\n"));
   }
   const linea = (e: ContextEntry): string => {
     const aviso = avisos.get(e.id);
