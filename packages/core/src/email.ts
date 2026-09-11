@@ -54,7 +54,7 @@ function logSender(): EmailSender {
     name: "log",
     async send(msg) {
       // CONTRATO: los tests de integración capturan el código de 6 dígitos de esta línea.
-      console.log(`[email:log] (${msg.subject}) para ${msg.to}: ${msg.text}`);
+      console.log(`[email:log] (${msg.subject}) to ${msg.to}: ${msg.text}`);
     },
   };
 }
@@ -158,13 +158,13 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const brand = getBrandName();
   await getEmailSender().send({
     to: email,
-    subject: `Tu código de acceso a ${brand}`,
-    // El literal "código OTP para <email>: <code>" es el contrato que capturan los tests
-    // de integración del flujo de auth; no lo cambies sin actualizarlos.
-    text: `código OTP para ${email}: ${code}`,
+    subject: `Your ${brand} sign-in code`,
+    // El literal "OTP code for <email>: <code>" es el contrato que capturan los tests de
+    // integración del flujo de auth, que lo leen del sender `log`; no lo cambies sin ellos.
+    text: `OTP code for ${email}: ${code}`,
     html:
-      `<p>Hola,</p><p>Tu código de acceso a <b>${brand}</b> es:</p>` +
+      `<p>Hi,</p><p>Your sign-in code for <b>${brand}</b> is:</p>` +
       `<p style="font-size:28px;font-weight:700;letter-spacing:4px">${code}</p>` +
-      `<p>Caduca en unos minutos. Si no lo has solicitado, ignora este correo.</p>`,
+      `<p>It expires in a few minutes. If you did not ask for it, ignore this email.</p>`,
   });
 }
