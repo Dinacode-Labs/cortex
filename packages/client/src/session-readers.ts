@@ -129,20 +129,103 @@ export function readCodexSessions(repoPath: string): RawSession[] {
   return sessions;
 }
 
-// --- OpenCode: ~/.local/share/opencode/storage/{session,message,part} ---------
-/** Una sesión de OpenCode por id (lo que da el hook). */
-export function readOpenCodeSession(sessionId: string): RawSession | null {
-  if (!sessionId) return null;
-  return collectOpenCode(null, sessionId)[0] ?? null;
+/**
+ * Carga `node:sqlite` sin que el bundler pueda tocar el nombre del módulo.
+ *
+ * Con el especificador literal, esbuild (vía tsup) reescribía `import("node:sqlite")` como
+ * `import("sqlite")` —quitando el prefijo— al empaquetar el CLI. Ese módulo no existe, la
+ * importación lanzaba, el `catch` devolvía vacío y la captura de OpenCode y de Hermes se iba
+ * en silencio: funcionaba desde las fuentes y no funcionaba desde npm, que es la peor forma de
+ * que algo esté roto. Partir la cadena impide la reescritura, porque el bundler ya no ve una
+ * constante. Hay un test que comprueba el bundle (`tests/cli-smoke.test.ts`).
+ */
+async function cargaSqlite(): Promise<any | null> {
+  const modulo = "node:" + "sqlite";
+  try {
+    return await import(/* @vite-ignore */ modulo);
+  } catch {
+    return null; // Node < 22.5
+  }
 }
 
-export function readOpenCodeSessions(repoPath: string): RawSession[] {
+// --- OpenCode: SQLite (opencode.db) y, si no, el store de ficheros antiguo -----
+//
+// OpenCode movió las sesiones de `storage/{session,message,part}/*.json` a una base SQLite
+// (`opencode.db`, tablas session/message/part). El lector de ficheros seguía buscando el layout
+// viejo, no encontraba nada y la captura se iba en silencio: OpenCode parecía configurado y no
+// guardaba una sola sesión. Se soportan los dos, empezando por la base, porque un portátil con
+// OpenCode antiguo conserva el store de ficheros.
+
+/** Una sesión de OpenCode por id (lo que da el hook). */
+export async function readOpenCodeSession(sessionId: string): Promise<RawSession | null> {
+  if (!sessionId) return null;
+  return (await collectOpenCode(null, sessionId))[0] ?? null;
+}
+
+export async function readOpenCodeSessions(repoPath: string): Promise<RawSession[]> {
   return collectOpenCode(resolve(repoPath), null);
 }
 
-/** Recorre el store de OpenCode filtrando por repo o por id de sesión. */
-function collectOpenCode(target: string | null, wantedId: string | null): RawSession[] {
-  const base = process.env.CORTEX_OPENCODE_DIR || join(homedir(), ".local/share/opencode/storage");
+function openCodeRoot(): string {
+  return process.env.CORTEX_OPENCODE_DIR || join(homedir(), ".local/share/opencode/storage");
+}
+
+/** La base vive un nivel por encima del store de ficheros (…/opencode/opencode.db). */
+function openCodeDbPath(): string {
+  return process.env.CORTEX_OPENCODE_DB || join(openCodeRoot(), "..", "opencode.db");
+}
+
+async function collectOpenCode(target: string | null, wantedId: string | null): Promise<RawSession[]> {
+  const desdeDb = await collectOpenCodeDb(target, wantedId);
+  if (desdeDb.length > 0) return desdeDb;
+  return collectOpenCodeFiles(target, wantedId);
+}
+
+/** Formato actual: SQLite. `part.data` es JSON; solo interesa `{type:"text", text}`. */
+async function collectOpenCodeDb(target: string | null, wantedId: string | null): Promise<RawSession[]> {
+  const dbPath = openCodeDbPath();
+  if (!existsSync(dbPath)) return [];
+  const sqlite = await cargaSqlite();
+  if (!sqlite) return []; // Node < 22.5: se intentará el store de ficheros
+  const { DatabaseSync } = sqlite;
+  const out: RawSession[] = [];
+  try {
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    const sesiones = db
+      .prepare("SELECT id, directory, parent_id FROM session ORDER BY time_created ASC")
+      .all() as { id: string; directory?: string; parent_id?: string | null }[];
+    const stmtMsgs = db.prepare("SELECT id, data FROM message WHERE session_id = ? ORDER BY time_created ASC");
+    const stmtParts = db.prepare("SELECT data FROM part WHERE message_id = ? ORDER BY time_created ASC");
+
+    for (const s of sesiones) {
+      if (s.parent_id) continue; // subagentes: su diálogo ya viaja en el de la sesión padre
+      if (wantedId && s.id !== wantedId) continue;
+      if (target && s.directory && resolve(s.directory) !== target) continue;
+
+      const msgs: { role: string; text: string }[] = [];
+      for (const m of stmtMsgs.all(s.id) as { id: string; data: string }[]) {
+        const meta = safe(() => JSON.parse(m.data) as { role?: string }, null);
+        if (!meta?.role) continue;
+        const text = (stmtParts.all(m.id) as { data: string }[])
+          .map((p) => safe(() => JSON.parse(p.data) as { type?: string; text?: string; synthetic?: boolean; ignored?: boolean }, null))
+          .filter((p) => p && p.type === "text" && p.text && !p.synthetic && !p.ignored)
+          .map((p) => p!.text as string)
+          .join("\n");
+        if (text) msgs.push({ role: meta.role, text });
+      }
+      const condensed = condenseMessages(msgs);
+      if (condensed) out.push({ sessionId: s.id, condensed });
+    }
+    db.close();
+  } catch {
+    return []; // base bloqueada o con otro esquema: que lo intente el store de ficheros
+  }
+  return out;
+}
+
+/** Formato antiguo: un fichero JSON por sesión, mensaje y parte. */
+function collectOpenCodeFiles(target: string | null, wantedId: string | null): RawSession[] {
+  const base = openCodeRoot();
   const sessionsDir = join(base, "session");
   if (!existsSync(sessionsDir)) return [];
   const out: RawSession[] = [];
@@ -198,13 +281,12 @@ export async function readHermesSessions(repoPath: string): Promise<RawSession[]
 async function collectHermes(target: string | null, wantedId: string | null): Promise<RawSession[]> {
   const dbPath = process.env.CORTEX_HERMES_DB || join(homedir(), ".hermes", "state.db");
   if (!existsSync(dbPath)) return [];
-  let DatabaseSync: any;
-  try {
-    ({ DatabaseSync } = await import("node:sqlite"));
-  } catch {
+  const sqlite = await cargaSqlite();
+  if (!sqlite) {
     console.error("  (node:sqlite no disponible; Hermes requiere Node ≥ 22)");
     return [];
   }
+  const { DatabaseSync } = sqlite;
   const out: RawSession[] = [];
   try {
     const db = new DatabaseSync(dbPath, { readOnly: true });

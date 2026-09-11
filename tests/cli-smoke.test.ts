@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { CLI_VERSION, isOlderThan } from "../apps/cli/src/version.js";
 
@@ -66,5 +66,29 @@ describe("versión del CLI", () => {
     expect(isOlderThan("0.9.0", "0.10.0")).toBe(true); // no es orden alfabético
     expect(isOlderThan("1.0.0", "0.9.9")).toBe(false);
     expect(isOlderThan("0.1.0", "0.1.0")).toBe(false);
+  });
+});
+
+/**
+ * El bundle publicado tiene que comportarse como las fuentes. Aquí se comprueba lo que ya se
+ * rompió una vez: esbuild reescribía `import("node:sqlite")` como `import("sqlite")` al
+ * empaquetar, ese módulo no existe, la importación lanzaba y la captura de OpenCode y de
+ * Hermes se iba en silencio. Funcionaba en desarrollo y no funcionaba instalado desde npm,
+ * que es la peor forma de que algo esté roto.
+ *
+ * Solo corre si el bundle está construido: en local no siempre lo está, y en CI sí (hay un
+ * paso de build antes de los tests).
+ */
+describe("bundle publicado", () => {
+  const bundlePath = resolve(import.meta.dirname, "../apps/cli/dist/cortex.js");
+  const bundle = existsSync(bundlePath) ? readFileSync(bundlePath, "utf8") : null;
+
+  it.skipIf(!bundle)("no pierde el prefijo `node:` de los módulos internos", () => {
+    expect(bundle).not.toMatch(/import\(\s*["']sqlite["']\s*\)/);
+    expect(bundle).toContain("node:sqlite");
+  });
+
+  it.skipIf(!bundle)("no lee ficheros por `import.meta.dirname`, que tras el bundle no apunta a nada", () => {
+    expect(bundle).not.toContain("import.meta.dirname");
   });
 });

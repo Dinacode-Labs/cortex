@@ -33,6 +33,16 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   que redirigir ni nadie a quien avisar.
 
 ### Fixed
+- **La captura de OpenCode no guardaba nada, en silencio.** OpenCode movió sus sesiones de
+  ficheros JSON (`storage/{session,message,part}`) a una base SQLite (`opencode.db`). El lector
+  seguía buscando el layout viejo, no encontraba nada, y el hook, que calla por diseño, salía
+  con 0. Parecía configurado y no guardaba una sola sesión. Ahora lee la base y, si no está,
+  el store de ficheros: un portátil con OpenCode antiguo sigue funcionando.
+- **El CLI empaquetado perdía `node:sqlite`, y con él la captura de OpenCode y de Hermes.**
+  esbuild reescribía `import("node:sqlite")` como `import("sqlite")` al hacer el bundle. Ese
+  módulo no existe, la importación lanzaba y el `catch` devolvía vacío. Funcionaba desde las
+  fuentes y no funcionaba instalado desde npm, que es la peor forma de que algo esté roto. Hay
+  un test que ahora mira el propio bundle.
 - Un id de entrada mal formado llegaba a Postgres y salía un 500. Es entrada de usuario: ahora
   responde lo mismo que un id que no existe.
 - **Pi ya recibe contexto y captura al cerrar.** Los hooks se colgaban leyendo `stdin`: Claude
