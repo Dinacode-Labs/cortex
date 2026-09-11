@@ -68,8 +68,8 @@ describe("readCodexSessions (~/.codex/sessions/*.jsonl)", () => {
   });
 });
 
-describe("readOpenCodeSessions (storage: session→message→part)", () => {
-  it("une partes de texto y omite partes tool/subagentes", () => {
+describe("readOpenCodeSessions (store de ficheros antiguo)", () => {
+  it("une partes de texto y omite partes tool/subagentes", async () => {
     const base = tmp("oc-");
     mkdirSync(join(base, "session/proj1"), { recursive: true });
     mkdirSync(join(base, "message/ses1"), { recursive: true });
@@ -82,7 +82,8 @@ describe("readOpenCodeSessions (storage: session→message→part)", () => {
     writeFileSync(join(base, "part/m2/p1.json"), JSON.stringify({ type: "tool", tool: "bash" }));
     writeFileSync(join(base, "part/m2/p2.json"), JSON.stringify({ type: "text", text: "Añade la ruta en apps/server." }));
     process.env.CORTEX_OPENCODE_DIR = base;
-    const sessions = readOpenCodeSessions(REPO);
+    process.env.CORTEX_OPENCODE_DB = join(base, "no-hay-base.db"); // forzar el camino de ficheros
+    const sessions = await readOpenCodeSessions(REPO);
     expect(sessions).toHaveLength(1);
     expect(sessions[0]!.condensed).toContain("[user] Como añado un endpoint?");
     expect(sessions[0]!.condensed).toContain("[assistant] Añade la ruta");
@@ -197,10 +198,65 @@ describe("readSessionByRef", () => {
   });
 });
 
+/**
+ * OpenCode movió las sesiones de ficheros JSON a SQLite. El lector seguía buscando el layout
+ * viejo, no encontraba nada, y la captura se iba en silencio: parecía configurado y no guardaba
+ * una sola sesión. Aquí se construye una base con el esquema real y se comprueba que la lee.
+ */
+describe("readOpenCodeSessions (SQLite, el formato actual)", () => {
+  it("lee sesiones de opencode.db y prefiere la base al store de ficheros", async () => {
+    const { DatabaseSync } = await import("node:sqlite");
+    const base = tmp("oc-db-");
+    mkdirSync(base, { recursive: true });
+    const dbPath = join(base, "opencode.db");
+    const db = new DatabaseSync(dbPath);
+    db.exec(`CREATE TABLE session (id text PRIMARY KEY, project_id text, parent_id text, directory text, time_created integer);
+             CREATE TABLE message (id text PRIMARY KEY, session_id text, time_created integer, data text);
+             CREATE TABLE part (id text PRIMARY KEY, message_id text, session_id text, time_created integer, data text);`);
+    const ses = (id: string, dir: string, parent: string | null, t: number): void => {
+      db.prepare("INSERT INTO session VALUES (?,?,?,?,?)").run(id, "prj", parent, dir, t);
+    };
+    const msg = (id: string, sid: string, role: string, t: number): void => {
+      db.prepare("INSERT INTO message VALUES (?,?,?,?)").run(id, sid, t, JSON.stringify({ role }));
+    };
+    const part = (id: string, mid: string, sid: string, data: unknown, t: number): void => {
+      db.prepare("INSERT INTO part VALUES (?,?,?,?,?)").run(id, mid, sid, t, JSON.stringify(data));
+    };
+
+    ses("ses1", REPO, null, 1);
+    msg("m1", "ses1", "user", 1);
+    part("p1", "m1", "ses1", { type: "text", text: "Que backoff usamos?" }, 1);
+    msg("m2", "ses1", "assistant", 2);
+    part("p2", "m2", "ses1", { type: "reasoning", text: "pensando en voz alta" }, 1);
+    part("p3", "m2", "ses1", { type: "text", text: "Exponencial con tope de 60s." }, 2);
+    ses("ses-sub", REPO, "ses1", 3); // subagente: no debe salir suelto
+    ses("ses-otra", "/otro/repo", null, 4); // otro repo
+    msg("m3", "ses-otra", "user", 4);
+    part("p4", "m3", "ses-otra", { type: "text", text: "Esto es de otro repositorio." }, 4);
+
+    db.close();
+
+    process.env.CORTEX_OPENCODE_DIR = join(base, "storage");
+    process.env.CORTEX_OPENCODE_DB = dbPath;
+
+    const sesiones = await readOpenCodeSessions(REPO);
+    expect(sesiones).toHaveLength(1);
+    expect(sesiones[0]!.sessionId).toBe("ses1");
+    expect(sesiones[0]!.condensed).toContain("[user] Que backoff usamos?");
+    expect(sesiones[0]!.condensed).toContain("[assistant] Exponencial con tope de 60s.");
+    expect(sesiones[0]!.condensed).not.toContain("pensando en voz alta"); // reasoning fuera
+
+    expect((await readOpenCodeSession("ses1"))!.condensed).toContain("backoff");
+    expect(await readOpenCodeSession("ses-otra")).not.toBeNull(); // por id no se filtra por repo
+    expect(await readOpenCodeSession("no-existe")).toBeNull();
+  });
+});
+
 describe("readOpenCodeSession (por id)", () => {
-  it("devuelve solo la sesión pedida", () => {
+  it("devuelve solo la sesión pedida", async () => {
     const base = tmp("oc-one-");
     process.env.CORTEX_OPENCODE_DIR = base;
+    process.env.CORTEX_OPENCODE_DB = join(base, "no-hay-base.db");
     const mk = (sid: string, texto: string): void => {
       mkdirSync(join(base, "session/prj"), { recursive: true });
       writeFileSync(join(base, `session/prj/${sid}.json`), JSON.stringify({ id: sid, directory: REPO }));
@@ -211,10 +267,10 @@ describe("readOpenCodeSession (por id)", () => {
     };
     mk("ses-a", "hablamos de la cola de captura");
     mk("ses-b", "hablamos de otra cosa");
-    expect(readOpenCodeSession("ses-a")!.condensed).toContain("cola de captura");
-    expect(readOpenCodeSession("ses-b")!.condensed).toContain("otra cosa");
-    expect(readOpenCodeSession("no-existe")).toBeNull();
-    expect(readOpenCodeSessions(REPO)).toHaveLength(2);
+    expect((await readOpenCodeSession("ses-a"))!.condensed).toContain("cola de captura");
+    expect((await readOpenCodeSession("ses-b"))!.condensed).toContain("otra cosa");
+    expect(await readOpenCodeSession("no-existe")).toBeNull();
+    expect(await readOpenCodeSessions(REPO)).toHaveLength(2);
   });
 });
 
