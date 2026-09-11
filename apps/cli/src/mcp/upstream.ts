@@ -1,6 +1,6 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { DEFAULT_SERVER_URL, getClientConfig, readCredentials } from "@cortex/client";
+import { DEFAULT_SERVER_URL, apiBase, getClientConfig, readCredentials, useProjectServer } from "@cortex/client";
 
 /**
  * Cómo encuentra el CLI el MCP del servidor y con qué credenciales habla.
@@ -26,9 +26,17 @@ function guessFromServer(server: string): string {
   }
 }
 
-/** Resuelve a qué MCP conectarse y con qué token. `null` si no hay sesión. */
-export async function resolveUpstream(): Promise<UpstreamTarget | null> {
-  const creds = readCredentials();
+/**
+ * Resuelve a qué MCP conectarse y con qué token. `null` si no hay sesión.
+ *
+ * El agente lanza este proceso desde la carpeta en la que se está trabajando, así que el
+ * `.cortex.json` de ese repo es quien decide el servidor (ADR-0033). Fuera de un repo
+ * vinculado se cae al de por defecto: las tools siguen pidiendo el proyecto por nombre y los
+ * permisos siguen aplicando, así que como mucho es una consulta a la memoria equivocada.
+ */
+export async function resolveUpstream(cwd = process.cwd()): Promise<UpstreamTarget | null> {
+  useProjectServer(cwd);
+  const creds = readCredentials(apiBase());
   if (!creds?.token) return null;
   const override = process.env.CORTEX_MCP_URL?.trim();
   if (override) return { url: override, token: creds.token };

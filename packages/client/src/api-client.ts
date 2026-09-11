@@ -1,4 +1,4 @@
-import { readCredentials } from "./credentials.js";
+import { normalizeServer, readCredentials } from "./credentials.js";
 
 /**
  * Transporte HTTP hacia el servidor de Cortex, usado por el CLI, los hooks y los
@@ -13,8 +13,20 @@ import { readCredentials } from "./credentials.js";
 export const DEFAULT_SERVER_URL = "http://localhost:8787";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+/**
+ * Servidor activo de este proceso, fijado por el repo en el que se está trabajando
+ * (`useProjectServer`). Es lo que permite tener un Cortex por cliente sin cambiar nada a
+ * mano: el `.cortex.json` dice a cuál pertenece el repo, y todo lo demás va detrás.
+ */
+let activeServer: string | null = null;
+
+/** La fija el repo. `null` vuelve al servidor por defecto de las credenciales. */
+export function setActiveServer(server: string | null): void {
+  activeServer = server ? normalizeServer(server) : null;
+}
+
 export function apiBase(): string {
-  return process.env.CORTEX_SERVER_URL || readCredentials()?.server || DEFAULT_SERVER_URL;
+  return process.env.CORTEX_SERVER_URL || activeServer || readCredentials()?.server || DEFAULT_SERVER_URL;
 }
 
 export interface ApiResult<T = unknown> {
@@ -38,16 +50,19 @@ export async function apiRequest<T = unknown>(
   opts: ApiRequestOptions = {},
 ): Promise<ApiResult<T>> {
   const needsAuth = opts.auth !== false;
-  const token = readCredentials()?.token;
+  // El token se busca POR SERVIDOR: con varias sesiones, mandar el de otro es un 401
+  // desconcertante en el mejor caso, y en el peor una petición a quien no toca.
+  const base = opts.baseUrl ?? apiBase();
+  const token = readCredentials(base)?.token;
   if (needsAuth && !token) {
-    return { ok: false, status: 401, data: { error: "no autenticado (cortex auth login)" } as T };
+    return { ok: false, status: 401, data: { error: `not signed in to ${base} (cortex auth login --server ${base})` } as T };
   }
   const headers: Record<string, string> = {};
   if (needsAuth && token) headers.authorization = `Bearer ${token}`;
   if (body !== undefined) headers["content-type"] = "application/json";
 
   try {
-    const res = await fetch(`${opts.baseUrl ?? apiBase()}${path}`, {
+    const res = await fetch(`${base}${path}`, {
       method,
       headers,
       ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
