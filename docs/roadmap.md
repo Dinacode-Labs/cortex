@@ -21,7 +21,7 @@ Hecho y en el producto:
 - **Destilación en el servidor** (ADR-0025). El hook condensa y limpia en local; el servidor
   destila con su clave. Ningún portátil necesita credenciales de modelo. Idempotente por
   sesión, y si la sesión creció solo se destila la parte nueva.
-- **Cliente ligero en npm**: `@dinacode/cortex`, un bundle de ~110 KB, 24 MB instalado.
+- **Cliente ligero en npm**: `@dinacodelabs/cortex`, un bundle de ~110 KB, 24 MB instalado.
   Antes había que clonar el monorepo entero.
 - **MCP por HTTP autenticado**, con las 8 tools aplicando los permisos de quien llama, y
   `cortex mcp` como puente stdio para los agentes.

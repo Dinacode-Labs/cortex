@@ -6,7 +6,7 @@ import { parse as yamlParse } from "yaml";
 
 /**
  * Publicar una versión es de las pocas cosas que no se pueden deshacer: una vez que
- * `@dinacode/cortex@0.2.0` está en npm, ese número ya no se puede reutilizar. Así que lo que
+ * `@dinacodelabs/cortex@0.2.0` está en npm, ese número ya no se puede reutilizar. Así que lo que
  * se comprueba aquí es que todas las versiones del repo van a la par, y que el workflow no ha
  * perdido el paso que lo verifica antes de publicar nada.
  */
