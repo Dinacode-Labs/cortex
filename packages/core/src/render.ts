@@ -3,36 +3,41 @@ import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "./vectors.js";
 
-/** Renderizadores a Markdown para que las tools MCP devuelvan texto legible. */
+/**
+ * Renderizadores a Markdown: es lo que devuelven las tools MCP y lo que el hook inyecta al
+ * abrir sesión. Va en INGLÉS porque lo lee un modelo que puede estar trabajando en cualquier
+ * idioma, y porque a menudo lo repite tal cual al usuario. El CONTENIDO de cada entrada
+ * conserva el idioma en que se escribió; lo que se traduce es el andamiaje.
+ */
 
 function entryLine(e: ContextEntry): string {
-  const ref = e.sourceReference ? ` · fuente: ${e.sourceReference}` : "";
-  return `- **${e.title}** _(conf: ${e.confidence}, estado: ${e.status})_\n  ${e.summary ?? e.content}${ref}`;
+  const ref = e.sourceReference ? ` · source: ${e.sourceReference}` : "";
+  return `- **${e.title}** _(confidence: ${e.confidence}, status: ${e.status})_\n  ${e.summary ?? e.content}${ref}`;
 }
 
 export function renderSaveResult(result: SaveContextResult): string {
   const { entry, warnings } = result;
   const lines = [
-    `✅ Guardado en Cortex como **${entry.type}** (id: \`${entry.id}\`).`,
-    `Título: ${entry.title}`,
-    `Estado: ${entry.status} · Confianza: ${entry.confidence}`,
+    `✅ Saved to Cortex as **${entry.type}** (id: \`${entry.id}\`).`,
+    `Title: ${entry.title}`,
+    `Status: ${entry.status} · Confidence: ${entry.confidence}`,
   ];
   if (warnings.length > 0) {
-    lines.push("", "⚠️ Señales del loop de mejora:");
+    lines.push("", "⚠️ Things worth looking at:");
     for (const w of warnings) lines.push(`- ${w.message}`);
   }
   return lines.join("\n");
 }
 
 export function renderSearchHits(hits: SearchHit[]): string {
-  if (hits.length === 0) return "Sin resultados relevantes en Cortex.";
+  if (hits.length === 0) return "Nothing relevant in Cortex.";
   return hits
     .map((h, i) => `${i + 1}. (${h.score.toFixed(2)}) ${entryLine(h.entry)}`)
     .join("\n");
 }
 
 export function renderDecisions(entries: ContextEntry[]): string {
-  if (entries.length === 0) return "No hay decisiones registradas para este proyecto.";
+  if (entries.length === 0) return "No decisions recorded for this project yet.";
   return entries.map(entryLine).join("\n");
 }
 
@@ -42,20 +47,20 @@ export function renderContextPack(pack: ContextPack): string {
 
   const parts = [
     `# Context Pack — ${pack.project}`,
-    `_${pack.totalEntries} entradas en total · generado ${pack.generatedAt.toISOString()}_`,
-    section("Decisiones técnicas vigentes", pack.decisions),
-    section("Restricciones activas", pack.constraints),
-    section("Riesgos conocidos", pack.risks),
-    section("Deuda técnica", pack.technicalDebt),
-    section("Convenciones", pack.conventions),
+    `_${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total · generated ${pack.generatedAt.toISOString()}_`,
+    section("Decisions in force", pack.decisions),
+    section("Active constraints", pack.constraints),
+    section("Known risks", pack.risks),
+    section("Technical debt", pack.technicalDebt),
+    section("Conventions", pack.conventions),
   ];
 
   if (pack.sensitiveModules.length > 0) {
-    parts.push(`\n## Módulos sensibles\n${pack.sensitiveModules.map((m) => `- ${m}`).join("\n")}`);
+    parts.push(`\n## Sensitive modules\n${pack.sensitiveModules.map((m) => `- ${m}`).join("\n")}`);
   }
   if (pack.relevantToArea.length > 0) {
     parts.push(
-      `\n## Relevante para el área consultada\n${pack.relevantToArea
+      `\n## Most relevant to the area you asked about\n${pack.relevantToArea
         .map((h) => `- (${h.score.toFixed(2)}) ${h.entry.title} — ${h.entry.summary ?? ""}`)
         .join("\n")}`,
     );
