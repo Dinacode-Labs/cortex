@@ -17,6 +17,11 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   producción entero.
 
 ### Changed
+- **El texto que devuelven las tools MCP, en inglés.** En el pase anterior se tradujeron las
+  descripciones de las tools pero no lo que devuelven, que es justo lo que el agente lee y a
+  menudo repite al usuario: el context pack, los resultados de búsqueda, el informe de lint y
+  la confirmación al guardar. El contenido de cada entrada conserva el idioma en que se
+  escribió; lo que se traduce es el andamiaje.
 - **README en inglés y la guía de interioridades como página propia**
   (`docs/how-it-works.md`, 498 líneas). El README pasa de 872 líneas a 407 y se queda con lo
   práctico; la guía que explica embeddings, RAG, el grafo y los siete agentes desde cero vale

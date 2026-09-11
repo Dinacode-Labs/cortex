@@ -144,7 +144,7 @@ export function chunkFile(file: CodeFile): CodeChunk[] {
       language: file.language,
       startLine,
       endLine,
-      content: `// ${file.relPath} (líneas ${startLine}-${endLine})\n${body}`,
+      content: `// ${file.relPath} (lines ${startLine}-${endLine})\n${body}`,
     });
     if (i + CHUNK_LINES >= lines.length) break;
   }
@@ -219,7 +219,7 @@ export async function searchProjectCode(
 }
 
 export function renderCodeHits(hits: CodeHit[]): string {
-  if (hits.length === 0) return "Sin resultados de código.";
+  if (hits.length === 0) return "No matching code found.";
   return hits
     .map(
       (h) =>
@@ -229,7 +229,7 @@ export function renderCodeHits(hits: CodeHit[]): string {
 }
 
 function stripHeader(content: string): string {
-  // quita la línea de cabecera "// path (líneas ...)" para mostrar el código limpio
+  // quita la línea de cabecera "// path (lines ...)" para mostrar el código limpio
   const nl = content.indexOf("\n");
   return nl > 0 && content.startsWith("// ") ? content.slice(nl + 1) : content;
 }
