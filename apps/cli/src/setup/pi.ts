@@ -18,6 +18,12 @@ import { GENERATED_MARKER, emptyReport, type AgentAdapter, type AgentStatus, typ
  * El directorio sale de `ctx.cwd`, no de `process.cwd()`: el proceso de Pi no tiene por qué
  * estar en el repo de la sesión, y equivocarse ahí es quedarse sin proyecto en silencio.
  *
+ * Además registra cuatro tools `cortex.mem_*`. El nombre lleva prefijo A PROPÓSITO: Pi resuelve
+ * las colisiones quedándose con la PRIMERA extensión que registra un nombre, y en silencio, así
+ * que un `mem_save` a secas dejaría inalcanzables las tools de quien ya tuviera otra memoria
+ * instalada. Con prefijo conviven las dos. Y gentle-pi las reconoce igual, porque acepta
+ * `mem_save` o cualquier nombre acabado en `.mem_save` (ADR-0034).
+ *
  * La captura sale de `session_shutdown` (y de la compactación automática, que es cuando una
  * sesión larga pierde su principio). La ruta del JSONL viene en `event.targetSessionFile` o en
  * `ctx.sessionManager.getSessionFile()`, que es lo que el hook sabe leer.
@@ -29,15 +35,17 @@ const MCP_FILE = (ctx: SetupCtx): string => homeFile(ctx, ".pi/agent/mcp.json");
 const EXTENSION_TS = `// ${GENERATED_MARKER} — no edites este fichero (se regenera con \`cortex setup pi\`).
 import { execFile } from "node:child_process";
 
-const run = (args: string[], cwd: string): Promise<string> =>
+interface Salida { code: number; out: string; err: string }
+
+const run = (args: string[], cwd: string): Promise<Salida> =>
   new Promise((resolve) => {
     // stdin cerrado a propósito: el CLI lee el JSON del hook de ahí, y una tubería abierta y
     // muda lo dejaba esperando hasta el timeout. Aquí todo va por argumentos.
-    const hijo = execFile("cortex", args, { cwd, timeout: 20000 }, (err, stdout) => {
+    const hijo = execFile("cortex", args, { cwd, timeout: 30000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
       // Un fallo aquí dejaba al agente sin contexto sin decir nada. Va a stderr, que en Pi
       // no ensucia la conversación pero sí se puede mirar.
       if (err) console.error(\`[cortex] \${args[0]} falló: \${err.message}\`);
-      resolve(String(stdout ?? ""));
+      resolve({ code: err ? 1 : 0, out: String(stdout ?? ""), err: String(stderr ?? "") });
     });
     hijo.stdin?.end();
   });
@@ -49,6 +57,23 @@ const sessionFile = (event: any, ctx: any): string | null => {
   return typeof f === "string" && f ? f : null;
 };
 
+const texto = (t: string, isError = false) => ({ content: [{ type: "text" as const, text: t }], ...(isError ? { isError: true } : {}) });
+
+/** Ejecuta \`cortex mem …\` y devuelve al agente el JSON tal cual, o el error en claro. */
+async function mem(args: string[], ctx: any) {
+  const r = await run(["mem", ...args, "--json"], cwdDe(ctx));
+  const crudo = r.out.trim();
+  if (r.code !== 0 || !crudo) {
+    let motivo = r.err.trim() || "cortex mem failed";
+    try { motivo = JSON.parse(crudo)?.error ?? motivo; } catch { /* no era JSON */ }
+    return texto(\`Cortex: \${motivo}\`, true);
+  }
+  return texto(crudo);
+}
+
+const T = (props: Record<string, unknown>, required: string[]) => ({ type: "object", properties: props, required, additionalProperties: false });
+const S = (description: string) => ({ type: "string", description });
+
 export default function (pi: any) {
   let contexto: Promise<string | null> = Promise.resolve(null);
   let inyectado = false;
@@ -56,17 +81,17 @@ export default function (pi: any) {
   pi.on("session_start", (_event: unknown, ctx: any) => {
     inyectado = false;
     const cwd = cwdDe(ctx);
-    contexto = run(["hook-context", "--format", "text", "--cwd", cwd], cwd).then((out) => out.trim() || null);
+    contexto = run(["hook-context", "--format", "text", "--cwd", cwd], cwd).then((r) => r.out.trim() || null);
     return contexto.then(() => undefined);
   });
 
   // before_agent_start salta en CADA turno: el contexto se inyecta una vez y ya.
   pi.on("before_agent_start", async (event: any) => {
     if (inyectado) return;
-    const texto = await contexto;
-    if (!texto) return;
+    const t = await contexto;
+    if (!t) return;
     inyectado = true;
-    return { systemPrompt: \`\${event?.systemPrompt ?? ""}\n\n\${texto}\` };
+    return { systemPrompt: \`\${event?.systemPrompt ?? ""}\\n\\n\${t}\` };
   });
 
   const capture = async (event: any, ctx: any): Promise<void> => {
@@ -76,6 +101,48 @@ export default function (pi: any) {
   };
   pi.on("session_shutdown", async (event: any, ctx: any) => capture(event, ctx));
   pi.on("auto_compaction_start", async (event: any, ctx: any) => capture(event, ctx));
+
+  // --- Memoria como tools -------------------------------------------------------------
+  // El prefijo \`cortex.\` evita pisar a otra extensión de memoria; gentle-pi las reconoce
+  // igual porque acepta cualquier nombre acabado en \`.mem_save\`.
+  pi.registerTool({
+    name: "cortex.mem_save",
+    label: "Cortex: save",
+    description: "Save a piece of project knowledge (decision, constraint, convention, incident…) to Cortex, the shared project memory.",
+    promptSnippet: "Cortex memory: save",
+    parameters: T({ content: S("What to remember, written so it still makes sense in six months"), title: S("Short, searchable title"), type: S("decision | constraint | convention | incident | risk | how_to | architecture…") }, ["content"]),
+    execute: async (_id: string, p: any, _s: unknown, _u: unknown, ctx: any) =>
+      mem(["save", String(p?.content ?? ""), ...(p?.title ? ["--title", String(p.title)] : []), ...(p?.type ? ["--type", String(p.type)] : [])], ctx),
+  });
+
+  pi.registerTool({
+    name: "cortex.mem_search",
+    label: "Cortex: search",
+    description: "Search the project memory in Cortex. Returns matching entries with their ids.",
+    promptSnippet: "Cortex memory: search",
+    parameters: T({ query: S("Natural language or keywords"), limit: { type: "number", description: "Max results (default 10)" }, all_projects: { type: "boolean", description: "Search every project you can see, not just this one" }, type: S("Filter by entry type") }, ["query"]),
+    execute: async (_id: string, p: any, _s: unknown, _u: unknown, ctx: any) =>
+      mem(["search", String(p?.query ?? ""), ...(p?.limit ? ["--limit", String(p.limit)] : []), ...(p?.all_projects ? ["--all"] : []), ...(p?.type ? ["--type", String(p.type)] : [])], ctx),
+  });
+
+  pi.registerTool({
+    name: "cortex.mem_get_observation",
+    label: "Cortex: read entry",
+    description: "Read one Cortex entry in full by its id, with where it came from.",
+    promptSnippet: "Cortex memory: read entry",
+    parameters: T({ id: S("Entry id, as returned by cortex.mem_search") }, ["id"]),
+    execute: async (_id: string, p: any, _s: unknown, _u: unknown, ctx: any) => mem(["get", String(p?.id ?? "")], ctx),
+  });
+
+  pi.registerTool({
+    name: "cortex.mem_update",
+    label: "Cortex: fix entry",
+    description: "Fix the title or content of a Cortex entry you got wrong. Use it to correct, not to record a change of mind: for that, save the new fact.",
+    promptSnippet: "Cortex memory: fix entry",
+    parameters: T({ id: S("Entry id, as returned by cortex.mem_search"), title: S("New title"), content: S("New content") }, ["id"]),
+    execute: async (_id: string, p: any, _s: unknown, _u: unknown, ctx: any) =>
+      mem(["update", String(p?.id ?? ""), ...(p?.title ? ["--title", String(p.title)] : []), ...(p?.content ? ["--content", String(p.content)] : [])], ctx),
+  });
 }
 `;
 

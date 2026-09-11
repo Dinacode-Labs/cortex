@@ -123,6 +123,13 @@ What it does in each one:
 | Pi | an extension in `~/.pi/agent/extensions`, plus MCP | ✓ | ✓ |
 | Hermes | hooks and MCP in `config.yaml` | ✓ | ✓ |
 
+**In Pi, the memory is also four tools** — `cortex.mem_save`, `cortex.mem_search`,
+`cortex.mem_get_observation` and `cortex.mem_update` — on top of the MCP. The `cortex.` prefix
+is deliberate: Pi keeps the *first* extension that registers a given name and does so silently,
+so a bare `mem_save` would have made another memory extension's tools unreachable without a
+word. Prefixed, both coexist, and harnesses that look for a memory tool still find this one
+(ADR-0034).
+
 If you are coming from the old install, the one that cloned the repository, `setup` migrates
 it: old hooks are replaced in place, the MCP is re-registered against the server, and the
 shim is removed from your PATH.
@@ -139,6 +146,15 @@ cortex link <slug>                  # link to a project that ALREADY exists, if 
 cortex ui                           # open the web UI, already signed in
 cortex doctor                       # when something is off: which piece failed, and how to fix it
 cortex --help                       # every command
+```
+
+The memory is also reachable straight from the terminal, without an agent in the middle:
+
+```bash
+cortex mem search "why did we drop the queue"   # add --all to search every project you can see
+cortex mem save "We cap uploads at 25MB (Caddy)" --title "Upload limit" --type constraint
+cortex mem get <id>                             # one entry in full, with where it came from
+cortex mem update <id> --content "…"            # fix something you got wrong
 ```
 
 **What you get without doing anything else:** when you open a session, Cortex **injects** the

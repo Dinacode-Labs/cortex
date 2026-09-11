@@ -1084,3 +1084,44 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** alguien necesite dos proyectos de servidores distintos en la misma
   carpeta (hoy imposible por diseño, y probablemente deba seguir siéndolo), o cuando el
   servidor gane organizaciones de verdad y esto se pueda simplificar.
+
+## ADR-0034 · La memoria como tools con nombre propio: `cortex.mem_*` en Pi, y una API que sabe leer
+
+- **Estado:** aceptada (2026-09).
+- **Contexto:** gentle-pi, el harness que usamos sobre Pi, decide si puede guardar artefactos de
+  su ciclo de trabajo comprobando si existe una tool de memoria entre las activas. No llama a
+  Engram ni lo importa: solo mira el nombre. Quien habla con Engram es otro paquete distinto,
+  `gentle-engram`, que registra él mismo 19 tools `mem_*`. La idea era registrar las nuestras
+  para que Cortex ocupara ese hueco sin tocar código ajeno.
+
+  Al comprobarlo antes de escribir nada aparecieron dos cosas. Una: **Pi resuelve las colisiones
+  de nombre quedándose con la primera extensión que registra, y en silencio** (`getAllRegisteredTools`:
+  «first registration per name wins»), y las extensiones de `~/.pi/agent/extensions/` se cargan
+  **antes** que los paquetes npm. Un `mem_save` nuestro habría dejado inalcanzables las tools de
+  quien ya tuviera otra memoria instalada, sin un aviso. Dos: la comprobación de gentle-pi acepta
+  `mem_save` **o cualquier nombre acabado en `.mem_save`**, así que el prefijo no cuesta nada.
+
+  Por el camino salió un tercer problema, más de fondo: **la API sabía escribir pero no leer**.
+  Buscar solo existía por MCP, contra la base de datos. Ni el CLI ni ninguna integración que no
+  sea un agente con MCP podían consultar la memoria.
+- **Decisión:** (1) las tools se registran como `cortex.mem_save`, `cortex.mem_search`,
+  `cortex.mem_get_observation` y `cortex.mem_update`. Con prefijo conviven con cualquier otra
+  memoria y gentle-pi las reconoce igual. (2) La API gana lectura: `GET /search` (sin `slug`,
+  acotada a lo accesible; con `slug`, a ese proyecto), `GET /entries/:id` y `PATCH /entries/:id`
+  (solo título y contenido: el tipo, la confianza y la vigencia los decide la reconciliación o
+  el lint, no quien llama). (3) El puente es `cortex mem <save|search|get|update> --json`: la
+  extensión no habla HTTP por su cuenta, así que la resolución del servidor y del token vive en
+  un solo sitio (ADR-0033). (4) Los ids son los UUID de Cortex; como las tools viven en su propio
+  namespace, nunca se cruzan con los ids numéricos de otra memoria.
+- **Alternativas:** exponer `mem_save` desde el servidor MCP — no vale, el adaptador de Pi nombra
+  las tools de MCP con guion bajo (`cortex_mem_save`) y no pasa la comprobación. Registrar
+  `mem_save` a secas y pedir al usuario que desinstale la otra memoria — obliga a elegir por algo
+  que no es una decisión suya. Que la extensión hablara HTTP directamente — duplicaría la lectura
+  de credenciales y del `.cortex.json` en un fichero generado.
+- **Consecuencias:** un proyecto puede tener dos memorias a la vez sin que ninguna pise a la otra,
+  y quien use gentle-pi puede elegir Cortex como almacén. La API de lectura abre una superficie
+  nueva, que es justo donde se filtra el proyecto privado de otro: los guards están probados uno a
+  uno (`tests/integration/entries-api.test.ts`), incluida la búsqueda sin `slug`, que es la
+  delicada porque recorre varios proyectos.
+- **Revisar cuando:** Pi avise de las colisiones en vez de tragárselas (entonces el prefijo sería
+  opcional); gentle-pi deje de duck-typear; o la búsqueda por API necesite paginación.

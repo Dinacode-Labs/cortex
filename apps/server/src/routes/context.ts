@@ -5,11 +5,14 @@ import {
   checkEntryAccess,
   checkProjectAccess,
   getContextPack,
+  getEntryDetail,
   relateEntries,
   renderContextPack,
   saveWithReconciliation,
+  searchContext,
+  updateEntryFields,
 } from "@cortex/core";
-import { confidenceLevel, contextEntryType, relationType, sourceType } from "@cortex/shared";
+import { confidenceLevel, contextEntryType, relationType, sourceType, updateEntryRequest } from "@cortex/shared";
 import { currentUser } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
@@ -145,4 +148,87 @@ contextRoutes.post("/relate", async (c) => {
   }
   await relateEntries(body.sourceId, body.targetId, body.relationType);
   return c.json({ ok: true });
+});
+
+// --- Lectura: búsqueda y acceso por id -------------------------------------------------
+
+/**
+ * Los ids son UUID y llegan de fuera (un agente los inventa antes que preguntarlos). Sin esta
+ * comprobación, un id mal formado llega a Postgres y sale un 500: es entrada de usuario, no un
+ * fallo del servidor, así que se responde lo mismo que a un id que no existe.
+ */
+const ES_UUID = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+//
+// La API sabía escribir pero no leer: buscar solo existía por MCP, contra la base de datos.
+// Eso dejaba fuera al CLI y a las tools de memoria que Cortex registra en Pi (ADR-0034).
+
+/** Búsqueda híbrida. Sin `slug`, en todo lo que el usuario puede ver; con `slug`, en ese proyecto. */
+contextRoutes.get("/search", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+
+  const q = (c.req.query("q") ?? "").trim();
+  if (!q) return c.json({ error: "Missing query: pass ?q=" }, 400);
+  const tipo = contextEntryType.safeParse(c.req.query("type"));
+  const limiteCrudo = Number(c.req.query("limit") ?? "10");
+  const limit = Number.isFinite(limiteCrudo) ? Math.min(Math.max(Math.trunc(limiteCrudo), 1), 50) : 10;
+
+  const slug = c.req.query("slug");
+  let project: string | undefined;
+  if (slug) {
+    const access = await checkProjectAccess(user.email, { slug });
+    if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
+    if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
+    project = access.project.name;
+  }
+
+  // Sin proyecto concreto hay que acotar a lo accesible: si no, la búsqueda global sería una
+  // vía para leer proyectos privados de otros.
+  const hits = await searchContext(
+    { query: q, project, type: tipo.success ? tipo.data : undefined, limit },
+    project ? undefined : { restrictToAccessibleOf: user.email },
+  );
+
+  return c.json({
+    hits: hits.map((h) => ({
+      id: h.entry.id,
+      title: h.entry.title ?? "",
+      content: h.entry.content,
+      type: h.entry.type,
+      projectId: h.entry.projectId ?? null,
+      confidence: h.entry.confidence ?? null,
+      status: h.entry.status ?? null,
+      score: h.score ?? null,
+    })),
+  });
+});
+
+/** Una entrada concreta, con su trazabilidad. Permiso POR ENTRADA, no por nombre de proyecto. */
+contextRoutes.get("/entries/:id", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const id = c.req.param("id");
+  if (!ES_UUID(id)) return c.json({ error: "Entry not found." }, 404);
+  const access = await checkEntryAccess(user.email, id);
+  if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
+  if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
+  const detail = await getEntryDetail(id);
+  if (!detail) return c.json({ error: "Entry not found." }, 404); // carrera guard→consulta
+  return c.json(detail);
+});
+
+/** Corrección de una entrada (título y/o contenido). Es como un agente arregla lo que guardó mal. */
+contextRoutes.patch("/entries/:id", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const id = c.req.param("id");
+  if (!ES_UUID(id)) return c.json({ error: "Entry not found." }, 404);
+  const body = await parseBody(c, updateEntryRequest);
+  if (body instanceof Response) return body;
+  const access = await checkEntryAccess(user.email, id);
+  if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
+  if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
+  const ok = await updateEntryFields(id, body);
+  if (!ok) return c.json({ error: "Entry not found." }, 404);
+  return c.json({ ok: true, id });
 });
