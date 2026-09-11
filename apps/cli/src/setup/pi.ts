@@ -6,10 +6,12 @@ import { GENERATED_MARKER, emptyReport, type AgentAdapter, type AgentStatus, typ
  * Pi. Las extensiones son ficheros TypeScript sueltos en `~/.pi/agent/extensions/`, que Pi
  * descubre solo, y el MCP se declara en `~/.pi/agent/mcp.json`.
  *
- * El contexto se inyecta en `before_agent_start` como **mensaje** de sesión, no tocando el
- * system prompt: queda guardado en la sesión, el usuario lo ve y no se pisa con lo que hayan
- * puesto otras extensiones. Se inyecta una sola vez por sesión, porque el evento salta en
- * cada turno.
+ * El contexto se inyecta en `before_agent_start` **encadenando el system prompt**. Se probó
+ * antes devolviendo `{ message }`, que la documentación de Pi también contempla, y no llegaba
+ * nunca: el agente arrancaba sin saber nada del proyecto. El encadenado del system prompt es
+ * lo que usa la otra extensión de memoria que funciona en esta versión de Pi.
+ *
+ * Se inyecta una sola vez por sesión, porque el evento salta en cada turno.
  *
  * La captura sale de `session_shutdown` (y de la compactación automática, que es cuando una
  * sesión larga pierde su principio). `ctx.sessionManager.getSessionFile()` da la ruta del
@@ -24,7 +26,12 @@ import { execFile } from "node:child_process";
 
 const run = (args: string[]): Promise<string> =>
   new Promise((resolve) => {
-    execFile("cortex", args, { cwd: process.cwd(), timeout: 20000 }, (_err, stdout) => resolve(String(stdout ?? "")));
+    execFile("cortex", args, { cwd: process.cwd(), timeout: 20000 }, (err, stdout) => {
+      // Un fallo aquí dejaba al agente sin contexto sin decir nada. Va a stderr, que en Pi
+      // no ensucia la conversación pero sí se puede mirar.
+      if (err) console.error(\`[cortex] \${args[0]} falló: \${err.message}\`);
+      resolve(String(stdout ?? ""));
+    });
   });
 
 const sessionFile = (ctx: any): string | null => {
@@ -43,10 +50,10 @@ export default function (pi: any) {
   });
 
   // before_agent_start salta en CADA turno: el contexto se inyecta una vez y ya.
-  pi.on("before_agent_start", async () => {
+  pi.on("before_agent_start", async (event: any) => {
     if (!context || injected) return;
     injected = true;
-    return { message: { customType: "cortex-context", content: context, display: true } };
+    return { systemPrompt: \`\${event?.systemPrompt ?? ""}\\n\\n\${context}\` };
   });
 
   const capture = async (ctx: any): Promise<void> => {
