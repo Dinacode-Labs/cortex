@@ -33,6 +33,18 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   que redirigir ni nadie a quien avisar.
 
 ### Fixed
+- **La memoria dejaba de llenarse de ecos de sí misma.** Cuando un agente guarda una decisión
+  con la tool y, al cerrar la sesión, la destilación la vuelve a guardar con otras palabras, las
+  dos entradas llegan con `sourceType` distinto (`manual` y `agent_session`). Las ramas de
+  reconciliación exigen el mismo origen —para no reescribir conocimiento curado— y el umbral de
+  «ya lo sé» está en 0.95, así que el par pasaba por el medio: medido con cuatro agentes sobre
+  un proyecto real, ese eco puntúa **0.86–0.88**. Ahora, entre orígenes distintos y por encima
+  del umbral, se pregunta al reconciliador **solo para no escribir**: nunca se modifica ni se
+  invalida nada, y lo peor que puede pasar es que no se añada algo que ya sabíamos.
+- **El lint ya ve esos duplicados.** El listón era 0.88 para todo; ahora baja a 0.85 entre
+  entradas del **mismo tipo**, que es donde cae el eco, y se mantiene entre tipos distintos,
+  donde parecerse mucho es legítimo (la incidencia que motivó una decisión se parece a la
+  decisión, y no sobra ninguna).
 - **La captura de OpenCode no guardaba nada, en silencio.** OpenCode movió sus sesiones de
   ficheros JSON (`storage/{session,message,part}`) a una base SQLite (`opencode.db`). El lector
   seguía buscando el layout viejo, no encontraba nada, y el hook, que calla por diseño, salía
