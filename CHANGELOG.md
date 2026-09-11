@@ -182,6 +182,12 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   está abandonada con dos CVE sin corregir.
 
 ### Fixed
+- **`cortex setup` ya no se cae ante un symlink roto** de la instalación anterior. Al mover
+  la skill y el comando dentro del plugin, los enlaces que dejó `cortex sync` apuntando al
+  repo clonado quedaron colgando, y escribir a través de uno falla con ENOENT. Tumbaba el
+  `setup --all` entero. Ahora el enlace se sustituye por un fichero de verdad, lo que además
+  arregla el caso peor: con un enlace VIVO se estaría escribiendo dentro del repo de otro.
+  Encontrado migrando una máquina real.
 - **Una clave de inferencia rechazada ya no pasa por «no había nada que guardar».** El
   destilador se tragaba cualquier error de la ventana, así que un 401 del proveedor devolvía
   `saved: 0, failed: 0` y estado `done`: todo verde, cero conocimiento, y así indefinidamente.
