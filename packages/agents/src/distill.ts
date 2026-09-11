@@ -16,6 +16,20 @@ const TYPES = contextEntryType.options as readonly string[];
 
 export interface Item { type: string; title: string; content: string }
 
+/**
+ * ¿El proveedor nos está rechazando? Se distingue de un fallo de ventana porque NO es
+ * recuperable: con la clave mal, todas las ventanas de todas las sesiones fallarán igual.
+ *
+ * Importa porque tragarse esto en silencio deja la captura produciendo cero para siempre
+ * mientras los contadores dicen que todo va bien. Pasó al desplegar: una clave equivocada
+ * devolvía `saved: 0, failed: 0`, que es indistinguible de «esta sesión no tenía nada».
+ */
+function esRechazoDelProveedor(e: unknown): boolean {
+  const err = e as { statusCode?: unknown; status?: unknown; message?: unknown };
+  if (err?.statusCode === 401 || err?.statusCode === 403 || err?.status === 401 || err?.status === 403) return true;
+  return /invalid api key|unauthorized|\b401\b|\b403\b/i.test(String(err?.message ?? e ?? ""));
+}
+
 export async function distill(project: string, window: string): Promise<Item[]> {
   const prompt = `Proyecto: "${project}". Fragmento de transcript de una sesión de un agente de IA trabajando en este proyecto:
 """
@@ -31,6 +45,10 @@ Incluye decisiones técnicas, restricciones, incidencias y su resolución, conve
       .filter((i): i is Item => Boolean(i?.title && i?.content))
       .map((i) => ({ type: TYPES.includes(i.type ?? "") ? (i.type as string) : "module_note", title: i.title.trim().slice(0, 160), content: i.content.trim() }));
   } catch (e) {
+    // Sin LLM configurado no hay fallo: es un estado deliberado y core cae a heurísticas.
+    if (esRechazoDelProveedor(e)) {
+      throw new Error(`el proveedor de inferencia rechaza la clave: ${(e as Error).message}`);
+    }
     console.error(`  ✗ destilación falló en una ventana: ${(e as Error).message}`);
     return [];
   }
