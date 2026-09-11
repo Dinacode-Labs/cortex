@@ -20,6 +20,7 @@ export {
   isNearDuplicate,
   findNearest,
   updateEntryContent,
+  updateEntryFields,
   invalidateEntry,
   setReconciler,
   saveWithReconciliation,

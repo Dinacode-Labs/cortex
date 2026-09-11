@@ -44,7 +44,7 @@ export interface ApiRequestOptions {
 }
 
 export async function apiRequest<T = unknown>(
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST" | "PATCH" | "DELETE",
   path: string,
   body?: unknown,
   opts: ApiRequestOptions = {},

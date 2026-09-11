@@ -52,6 +52,35 @@ export async function updateEntryContent(entryId: string, content: string): Prom
   await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
 }
 
+/**
+ * Corrección puntual de una entrada: título, contenido o los dos. La usa `PATCH /entries/:id`,
+ * que es como un agente arregla algo que él mismo guardó mal.
+ *
+ * Solo esos dos campos: el tipo, la confianza y la vigencia los decide la reconciliación o el
+ * lint a partir de la evidencia, no quien llama por la API. Y si cambia el contenido se vuelve
+ * a calcular el embedding, porque una entrada corregida que ya no se encuentra es peor que la
+ * entrada sin corregir.
+ */
+export async function updateEntryFields(
+  entryId: string,
+  fields: { title?: string; content?: string },
+): Promise<boolean> {
+  const { title, content } = fields;
+  if (title === undefined && content === undefined) return false;
+  const sql = getSql();
+  const filas = (await sql`
+    UPDATE context_entries
+       SET title = COALESCE(${title ?? null}, title),
+           content = COALESCE(${content ?? null}, content),
+           updated_at = now()
+     WHERE id = ${entryId}
+     RETURNING id
+  `) as unknown as { id: string }[];
+  if (filas.length === 0) return false;
+  if (content !== undefined) await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
+  return true;
+}
+
 /** DELETE bi-temporal (§5.5: invalidar ≠ borrar): marca la entrada como histórica y
  * superada por otra. Mismo patrón que la invalidación temporal. */
 export async function invalidateEntry(entryId: string, supersededById: string): Promise<void> {

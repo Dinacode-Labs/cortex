@@ -26,6 +26,7 @@ const COMMANDS: Record<string, Cmd> = {
   link: { help: "link this folder to a project, or create one (writes .cortex.json)", load: () => import("./commands/link.js") },
   ui: { help: "open the web UI, already signed in", load: () => import("./commands/ui.js") },
   setup: { help: "wire your coding agents (Claude Code, Codex, …) into Cortex", load: () => import("./commands/setup.js") },
+  mem: { help: "project memory from the terminal: save, search, read and fix entries", load: () => import("./commands/mem.js") },
   mcp: { help: "MCP server over stdio for your agent (proxies to the Cortex server)", managed: false, load: () => import("./commands/mcp.js") },
   toolbelt: { help: "install your organisation's toolbelt (third-party MCPs and skills)", load: () => import("./commands/toolbelt.js") },
   version: { help: "this CLI's version and the server's", load: () => import("./commands/version.js") },

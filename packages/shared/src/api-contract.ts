@@ -117,3 +117,55 @@ export interface BatchItem {
   confidence?: string;
   metadata?: Record<string, unknown>;
 }
+
+// --- Búsqueda y acceso por id ---------------------------------------------------------
+//
+// La API sabía escribir (`/capture`) pero no leer: buscar solo existía por MCP, contra la
+// base de datos. Eso dejaba fuera al CLI y a cualquier integración que no sea un agente con
+// MCP, como las tools de memoria que Cortex registra en Pi (ADR-0034).
+
+export const searchRequest = z.object({
+  q: z.string().min(1),
+  /** Sin slug se busca en todo lo accesible; con slug, solo en ese proyecto. */
+  slug: z.string().optional(),
+  type: contextEntryType.optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+export type SearchRequest = z.infer<typeof searchRequest>;
+
+export const searchHitSummary = z.object({
+  id: z.string(),
+  title: z.string(),
+  content: z.string(),
+  type: z.string(),
+  projectId: z.string().nullable(),
+  confidence: z.string().nullable(),
+  status: z.string().nullable(),
+  score: z.number().nullable(),
+});
+export type SearchHitSummary = z.infer<typeof searchHitSummary>;
+
+export const searchResponse = z.object({ hits: z.array(searchHitSummary) });
+export type SearchResponse = z.infer<typeof searchResponse>;
+
+/**
+ * Actualización de una entrada por id. Solo `title` y `content`: el resto (tipo, confianza,
+ * vigencia) lo decide la reconciliación o el lint, no quien llama por la API. Cambiar el
+ * contenido vuelve a calcular el embedding, así que la entrada sigue siendo encontrable.
+ */
+export const updateEntryRequest = z
+  .object({ title: z.string().min(1).optional(), content: z.string().min(1).optional() })
+  .refine((v) => v.title !== undefined || v.content !== undefined, {
+    message: "Nothing to update: pass title, content, or both.",
+  });
+export type UpdateEntryRequest = z.infer<typeof updateEntryRequest>;
+
+/**
+ * `GET /entries/:id` devuelve el `EntryDetail` de core tal cual. El cliente no necesita
+ * conocer su forma entera —la usa para mostrarla—, así que aquí solo se fija lo que sí se
+ * lee por código; el resto viaja igualmente.
+ */
+export interface EntryDetailResponse {
+  entry: { id: string; title?: string | null; content: string; type: string; status?: string | null; confidence?: string | null };
+  [k: string]: unknown;
+}
