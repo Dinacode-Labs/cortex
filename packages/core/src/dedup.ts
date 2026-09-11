@@ -84,13 +84,20 @@ export interface ReconcileResult {
 }
 
 /**
- * Guarda una pieza reconciliando contra lo existente (estilo mem0). Solo compara contra
- * entradas del MISMO `sourceType` (no dedup ni mezcla conocimiento de distinta procedencia):
- *  - NOOP si ya hay algo near-idéntico (≥ NOOP_THRESHOLD) — dedup determinista, sin LLM.
- *  - Con reconciliador inyectado y similitud 0.82–0.95: UPDATE (fusiona, solo lo
- *    auto-capturado), SUPERSEDE (invalida lo viejo auto-capturado; si es fuente/curado
- *    solo se marca `contradicts`) o NOOP.
- *  - ADD en cualquier otro caso. NUNCA reescribe/invalida conocimiento de fuente o curado.
+ * Guarda una pieza reconciliando contra lo existente (estilo mem0):
+ *  - NOOP si ya hay algo near-idéntico (≥ NOOP_THRESHOLD), **venga de donde venga**. Dedup
+ *    determinista, sin LLM. Reconocer que ya lo sabemos no toca nada, así que no hace falta
+ *    exigir el mismo origen.
+ *  - Con reconciliador inyectado, similitud 0.82–0.95 **y el mismo `sourceType`**: UPDATE
+ *    (fusiona, solo lo auto-capturado), SUPERSEDE (invalida lo viejo auto-capturado; si es
+ *    fuente o curado solo se marca `contradicts`) o NOOP. Aquí sí se exige el mismo origen,
+ *    porque estas ramas MODIFICAN lo que ya había.
+ *  - ADD en cualquier otro caso. NUNCA reescribe ni invalida conocimiento de fuente o curado.
+ *
+ * Queda un caso conocido: una PARÁFRASIS (~0.84) de algo capturado a mano se añade en vez de
+ * fusionarse, porque cae en la banda de UPDATE y ahí sí manda el origen. Es deliberado —
+ * fusionar automáticamente sobre lo que ha escrito una persona es peor— pero significa que
+ * `lint` es quien tiene que sacar esos casi-duplicados a la luz.
  */
 export async function saveWithReconciliation(
   input: Parameters<typeof saveContext>[0],
@@ -99,7 +106,15 @@ export async function saveWithReconciliation(
   const near = input.project ? await findNearest(input.project, input.content) : null;
   const sameKind = !!near && near.sourceType === input.sourceType;
 
-  if (near && sameKind && near.score >= NOOP_THRESHOLD) return { action: "noop", entryId: near.id };
+  // Casi idéntico: ya lo sabemos, venga de donde venga. RECONOCERLO es seguro siempre; lo
+  // que no lo sería es MODIFICAR conocimiento curado, y de eso se encargan las ramas de
+  // abajo, que sí exigen el mismo origen.
+  //
+  // Antes esto también exigía el mismo `sourceType`, y el efecto se veía usándolo: un agente
+  // repite en su respuesta lo que la memoria le acaba de contar, la captura lo destila, y
+  // como viene de "agent_session" nunca se compara con la entrada "manual" original. La
+  // memoria se iba llenando de ecos de sí misma.
+  if (near && near.score >= NOOP_THRESHOLD) return { action: "noop", entryId: near.id };
 
   if (near && sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
     const decision = await reconciler.decide(near.content, input.content);

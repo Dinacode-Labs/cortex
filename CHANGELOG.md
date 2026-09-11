@@ -184,6 +184,13 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   está abandonada con dos CVE sin corregir.
 
 ### Fixed
+- **La memoria dejaba de reconocer lo que ya sabía si venía de otro sitio.** El NOOP de la
+  reconciliación exigía que coincidiera el `sourceType`, así que una entrada destilada de una
+  sesión nunca se comparaba con la misma información capturada a mano. El efecto, visto
+  probando con agentes de verdad: el agente repite en su respuesta lo que la memoria acaba de
+  contarle, la captura lo destila, y la memoria se va llenando de ecos de sí misma. Ahora
+  reconocer un casi-idéntico no depende del origen. Modificar conocimiento curado sigue
+  exigiéndolo, que es lo que de verdad había que proteger.
 - **`cortex setup` ya no se cae ante un symlink roto** de la instalación anterior. Al mover
   la skill y el comando dentro del plugin, los enlaces que dejó `cortex sync` apuntando al
   repo clonado quedaron colgando, y escribir a través de uno falla con ENOENT. Tumbaba el
