@@ -182,6 +182,12 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   está abandonada con dos CVE sin corregir.
 
 ### Fixed
+- **Una clave de inferencia rechazada ya no pasa por «no había nada que guardar».** El
+  destilador se tragaba cualquier error de la ventana, así que un 401 del proveedor devolvía
+  `saved: 0, failed: 0` y estado `done`: todo verde, cero conocimiento, y así indefinidamente.
+  Ahora un rechazo del proveedor sale hacia arriba y la captura se marca fallida con su
+  motivo. Lo demás (JSON inválido, una ventana que no da nada) se sigue saltando, que sí es
+  recuperable. Encontrado al desplegar el servidor de producción.
 - Los tres errores de alta que ve un usuario (email mal escrito, dominio no permitido,
   demasiados códigos seguidos) estaban aún en español. Se descubrieron al desplegar: son lo
   primero que lee alguien que intenta entrar y no puede.
