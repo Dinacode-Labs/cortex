@@ -36,6 +36,24 @@ export interface ContextPack {
   sensitiveModules: string[];
   relevantToArea: SearchHit[];
   totalEntries: number;
+  /**
+   * Pares de entradas del pack que se contradicen entre sí.
+   *
+   * No se invalida ninguna: cuál sobra es un juicio que no se puede hacer en automático sin
+   * arriesgarse a borrar la buena. Pero callarlo es peor, porque el pack entrega las dos como
+   * vigentes y el agente decide a ciegas. Visto en pruebas reales: dos agentes distintos lo
+   * detectaron solos y lo dijeron, que es señal de que el aviso les hacía falta.
+   */
+  conflicts: EntryConflict[];
+}
+
+export interface EntryConflict {
+  aId: string;
+  aTitle: string;
+  bId: string;
+  bTitle: string;
+  /** La registrada más tarde. Ser más nueva no la hace cierta, pero es el dato que hay. */
+  newerId: string;
 }
 
 /**
@@ -73,6 +91,8 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   `) as unknown as Row[];
   const totalEntries = Number(countRows[0]!.n);
 
+  const conflicts = await entryConflicts(sql, ids);
+
   let relevantToArea: SearchHit[] = [];
   if (area) {
     const provider = getEmbeddingProvider();
@@ -95,7 +115,33 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
     sensitiveModules,
     relevantToArea,
     totalEntries,
+    conflicts,
   };
+}
+
+/**
+ * Contradicciones entre entradas VIGENTES del proyecto (las crea `maintain` al enriquecer el
+ * grafo, y también la reconciliación cuando lo nuevo contradice algo curado). Solo entre
+ * entradas: las que involucran entidades sueltas las reporta el lint, pero no ayudan aquí.
+ */
+async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConflict[]> {
+  const rows = (await sql`
+    SELECT ca.id AS a_id, ca.title AS a_title, ca.created_at AS a_at,
+           cb.id AS b_id, cb.title AS b_title, cb.created_at AS b_at
+    FROM relations r
+    JOIN context_entries ca ON ca.id = r.source_id AND ca.valid_to IS NULL
+    JOIN context_entries cb ON cb.id = r.target_id AND cb.valid_to IS NULL
+    WHERE r.relation_type = 'contradicts'
+      AND ca.project_id = ANY(${projectIds}) AND cb.project_id = ANY(${projectIds})
+    LIMIT 25
+  `) as unknown as Row[];
+  return rows.map((r) => ({
+    aId: r.a_id as string,
+    aTitle: r.a_title as string,
+    bId: r.b_id as string,
+    bTitle: r.b_title as string,
+    newerId: new Date(r.a_at as string) >= new Date(r.b_at as string) ? (r.a_id as string) : (r.b_id as string),
+  }));
 }
 
 // --- helpers -----------------------------------------------------------------
