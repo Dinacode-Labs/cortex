@@ -29,7 +29,8 @@ Apache-2.0. Found a vulnerability? See [`SECURITY.md`](./SECURITY.md).
 ## Contents
 
 - [Try it on your machine](#try-it-on-your-machine)
-- [For developers](#for-developers) · [What it does](#what-it-does) · [Architecture](#architecture)
+- [For developers](#for-developers) · [Let your agent install it](#or-let-your-agent-do-it)
+- [What it does](#what-it-does) · [Architecture](#architecture)
 - [The 8 MCP tools](#the-8-mcp-tools) · [How Cortex reaches your agents](#how-cortex-reaches-your-agents) · [Connectors](#ingesting-sources-connectors)
 - [Running the server](#running-the-server) · [Repository layout](#repository-layout)
 
@@ -119,12 +120,22 @@ What it does in each one:
 | Claude Code | the `cortex` plugin, or hooks in `settings.json` if you cannot install it | ✓ | ✓ |
 | Codex | the same plugin, plus `codex mcp add` | ✓ | ✓ |
 | OpenCode | a JS plugin and an MCP entry in `opencode.json` | ✓ | ✓ |
-| Pi | an extension in `~/.pi/agent/extensions`, plus MCP | ✓ | ✓ |
+| Pi | an extension in `~/.pi/agent/extensions`, plus MCP | ✗ | ✗ |
 | Hermes | hooks and MCP in `config.yaml` | ✓ | ✓ |
+
+**Pi is not working yet.** The extension installs and Pi loads it, but neither the context
+injection nor the capture takes effect. Verified against a live session: the CLI is on Pi's
+PATH, the working directory is right, and the command the extension runs returns the context
+correctly on its own. Both documented ways of injecting were tried. The MCP tools do work in
+Pi, so you can query the memory by hand. Tracked as CORTEX-11.
 
 If you are coming from the old install, the one that cloned the repository, `setup` migrates
 it: old hooks are replaced in place, the MCP is re-registered against the server, and the
 shim is removed from your PATH.
+
+Two things to expect the first time: **Codex asks you to trust the plugin hooks**, and
+**Hermes asks permission for shell hooks**. Both are one-off and both are the agent doing the
+right thing.
 
 Then, in any repository you work in:
 
@@ -153,6 +164,40 @@ at any point in between.
   membership of the private ones.
 - All you need is a **Cortex server running somewhere**. Whoever handles your infrastructure
   runs it.
+
+### Or let your agent do it
+
+Paste this into Claude Code, Codex, or whatever you use. It does everything except the one
+step it cannot do for you.
+
+```text
+Set up Cortex on this machine. Run the commands, do not explain them to me.
+
+1. Check that Node is 20 or newer. If it is not, stop and tell me how to upgrade it.
+2. Install the CLI:  npm install -g @dinacode/cortex
+3. Sign me in:  cortex auth login --server <SERVER URL>
+   It asks for my work email and then a code that arrives by email. You cannot read my
+   inbox, so print the prompt and wait for me to type the code.
+4. Wire up my agents:  cortex setup --all
+   It is idempotent and backs up anything it touches. If I came from an older install, it
+   migrates it.
+5. If this folder is a project I work on, ask me the project name and link it:
+   cortex link --create "<name>"      Do not invent a name.
+6. Check it worked:  cortex doctor
+   Tell me what it reports. If something is not green, say which piece and why.
+
+If a step fails, stop and show me the error. Do not work around it.
+```
+
+For a machine that is already set up, connecting one more repository is shorter:
+
+```text
+Link this repository to Cortex so my sessions are remembered.
+
+Run `cortex link` first to see which projects I can reach. If one of them is obviously this
+repository, link to it with `cortex link <slug>`. If none fits, ask me for a name before
+creating anything. Then run `cortex doctor` and tell me if this folder is linked.
+```
 
 ### Working with more than one Cortex
 
