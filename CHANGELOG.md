@@ -9,6 +9,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Varios Cortex a la vez** (ADR-0033). El servidor es una propiedad del repositorio:
+  `.cortex.json` admite un campo `server` y las credenciales guardan una sesión por servidor,
+  leyendo el formato anterior sin obligar a volver a entrar. Los hooks, el CLI y el proxy MCP
+  resuelven a cuál hablar desde la carpeta en la que se está trabajando, y el token se busca
+  por servidor. Con más de una sesión, `cortex link --create` exige decir en cuál: es el único
+  punto donde se podría crear el proyecto de un cliente en el servidor de otro.
+  `cortex auth status` y `cortex doctor` comprueban todos. Nuevo `cortex auth use <url>`.
 - **Modo local, para probar Cortex sin desplegar nada** (`deploy/local.yml`): un compose que
   levanta Postgres, la API, la UI y el MCP en `127.0.0.1` con un solo comando, sin dominio,
   sin TLS, sin claves y sin pedir una sola variable de entorno. Los datos sobreviven a un
@@ -175,6 +182,8 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   está abandonada con dos CVE sin corregir.
 
 ### Fixed
+- `cortex link` ya no revienta al listar si un proyecto antiguo no tiene slug. Un dato viejo
+  tumbaba el comando entero en vez de listar los demás.
 - `scrub()` se aplica en **todos** los caminos de captura: hasta ahora solo los transcripts
   de Claude llegaban limpios al modelo; los de Codex, OpenCode, Hermes y las reuniones iban
   crudos. Además el servidor vuelve a limpiar lo que recibe, sin fiarse del cliente.

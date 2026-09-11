@@ -144,6 +144,10 @@ claves** (embeddings `local`, no semánticos); conecta un endpoint real
   español**: comentarios del código, ADRs, roadmap e investigación. También los prompts de los
   agentes LLM, porque el corpus que procesan es español. La UI web también está en inglés.
 - Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
+- **Un cliente puede hablar con varios servidores** (ADR-0033). El servidor sale del
+  `.cortex.json` del repo, no de una variable global: quien vaya a llamar a la API desde una
+  carpeta debe pasar antes por `useProjectServer(cwd)`. El token se busca **por servidor**;
+  no asumas que `readCredentials()` sin argumento es el correcto.
 - **Borrado de secretos**: `scrub()` vive en `@cortex/shared` (función pura, sin I/O).
   `agents` lo aplica antes de mandar nada al LLM y `core` al persistir (`saveContext`,
   `captureBatch`): el servidor no confía en que el cliente haya limpiado. Es idempotente,
