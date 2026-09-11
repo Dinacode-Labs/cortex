@@ -95,6 +95,25 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     expect(b.action).toBe("noop"); // idéntico (≥ NOOP) y mismo source_type → NOOP
   });
 
+  it("un eco de la sesión NO se vuelve a guardar aunque la original sea manual", async () => {
+    // El caso real: alguien captura algo a mano, un agente lo repite en su respuesta porque
+    // la memoria se lo acaba de contar, y la captura de la sesión lo destila otra vez. Antes
+    // se añadía, porque el NOOP exigía el mismo source_type y "manual" ≠ "agent_session".
+    const p = await createProject(`IT Eco ${RID}`);
+    const content = "Las exportaciones se procesan de forma asíncrona con reintentos y backoff exponencial.";
+    const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
+
+    const manual = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "medium", sourceType: "manual" } as never, opts);
+    expect(manual.action).toBe("add");
+
+    const eco = await saveWithReconciliation(
+      { content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "claude:x" } as never,
+      opts,
+    );
+    expect(eco.action).toBe("noop");
+    expect(eco.entryId).toBe(manual.entryId); // apunta a la original, no crea otra
+  });
+
   it("la resolución de proyecto es canónica: reconcilia aunque cambie la capitalización", async () => {
     const p = await createProject(`IT Canonical ${RID}`);
     const content = "La cola de trabajos usa Redis con reintentos exponenciales.";
