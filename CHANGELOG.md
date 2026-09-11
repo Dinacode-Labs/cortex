@@ -182,6 +182,9 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   está abandonada con dos CVE sin corregir.
 
 ### Fixed
+- Los tres errores de alta que ve un usuario (email mal escrito, dominio no permitido,
+  demasiados códigos seguidos) estaban aún en español. Se descubrieron al desplegar: son lo
+  primero que lee alguien que intenta entrar y no puede.
 - `cortex link` ya no revienta al listar si un proyecto antiguo no tiene slug. Un dato viejo
   tumbaba el comando entero en vez de listar los demás.
 - `scrub()` se aplica en **todos** los caminos de captura: hasta ahora solo los transcripts

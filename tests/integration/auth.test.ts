@@ -50,7 +50,7 @@ describe("auth email + OTP (BD real)", () => {
   it("rate limit: no más de CORTEX_OTP_RATE_MAX (def. 5) códigos por email en la ventana", async () => {
     const email = `rate-${RID}@example.com`;
     for (let i = 0; i < 5; i++) await requestOtp(email); // 5 OK
-    await expect(requestOtp(email)).rejects.toThrow(/Demasiadas solicitudes/); // el 6º se corta
+    await expect(requestOtp(email)).rejects.toThrow(/Too many codes/); // el 6º se corta
   });
 
   it("bloqueo por intentos: tras 5 códigos erróneos ni el correcto sirve", async () => {
