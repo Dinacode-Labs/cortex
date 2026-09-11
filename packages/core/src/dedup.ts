@@ -145,6 +145,21 @@ export async function saveWithReconciliation(
   // memoria se iba llenando de ecos de sí misma.
   if (near && near.score >= NOOP_THRESHOLD) return { action: "noop", entryId: near.id };
 
+  // El mismo conocimiento por DOS vías: el agente lo guarda con la tool y, al cerrar la
+  // sesión, la destilación lo vuelve a guardar. Llegan con `sourceType` distinto ("manual" y
+  // "agent_session"), así que las ramas de abajo —que exigen el mismo origen para no reescribir
+  // conocimiento curado— ni lo miran, y el 0.95 de arriba no llega: medido en un proyecto real
+  // con cuatro agentes, este eco puntúa 0.86–0.88.
+  //
+  // Así que se pregunta al reconciliador, pero SOLO para no escribir. Entre orígenes distintos
+  // nunca se modifica ni se invalida nada: lo peor que puede pasar es que la entrada no se
+  // añada porque ya la sabíamos, que es justo lo que se quiere.
+  if (near && !sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
+    if ((await reconciler.decide(near.content, input.content)) === "noop") {
+      return { action: "noop", entryId: near.id };
+    }
+  }
+
   if (near && sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
     const decision = await reconciler.decide(near.content, input.content);
     if (decision === "noop") return { action: "noop", entryId: near.id };

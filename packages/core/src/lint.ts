@@ -55,7 +55,15 @@ export async function lintProject(project: string): Promise<LintReport> {
       AND a.embedding_model = b.embedding_model
     JOIN context_entries ca ON ca.id=a.context_entry_id AND ca.project_id=${pid} AND ca.valid_to IS NULL
     JOIN context_entries cb ON cb.id=b.context_entry_id AND cb.project_id=${pid} AND cb.valid_to IS NULL
-    WHERE (a.vector <=> b.vector) < 0.12
+    -- Umbral por tipo: entre tipos distintos un parecido alto suele ser legítimo (la incidencia
+    -- que motivó una decisión se parece mucho a la decisión, y no sobra ninguna de las dos), así
+    -- que ahí se mantiene el listón. Dentro del mismo tipo se baja a 0.85, porque es donde cae
+    -- el eco medido en un proyecto real —la misma decisión guardada por la tool y otra vez por
+    -- la destilación de la sesión, 0.86–0.88— que antes era invisible.
+    --
+    -- Es una señal para que alguien mire, no una verdad: reclassify puede cambiar el tipo de
+    -- una entrada y juntar dos que no lo estaban. Por eso el informe dice "likely".
+    WHERE (a.vector <=> b.vector) < CASE WHEN ca.type = cb.type THEN 0.15 ELSE 0.12 END
     ORDER BY score DESC
     LIMIT 25
   `) as unknown as Row[];
