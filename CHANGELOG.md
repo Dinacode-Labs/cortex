@@ -8,7 +8,23 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
-### Fixed
+### Added
+- **La memoria, como herramientas del agente en Pi** (ADR-0034). Cortex registra
+  `cortex.mem_save`, `cortex.mem_search`, `cortex.mem_get_observation` y `cortex.mem_update`,
+  que es lo que gentle-pi busca para ofrecer Cortex como almacén de su ciclo de trabajo. El
+  prefijo no es decorativo: Pi se queda con la primera extensión que registra un nombre y lo
+  hace **en silencio**, así que un `mem_save` a secas habría dejado inalcanzables las tools de
+  quien ya tuviera otra memoria instalada. Con prefijo conviven, y gentle-pi las reconoce igual.
+- **La API ya sabe leer.** Antes solo escribía: buscar existía únicamente por MCP, contra la
+  base de datos, así que ni el CLI ni ninguna integración sin MCP podían consultar la memoria.
+  Ahora hay `GET /search` (sin `slug`, acotada a lo que puedes ver; con `slug`, a ese proyecto),
+  `GET /entries/:id` y `PATCH /entries/:id` para corregir título y contenido.
+- **`cortex mem`**: guardar, buscar, leer y corregir desde el terminal, con `--json` para quien
+  lo llama desde código. Es también el puente que usan las tools de Pi, para que la resolución
+  del servidor y del token siga viviendo en un solo sitio.
+
+- Un id de entrada mal formado llegaba a Postgres y salía un 500. Es entrada de usuario: ahora
+  responde lo mismo que un id que no existe.
 - **Pi ya recibe contexto y captura al cerrar.** Los hooks se colgaban leyendo `stdin`: Claude
   Code escribe su JSON y **cierra** la tubería, pero Pi llama al CLI con `execFile`, que la deja
   abierta y muda. El `for await` sobre `process.stdin` no terminaba nunca, el hook moría por

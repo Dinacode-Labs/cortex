@@ -120,6 +120,14 @@ describe("pi", () => {
     expect(ext).toContain("stdin?.end()");
     // El directorio sale de la sesión, no del proceso de Pi.
     expect(ext).toContain("ctx?.cwd");
+    // Las tools de memoria van con prefijo `cortex.`: Pi se queda con la PRIMERA extensión
+    // que registra un nombre y lo hace en silencio, así que un `mem_save` a secas dejaría
+    // inalcanzables las de otra memoria ya instalada. gentle-pi las reconoce igual porque
+    // acepta cualquier nombre acabado en `.mem_save` (ADR-0034).
+    for (const t of ["cortex.mem_save", "cortex.mem_search", "cortex.mem_get_observation", "cortex.mem_update"]) {
+      expect(ext).toContain(`name: "${t}"`);
+    }
+    expect(ext).not.toContain('name: "mem_save"');
     expect(readJson(MCP).mcpServers.cortex).toEqual({ command: "cortex", args: ["mcp"] });
     expect(readJson(MCP).mcpServers.context7).toBeDefined();
   });

@@ -51,7 +51,7 @@ apps/
   web/         # UI web (Hono SSR, cookie de sesión): src/routes/ + views/ (hono/html,
                # autoescape) + middleware/ + public/ (estáticos)
   cli/         # CLI `cortex` de DEVELOPER (auth, link, ui, setup, toolbelt, doctor,
-               # hooks, `mcp`). Ligero: solo depende de client+shared, para poder
+               # hooks, `mem`, `mcp`). Ligero: solo depende de client+shared, para poder
                # instalarlo con npm i -g.
                # `cortex mcp` (src/mcp/) hace de proxy stdio → MCP HTTP del servidor: es
                # así como los agentes usan las tools con los permisos del usuario

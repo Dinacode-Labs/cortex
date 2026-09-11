@@ -5,7 +5,11 @@ import type {
   ClientConfig,
   CreateProjectRequest,
   CreateProjectResponse,
+  EntryDetailResponse,
   ProjectSummary,
+  SearchRequest,
+  SearchResponse,
+  UpdateEntryRequest,
 } from "@cortex/shared";
 import { apiRequest, type ApiResult } from "./api-client.js";
 import { readCredentials, writeCredentials, clearCredentials } from "./credentials.js";
@@ -116,3 +120,24 @@ export function getCaptureSession(id: string): Promise<ApiResult<CaptureSessionR
 
 // Re-export por comodidad: quien usa el cliente casi siempre necesita las credenciales.
 export { readCredentials, writeCredentials, clearCredentials };
+
+// --- Lectura: búsqueda y acceso por id -------------------------------------------------
+
+/** Búsqueda híbrida. Sin `slug`, en todo lo accesible; con `slug`, solo en ese proyecto. */
+export function searchEntries(input: SearchRequest): Promise<ApiResult<SearchResponse>> {
+  const p = new URLSearchParams({ q: input.q });
+  if (input.slug) p.set("slug", input.slug);
+  if (input.type) p.set("type", input.type);
+  if (input.limit) p.set("limit", String(input.limit));
+  return apiRequest<SearchResponse>("GET", `/search?${p.toString()}`);
+}
+
+/** Una entrada por id, con su trazabilidad. */
+export function getEntry(id: string): Promise<ApiResult<EntryDetailResponse>> {
+  return apiRequest<EntryDetailResponse>("GET", `/entries/${encodeURIComponent(id)}`);
+}
+
+/** Corrige título y/o contenido de una entrada. */
+export function updateEntry(id: string, body: UpdateEntryRequest): Promise<ApiResult<{ ok: boolean; id: string }>> {
+  return apiRequest<{ ok: boolean; id: string }>("PATCH", `/entries/${encodeURIComponent(id)}`, body);
+}
