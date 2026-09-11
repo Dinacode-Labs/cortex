@@ -50,8 +50,16 @@ export interface ContextPack {
 export interface EntryConflict {
   /** La entrada del pack que recibe el aviso. */
   entryId: string;
-  /** Con qué choca: otra entrada, o una cosa del grafo (un módulo, un fichero, un concepto). */
-  with: { label: string; recordedLater?: boolean }[];
+  /** Choque directo con otra entrada: ahí sí se sabe quién contra quién. */
+  entries: { label: string; recordedLater: boolean }[];
+  /**
+   * Zonas que esta entrada toca y que están en disputa. Se dice así, y no "esta entrada
+   * contradice a X", porque no es verdad: la entrada está colgada de una entidad que
+   * contradice a X, que es bastante menos. Afirmar el par concreto daba avisos absurdos —una
+   * decisión sobre el backoff "contradiciendo" la conciliación diaria— y un aviso que miente
+   * enseña a ignorar todos los avisos.
+   */
+  areas: { entity: string; against: string[] }[];
 }
 
 /**
@@ -120,21 +128,15 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
 /**
  * Contradicciones que afectan a las entradas VIGENTES del pack.
  *
- * Llegan por dos caminos y los dos cuentan. La reconciliación relaciona ENTRADA con ENTRADA
- * cuando lo nuevo contradice algo curado. El enriquecido del grafo de `maintain` relaciona
- * ENTIDADES entre sí ("README" contradice "src/webhook.js"), que en la práctica es el caso
- * frecuente: ahí el aviso va a las entradas colgadas de cada entidad, porque es lo que el
- * agente está leyendo.
- *
- * Se agrupa por entrada para no repetir cuatro avisos casi iguales en la misma línea.
+ * Llegan por dos caminos y se cuentan distinto. La reconciliación relaciona ENTRADA con
+ * ENTRADA cuando lo nuevo contradice algo curado: ahí se sabe quién contra quién y se dice.
+ * El enriquecido del grafo de `maintain` relaciona ENTIDADES entre sí ("README" contradice
+ * "src/webhook.js"), que es el caso frecuente; ahí solo se puede decir que la zona está en
+ * disputa, porque una entrada colgada de "README" no contradice necesariamente nada.
  */
 async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConflict[]> {
-  const porEntrada = new Map<string, Map<string, boolean | undefined>>();
-  const anota = (entryId: string, label: string, recordedLater?: boolean): void => {
-    const m = porEntrada.get(entryId) ?? new Map<string, boolean | undefined>();
-    if (!m.has(label)) m.set(label, recordedLater);
-    porEntrada.set(entryId, m);
-  };
+  const directos = new Map<string, { label: string; recordedLater: boolean }[]>();
+  const zonas = new Map<string, Map<string, Set<string>>>();
 
   // 1) Entrada ↔ entrada: además de con qué choca, cuál se registró antes.
   const entreEntradas = (await sql`
@@ -147,15 +149,21 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
       AND ca.project_id = ANY(${projectIds}) AND cb.project_id = ANY(${projectIds})
     LIMIT 25
   `) as unknown as Row[];
+  const anotaDirecto = (id: string, label: string, recordedLater: boolean): void => {
+    const lista = directos.get(id) ?? [];
+    if (!lista.some((x) => x.label === label)) lista.push({ label, recordedLater });
+    directos.set(id, lista);
+  };
   for (const r of entreEntradas) {
     const aNueva = new Date(r.a_at as string) >= new Date(r.b_at as string);
-    anota(r.a_id as string, r.b_title as string, !aNueva);
-    anota(r.b_id as string, r.a_title as string, aNueva);
+    anotaDirecto(r.a_id as string, r.b_title as string, !aNueva);
+    anotaDirecto(r.b_id as string, r.a_title as string, aNueva);
   }
 
-  // 2) Entidad ↔ entidad (y entrada ↔ entidad): el aviso baja a las entradas de cada lado.
+  // 2) Entidades en disputa. Se excluyen las entradas colgadas de AMBOS lados: esas no están
+  //    en medio de la discusión, son la discusión, y avisarlas de sí mismas no dice nada.
   const conEntidades = (await sql`
-    SELECT ce.id AS entry_id, otra.name AS label
+    SELECT ce.id AS entry_id, mia.name AS zona, otra.name AS contra
     FROM relations r
     JOIN entities mia  ON mia.id  IN (r.source_id, r.target_id)
     JOIN entities otra ON otra.id IN (r.source_id, r.target_id) AND otra.id <> mia.id
@@ -163,14 +171,28 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
     JOIN context_entries ce ON ce.id = cee.context_entry_id
       AND ce.valid_to IS NULL AND ce.project_id = ANY(${projectIds})
     WHERE r.relation_type = 'contradicts' AND mia.type <> 'project' AND otra.type <> 'project'
-    LIMIT 100
+      AND NOT EXISTS (
+        SELECT 1 FROM context_entry_entities x WHERE x.context_entry_id = ce.id AND x.entity_id = otra.id
+      )
+    LIMIT 200
   `) as unknown as Row[];
-  for (const r of conEntidades) anota(r.entry_id as string, r.label as string);
+  for (const r of conEntidades) {
+    const porZona = zonas.get(r.entry_id as string) ?? new Map<string, Set<string>>();
+    const contra = porZona.get(r.zona as string) ?? new Set<string>();
+    contra.add(r.contra as string);
+    porZona.set(r.zona as string, contra);
+    zonas.set(r.entry_id as string, porZona);
+  }
 
-  // Tope por entrada: más de cuatro avisos en una línea ya no se leen, se saltan.
-  return [...porEntrada].map(([entryId, m]) => ({
+  // Topes: un aviso con más de esto ya no se lee, se salta.
+  const ids = new Set([...directos.keys(), ...zonas.keys()]);
+  return [...ids].map((entryId) => ({
     entryId,
-    with: [...m].slice(0, 4).map(([label, recordedLater]) => ({ label, recordedLater })),
+    entries: (directos.get(entryId) ?? []).slice(0, 3),
+    areas: [...(zonas.get(entryId) ?? new Map())].slice(0, 2).map(([entity, against]) => ({
+      entity,
+      against: [...against].slice(0, 3),
+    })),
   }));
 }
 

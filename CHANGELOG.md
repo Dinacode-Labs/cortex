@@ -12,8 +12,11 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 - **El context-pack avisa de las decisiones que se contradicen** (ADR-0035). Cuando dos entradas
   vigentes chocan, el pack las sigue entregando las dos —cuál sobra no se puede juzgar en
   automático sin arriesgarse a borrar la buena— pero ahora lo dice **al lado de cada una**, y
-  cuál se registró antes. Antes las entregaba como si nada y el agente decidía a ciegas: en
-  pruebas con varios agentes, dos lo detectaron solos y lo advirtieron sin que nadie preguntara.
+  cuál se registró antes cuando se sabe. Entre entradas se nombra el par; cuando la
+  contradicción está entre entidades del grafo —el caso frecuente— solo se dice que esa zona
+  está en disputa, porque afirmar un par concreto ahí sería mentira. Antes el pack las entregaba
+  como si nada y el agente decidía a ciegas: en pruebas con varios agentes, dos lo detectaron
+  solos y lo advirtieron sin que nadie preguntara.
 - **La memoria, como herramientas del agente en Pi** (ADR-0034). Cortex registra
   `cortex.mem_save`, `cortex.mem_search`, `cortex.mem_get_observation` y `cortex.mem_update`,
   que es lo que gentle-pi busca para ofrecer Cortex como almacén de su ciclo de trabajo. El

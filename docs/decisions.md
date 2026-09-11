@@ -1136,8 +1136,14 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   entregando las dos como vigentes, sin decir que chocaban. Dos agentes distintos lo detectaron
   por su cuenta al arrancar y lo dijeron sin que nadie preguntara — señal de que el aviso hacía
   falta y de que, sin él, cada agente gasta razonamiento en resolver lo mismo.
-- **Decisión:** el pack incluye los pares de entradas vigentes relacionadas por `contradicts` y
-  el render pega el aviso **a cada una de las dos**, con cuál se registró antes. No se invalida
+- **Decisión:** el pack incluye las contradicciones que afectan a sus entradas y el render pega
+  el aviso **a cada entrada implicada**, no en una sección al final. Se dicen de dos formas
+  distintas porque se saben dos cosas distintas: entre ENTRADAS (lo que crea la reconciliación)
+  se nombra el par y cuál se registró antes; entre ENTIDADES del grafo (lo que crea `maintain`,
+  y es el caso frecuente) solo se dice que **esa zona está en disputa**, porque una entrada
+  colgada de "README" no contradice necesariamente aquello con lo que el README choca. Afirmar
+  el par concreto daba avisos absurdos —una decisión sobre el backoff «contradiciendo» la
+  conciliación diaria— y un aviso que miente enseña a ignorar todos los avisos. No se invalida
   ninguna ni se elige ganadora: cuál sobra es un juicio que en automático se equivoca, y el
   coste de borrar la buena es mucho mayor que el de leer un aviso. La antigüedad se da como
   dato, no como veredicto: ser más nueva no la hace cierta.
@@ -1147,7 +1153,9 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
   Esconder del pack el lado más antiguo: lo mismo, pero además en silencio. Dejarlo solo en el
   lint: no lo lee nadie en el momento de trabajar, que es cuando importa.
 - **Consecuencias:** el pack crece un poco cuando hay conflictos, que es exactamente cuando
-  merece la pena. Sigue haciendo falta que alguien —persona o `maintain`— cierre el conflicto;
+  merece la pena; los avisos se agrupan por entrada y se topan (3 pares, 2 zonas, 3 contrarios
+  por zona) porque una línea más larga no se lee. Una entrada colgada de los DOS lados de una
+  disputa no recibe aviso: no está en medio de la discusión, es la discusión. Sigue haciendo falta que alguien —persona o `maintain`— cierre el conflicto;
   el aviso es para que no se decida a ciegas mientras tanto.
 - **Revisar cuando:** el reconciliador sea fiable resolviendo contradicciones (entonces podría
   proponer una ganadora y marcarla), o el pack se quede corto de espacio y haya que priorizar.
