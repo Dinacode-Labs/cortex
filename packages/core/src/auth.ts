@@ -52,15 +52,15 @@ export interface AuthUser {
 /** Genera un OTP para el email y lo envía (Brevo o dev-log). Invalida los previos. */
 export async function requestOtp(emailRaw: string): Promise<void> {
   const email = normEmail(emailRaw);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Email inválido.");
-  if (!isAllowedEmail(email)) throw new Error(`Dominio no permitido (solo: ${authDomains().join(", ") || "—"}).`);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("That does not look like an email address.");
+  if (!isAllowedEmail(email)) throw new Error(`That email domain is not allowed here (only: ${authDomains().join(", ") || "—"}).`);
   const sql = getSql();
   const recent = (await sql`
     SELECT count(*)::int AS n FROM otp_codes
     WHERE email = ${email} AND created_at > now() - make_interval(mins => ${otpRateWindowMin()})
   `) as unknown as Row[];
   if ((recent[0]?.n as number) >= otpRateMax()) {
-    throw new Error("Demasiadas solicitudes de código. Espera unos minutos y reinténtalo.");
+    throw new Error("Too many codes requested. Wait a few minutes and try again.");
   }
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   await sql`UPDATE otp_codes SET consumed_at = now() WHERE email = ${email} AND consumed_at IS NULL`;
