@@ -32,18 +32,23 @@ afterAll(() => {
  */
 function corre(args: string[], limiteMs: number): Promise<number | null> {
   return new Promise((cumplir, fallar) => {
-    const hijo = spawn(process.execPath, ["--import", "tsx", CLI, ...args], {
+    // `--conditions=development` como los scripts del repo: sin él, `@cortex/*` resuelve a
+    // `dist/`, que en un clon recién hecho (CI) no existe.
+    const hijo = spawn(process.execPath, ["--conditions=development", "--import", "tsx", CLI, ...args], {
       cwd: RAIZ,
-      stdio: ["pipe", "ignore", "inherit"],
+      stdio: ["pipe", "ignore", "pipe"],
       env: { ...process.env, CORTEX_SERVER_URL: "http://127.0.0.1:9" }, // nadie escucha: da igual, no hay proyecto
     });
+    let err = "";
+    hijo.stderr.on("data", (d) => (err += String(d)));
     const corte = setTimeout(() => {
       hijo.kill("SIGKILL");
       fallar(new Error(`el hook sigue vivo tras ${limiteMs} ms: se colgó leyendo stdin`));
     }, limiteMs);
     hijo.on("exit", (code) => {
       clearTimeout(corte);
-      cumplir(code);
+      // El stderr va en el fallo: si el hijo muere por otra cosa, que se vea cuál.
+      cumplir(code === 0 || !err ? code : (fallar(new Error(`salió con ${code}: ${err.slice(0, 600)}`)) as never));
     });
     hijo.on("error", fallar);
   });
