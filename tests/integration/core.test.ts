@@ -13,6 +13,7 @@ import {
   relate,
   resolveEntities,
   setClassifier,
+  setReconciler,
   lintProject,
   invalidateEntry,
   reclassifyProject,
@@ -93,6 +94,38 @@ describe("captura por lotes + reconciliación (BD real)", () => {
     expect(await isNearDuplicate(p.name, content)).toBe(true);
     const b = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "s2" } as never, opts);
     expect(b.action).toBe("noop"); // idéntico (≥ NOOP) y mismo source_type → NOOP
+  });
+
+  /**
+   * El eco de dos vías: el agente guarda la decisión con la tool (`manual`) y, al cerrar la
+   * sesión, la destilación la vuelve a guardar (`agent_session`) con otras palabras. Medido en
+   * un proyecto real, ese par puntúa 0.86–0.88: ni llega al NOOP de 0.95 ni pasaba por las ramas
+   * de abajo, que exigen el mismo origen. Se guardaba dos veces.
+   */
+  it("no repite conocimiento que ya está, aunque venga por otra vía", async () => {
+    const p = await createProject(`IT Eco ${RID}`);
+    const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
+    // El par está elegido para puntuar ~0.88 con los embeddings locales de los tests: en la
+    // banda del eco real medido en producción (0.86–0.88), ni idéntico (≥0.95) ni distinto.
+    const original = "El backoff de reintentos es exponencial con tope de 60 segundos y jitter.";
+    const eco = "El backoff de reintentos es exponencial con tope de 60 segundos y jitter aleatorio para evitar sincronizacion.";
+
+    const a = await saveWithReconciliation({ content: original, project: p.name, type: "decision", confidence: "low", sourceType: "manual", sourceReference: "tool" } as never, opts);
+    expect(a.action).toBe("add");
+
+    // Reconciliador de prueba: dice que es lo mismo, que es lo que haría el de verdad.
+    setReconciler({ decide: async () => "noop", merge: async (x: string) => x });
+    try {
+      const b = await saveWithReconciliation({ content: eco, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "sesion" } as never, opts);
+      expect(b.action).toBe("noop");
+      expect(b.entryId).toBe(a.entryId); // apunta a la que ya estaba, no a una nueva
+    } finally {
+      setReconciler(null);
+    }
+
+    // Y sin reconciliador no se inventa nada: se guarda, como antes.
+    const c = await saveWithReconciliation({ content: eco, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "sesion2" } as never, opts);
+    expect(c.action).toBe("add");
   });
 
   it("un eco de la sesión NO se vuelve a guardar aunque la original sea manual", async () => {
