@@ -35,14 +35,31 @@ command -v npm >/dev/null 2>&1 || fail "Tienes Node pero no npm. Reinstala Node 
 
 # --- CLI ---------------------------------------------------------------------
 say "Instalando $PKG"
-if ! npm install -g "$PKG" >/dev/null 2>&1; then
-  printf '\033[31m✗ npm no ha podido instalarlo.\033[0m\n' >&2
-  echo "  Si es por permisos, lo habitual es instalar en tu carpeta y no en el sistema:" >&2
-  echo "    npm config set prefix ~/.npm-global" >&2
-  echo '    export PATH="$HOME/.npm-global/bin:$PATH"   # añádelo a tu ~/.zshrc o ~/.bashrc' >&2
-  echo "  Y repite este mismo comando." >&2
+# La salida de npm se guarda en vez de tirarse: antes se silenciaba y se culpaba siempre a los
+# permisos, así que un paquete inexistente o un registro caído mandaban a la gente a
+# reconfigurar su npm para nada. El error de npm dice cuál de las tres es.
+LOG_NPM="$(mktemp)"
+if ! npm install -g "$PKG" >"$LOG_NPM" 2>&1; then
+  printf '\033[31m✗ npm no ha podido instalar %s.\033[0m\n' "$PKG" >&2
+  if grep -qE "E404|404 Not Found" "$LOG_NPM"; then
+    echo "  El registro dice que ese paquete no existe." >&2
+    echo "  Si Cortex aún no está publicado, pide a quien lleve el servidor la forma de instalarlo" >&2
+    echo "  mientras tanto. Si estás probando otro paquete, pásalo con CORTEX_NPM_PACKAGE." >&2
+  elif grep -qE "EACCES|EPERM|permission denied" "$LOG_NPM"; then
+    echo "  Es cosa de permisos. Lo habitual es instalar en tu carpeta y no en el sistema:" >&2
+    echo "    npm config set prefix ~/.npm-global" >&2
+    echo '    export PATH="$HOME/.npm-global/bin:$PATH"   # añádelo a tu ~/.zshrc o ~/.bashrc' >&2
+    echo "  Y repite este mismo comando." >&2
+  elif grep -qE "ENOTFOUND|ETIMEDOUT|ECONNREFUSED|network" "$LOG_NPM"; then
+    echo "  No se ha podido llegar al registro de npm. ¿Estás conectado? ¿Hay un proxy por medio?" >&2
+  else
+    echo "  Esto es lo que ha dicho npm:" >&2
+    tail -n 6 "$LOG_NPM" | sed 's/^/    /' >&2
+  fi
+  rm -f "$LOG_NPM"
   exit 1
 fi
+rm -f "$LOG_NPM"
 
 if ! command -v cortex >/dev/null 2>&1; then
   BIN="$(npm prefix -g 2>/dev/null)/bin"

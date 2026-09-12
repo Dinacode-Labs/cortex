@@ -48,4 +48,20 @@ describe("scripts/install.sh", () => {
     expect(src).toContain("/dev/tty");
     expect(src).toContain("cortex auth login --server");
   });
+
+  /**
+   * El instalador silenciaba la salida de npm y culpaba siempre a los permisos. Un paquete
+   * que no existe, un registro caído o un proxy por medio mandaban a la gente a reconfigurar
+   * su npm para nada, que es la peor primera impresión posible.
+   */
+  it("distingue por qué ha fallado npm en vez de culpar siempre a los permisos", () => {
+    const sh = src;
+    expect(sh).toMatch(/E404|404 Not Found/);
+    expect(sh).toMatch(/EACCES|EPERM/);
+    expect(sh).toMatch(/ENOTFOUND|ETIMEDOUT|ECONNREFUSED/);
+    // Y si no es ninguna de las tres, enseña lo que dijo npm en vez de inventarse una causa.
+    expect(sh).toContain("Esto es lo que ha dicho npm");
+    // La salida ya no se tira: sin guardarla no hay nada que mirar.
+    expect(sh).not.toMatch(/npm install -g "\$PKG" >\/dev\/null/);
+  });
 });

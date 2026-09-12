@@ -8,6 +8,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **El instalador dice por qué ha fallado, en vez de culpar siempre a los permisos.** Silenciaba
+  la salida de `npm` y, pasara lo que pasara, mandaba a reconfigurar el prefijo de npm. Si el
+  paquete no existía, si el registro no respondía o si había un proxy por medio, la persona se
+  iba a tocar su configuración para nada — y esa es la primera impresión que se lleva de Cortex.
+  Ahora distingue el 404, los permisos y la red, y si no es ninguno de los tres enseña lo que
+  dijo npm en lugar de inventarse una causa.
+
 ### Changed
 - **La búsqueda deduce el tipo cuando la pregunta lo nombra.** «¿Qué deuda técnica hay alrededor
   de la facturación?» no recuperaba ninguna de las dos entradas correctas: los cinco resultados
