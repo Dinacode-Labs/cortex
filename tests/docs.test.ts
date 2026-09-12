@@ -60,7 +60,7 @@ describe("documentación", () => {
   it("lo que abre alguien de fuera está en inglés", () => {
     // Palabras funcionales del español: aparecen en cualquier párrafo, y en inglés no.
     const español = /\b(el|la|los|las|una|porque|además|según|cómo|qué)\b/i;
-    for (const doc of ["README.md", "CONTRIBUTING.md", "SECURITY.md"]) {
+    for (const doc of ["README.md", "CONTRIBUTING.md", "SECURITY.md", "docs/decisions.md"]) {
       const sospechosas = read(doc)
         .split("\n")
         .filter((l) => español.test(l) && !l.trimStart().startsWith("```"));

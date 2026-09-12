@@ -8,6 +8,16 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Changed
+- **El registro de decisiones, revisado de arriba abajo y en inglés.** Tenía doce decisiones
+  **sin número**, escondidas dentro de otra con cabeceras sueltas: dos de ellas ya se citaban
+  por el título porque no había número al que apuntar. Ahora son ADR-0036 a ADR-0047, con su
+  fecha real sacada del historial. Diecisiete seguían marcadas «aceptada (demo)» en un sistema
+  desplegado y en uso. El orden se rompía a partir del 0024. Y el índice nuevo cuenta el hilo
+  por fases —fundación, multiusuario, limpieza de arquitectura, límites asumidos, producto,
+  uso real—, que es lo que hacía falta para ver a dónde iba esto y por qué. Los números no
+  cambian: los citan 67 ficheros.
+
 ### Added
 - **Límite por IP en el envío de códigos de acceso.** Ya había límite por dirección de correo,
   que impide machacar a una persona; lo que no impedía es pedir códigos para muchas direcciones
