@@ -8,6 +8,17 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+_Nada todavía._
+
+## [0.1.0] — 2026-09-12
+
+Primera versión publicable. Cortex deja de ser un repo que se clona para convertirse en un
+servidor que se despliega y un CLI que se instala: `npm i -g @dinacodelabs/cortex`, `cortex auth
+login`, `cortex setup --all`, y los agentes de ese portátil ya leen y escriben en la memoria
+del proyecto, sin claves de modelo y sin base de datos en local.
+
+### Cambios de esta versión, en orden inverso de llegada
+
 ### Added
 - **El context-pack avisa de las decisiones que se contradicen** (ADR-0035). Cuando dos entradas
   vigentes chocan, el pack las sigue entregando las dos —cuál sobra no se puede juzgar en
@@ -114,13 +125,6 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   ya está hecho y se queda con lo que falta de verdad; el README, `CLAUDE.md` y
   `CONTRIBUTING.md` describen el producto que hay hoy, no el que se clonaba. Hay tests que
   vigilan los enlaces internos, los ADR citados y que no se cuele material corporativo.
-
-## [0.1.0] — 2026-09-10
-
-Primera versión publicable. Cortex deja de ser un repo que se clona para convertirse en un
-servidor que se despliega y un CLI que se instala: `npm i -g @dinacodelabs/cortex`, `cortex auth
-login`, `cortex setup --all`, y los agentes de ese portátil ya leen y escriben en la memoria
-del proyecto, sin claves de modelo y sin base de datos en local.
 
 ### Added
 - **Despliegue de producción completo** (ADR-0027): imagen de tres etapas sin
