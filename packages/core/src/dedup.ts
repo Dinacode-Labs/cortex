@@ -148,8 +148,8 @@ export async function saveWithReconciliation(
   // El mismo conocimiento por DOS vías: el agente lo guarda con la tool y, al cerrar la
   // sesión, la destilación lo vuelve a guardar. Llegan con `sourceType` distinto ("manual" y
   // "agent_session"), así que las ramas de abajo —que exigen el mismo origen para no reescribir
-  // conocimiento curado— ni lo miran, y el 0.95 de arriba no llega: medido en un proyecto real
-  // con cuatro agentes, este eco puntúa 0.86–0.88.
+  // conocimiento curado— ni lo miran, y el 0.95 de arriba no llega: medido sobre un proyecto
+  // con varios agentes trabajando, este eco puntúa 0.86–0.88.
   //
   // Así que se pregunta al reconciliador, pero SOLO para no escribir. Entre orígenes distintos
   // nunca se modifica ni se invalida nada: lo peor que puede pasar es que la entrada no se

@@ -9,7 +9,7 @@ describe("isAllowedEmail (whitelist de dominios)", () => {
 
   it("acepta el dominio permitido y rechaza otros", () => {
     process.env.CORTEX_AUTH_DOMAIN = "example.com";
-    expect(isAllowedEmail("ruben@example.com")).toBe(true);
+    expect(isAllowedEmail("dev@example.com")).toBe(true);
     expect(isAllowedEmail("ALGUIEN@Example.com")).toBe(true); // case-insensitive
     expect(isAllowedEmail("hacker@gmail.com")).toBe(false);
   });
@@ -39,8 +39,8 @@ describe("isAdmin (uno o varios)", () => {
   });
 
   it("reconoce varios admins y rechaza el resto", () => {
-    process.env.CORTEX_ADMIN_EMAIL = "ruben@example.com, alex@example.com";
-    expect(isAdmin("ruben@example.com")).toBe(true);
+    process.env.CORTEX_ADMIN_EMAIL = "dev@example.com, alex@example.com";
+    expect(isAdmin("dev@example.com")).toBe(true);
     expect(isAdmin("ALEX@example.com")).toBe(true);
     expect(isAdmin("bob@example.com")).toBe(false);
   });
@@ -49,6 +49,6 @@ describe("isAdmin (uno o varios)", () => {
     expect(isAdmin(null)).toBe(false);
     expect(isAdmin(undefined)).toBe(false);
     process.env.CORTEX_ADMIN_EMAIL = "";
-    expect(isAdmin("ruben@example.com")).toBe(false);
+    expect(isAdmin("dev@example.com")).toBe(false);
   });
 });

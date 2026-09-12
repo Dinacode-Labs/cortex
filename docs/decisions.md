@@ -1088,7 +1088,7 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 ## ADR-0034 · La memoria como tools con nombre propio: `cortex.mem_*` en Pi, y una API que sabe leer
 
 - **Estado:** aceptada (2026-09).
-- **Contexto:** gentle-pi, el harness que usamos sobre Pi, decide si puede guardar artefactos de
+- **Contexto:** gentle-pi, un harness construido sobre Pi, decide si puede guardar artefactos de
   su ciclo de trabajo comprobando si existe una tool de memoria entre las activas. No llama a
   Engram ni lo importa: solo mira el nombre. Quien habla con Engram es otro paquete distinto,
   `gentle-engram`, que registra él mismo 19 tools `mem_*`. La idea era registrar las nuestras
@@ -1129,21 +1129,21 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 ## ADR-0035 · Las contradicciones se avisan en el context-pack, no se resuelven solas
 
 - **Estado:** aceptada (2026-09).
-- **Contexto:** probando con cuatro agentes a la vez sobre un mismo proyecto, dos registraron
+- **Contexto:** con varios agentes trabajando sobre un mismo proyecto, dos registraron
   decisiones incompatibles sobre lo mismo (backoff fijo de 30 s contra exponencial con tope),
   porque uno leyó el código antes de que el otro lo cambiara. `maintain` detecta la
   contradicción y el lint la reporta, pero nadie invalida nada: el context-pack seguía
   entregando las dos como vigentes, sin decir que chocaban. Dos agentes distintos lo detectaron
-  por su cuenta al arrancar y lo dijeron sin que nadie preguntara — señal de que el aviso hacía
-  falta y de que, sin él, cada agente gasta razonamiento en resolver lo mismo.
+  por su cuenta al arrancar y lo advirtieron sin que nadie preguntara: señal de que el aviso
+  hacía falta y de que, sin él, cada agente gasta razonamiento en resolver lo mismo.
 - **Decisión:** el pack incluye las contradicciones que afectan a sus entradas y el render pega
   el aviso **a cada entrada implicada**, no en una sección al final. Se dicen de dos formas
   distintas porque se saben dos cosas distintas: entre ENTRADAS (lo que crea la reconciliación)
   se nombra el par y cuál se registró antes; entre ENTIDADES del grafo (lo que crea `maintain`,
   y es el caso frecuente) solo se dice que **esa zona está en disputa**, porque una entrada
   colgada de "README" no contradice necesariamente aquello con lo que el README choca. Afirmar
-  el par concreto daba avisos absurdos —una decisión sobre el backoff «contradiciendo» la
-  conciliación diaria— y un aviso que miente enseña a ignorar todos los avisos. No se invalida
+  el par concreto daba avisos absurdos —una decisión sobre reintentos «contradiciendo» un
+  proceso nocturno— y un aviso que miente enseña a ignorar todos los avisos. No se invalida
   ninguna ni se elige ganadora: cuál sobra es un juicio que en automático se equivoca, y el
   coste de borrar la buena es mucho mayor que el de leer un aviso. La antigüedad se da como
   dato, no como veredicto: ser más nueva no la hace cierta.
