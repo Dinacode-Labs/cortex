@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { clientIp, demasiadasPeticiones } from "../rate-limit.js";
 import { z } from "zod";
 import { createUiTicket, requestOtp, revokeToken, verifyOtp } from "@cortex/core";
 import { bearer, currentUser } from "../auth-helpers.js";
@@ -12,6 +13,10 @@ const authRequestSchema = z.object({ email: z.string().min(1) });
 const authVerifySchema = z.object({ email: z.string().min(1), code: z.string().min(1) });
 
 authRoutes.post("/auth/request", async (c) => {
+  // El límite por IP va ANTES de mirar el body: si no, una ráfaga cuesta igual de cara.
+  if (demasiadasPeticiones(clientIp(c))) {
+    return c.json({ error: "Too many codes requested from here. Wait a few minutes and try again." }, 429);
+  }
   const body = await parseBody(c, authRequestSchema);
   if (body instanceof Response) return body;
   try {

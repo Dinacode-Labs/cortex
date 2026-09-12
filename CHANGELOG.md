@@ -8,6 +8,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **Límite por IP en el envío de códigos de acceso.** Ya había límite por dirección de correo,
+  que impide machacar a una persona; lo que no impedía es pedir códigos para muchas direcciones
+  distintas desde una sola IP, porque cada una estrenaba su propio cupo. Con el envío de correo
+  activo eso son mensajes de verdad a gente de verdad, y una factura. Ajustable con
+  `CORTEX_AUTH_IP_MAX` y `CORTEX_AUTH_IP_WINDOW_MIN`.
+
 ### Fixed
 - **El instalador dice por qué ha fallado, en vez de culpar siempre a los permisos.** Silenciaba
   la salida de `npm` y, pasara lo que pasara, mandaba a reconfigurar el prefijo de npm. Si el

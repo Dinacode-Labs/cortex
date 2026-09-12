@@ -73,8 +73,10 @@ no hecho.
 
 ### Operación y escala
 
-- **Límite de peticiones por IP.** Hoy solo hay límite por email en el envío de códigos. El
-  sitio natural es un plugin de Caddy o el CDN.
+- **Límite de peticiones por IP, general.** El envío de códigos **ya está cubierto** por IP
+  además de por email, porque es el único sitio sin autenticar que provoca un efecto —y un
+  coste— fuera del servidor. Para el resto del tráfico el sitio natural sigue siendo el borde:
+  un plugin de Caddy o el CDN, donde se puede parar antes de gastar un proceso.
 - **Cola de captura persistente.** Ahora vive en memoria: si el servidor se reinicia con
   trabajos encolados, se pierden. Con el volumen actual no compensa; con varios equipos
   capturando a la vez, sí.
