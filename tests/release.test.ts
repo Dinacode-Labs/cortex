@@ -54,6 +54,23 @@ describe("workflow de release", () => {
     expect(JSON.stringify(wf.jobs["github-release"]!.needs)).toContain("image");
   });
 
+  /**
+   * Cada job arranca con su propio checkout y sin nada construido. El bundle del CLI se arma
+   * desde los `dist/` de los paquetes del monorepo, así que el job que publica tiene que
+   * compilarlos él. Que `verify` lo haga no sirve: es otra máquina.
+   *
+   * Esto se llevó por delante un release entero — con la imagen ya publicada y el tag ya
+   * puesto— porque tsup no resolvía `@cortex/client`.
+   */
+  it("el job que publica en npm construye el monorepo antes, y en ese orden", () => {
+    const pasos = wf.jobs.npm!.steps ?? [];
+    const iBuild = pasos.findIndex((p) => p.run?.trim() === "pnpm build");
+    const iPublish = pasos.findIndex((p) => p.run?.includes("publish"));
+    expect(iBuild, "falta `pnpm build` en el job de npm").toBeGreaterThanOrEqual(0);
+    expect(iPublish).toBeGreaterThanOrEqual(0);
+    expect(iBuild, "se construye después de publicar, que no sirve de nada").toBeLessThan(iPublish);
+  });
+
   it("verify comprueba que el tag coincide con las versiones del repo", () => {
     const pasos = JSON.stringify(wf.jobs.verify!.steps);
     expect(pasos).toContain("GITHUB_REF_NAME");

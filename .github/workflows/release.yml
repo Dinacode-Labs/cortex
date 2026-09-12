@@ -103,6 +103,11 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
+      # El bundle del CLI se arma desde los `dist/` de los paquetes del monorepo, así que hay
+      # que compilarlos antes. `verify` ya lo hace, pero es OTRO job con su propio checkout:
+      # aquí no hay nada construido. Sin esto, tsup no resuelve `@cortex/client` y el release
+      # muere después de haber publicado ya la imagen.
+      - run: pnpm build
       - name: Publicar @dinacodelabs/cortex
         if: ${{ env.NODE_AUTH_TOKEN != '' }}
         run: pnpm --filter @dinacodelabs/cortex publish --access public --no-git-checks --provenance
