@@ -42,7 +42,7 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   cuál se registró antes cuando se sabe. Entre entradas se nombra el par; cuando la
   contradicción está entre entidades del grafo —el caso frecuente— solo se dice que esa zona
   está en disputa, porque afirmar un par concreto ahí sería mentira. Antes el pack las entregaba
-  como si nada y el agente decidía a ciegas: en pruebas con varios agentes, dos lo detectaron
+  como si nada y el agente decidía a ciegas, y dos agentes distintos lo detectaron
   solos y lo advirtieron sin que nadie preguntara.
 - **La memoria, como herramientas del agente en Pi** (ADR-0034). Cortex registra
   `cortex.mem_save`, `cortex.mem_search`, `cortex.mem_get_observation` y `cortex.mem_update`,
@@ -72,8 +72,8 @@ del proyecto, sin claves de modelo y sin base de datos en local.
   con la tool y, al cerrar la sesión, la destilación la vuelve a guardar con otras palabras, las
   dos entradas llegan con `sourceType` distinto (`manual` y `agent_session`). Las ramas de
   reconciliación exigen el mismo origen —para no reescribir conocimiento curado— y el umbral de
-  «ya lo sé» está en 0.95, así que el par pasaba por el medio: medido con cuatro agentes sobre
-  un proyecto real, ese eco puntúa **0.86–0.88**. Ahora, entre orígenes distintos y por encima
+  «ya lo sé» está en 0.95, así que el par pasaba por el medio: medido sobre un proyecto con
+  varios agentes, ese eco puntúa **0.86–0.88**. Ahora, entre orígenes distintos y por encima
   del umbral, se pregunta al reconciliador **solo para no escribir**: nunca se modifica ni se
   invalida nada, y lo peor que puede pasar es que no se añada algo que ya sabíamos.
 - **El lint ya ve esos duplicados.** El listón era 0.88 para todo; ahora baja a 0.85 entre
