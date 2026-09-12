@@ -142,8 +142,10 @@ claves** (embeddings `local`, no semánticos); conecta un endpoint real
   descripciones de las tools MCP, la skill y los comandos del plugin, los errores de la API,
   la UI web, el `README.md`, `docs/how-it-works.md`, `CONTRIBUTING.md` y `SECURITY.md` — el
   repositorio es público, y quien encuentra un fallo de seguridad o quiere contribuir tiene
-  que poder leer cómo se hace. **Lo que es registro de trabajo del equipo va en español**:
-  comentarios del código, ADRs, roadmap e investigación. También los prompts de los agentes
+  que poder leer cómo se hace. También los ADR
+  (`docs/decisions.md`): explican **cómo está construido** el producto y son parte de lo que
+  hace creíble abrirlo, así que los lee gente de fuera. **Lo que es registro de trabajo del
+  equipo va en español**: comentarios del código, roadmap e investigación. También los prompts de los agentes
   LLM, porque el corpus que procesan es español.
 - Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
 - **Un cliente puede hablar con varios servidores** (ADR-0033). El servidor sale del
