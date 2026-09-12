@@ -1,0 +1,218 @@
+[
+  {
+    "id": "e01",
+    "type": "decision",
+    "title": "Postgres como base única, sin almacén vectorial aparte",
+    "content": "Nébula guarda documentos, metadatos y vectores en el mismo Postgres 16 con pgvector. Se evaluó sacar los vectores a un servicio dedicado y se descartó: con el volumen actual (≈2M fragmentos) el índice cabe en memoria, y tener dos almacenes obligaría a escribir en dos sitios de forma transaccionalmente coherente, que es la clase de complejidad que se paga todos los días."
+  },
+  {
+    "id": "e02",
+    "type": "constraint",
+    "title": "Los documentos subidos no pueden pasar de 40 MB",
+    "content": "El proxy corta las peticiones por encima de 40 MB. No es un capricho: por encima de esa cifra la conversión a texto se come la memoria del contenedor y tumba el resto de peticiones del mismo nodo. Los ficheros grandes se suben troceados desde el cliente."
+  },
+  {
+    "id": "e03",
+    "type": "incident",
+    "title": "Caída del 14 de marzo: la cola se llenó de reintentos",
+    "content": "El proveedor de OCR estuvo caído cuarenta minutos. Como el reintento era inmediato y sin tope, la cola acumuló 180.000 trabajos y Postgres se quedó sin conexiones, así que dejó de funcionar también lo que no dependía del OCR. El incidente motivó el backoff exponencial."
+  },
+  {
+    "id": "e04",
+    "type": "decision",
+    "title": "Backoff exponencial con jitter en los reintentos de la cola",
+    "content": "Tras la caída de marzo, los reintentos pasan a ser exponenciales empezando en 2 segundos y con tope de 5 minutos, más un jitter del 50% para que los trabajos que fallaron a la vez no vuelvan todos juntos. Un trabajo se abandona al noveno intento y va a la cola de fallidos."
+  },
+  {
+    "id": "e05",
+    "type": "convention",
+    "title": "Las migraciones de base de datos solo avanzan",
+    "content": "No se escriben migraciones de bajada. Deshacer un despliegue se hace desplegando la versión anterior del código, que tiene que seguir funcionando con el esquema nuevo. Por eso una columna nunca se borra en la misma versión que deja de usarse: se deja muerta y se retira dos versiones después."
+  },
+  {
+    "id": "e06",
+    "type": "decision",
+    "title": "Autenticación por código de un solo uso, sin contraseñas",
+    "content": "No se guardan contraseñas. El usuario pide un código a su correo corporativo y recibe un token de sesión de 30 días. Se eligió así porque el cliente tipo son equipos pequeños sin directorio corporativo, y mantener un almacén de contraseñas obliga a rotaciones, políticas y a responder de las filtraciones de otros."
+  },
+  {
+    "id": "e07",
+    "type": "constraint",
+    "title": "Solo se admiten correos del dominio del cliente",
+    "content": "El registro rechaza dominios de correo genéricos. Cada cuenta declara sus dominios permitidos y cualquier dirección fuera de esa lista no puede ni pedir código. Es la única barrera de entrada, así que si se relaja hay que poner otra cosa en su sitio."
+  },
+  {
+    "id": "e08",
+    "type": "architecture",
+    "title": "Tres servicios: recepción, proceso y facturación",
+    "content": "Recepción acepta el documento y lo deja en almacenamiento; proceso lo convierte, extrae campos y lo indexa; facturación cuenta páginas y emite el cargo mensual. Se comunican por la cola de Postgres, no por HTTP directo, para que una caída de proceso no rebote al usuario que sube."
+  },
+  {
+    "id": "e09",
+    "type": "technical_debt",
+    "title": "Facturación cuenta páginas leyendo el documento entero",
+    "content": "El contador de páginas vuelve a abrir el PDF en lugar de leer el dato que proceso ya calculó. En documentos de más de 500 páginas eso duplica el trabajo y ha llegado a tardar minutos. Está pendiente de que proceso escriba el número de páginas en la fila del documento."
+  },
+  {
+    "id": "e10",
+    "type": "decision",
+    "title": "El OCR se contrata fuera, no se monta",
+    "content": "Se usa un proveedor externo de OCR en lugar de montar uno propio. Montar OCR bueno exige GPU y un equipo que lo mantenga, y el coste por página del proveedor es menor que el de tener una GPU encendida al volumen que hay. Se revisará si el gasto mensual de OCR supera al de una GPU dedicada."
+  },
+  {
+    "id": "e11",
+    "type": "risk",
+    "title": "Dependemos de un único proveedor de OCR",
+    "content": "Todo el procesamiento pasa por un proveedor. Si sube el precio o cierra, no hay plan B escrito y la conversión quedaría parada. Mitigarlo exige una capa de abstracción que hoy no existe: el cliente del proveedor se llama directamente desde el servicio de proceso."
+  },
+  {
+    "id": "e12",
+    "type": "convention",
+    "title": "Todo importe se guarda en céntimos y como entero",
+    "content": "Ningún importe se guarda en coma flotante. Se guardan céntimos en un entero y la moneda en una columna aparte. Formatear es cosa de la interfaz. Viene de un cuadre de facturación que salía descuadrado por céntimos y costó dos días encontrar."
+  },
+  {
+    "id": "e13",
+    "type": "business_rule",
+    "title": "La facturación se cierra el día 1 a las 00:00 UTC",
+    "content": "El consumo de un mes se cierra el día 1 del mes siguiente a las 00:00 UTC. Lo que llegue después cuenta para el mes nuevo aunque el documento se subiera antes, porque la referencia es la hora de finalización del proceso, no la de subida."
+  },
+  {
+    "id": "e14",
+    "type": "decision",
+    "title": "Los documentos se guardan cifrados en reposo con clave por cuenta",
+    "content": "Cada cuenta tiene su propia clave de cifrado y los documentos se guardan cifrados en el almacenamiento de objetos. La clave maestra vive en el gestor de secretos y nunca en la base de datos. Así, un volcado de la base no expone ningún documento."
+  },
+  {
+    "id": "e15",
+    "type": "constraint",
+    "title": "No se guarda ningún documento fuera de la Unión Europea",
+    "content": "El almacenamiento y las réplicas están en regiones europeas, y eso incluye las copias de seguridad. El proveedor de OCR tiene que ofrecer proceso en región europea o queda descartado, por mucho que el precio sea mejor."
+  },
+  {
+    "id": "e16",
+    "type": "incident",
+    "title": "Una copia de seguridad restaurada no tenía la extensión vectorial",
+    "content": "En un simulacro, la copia se restauró sin la extensión de vectores, así que la base arrancó pero toda búsqueda fallaba. El volcado se hacía con una opción que se saltaba la creación de extensiones. Se corrigió el comando de copia y se añadió una comprobación al final de la restauración."
+  },
+  {
+    "id": "e17",
+    "type": "convention",
+    "title": "Las copias se prueban restaurándolas una vez al mes",
+    "content": "Una copia que no se ha restaurado no cuenta como copia. El primer lunes de cada mes se restaura la última en una base aparte y se comprueba que el número de documentos cuadra. El simulacro es obligatorio aunque no haya habido cambios."
+  },
+  {
+    "id": "e18",
+    "type": "decision",
+    "title": "Los campos extraídos se guardan con la confianza del modelo",
+    "content": "Cada campo extraído de un documento se guarda junto con la confianza que dio el modelo. Por debajo de 0.7 se marca para revisión humana en lugar de darse por bueno. Se prefirió esto a fijar un umbral por campo, que exigía mantener una tabla de umbrales que nadie iba a revisar."
+  },
+  {
+    "id": "e19",
+    "type": "technical_debt",
+    "title": "La revisión humana no tiene interfaz propia",
+    "content": "Los campos marcados para revisión se corrigen entrando a la base de datos a mano. Funciona porque hay pocos, pero no escala y no deja traza de quién corrigió qué. Es lo primero que habría que construir si entra un cliente con volumen."
+  },
+  {
+    "id": "e20",
+    "type": "decision",
+    "title": "Un índice por cuenta en lugar de uno compartido",
+    "content": "Cada cuenta tiene su propio índice de búsqueda en vez de compartir uno con filtro por cuenta. Cuesta más espacio, pero elimina de raíz la posibilidad de que un fallo en el filtro enseñe documentos de otro cliente, que es el tipo de fallo del que no se vuelve."
+  },
+  {
+    "id": "e21",
+    "type": "how_to",
+    "title": "Cómo reprocesar un documento sin volver a cobrarlo",
+    "content": "Se marca la fila como pendiente y se encola con la bandera de reproceso. Esa bandera hace que facturación ignore el trabajo al contar páginas. Sin ella, reprocesar un documento se cobra otra vez, que es lo que pasó con el cliente que pidió reextraer un lote entero."
+  },
+  {
+    "id": "e22",
+    "type": "constraint",
+    "title": "El proceso de un documento tiene 10 minutos como máximo",
+    "content": "Un trabajo que pasa de diez minutos se corta y se marca como fallido. Se puso el corte porque un PDF con imágenes gigantes podía tener un trabajador ocupado horas, y con la cola llena eso es un servicio parado para todos los demás."
+  },
+  {
+    "id": "e23",
+    "type": "convention",
+    "title": "Los mensajes de error que ve el cliente no llevan detalles internos",
+    "content": "La API nunca devuelve trazas, nombres de tabla ni mensajes del proveedor. Devuelve un código y una frase, y el detalle queda en el registro con un identificador de correlación. Si alguien necesita saber qué pasó, se busca por ese identificador."
+  },
+  {
+    "id": "e24",
+    "type": "decision",
+    "title": "Registro estructurado en JSON, con identificador de correlación",
+    "content": "Todo el registro sale en JSON con un identificador que acompaña a la petición por los tres servicios. Se eligió JSON en vez de texto porque las consultas que de verdad se hacen son «todo lo de esta petición» y «todos los fallos de esta cuenta», y con texto plano eso es una expresión regular frágil."
+  },
+  {
+    "id": "e25",
+    "type": "incident",
+    "title": "Una cuenta agotó la cuota del proveedor para todas las demás",
+    "content": "Un cliente subió 40.000 documentos en una noche y consumió la cuota diaria del proveedor de OCR. El resto de cuentas se quedaron sin procesar hasta el día siguiente. No había ningún límite por cuenta, solo el global del proveedor."
+  },
+  {
+    "id": "e26",
+    "type": "decision",
+    "title": "Cuota diaria por cuenta, con reparto justo de la cola",
+    "content": "Después de lo de la noche de los 40.000 documentos, cada cuenta tiene un tope diario de páginas y la cola reparte por turnos entre cuentas en lugar de servir por orden de llegada. Una cuenta puede ir lenta, pero no puede dejar al resto sin servicio."
+  },
+  {
+    "id": "e27",
+    "type": "convention",
+    "title": "Las variables de entorno se validan al arrancar, no al usarse",
+    "content": "Cada servicio comprueba al arrancar que tiene todo lo que necesita y se niega a levantar si falta algo. Antes, una variable mal puesta se descubría a las tres horas, cuando llegaba la primera petición que la usaba, y para entonces ya había tráfico encima."
+  },
+  {
+    "id": "e28",
+    "type": "technical_debt",
+    "title": "Los tres servicios comparten el mismo usuario de base de datos",
+    "content": "Recepción, proceso y facturación entran a Postgres con las mismas credenciales y con permisos de escritura sobre todo. Debería haber un usuario por servicio con permisos al mínimo, para que un fallo en recepción no pueda tocar las filas de facturación."
+  },
+  {
+    "id": "e29",
+    "type": "decision",
+    "title": "Las pruebas de integración corren contra un Postgres real",
+    "content": "No se simula la base de datos en las pruebas. Se levanta un Postgres en Docker y se corre contra él. Cuesta unos segundos más, pero los fallos que importan —una migración que no aplica, una consulta que se apoya en una extensión— solo aparecen contra la base de verdad."
+  },
+  {
+    "id": "e30",
+    "type": "risk",
+    "title": "Nadie más conoce el proceso de restauración",
+    "content": "El procedimiento de restauración está escrito, pero solo lo ha ejecutado una persona. Si esa persona no está disponible el día que haga falta, el tiempo de recuperación se multiplica. Habría que rotar quién hace el simulacro mensual."
+  },
+  {
+    "id": "e31",
+    "type": "business_rule",
+    "title": "Las páginas se cuentan aunque la extracción falle",
+    "content": "Si un documento se convierte pero la extracción de campos falla, las páginas convertidas se cobran igual, porque el coste del proveedor ya se pagó. Lo que no se cobra es un documento que ni llegó a convertirse."
+  },
+  {
+    "id": "e32",
+    "type": "convention",
+    "title": "Cada cambio lleva su documentación en el mismo cambio",
+    "content": "Un cambio de comportamiento que no actualice la documentación afectada no se aprueba. No se acepta «lo documento luego»: la documentación desfasada hace más daño que la ausente, porque la gente se la cree."
+  },
+  {
+    "id": "e33",
+    "type": "decision",
+    "title": "La interfaz se sirve renderizada en servidor",
+    "content": "La interfaz se genera en el servidor y se manda como HTML, sin marco de cliente. Las pantallas son listados y formularios, el equipo es pequeño, y así no hay que mantener dos modelos de datos ni un proceso de construcción aparte."
+  },
+  {
+    "id": "e34",
+    "type": "module_note",
+    "title": "El servicio de proceso es el único que habla con el proveedor",
+    "content": "Ningún otro servicio llama al proveedor de OCR. Si hace falta convertir algo desde otro sitio, se encola un trabajo. Esto es lo que hace que cambiar de proveedor sea un cambio localizado, aunque hoy no haya capa de abstracción."
+  },
+  {
+    "id": "e35",
+    "type": "constraint",
+    "title": "Los documentos se borran a los 90 días si el cliente no dice otra cosa",
+    "content": "Por defecto los documentos y su texto extraído se borran a los 90 días. Una cuenta puede pedir retención más larga y queda registrado quién lo pidió y cuándo. El borrado es real, no un marcado: incluye el objeto cifrado y sus fragmentos indexados."
+  },
+  {
+    "id": "e36",
+    "type": "incident",
+    "title": "El borrado a 90 días no limpiaba los fragmentos indexados",
+    "content": "Durante cuatro meses el borrado automático quitaba el documento y su texto, pero dejaba los fragmentos en el índice de búsqueda. Aparecían en resultados documentos que ya no existían, con su contenido visible. Se corrigió y se hizo una pasada de limpieza sobre lo que quedaba."
+  }
+]

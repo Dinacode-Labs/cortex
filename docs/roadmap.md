@@ -34,21 +34,29 @@ Hecho y en el producto:
 
 ## Qué queda
 
-### Medir el retrieval antes de mejorarlo
+### El retrieval ya se mide — HECHO (2026-09-12)
 
-Es lo siguiente que hay que hacer, y bloquea a lo demás de esta lista. Sin un conjunto de
-evaluación no hay forma de saber si un cambio en el chunking o en el rerank mejora o empeora.
+`pnpm admin eval` corre 40 preguntas en español con la evidencia anotada contra un corpus fijo
+(`tests/fixtures/eval/`), y da recall@5 y MRR por tipo de pregunta. El corpus va en el repo y
+no sale de la memoria real a propósito: un eval sirve para comparar ejecuciones, y la memoria
+real cambia todos los días.
 
-**Qué construir:** 30–100 preguntas en español con la evidencia anotada, incluyendo preguntas
-cuya respuesta esté repartida en varias entradas. Métricas: recall@5 y MRR. Plantilla de
-referencia: el benchmark abierto de Chroma.
+**Línea base:** recall@5 **0.961**, MRR **0.901** con `qwen3-embedding`. Lo parafraseado se
+recupera entero; se cae en las preguntas repartidas entre varias entradas.
 
-**Qué desbloquea:** Contextual Retrieval (un prefijo generado por LLM en cada fragmento) está
-**aplazado a propósito** hasta que el eval muestre fallos por pérdida de contexto. La
-investigación está hecha y verificada en
-[`research/chunking-strategies.md`](./research/chunking-strategies.md): el chunker estructural
-actual es lo que la evidencia respalda, el semantic chunking no justifica su coste, y el late
-chunking es inviable con proveedores por API.
+**Qué desbloquea, y cómo queda:** Contextual Retrieval estaba aplazado hasta que el eval
+mostrara fallos por pérdida de contexto. **No los muestra**: el recall de las preguntas
+parafraseadas es 1.000, que es justo donde se vería. Sigue aplazado, y ahora por una medida y
+no por una intuición. La investigación está en
+[`research/chunking-strategies.md`](./research/chunking-strategies.md).
+
+### Deducir el tipo de entrada de la pregunta
+
+Lo primero que ha sacado el eval. «¿Qué deuda técnica hay alrededor de la facturación?»
+recupera **0 de 2**: los cinco resultados hablan de facturación y ninguno es del tipo
+`technical_debt`. La similitud semántica se come el tipo cuando la pregunta nombra una
+categoría del dominio. La búsqueda ya acepta filtrar por tipo; falta que alguien lo deduzca de
+la pregunta. Con el eval montado, se puede medir si el arreglo sirve.
 
 ### Índice navegable dentro de un proyecto (a estudiar)
 
