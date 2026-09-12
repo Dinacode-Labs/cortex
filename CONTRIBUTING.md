@@ -151,12 +151,17 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 dos cosas apuntadas para retirarse en la `0.2.0`: el alias `LLM_PROVIDER=nan` y la variable
 `BREVO_SENDER`.
 
-## Abrir el código
+## El repositorio es público
 
-Cuando llegue el momento, el repositorio **no se abre publicando este historial**. Se abre
-desde una **instantánea limpia**: un repositorio nuevo con un commit inicial del árbol actual
-(ADR-0026). Reescribir la historia con `git filter-repo` rompe clones y referencias a PRs, y
-no aporta nada mientras el repositorio sea privado.
+Lo que se escribe aquí lo lee cualquiera, y eso cambia dos cosas del día a día:
 
-Lo que hay que tener hecho antes: el README y la UI web en inglés, y una revisión de que no
-queda nada corporativo (el ADR-0031 dice qué se publica y qué no).
+- **Se cuenta qué se descubrió, no cómo se descubrió.** Un hallazgo vale por lo que enseña
+  —«este par de entradas puntúa 0.86–0.88»—, no por el montaje que lo produjo. Lo segundo
+  envejece mal y no ayuda a nadie de fuera. Hay un test que lo vigila (`tests/docs.test.ts`).
+- **Nada corporativo, en ningún sitio**: ni clientes por su nombre, ni personas como
+  responsables, ni herramientas internas. El ADR-0031 dice dónde está la raya, y la regla
+  rápida es: si ayuda a alguien de fuera a usar, entender o mejorar Cortex, es público; si
+  describe cómo lo operamos nosotros, no.
+
+El historial anterior a la apertura es material de trabajo, no producto: no se mantiene, no se
+cita y no se da por vigente. Lo que describe Cortex hoy es el árbol actual y los ADR.

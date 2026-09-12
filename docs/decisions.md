@@ -720,9 +720,14 @@ Formato: estado · contexto · decisión · alternativas · cuándo revisar.
 - **Revisar cuando:** aparezca un motivo para volver a acoplar el código a un proveedor
   (no debería), o cuando toque retirar el alias `nan` (0.2.0).
 
-## ADR-0026 · Separación producto/empresa: el material corporativo a un repo privado, sin reescribir la historia
+## ADR-0026 · Separación producto/empresa: el material corporativo a un repo privado (revisado 2026-09-12)
 
-- **Estado:** aceptada (2026-09-10).
+- **Estado:** revisada. La premisa de una de sus partes cambió. Se decidió no reescribir la
+  historia «mientras el repositorio sea privado», y el repositorio ya es público. Siguen
+  valiendo enteros los puntos (1), (2) y (4) —material corporativo fuera, referencias
+  neutralizadas y un `.gitignore` que impide que vuelva—. El punto (3), sobre qué hacer con la
+  historia anterior a la apertura, vuelve a estar abierto y se decide con la situación nueva
+  delante, no por lo que se acordó cuando el repositorio no se veía.
 - **Contexto:** el repo contenía cosas que no son producto: el plan fundacional (marcado
   como confidencial, con estrategia de negocio), un workshop interno con sus assets, el
   wordmark de Dinacode, las skills de las herramientas internas (Plane, Bitbucket, MS
