@@ -51,6 +51,16 @@ describe("documentación", () => {
     expect(ofensores).toEqual([]);
   });
 
+  it("no se cuela cómo trabajamos por dentro", () => {
+    // ADR-0031: que el código sea público no hace público el proceso. Un hallazgo se cuenta por
+    // lo que enseña —«este eco puntúa 0.86–0.88»—, no por cómo se encontró: con cuántos agentes
+    // a la vez, en qué máquina, con qué orquestador o contra qué entorno. Lo primero ayuda a
+    // cualquiera; lo segundo solo describe nuestra cocina, y además envejece mal.
+    const interno = /\b(cuatro agentes|nuestro laboratorio|el harness que usamos|nuestro servidor|nuestra máquina)\b/i;
+    const ofensores = DOCS.filter((d) => interno.test(read(d)));
+    expect(ofensores).toEqual([]);
+  });
+
   it("el CHANGELOG mantiene una sección [Unreleased] para el próximo PR", () => {
     expect(read("CHANGELOG.md")).toContain("## [Unreleased]");
   });
