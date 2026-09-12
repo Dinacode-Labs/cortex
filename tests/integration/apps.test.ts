@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { closeSql } from "@cortex/database";
 import { createProject, listEntries, requestOtp, verifyOtp, saveContext, type ProjectRef } from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
@@ -95,6 +95,36 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     expect((await srv.request("/context-pack?slug=lo-que-sea")).status).toBe(401);
     expect((await srv.request(`/context-pack?slug=no-existe-${RID}`, { headers: auth })).status).toBe(404);
     expect((await srv.request(`/context-pack?slug=${prvForeign.slug}`, { headers: auth })).status).toBe(403);
+  });
+
+  it("server: POST /auth/request — la misma IP no puede pedir códigos sin freno", async () => {
+    const { reiniciaLimite } = await import("../../apps/server/src/rate-limit.js");
+    reiniciaLimite();
+    vi.stubEnv("CORTEX_AUTH_IP_MAX", "2");
+    try {
+      const app = createServerApp();
+      const pide = (n: number) =>
+        app.request("/auth/request", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.9" },
+          body: JSON.stringify({ email: `flood-${n}-${RID}@example.com` }),
+        });
+      // Direcciones DISTINTAS: el límite por email no las frena, el de IP sí.
+      expect((await pide(1)).status).toBe(200);
+      expect((await pide(2)).status).toBe(200);
+      expect((await pide(3)).status).toBe(429);
+
+      // Otra IP sigue pudiendo entrar: no se ha cerrado el servicio para todos.
+      const otra = await app.request("/auth/request", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": "198.51.100.1" },
+        body: JSON.stringify({ email: `otra-${RID}@example.com` }),
+      });
+      expect(otra.status).toBe(200);
+    } finally {
+      vi.unstubAllEnvs();
+      reiniciaLimite();
+    }
   });
 
   it("server: POST /capture — body inválido → 400 con issues; body válido → 200 y persiste", async () => {
