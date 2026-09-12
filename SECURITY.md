@@ -1,63 +1,64 @@
-# Política de seguridad
+# Security policy
 
-## Reportar una vulnerabilidad
+## Reporting a vulnerability
 
-**No abras un issue público.** Usa una de estas dos vías:
+**Please do not open a public issue.** Use one of these instead:
 
-- **GitHub Security Advisories** (preferida): pestaña *Security* → *Report a vulnerability*.
+- **GitHub Security Advisories** (preferred): the *Security* tab → *Report a vulnerability*.
 - **Email**: `security@dinacode.com`.
 
-Incluye qué versión, cómo reproducirlo y qué impacto crees que tiene. Respondemos en
-**5 días laborables** con una primera valoración, y te mantenemos al día hasta el cierre.
-Si el reporte es válido, acreditamos a quien lo envió en las notas de la versión, salvo que
-prefiera lo contrario.
+Tell us which version, how to reproduce it, and what impact you think it has. We reply within
+**5 working days** with a first assessment and keep you posted until it is closed. If the
+report holds up, we credit the reporter in the release notes unless they would rather we did
+not.
 
-## Versiones soportadas
+## Supported versions
 
-Solo la **última versión menor publicada**. Cortex está en `0.x`: mientras dure, una versión
-menor puede traer cambios incompatibles y no se hacen backports de seguridad a versiones
-anteriores.
+Only the **latest published minor**. Cortex is `0.x`: while that lasts, a minor release may
+break compatibility, and security fixes are not backported to earlier versions.
 
-## Alcance
+## Scope
 
-Entra dentro del alcance el código de este repositorio: la API HTTP (`apps/server`), la UI
-web (`apps/web`), el servidor MCP (`apps/mcp-server`), el CLI y los paquetes de
-`packages/`. Nos interesan especialmente:
+Everything in this repository is in scope: the HTTP API (`apps/server`), the web UI
+(`apps/web`), the MCP server (`apps/mcp-server`), the CLI and the `packages/`. We are
+especially interested in:
 
-- Saltarse el control de acceso a un proyecto (leer o escribir en uno ajeno).
-- Fugas entre proyectos en búsqueda, `ask`, context pack o grafo.
-- Problemas en el flujo de login por OTP (fuerza bruta, reutilización de códigos, fijación).
-- Inyección (SQL, XSS en la UI SSR) o ejecución de código.
-- Fuga de secretos: credenciales que acaben persistidas, enviadas al proveedor de LLM o
-  escritas en logs.
+- Getting around a project's access control — reading or writing somebody else's project.
+- Leaks across projects in search, `ask`, the context pack or the graph.
+- Anything wrong with the one-time-code login: brute force, code reuse, session fixation.
+- Injection (SQL, XSS in the server-rendered UI) or code execution.
+- Secrets escaping: credentials that end up persisted, sent to the language model provider,
+  or written to logs.
 
-Queda fuera lo que dependa de cómo se despliegue: una instancia sin TLS, sin
-`CORTEX_AUTH_DOMAIN` o con el proveedor de email en modo `log` **en producción** son
-configuraciones inseguras, no fallos del código. Aun así, el servidor avisa de esas tres
-cosas al arrancar.
+Out of scope is whatever depends on how you deploy it. An instance without TLS, without
+`CORTEX_AUTH_DOMAIN`, or with the email provider left on `log` **in production** is an
+insecure configuration, not a bug in the code. The server warns about all three at startup
+anyway.
 
-## Cómo tratamos los secretos
+## How we handle secrets
 
-- Nunca en el repositorio. `.env` está ignorado; `.env.example` es la plantilla.
-- Hay un borrado de secretos (`scrub`, en `@cortex/shared`) que se aplica **dos veces**:
-  antes de mandar nada al modelo de lenguaje y antes de persistir. El servidor no confía en
-  que el cliente haya limpiado. Es un filtro de última línea, no una garantía: si crees que
-  se le escapa un patrón habitual, repórtalo.
-- Las credenciales del CLI viven en `~/.cortex/credentials` con permisos `600`.
+- Never in the repository. `.env` is ignored; `.env.example` is the template.
+- There is a secret scrubber (`scrub`, in `@cortex/shared`) applied **twice**: before
+  anything reaches the language model, and again before anything is persisted. The server
+  does not trust the client to have cleaned up. It is a last line of defence, not a
+  guarantee: if you think it misses a common pattern, that is worth reporting.
+- CLI credentials live in `~/.cortex/credentials` with `600` permissions.
 
-## Dependencias
+## Dependencies
 
-`pnpm audit` corre en cada CI de forma **informativa, no bloqueante**, y Dependabot abre PRs
-semanales. La razón de que no bloquee: hoy hay vulnerabilidades altas **transitivas** en
-`mammoth`, `@modelcontextprotocol/sdk` y `@mastra/core` que no podemos arreglar hasta que
-esos proyectos publiquen. Un gate que falla desde el primer día se acaba desactivando y deja
-de aportar nada; preferimos verlo en cada build y actualizar en cuanto haya versión.
+`pnpm audit` runs on every CI build, **informational rather than blocking**, and Dependabot
+opens weekly PRs. Why it does not block: there are high-severity **transitive** advisories in
+`mammoth`, `@modelcontextprotocol/sdk` and `@mastra/core` that we cannot fix until those
+projects publish. A gate that fails from day one gets switched off and stops meaning
+anything; we would rather see it on every build and update as soon as there is a version.
 
-`xlsx` se instala desde el CDN oficial de SheetJS (`cdn.sheetjs.com`) y no desde npm, porque
-la versión de npm está abandonada y arrastra CVE-2023-30533 y CVE-2024-22363 sin corregir.
-Dependabot **no sigue** tarballs por URL: hay que revisarlo a mano cada trimestre.
+`xlsx` is installed from the official SheetJS CDN (`cdn.sheetjs.com`) instead of npm, because
+the npm release is abandoned and still carries CVE-2023-30533 and CVE-2024-22363. Dependabot
+**does not follow** tarball URLs, so this one needs a manual check every quarter.
 
-## Nota sobre el historial
+## A note on the history
 
-El historial de este repositorio anterior a su apertura **no se publica**. Si Cortex se
-publica como open source, será desde una instantánea limpia (ver ADR-0026).
+This repository is public, history included. The history before it was opened is working
+material, not product: it is not maintained, not cited, and not to be taken as current. What
+describes Cortex today is the tree you are looking at and the decision records in
+`docs/decisions.md`.

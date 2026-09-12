@@ -51,6 +51,23 @@ describe("documentación", () => {
     expect(ofensores).toEqual([]);
   });
 
+  /**
+   * El repositorio es público. Quien encuentra un fallo de seguridad o quiere contribuir
+   * abre estos ficheros, y si no puede leerlos da igual lo bien escritos que estén. El
+   * registro de trabajo del equipo —ADRs, roadmap, comentarios— sigue en español a
+   * propósito: eso no bloquea a nadie.
+   */
+  it("lo que abre alguien de fuera está en inglés", () => {
+    // Palabras funcionales del español: aparecen en cualquier párrafo, y en inglés no.
+    const español = /\b(el|la|los|las|una|porque|además|según|cómo|qué)\b/i;
+    for (const doc of ["README.md", "CONTRIBUTING.md", "SECURITY.md"]) {
+      const sospechosas = read(doc)
+        .split("\n")
+        .filter((l) => español.test(l) && !l.trimStart().startsWith("```"));
+      expect(sospechosas.slice(0, 3), `${doc} parece tener español`).toEqual([]);
+    }
+  });
+
   it("no se cuela cómo trabajamos por dentro", () => {
     // ADR-0031: que el código sea público no hace público el proceso. Un hallazgo se cuenta por
     // lo que enseña —«este eco puntúa 0.86–0.88»—, no por cómo se encontró: con cuántos agentes
