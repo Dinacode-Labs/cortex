@@ -50,13 +50,14 @@ parafraseadas es 1.000, que es justo donde se vería. Sigue aplazado, y ahora po
 no por una intuición. La investigación está en
 [`research/chunking-strategies.md`](./research/chunking-strategies.md).
 
-### Deducir el tipo de entrada de la pregunta
+### Deducir el tipo de entrada de la pregunta — HECHO (2026-09-12)
 
-Lo primero que ha sacado el eval. «¿Qué deuda técnica hay alrededor de la facturación?»
-recupera **0 de 2**: los cinco resultados hablan de facturación y ninguno es del tipo
-`technical_debt`. La similitud semántica se come el tipo cuando la pregunta nombra una
-categoría del dominio. La búsqueda ya acepta filtrar por tipo; falta que alguien lo deduzca de
-la pregunta. Con el eval montado, se puede medir si el arreglo sirve.
+Lo primero que sacó el eval, y arreglado midiendo. La búsqueda deduce la categoría cuando la
+pregunta la nombra («deuda técnica», «restricciones», «riesgos») y empuja ese tipo hacia
+arriba, **sin filtrar**: filtrar perdería la respuesta cuando está guardada con otro tipo.
+
+recall@5 0.961 → **0.987**, MRR 0.901 → **0.928**, y las preguntas repartidas 0.850 → 0.950,
+sin mover el resto. El tamaño del empujón se eligió por la curva del eval, no a ojo.
 
 ### Índice navegable dentro de un proyecto (a estudiar)
 

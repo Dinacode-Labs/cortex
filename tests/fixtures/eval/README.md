@@ -39,6 +39,11 @@ solo en las parafraseadas señala a los embeddings; solo en las repartidas, al t
 
 ## Línea base (2026-09-12)
 
+> **Actualizada el mismo día**: al deducir el tipo de la pregunta (ver abajo) pasa a
+> recall@5 **0.987** y MRR **0.928**. La tabla de aquí es la de antes de ese cambio, que es
+> contra lo que se comparó.
+
+
 Con `qwen3-embedding` (4096 dim), búsqueda híbrida, sin rerank LLM:
 
 | tipo | n | recall@5 | MRR |
@@ -68,4 +73,20 @@ similitud semántica se come el tipo: cuando la pregunta nombra una categoría d
 —«deuda técnica», «qué decidimos», «qué restricciones hay»— la búsqueda la ignora y devuelve lo
 más parecido por tema. La API ya acepta filtrar por tipo; nadie lo deduce de la pregunta.
 
-Ese es el siguiente hilo, y ahora se puede tirar de él midiendo en vez de opinando.
+Ese hilo ya se ha tirado, midiendo: la búsqueda **deduce el tipo de la pregunta** cuando esta
+nombra una categoría, y empuja ese tipo hacia arriba sin filtrar por él —filtrar perdería la
+respuesta cuando está guardada con otro tipo—. Resultado:
+
+| | recall@5 | MRR | repartidas (recall) |
+| --- | --- | --- | --- |
+| antes | 0.961 | 0.901 | 0.850 |
+| después | **0.987** | **0.928** | **0.950** |
+
+Sin tocar lo demás: directas, parafraseadas y razonadas siguen en 1.000, y las preguntas sin
+respuesta se mueven menos de una milésima (0.472 → 0.473), así que el empujón no hace que la
+memoria aparente saber lo que no sabe.
+
+El tamaño del empujón (`CORTEX_SEARCH_TYPE_BOOST`) se eligió midiendo, no a ojo: entre 0.12 y
+0.20 el resultado es idéntico y es el mejor; por debajo se queda corto y desde 0.30 el recall
+vuelve a caer, porque empieza a colar entradas del tipo correcto pero de otro asunto. Está en
+0.15, el centro de esa meseta.
