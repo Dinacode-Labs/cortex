@@ -1,167 +1,167 @@
-# Contribuir a Cortex
+# Contributing to Cortex
 
-Mejoras, arreglos y nuevas capacidades llegan por **PR** contra este repo. Esta guía explica
-cómo está montado y dónde tocar cada cosa.
+Fixes, improvements and new capabilities arrive as **pull requests**. This guide explains how
+the repository is put together and where each thing lives.
 
-> **Nada corporativo en el repo.** Clientes por su nombre, personas como responsables de
-> tareas, skills de herramientas internas y material de marca **no van aquí**: viven en un
-> repo privado aparte (ADR-0026). En la documentación, un cliente es «un cliente real» o
-> «Acme»; una tarea no lleva responsable.
+> **Nothing corporate in here.** Named clients, people as owners of work, internal tooling and
+> brand material do **not** belong in this repository: they live in a separate private one
+> (ADR-0026). In the docs a client is "a real project" or "Acme", and a task has no owner.
 >
-> **Tampoco el proceso interno** (ADR-0031): qué proveedor usamos con qué clave y a qué
-> coste, auditorías de seguridad, planes de refactor con hallazgos por fichero y prioridades
-> de negocio. El producto documenta *cómo se configura*, no *qué configuración tiene nuestro
-> despliegue*. Regla rápida: si ayuda a alguien de fuera a usar, entender o mejorar Cortex,
-> es público; si describe cómo lo operamos nosotros, es privado. Ante la duda, privado.
+> **Nor how we run it** (ADR-0031): which provider we use with which key and at what cost,
+> security audits, refactor plans with findings per file, business priorities. The product
+> documents *how to configure it*, not *what our deployment is configured with*. Quick rule:
+> if it helps somebody outside use, understand or improve Cortex, it is public; if it
+> describes how we operate it, it is not. When in doubt, it is not.
 
-## Puesta en marcha (dev)
+## Getting started
 
 ```bash
 pnpm install
-cp .env.example .env          # embeddings/LLM; sin claves funciona en modo local
-pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker) + esquema
-pnpm typecheck                # comprobar tipos en todo el monorepo (no requiere build)
-pnpm build                    # opcional en dev; obligatorio para Docker/producción
+cp .env.example .env          # embeddings/LLM; works with no keys at all in local mode
+pnpm db:up && pnpm db:migrate # Postgres + pgvector (Docker) + schema
+pnpm typecheck                # types across the monorepo — no build needed
+pnpm build                    # optional in dev; required for Docker and production
 ```
-**En desarrollo no hace falta compilar**: todo se ejecuta con `tsx` sobre las fuentes
-(`pnpm cortex`, `pnpm --filter @cortex/server dev`…). Lo hace posible una condición
-`development` en los `exports` de cada paquete, que resuelve a `src/` cuando el proceso se
-lanza con `--conditions=development` (lo hacen los scripts) y a `dist/` en cualquier otro
-caso. Por eso `pnpm typecheck` y los tests funcionan sin haber compilado nunca.
 
-**En producción sí se compila**: `pnpm build` ejecuta `tsc -b` sobre las *project
-references* y deja `dist/` en cada paquete y app; el Dockerfile arranca `node dist/...`. Si
-tocas la resolución de rutas a ficheros de datos (migraciones, estáticos de la web,
-`install.sh`), compila y comprueba que siguen resolviendo: el CI tiene un smoke para eso,
-porque es el fallo típico que ni el typecheck ni los tests detectan.
+**You do not need to compile in development**: everything runs with `tsx` straight off the
+sources (`pnpm cortex`, `pnpm --filter @cortex/server dev`…). What makes that work is a
+`development` condition in each package's `exports`, resolving to `src/` when the process is
+launched with `--conditions=development` (the scripts do) and to `dist/` otherwise. That is
+why `pnpm typecheck` and the tests work without ever having built.
 
-`apps/cli` queda fuera de `tsc -b` a propósito: se empaqueta con un bundler para poder
-distribuirlo como CLI instalable.
+**Production does compile**: `pnpm build` runs `tsc -b` over the project references and leaves
+a `dist/` in every package and app; the Dockerfile starts `node dist/...`. If you touch how a
+path to a data file is resolved — migrations, the web app's static files, `install.sh` —
+build and check they still resolve. CI has a smoke test for exactly that, because it is the
+failure that neither typecheck nor the tests catch.
 
-## Mapa del repo (dónde vive cada cosa)
+`apps/cli` is deliberately outside `tsc -b`: it is bundled, so it can ship as an installable
+CLI.
 
-| Quieres… | Toca… |
+## Map of the repository
+
+| If you want to… | Go to… |
 | --- | --- |
-| Operación de dominio (captura, búsqueda, pack, lint, proyectos, auth) | `packages/core/src/` (**determinista, sin LLM**) |
-| Capa LLM (clasificar, grafo, rerank, síntesis, destilar, fusionar, reconciliar) | `packages/agents/src/` (Agents de **Mastra**) |
-| Modelo de dominio (tipos, enums, schemas zod) | `packages/shared/src/domain.ts` |
-| Esquema/SQL/cliente Postgres | `packages/database/` (migraciones en `migrations/`) |
-| Proveedor de embeddings | `packages/embeddings/` |
-| Servidor MCP (stdio) · UI web · API+auth · CLI | `apps/mcp-server` · `apps/web` · `apps/server` · `apps/cli` |
-| Lado cliente (HTTP, credenciales, `.cortex.json`, transcripts) | `packages/client/` — **sin** Postgres ni LLM |
-| Comando de developer (auth, link, hooks) | `apps/cli/src/commands/` — solo `client` + `shared` |
-| Comando de operador (BD, modelo, servicios) | `apps/admin/src/commands/` |
-| Lo que Cortex instala en Claude Code (hooks, MCP, skill, comando) | `plugin/claude-code/` (+ `.claude-plugin/marketplace.json` en la raíz) |
-| Integración por agente (`cortex setup`) | `apps/cli/src/setup/` — un adaptador por agente, más `hooks-json.ts` y `legacy.ts` |
-| Registry de terceros (`cortex toolbelt`) | `config/toolbelt.json` (esquema) + `apps/cli/src/toolbelt/` |
-| Diagnóstico (`cortex doctor`) | `apps/cli/src/commands/doctor.ts` |
-| Empaquetado del CLI para npm | `apps/cli/tsup.config.ts` (bundle; los `@cortex/*` van dentro) |
+| Domain operations (capture, search, pack, lint, projects, auth) | `packages/core/src/` — **deterministic, no LLM** |
+| The LLM layer (classify, graph, rerank, synthesise, distil, merge, reconcile) | `packages/agents/src/` (Mastra agents) |
+| The domain model (types, enums, zod schemas) | `packages/shared/src/domain.ts` |
+| Schema, SQL, Postgres client | `packages/database/` (migrations in `migrations/`) |
+| The embeddings provider | `packages/embeddings/` |
+| MCP server · web UI · API and auth · CLI | `apps/mcp-server` · `apps/web` · `apps/server` · `apps/cli` |
+| Client side (HTTP, credentials, `.cortex.json`, transcripts) | `packages/client/` — **no** Postgres, **no** LLM |
+| A developer command (auth, link, hooks, mem) | `apps/cli/src/commands/` — only `client` + `shared` |
+| An operator command (database, model, services) | `apps/admin/src/commands/` |
+| What Cortex installs into Claude Code (hooks, MCP, skill, command) | `plugin/claude-code/` (+ `.claude-plugin/marketplace.json` at the root) |
+| Per-agent integration (`cortex setup`) | `apps/cli/src/setup/` — one adapter per agent, plus `hooks-json.ts` and `legacy.ts` |
+| Third-party registry (`cortex toolbelt`) | `config/toolbelt.json` (schema) + `apps/cli/src/toolbelt/` |
+| Diagnostics (`cortex doctor`) | `apps/cli/src/commands/doctor.ts` |
+| Packaging the CLI for npm | `apps/cli/tsup.config.ts` — the `@cortex/*` packages go inside the bundle |
 
-**Regla de oro de dependencias:** `core` NO importa `agents` (evita ciclo). La inteligencia
-se **inyecta**: cada entrypoint llama a `wireLlm()` (de `@cortex/agents`) tras `loadEnv()`,
-que cablea `setClassifier`/`setReranker`/`setReconciler` y el sink de uso de embeddings.
-Si una operación de core necesita LLM, define el hook en core y cabléalo en `wire.ts`.
-La tabla completa de reglas (qué paquete puede importar qué, dónde van los side effects)
-está en [`CLAUDE.md`](./CLAUDE.md#reglas-de-dependencia-qué-puede-importar-qué).
+**The dependency rule that matters:** `core` does **not** import `agents`, which would be a
+cycle. The intelligence is **injected**: every entrypoint calls `wireLlm()` (from
+`@cortex/agents`) after `loadEnv()`, wiring `setClassifier` / `setReranker` / `setReconciler`
+and the embeddings usage sink. If an operation in core needs an LLM, define the hook in core
+and wire it in `wire.ts`. The full table — which package may import which, where side effects
+are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
 
-> **Refactor en curso (julio 2026):** hay un plan por fases en
-> las decisiones en [`docs/decisions.md`](./docs/decisions.md). Antes de tocar un área, mira si
-> el plan la cubre; algunas rutas de esta guía (p.ej. dónde viven los conectores o los
-> subcomandos del CLI) cambiarán al ejecutarlo — cada PR del refactor actualiza esta guía.
+## Common recipes
 
-## Recetas frecuentes
+- **Add an MCP, skill or command to the toolbelt** → if it belongs to **the product** (anyone
+  deploying Cortex would use it), it goes in `config/toolbelt.json`. If it is **your
+  organisation's** tool, it goes in your own external registry, not here (ADR-0026); the
+  schema is in `docs/toolbelt-registry.md`. **Never** put credentials in it: declare the `env`
+  it needs and it is skipped when missing (`--doctor` lists them).
+- **Add a source connector** → `apps/cli/src/commands/connect-<x>.ts`, exporting `run(args)`.
+  Reuse core's `extract` layer (multimodal) and write through the authenticated API
+  (`/capture/batch`). Make it incremental by `sourceReference`. Register it in `COMMANDS`
+  (`apps/cli/src/index.ts`).
+- **Support a new file format** → `packages/core/src/extract.ts` (`SUPPORTED_EXTS` plus a
+  branch in `extractFileText`). Every connector inherits it.
+- **Change the schema** → a new migration in `packages/database/migrations/NNNN_desc.sql`,
+  idempotent (`IF NOT EXISTS`). The runner applies unregistered ones in order.
+- **Add an LLM agent role** → `AgentRole` + `INSTRUCTIONS` + the registration in
+  `packages/agents/src/mastra.ts` (`JSON_ROLES` if it returns JSON).
+- **Add a `cortex` subcommand** → create `apps/cli/src/commands/<cmd>.ts` exporting
+  `run(args: string[])` — no `process.exit`, no side effects on import; the dispatcher owns
+  the lifecycle — and register it in `COMMANDS`.
 
-- **Añadir un MCP / skill / comando al toolbelt** → si es **del producto** (lo usa
-  cualquiera que despliegue Cortex), va en `config/toolbelt.json`. Si es una herramienta
-  **de tu organización**, va en su registry externo, no aquí (ADR-0026); el esquema está en
-  `docs/toolbelt-registry.md`. **Nunca** metas credenciales: declara el `env` que requiere y
-  se omite si falta (`--doctor` lo lista).
-- **Añadir un conector de fuente** → `apps/cli/src/commands/connect-<x>.ts` (exporta
-  `run(args)`). Reutiliza la capa `extract` de core (multimodal) y escribe por la API
-  autenticada (`apiPost` de shared, `/capture/batch`). Incremental por
-  `sourceReference`. Añade su entrada en `COMMANDS` (`apps/cli/src/index.ts`).
-- **Soportar un formato de fichero nuevo** → `packages/core/src/extract.ts`
-  (`SUPPORTED_EXTS` + un branch en `extractFileText`). Todos los conectores lo heredan.
-- **Cambiar el esquema** → nueva migración `packages/database/migrations/NNNN_desc.sql`
-  (idempotente, `IF NOT EXISTS`). El runner aplica en orden las no registradas.
-- **Nuevo rol de agente LLM** → añádelo a `AgentRole` + `INSTRUCTIONS` + el registro en
-  `packages/agents/src/mastra.ts` (JSON_ROLES si devuelve JSON).
-- **Nuevo subcomando `cortex`** → crea `apps/cli/src/commands/<cmd>.ts` exportando
-  `run(args: string[])` (sin `process.exit` ni side effects de import: el ciclo de vida
-  lo gestiona el dispatcher) y añade su entrada en `COMMANDS` de `apps/cli/src/index.ts`.
+## Conventions
 
-## Convenciones
+- **Language.** Anything an outsider reads is in **English**: the README, this guide, the
+  security policy, CLI output, MCP tool descriptions, the web UI, and the code itself. The
+  team's working record stays in **Spanish**: code comments, the decision records, the roadmap
+  and the research notes. The prompts the LLM agents use are Spanish too, because the corpus
+  they process is.
+- **No secrets in the repository.** `.env` is ignored; use `.env.example`. Secrets are
+  scrubbed before anything reaches an LLM and again before it is stored.
+- **Traceability.** Every unit of knowledge keeps its source, date, author, confidence, status
+  and validity. Do not turn inferences into facts — anything automatic gets low confidence.
+- **zod is split:** `agents` uses **zod v4** (Mastra requires it); everything else uses **v3**.
+  Do not pass schemas between them.
+- **Quality:** `pnpm typecheck` and `pnpm test` must pass. Tests live in `tests/`:
+  - **Unit** (`pnpm test`): pure, deterministic logic — auth and permissions, project linking
+    and slugs, session parsers, schemas. No database, no network.
+  - **Integration** (`pnpm test:integration`, in `tests/integration/`): against a real
+    Postgres (`cortex_test`, `local` embeddings, no LLM). Needs `pnpm db:up`; the global setup
+    creates and migrates the test database. Covers persistence and search, hierarchy and
+    inheritance, permissions and cascades, batch capture, and auth.
 
-- **Idioma:** código y nombres en **inglés**; comentarios y docs de producto en **español**.
-- **Sin secretos en el repo.** `.env` está ignorado; usa `.env.example`. Scrub de secretos
-  antes de mandar contenido a un LLM o guardarlo (sesiones/ficheros).
-- **Trazabilidad (§5.5):** cada unidad de conocimiento conserva fuente, fecha, autor,
-  confianza, estado y vigencia. No conviertas inferencias en hechos (confianza baja para lo auto).
-- **zod aislado:** `agents` usa **zod v4** (lo exige Mastra); el resto **zod v3**. No cruces schemas.
-- **Calidad:** `pnpm typecheck` y `pnpm test` (Vitest) deben pasar. Tests en `tests/`:
-  - **Unit** (`pnpm test`): lógica pura/determinista (auth/permisos, vínculo/slug,
-    parsers de sesiones, schemas). Sin BD ni red.
-  - **Integración** (`pnpm test:integration`, en `tests/integration/`): contra Postgres
-    real (BD `cortex_test`, embeddings `local`, LLM `none`). Requiere `pnpm db:up`; el
-    globalSetup crea+migra la BD de test. Cubre persistencia/búsqueda, jerarquía/herencia,
-    permisos/cascada, captura por lotes y auth (OTP/token/ticket).
+  Add tests with your PR when you touch testable logic.
 
-  Añade tests con tu PR cuando toques lógica testeable.
+## Pull requests
 
-## Flujo de PR
+1. Branch from `main`; keep the change focused.
+2. `pnpm typecheck` green.
+3. **Update the documentation you affected** (see below). A PR that changes behaviour without
+   touching docs is unfinished.
+4. In the PR: what changes, why, and how you verified it.
 
-1. Rama desde `main`; cambios enfocados.
-2. `pnpm typecheck` en verde.
-3. **Actualiza la documentación afectada** (ver abajo) — un PR que cambia comportamiento
-   sin tocar docs está incompleto.
-4. PR con: qué cambia, por qué, y cómo lo verificaste.
+## Keeping the documentation alive
 
-## Documentación (mantenerla viva)
+Documentation is part of the work, not an extra:
 
-Mantener los docs al día es parte del trabajo, no un extra:
-- **`README.md`** — capacidades, arquitectura, comandos, estructura.
-- **`docs/decisions.md`** — ADR ligero: cada decisión es una **hipótesis a revisar**
-  (decisión, por qué, y "revisar cuando…"). Añade una entrada al tomar una decisión de calado.
-- **`docs/roadmap.md`** — lo que queda / lo recién hecho.
-- **`docs/research/`** — investigación que respalda decisiones (memoria, hooks, multimodal…).
-- **`CLAUDE.md`** — guía para agentes de IA que trabajen el repo; mantenerla actualizada y
-  podarla periódicamente para que no acumule ruido ni quede obsoleta.
+- **`README.md`** — capabilities, architecture, commands, layout.
+- **`docs/decisions.md`** — lightweight ADRs: every decision is a **hypothesis to revisit**
+  (the decision, why, and "revisit when…"). Add an entry when you make a decision that
+  matters.
+- **`docs/roadmap.md`** — what is left, and what was just done.
+- **`docs/research/`** — the investigation behind decisions.
+- **`CLAUDE.md`** — the guide for AI agents working on this repository. Keep it current, and
+  prune it now and then so it does not drift into noise.
 
-## Publicar una versión
+## Publishing a release
 
-La versión es **única para todo el monorepo**. Con un solo artefacto publicable —el CLI— y
-una imagen que lleva todo lo demás dentro, versionar cada paquete por su cuenta sería
-ceremonia sin beneficio, y nadie sabría qué versión tiene desplegada.
+There is **one version for the whole monorepo**. With a single publishable artefact — the CLI
+— and an image carrying everything else, versioning each package separately would be ceremony
+without benefit, and nobody would know which version they had deployed.
 
 ```bash
-pnpm version:set 0.2.0                       # raíz, paquetes, apps, plugin y CHANGELOG
+pnpm version:set 0.2.0                       # root, packages, apps, plugin and CHANGELOG
 git commit -am "chore(release): v0.2.0"
 git tag v0.2.0 && git push origin main v0.2.0
 ```
 
-El tag dispara el workflow, que verifica que el tag coincide con lo que dicen los
-`package.json` y que el CHANGELOG tiene esa sección, corre todo (typecheck, tests, build),
-publica la imagen en GHCR, publica `@dinacodelabs/cortex` en npm y crea la Release con las notas
-del CHANGELOG.
+The tag triggers the workflow, which checks that it matches what the `package.json` files say
+and that the CHANGELOG has that section, runs everything (typecheck, tests, build), publishes
+the image to GHCR, publishes `@dinacodelabs/cortex` to npm, and creates the Release from the
+CHANGELOG notes.
 
-**Cada PR añade su línea a `[Unreleased]`.** Escribe qué cambia para quien lo usa, no qué
-hiciste: las notas de la versión salen de ahí, no de los commits.
+**Every PR adds its line to `[Unreleased]`.** Write what changes for whoever uses it, not what
+you did: the release notes come from there, not from the commits.
 
-Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatibles. Ya hay
-dos cosas apuntadas para retirarse en la `0.2.0`: el alias `LLM_PROVIDER=nan` y la variable
-`BREVO_SENDER`.
+While we are on `0.x`, a **minor** release may break compatibility. Two things are already
+marked for removal in `0.2.0`: the `LLM_PROVIDER=nan` alias and the `BREVO_SENDER` variable.
 
-## El repositorio es público
+## This repository is public
 
-Lo que se escribe aquí lo lee cualquiera, y eso cambia dos cosas del día a día:
+What gets written here, anyone can read. Two things follow from that:
 
-- **Se cuenta qué se descubrió, no cómo se descubrió.** Un hallazgo vale por lo que enseña
-  —«este par de entradas puntúa 0.86–0.88»—, no por el montaje que lo produjo. Lo segundo
-  envejece mal y no ayuda a nadie de fuera. Hay un test que lo vigila (`tests/docs.test.ts`).
-- **Nada corporativo, en ningún sitio**: ni clientes por su nombre, ni personas como
-  responsables, ni herramientas internas. El ADR-0031 dice dónde está la raya, y la regla
-  rápida es: si ayuda a alguien de fuera a usar, entender o mejorar Cortex, es público; si
-  describe cómo lo operamos nosotros, no.
+- **Say what was found, not how it was found.** A finding is worth what it teaches — "this
+  pair of entries scores 0.86–0.88" — not the rig that produced it. The rig ages badly and
+  helps nobody outside. There is a test watching for it (`tests/docs.test.ts`).
+- **Nothing corporate, anywhere**: no named clients, no people as owners, no internal tooling.
+  ADR-0031 draws the line; the quick rule is above.
 
-El historial anterior a la apertura es material de trabajo, no producto: no se mantiene, no se
-cita y no se da por vigente. Lo que describe Cortex hoy es el árbol actual y los ADR.
+The history from before the repository was opened is working material, not product: it is not
+maintained, not cited, and not to be taken as current. What describes Cortex today is the tree
+you are looking at and the decision records.

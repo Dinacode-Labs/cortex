@@ -140,9 +140,11 @@ claves** (embeddings `local`, no semánticos); conecta un endpoint real
 
 - Idioma: **lo que ve alguien de fuera va en inglés**. Eso incluye los mensajes del CLI, las
   descripciones de las tools MCP, la skill y los comandos del plugin, los errores de la API,
-  el `README.md` y `docs/how-it-works.md`. **Lo que es registro de trabajo del equipo va en
-  español**: comentarios del código, ADRs, roadmap e investigación. También los prompts de los
-  agentes LLM, porque el corpus que procesan es español. La UI web también está en inglés.
+  la UI web, el `README.md`, `docs/how-it-works.md`, `CONTRIBUTING.md` y `SECURITY.md` — el
+  repositorio es público, y quien encuentra un fallo de seguridad o quiere contribuir tiene
+  que poder leer cómo se hace. **Lo que es registro de trabajo del equipo va en español**:
+  comentarios del código, ADRs, roadmap e investigación. También los prompts de los agentes
+  LLM, porque el corpus que procesan es español.
 - Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
 - **Un cliente puede hablar con varios servidores** (ADR-0033). El servidor sale del
   `.cortex.json` del repo, no de una variable global: quien vaya a llamar a la API desde una
