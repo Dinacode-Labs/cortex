@@ -42,6 +42,7 @@ const COMMANDS: Record<string, Cmd> = {
   maintain: { help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
   enrich: { help: "pase de enriquecimiento de grafo (entidades + relaciones)", load: () => import("./commands/enrich.js") },
   lint: { help: "salud del conocimiento de un proyecto (contradicciones, huecos…)", load: () => import("./commands/lint.js") },
+  eval: { help: "mide la recuperación contra el conjunto de preguntas con evidencia anotada", load: () => import("./commands/eval.js") },
   "lint-act": { help: "plan de acciones (dry-run) a partir del lint", load: () => import("./commands/lint-act.js") },
   temporal: { help: "invalidación temporal: cierra la validez de hechos no vigentes", load: () => import("./commands/temporal.js") },
   "resolve-entities": { help: "fusionar variantes de entidades en una canónica", load: () => import("./commands/resolve-entities.js") },

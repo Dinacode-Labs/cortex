@@ -8,7 +8,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
-_Nada todavía._
+### Added
+- **`cortex-admin eval`: la recuperación ya se mide.** 40 preguntas en español con la evidencia
+  anotada contra un corpus fijo que va en el repo (`tests/fixtures/eval/`), con recall@5 y MRR
+  desglosados por tipo de pregunta —directa, parafraseada, repartida entre varias entradas,
+  razonada— y dos preguntas cuya respuesta no está, para ver si la memoria aparenta saber lo que
+  no sabe. `--verbose` enseña qué salió cuando algo falla, que es lo que dice por dónde
+  arreglarlo. El corpus no sale de la memoria real a propósito: un eval sirve para comparar
+  ejecuciones, y la memoria real cambia todos los días.
 
 ## [0.1.0] — 2026-09-12
 
