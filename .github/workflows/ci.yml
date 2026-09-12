@@ -27,7 +27,7 @@ jobs:
       CORTEX_TEST_DATABASE_URL: postgres://cortex:cortex@localhost:5433/cortex_test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v6 # lee packageManager del package.json
 
