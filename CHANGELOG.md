@@ -8,6 +8,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Changed
+- **La búsqueda deduce el tipo cuando la pregunta lo nombra.** «¿Qué deuda técnica hay alrededor
+  de la facturación?» no recuperaba ninguna de las dos entradas correctas: los cinco resultados
+  hablaban de facturación y ninguno era deuda técnica, porque «deuda técnica» aporta muchísimo
+  menos al embedding que «facturación». Ahora ese tipo se empuja hacia arriba, **sin filtrar**
+  —filtrar perdería la respuesta cuando está guardada con otro tipo—. recall@5 0.961 → 0.987 y
+  MRR 0.901 → 0.928 en el eval, sin mover las preguntas que ya iban bien. El tamaño del empujón
+  se eligió por la curva del eval (`CORTEX_SEARCH_TYPE_BOOST`, 0.15).
+
 ### Added
 - **`cortex-admin eval`: la recuperación ya se mide.** 40 preguntas en español con la evidencia
   anotada contra un corpus fijo que va en el repo (`tests/fixtures/eval/`), con recall@5 y MRR
