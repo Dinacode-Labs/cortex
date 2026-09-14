@@ -8,6 +8,16 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **`GET /metrics` en formato Prometheus** (ADR-0048), para enterarse de lo que un chequeo de
+  salud no ve: que el worker de mantenimiento muera —no tiene puerto, y es quien mantiene la
+  memoria viva— o que las capturas empiecen a fallar mientras el servicio sigue respondiendo
+  tan campante. Formato estándar y no panel propio: esto lo despliega otra gente, que ya tiene
+  su forma de vigilar, y un panel hay que mirarlo. Apagado salvo que se defina
+  `CORTEX_METRICS_TOKEN`; sin token responde 404 y no 403, para no anunciar lo que hay.
+- El worker late también en la base de datos, no solo a un fichero dentro de su contenedor,
+  que era el motivo de que su muerte fuera invisible desde fuera.
+
 ## [0.1.1] — 2026-09-14
 
 ### Fixed

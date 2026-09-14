@@ -9,6 +9,7 @@ import { authRoutes } from "./routes/auth.js";
 import { contextRoutes } from "./routes/context.js";
 import { installRoutes } from "./routes/install.js";
 import { metaRoutes } from "./routes/meta.js";
+import { metricsRoutes } from "./routes/metrics.js";
 import { projectRoutes } from "./routes/projects.js";
 
 /**
@@ -50,6 +51,7 @@ export function createApp(deps: AppDeps = {}): Hono {
     return c.json({ ok: db, service: "cortex-server", db: db ? "ok" : "down" }, db ? 200 : 503);
   });
 
+  app.route("/", metricsRoutes);
   app.route("/", metaRoutes);
   app.route("/", installRoutes);
   app.route("/", authRoutes);

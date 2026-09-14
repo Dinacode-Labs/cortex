@@ -90,7 +90,9 @@ no hecho.
   trabajos encolados, se pierden. Con el volumen actual no compensa; con varios equipos
   capturando a la vez, sí.
 - **Sesiones del MCP en memoria**, lo que ata el despliegue a un solo nodo.
-- **Observabilidad HTTP**: hoy se mide el uso de modelo y embeddings, no las peticiones.
+- **Observabilidad HTTP**: hoy se mide el uso de modelo y embeddings, y `/metrics` expone el
+  estado del sistema en formato Prometheus, pero no hay métricas por petición (latencia,
+  códigos de respuesta). El sitio natural es un middleware que alimente el mismo endpoint.
 - **Índice ANN** en pgvector. A partir de unas decenas de miles de vectores, el escaneo
   secuencial deja de ser suficiente.
 
