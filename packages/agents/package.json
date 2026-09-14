@@ -15,7 +15,7 @@
     "build": "tsc -b tsconfig.build.json"
   },
   "dependencies": {
-    "@ai-sdk/openai-compatible": "^2.0.51",
+    "@ai-sdk/openai-compatible": "^3.0.47",
     "@cortex/client": "workspace:*",
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
