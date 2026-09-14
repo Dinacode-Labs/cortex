@@ -8,6 +8,26 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **`cortex auth login` se iba al servidor equivocado.** Con una sesión ya configurada,
+  ejecutarlo sin `--server` intentaba autenticar contra el servidor de desarrollo por defecto
+  en vez de contra el tuyo — el único comando del CLI que no respetaba lo que ya había. Ahora
+  los comandos que no trabajan dentro de un repositorio (`auth login`, `auth logout`, `ui`)
+  siguen una sola regla: lo que pides a mano manda, luego el entorno, luego la única sesión
+  que haya, y **con varias se pregunta** en vez de adivinar. Sin nadie delante —un script— no
+  adivina tampoco: dice cuáles hay y para. Los comandos que sí trabajan en un repositorio
+  siguen sacándolo del `.cortex.json` y no preguntan nunca (ADR-0033).
+- **Dos conectores escribían en el servidor equivocado.** `connect-sessions` y
+  `connect-github` no resolvían el servidor desde la carpeta, así que con varios Cortex
+  configurados mandaban el conocimiento al de por defecto. Es exactamente lo que ADR-0033
+  existe para impedir.
+
+### Changed
+- **`cortex connect-sessions` ya no pide lo que la carpeta ya sabe.** Ejecutado dentro de un
+  repositorio vinculado no necesita ni slug ni ruta: los saca del `.cortex.json` y del
+  directorio. Pedir ambos era redundante e invitaba a escribir el slug de otro proyecto. La
+  forma explícita sigue valiendo para backfillear una carpeta distinta.
+
 ### Added
 - **`GET /metrics` en formato Prometheus** (ADR-0048), para enterarse de lo que un chequeo de
   salud no ve: que el worker de mantenimiento muera —no tiene puerto, y es quien mantiene la

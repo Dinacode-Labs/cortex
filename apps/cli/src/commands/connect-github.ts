@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { apiPost } from "@cortex/client";
+import { apiPost, useProjectServer } from "@cortex/client";
 import type { BatchItem } from "@cortex/shared";
 
 /**
@@ -9,6 +9,10 @@ import type { BatchItem } from "@cortex/shared";
  * `cortex auth login` y el servidor en marcha.
  *
  * Uso: cortex connect-github "<slug>" <owner/repo> [maxItems]
+ *
+ * El servidor sale de la carpeta desde la que se ejecuta (ADR-0033): con varios Cortex
+ * configurados, escribir en el de por defecto sería mandar el conocimiento de un cliente al
+ * servidor de otro.
  * Requiere `gh` en PATH y autenticado con acceso al repo.
  */
 
@@ -36,6 +40,7 @@ interface Issue {
 }
 
 export async function run(args: string[]): Promise<void> {
+  useProjectServer(process.env.INIT_CWD || process.cwd());
   const slug = args[0];
   const repo = args[1];
   const max = Number(args[2] ?? "100");
