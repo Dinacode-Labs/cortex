@@ -1,17 +1,26 @@
 import { getEnvNum } from "./env.js";
 
 /**
- * Semáforo en proceso para las llamadas al proveedor de inferencia (chat, visión, STT y
- * embeddings comparten cupo porque comparten API key).
+ * Semáforo para las llamadas al proveedor de inferencia. Chat, visión, transcripción y
+ * embeddings comparten cupo porque comparten clave, y los proveedores suelen limitar por
+ * clave y no por tipo de endpoint.
  *
- * Por qué existe: los clusters con cuota limitan peticiones EN PARALELO por clave, no solo
- * por minuto — NaN admite 5 concurrentes y 60 rpm. Sin esto, un `maintain` o una ingesta
- * con concurrencia 8 dispara 429 en ráfaga y el backoff acaba costando más tiempo del que
- * ahorró el paralelismo. `CORTEX_LLM_CONCURRENCY` (def. 4) deja margen para que la visión o
- * el STT quepan a la vez sin tocar el techo.
+ * **Por qué existe:** muchos proveedores limitan peticiones EN PARALELO, además de por
+ * minuto. Sin esto, una tarea de mantenimiento o una ingesta lanzando ocho a la vez dispara
+ * 429 en ráfaga, y el backoff acaba costando más tiempo del que ahorró el paralelismo.
+ * Cuál es el número de cada proveedor no se documenta aquí: es configuración del operador
+ * (ADR-0031), y va en `CORTEX_LLM_CONCURRENCY`.
  *
- * Es un límite POR PROCESO, no distribuido: varios workers a la vez siguen pudiendo
- * superarlo (para eso está el backoff de cada cliente).
+ * **ES UN LÍMITE POR PROCESO.** Eso importa más de lo que parece: un despliegue típico
+ * corre varios procesos que llaman al modelo —la API, el worker de mantenimiento, el MCP,
+ * la web—, y cada uno tiene su propio contador. El techo real contra la clave es
+ * `procesos × CORTEX_LLM_CONCURRENCY`, no el valor a secas. Quien lo configure tiene que
+ * hacer esa división; está explicado en `.env.example` y en `deploy/README.md`.
+ *
+ * Un límite compartido de verdad exige estado compartido —y `shared` no puede depender de la
+ * base de datos—, así que tendría que inyectarse desde los entrypoints, como el clasificador
+ * o el reranker. Está anotado en el roadmap. Mientras no exista, lo que absorbe el exceso es
+ * el reintento con backoff que ya tiene cada cliente.
  */
 
 let inFlight = 0;
