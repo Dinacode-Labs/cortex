@@ -9,6 +9,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Fixed
+- **Las sesiones largas se perdían enteras.** El servidor rechaza con 413 lo que pase de
+  150.000 caracteres, y una sesión de trabajo con un agente los pasa de sobra — medido,
+  154.035 en una sola. Justo las sesiones largas son las que más conocimiento llevan, así que
+  el efecto era perder el día entero de trabajo. Ahora el cliente recorta antes de enviar, y
+  lo hace **por el principio**: una sesión termina en conclusiones y empieza en tanteos, así
+  que si hay que perder algo, que sea el tanteo. Queda una marca para que la destilación no
+  lea el corte como el comienzo de la conversación.
 - **`cortex doctor` daba una falsa alarma con varios servidores.** Cualquiera de ellos caído
   producía «1 problem stopping Cortex from working» aunque el que usa esa carpeta estuviera
   perfectamente. Ahora solo bloquea el servidor que la carpeta usa de verdad —el del
