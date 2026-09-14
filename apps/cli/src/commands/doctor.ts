@@ -1,4 +1,4 @@
-import { getClientConfig, listCredentials, useProjectServer } from "@cortex/client";
+import { defaultServer, getClientConfig, listCredentials, normalizeServer, readCortexLink, useProjectServer } from "@cortex/client";
 import { defaultCtx, detectAgents, getAdapter } from "../setup/index.js";
 import type { SetupCtx } from "../setup/types.js";
 import { CLI_VERSION, isOlderThan } from "../version.js";
@@ -71,24 +71,41 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
   if (sesiones.length === 0) {
     checks.push({ nombre: "Session", nivel: "error", detalle: "not signed in", arreglo: "cortex auth login" });
   }
+
+  // Con varios servidores (ADR-0033), que uno esté caído no significa que Cortex no funcione:
+  // significa que ESE no va. Solo bloquea el que esta carpeta usa de verdad — el del
+  // `.cortex.json` o, si no lo dice, el de por defecto. Antes cualquiera de ellos daba «1
+  // problem stopping Cortex from working» con todo lo demás sano, que es una falsa alarma y
+  // de las caras: la primera vez que alguien ve eso, deja de fiarse del diagnóstico.
+  const elQueImporta = normalizeServer(readCortexLink(cwd)?.server ?? defaultServer() ?? "");
+  const bloquea = (servidor: string): Nivel =>
+    sesiones.length === 1 || normalizeServer(servidor) === elQueImporta ? "error" : "aviso";
+
   for (const creds of sesiones) {
     const varios = sesiones.length > 1;
+    const esElDeEstaCarpeta = bloquea(creds.server) === "error";
     const et = (n: string): string => (varios ? `${n} · ${creds.server.replace(/^https?:\/\//, "")}` : n);
     checks.push({ nombre: et("Session"), nivel: "ok", detalle: `${creds.email} on ${creds.server}` });
 
     const health = await ping(`${creds.server.replace(/\/$/, "")}/health`);
     checks.push({
       nombre: et("Server"),
-      nivel: health.ok ? "ok" : "error",
+      nivel: health.ok ? "ok" : bloquea(creds.server),
       detalle: health.ok ? creds.server : `not responding (${health.error ?? `HTTP ${health.status}`})`,
-      ...(health.ok ? {} : { arreglo: "Check the URL, or ask whoever runs the server." }),
+      ...(health.ok
+        ? {}
+        : {
+            arreglo: esElDeEstaCarpeta
+              ? "Check the URL, or ask whoever runs the server."
+              : `This folder does not use this server, so nothing here is blocked. Sign out of it with: cortex auth logout --server ${creds.server}`,
+          }),
     });
     if (!health.ok) continue;
 
     const me = await ping(`${creds.server.replace(/\/$/, "")}/auth/me`, { token: creds.token });
     checks.push({
       nombre: et("Token"),
-      nivel: me.ok ? "ok" : "error",
+      nivel: me.ok ? "ok" : bloquea(creds.server),
       detalle: me.ok ? "valid" : `rejected (HTTP ${me.status})`,
       ...(me.ok ? {} : { arreglo: `cortex auth login --server ${creds.server}` }),
     });
@@ -100,7 +117,7 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
       const vivo = mcp.ok || mcp.status === 401 || mcp.status === 405 || mcp.status === 406;
       checks.push({
         nombre: et("MCP"),
-        nivel: vivo ? "ok" : "error",
+        nivel: vivo ? "ok" : bloquea(creds.server),
         detalle: vivo ? cfg.mcpUrl : `not responding (${mcp.error ?? `HTTP ${mcp.status}`})`,
         ...(vivo ? {} : { arreglo: "The MCP server is not running; tell whoever runs it." }),
       });

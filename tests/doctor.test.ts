@@ -117,6 +117,61 @@ describe("cortex doctor", () => {
     expect(hayError).toBe(false);
   });
 
+  /**
+   * Con dos servidores (ADR-0033), que uno esté caído no significa que Cortex no funcione:
+   * significa que ese no va. Si esta carpeta usa el otro, y el otro responde, el diagnóstico
+   * tiene que decir que todo lo esencial funciona. Antes decía «1 problem stopping Cortex
+   * from working», que es una falsa alarma de las caras: la primera vez que alguien la ve,
+   * deja de fiarse del diagnóstico entero.
+   */
+  it("un servidor caído que esta carpeta no usa es un aviso, no un fallo", async () => {
+    mkdirSync(join(home, ".cortex"), { recursive: true });
+    writeFileSync(
+      join(home, ".cortex/credentials"),
+      JSON.stringify({
+        version: 2,
+        servers: {
+          "http://vivo.test": { token: "t1", email: "dev@example.com" },
+          "http://muerto.test": { token: "t2", email: "dev@example.com" },
+        },
+        default: "http://vivo.test",
+      }),
+    );
+    writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "x", server: "http://vivo.test" }));
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (String(url).includes("muerto.test")) throw new Error("fetch failed");
+      return new Response(JSON.stringify({ ok: true, mcpUrl: "http://vivo.test/mcp" }), { status: 200 });
+    });
+
+    const r = await correrDoctor();
+    expect(r.texto).toContain("aviso Server · muerto.test");
+    expect(r.texto).toContain("cortex auth logout --server http://muerto.test");
+    expect(r.hayError, "un servidor que no se usa no puede bloquear").toBe(false);
+  });
+
+  /** Pero el que SÍ usa esta carpeta, si no responde, bloquea: ahí no hay Cortex que valga. */
+  it("si el caído es el que usa esta carpeta, entonces sí es un fallo", async () => {
+    mkdirSync(join(home, ".cortex"), { recursive: true });
+    writeFileSync(
+      join(home, ".cortex/credentials"),
+      JSON.stringify({
+        version: 2,
+        servers: {
+          "http://vivo.test": { token: "t1", email: "dev@example.com" },
+          "http://muerto.test": { token: "t2", email: "dev@example.com" },
+        },
+        default: "http://vivo.test",
+      }),
+    );
+    writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "x", server: "http://muerto.test" }));
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (String(url).includes("muerto.test")) throw new Error("fetch failed");
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    });
+
+    expect((await correrDoctor()).hayError).toBe(true);
+  });
+
   it("una carpeta sin vincular es un aviso, con el comando para vincularla", async () => {
     conCredenciales();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
