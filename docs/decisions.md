@@ -42,7 +42,8 @@ be installed from npm without a database, distillation moved to the server, per-
 integration, a real production deployment, a licence, and an explicit line between publishing
 the code and publishing how it is run.
 
-**Using it for real — from 11 September 2026** ([0033](#adr-0033)–[0035](#adr-0035)). Several
+**Using it for real — from 11 September 2026** ([0033](#adr-0033)–[0035](#adr-0035),
+[0048](#adr-0048)). Several
 Cortex servers at once, memory exposed as tools an agent already looks for, and contradictions
 surfaced instead of silently resolved. All three came out of running it daily and finding
 things that no amount of design would have predicted.
@@ -1130,3 +1131,44 @@ things that no amount of design would have predicted.
   the **presence** of the option, not its truthiness, because a falsy check would collapse the
   two into the dangerous one.
 - **Revisit when:** legitimately global entries appear that users should be able to search.
+
+<a id="adr-0048"></a>
+
+## ADR-0048 · Metrics in a standard format, not a dashboard of our own
+
+- **Status:** accepted (2026-09-14).
+- **Context:** the health checks answer "is the service responding", and that leaves out the
+  two failures that actually hurt here, because the service keeps responding while both
+  happen. The **maintenance worker** can die — it has no port, so nothing external notices, and
+  it is what keeps the memory alive through enrichment, reconciliation and the lint; the memory
+  then degrades slowly and silently. And **captures can start failing** — they sit in the table
+  marked failed, the agents carry on working, and nobody notices until somebody wonders why the
+  memory has not grown in weeks.
+
+  The question behind this, asked well: whatever gets built has to be generic, because this is
+  a product other people deploy.
+- **Decision:** expose `GET /metrics` in the **Prometheus text format**. Not a dashboard of our
+  own.
+
+  A dashboard has to be looked at, and nobody looks at a dashboard on a good day. A standard
+  format is read by whatever the operator already runs — Prometheus, Grafana Agent, Datadog,
+  anything — and lets **them** set their own thresholds on their own schedule. It is plain
+  text, so it adds no dependency to the product.
+
+  What it exposes is deliberately about the system, not about a request: captures by status,
+  the age of each portless process's heartbeat, current entries, projects, and inference calls
+  and tokens. The worker now also beats into the database, because the file it was writing
+  lives inside its own container where only its own health check can see it.
+
+  **Off unless configured.** It needs `CORTEX_METRICS_TOKEN`, and without a valid one the
+  endpoint answers 404 rather than 403 — a 403 would announce that there is something worth
+  asking for. These numbers say how much a deployment is used and how much it spends.
+- **Alternatives:** a status page in the web UI — has to be looked at, and it would only serve
+  this product; pushing to a specific provider — picks the operator's tooling for them, which
+  is exactly the thing to avoid; OpenTelemetry for metrics too — heavier for what is currently
+  a handful of numbers, and the trace side already has its own exporter ([0016](#adr-0016)).
+- **Consequences:** an operator who wants alerts now has something to point at, and one who
+  wants none loses nothing. Per-request metrics — latency, status codes — are **not** here yet;
+  the natural place is a middleware feeding the same endpoint, and it is on the roadmap.
+- **Revisit when:** per-request metrics are wanted, or enough deployments want OpenTelemetry
+  that maintaining one format stops being simpler than maintaining two.

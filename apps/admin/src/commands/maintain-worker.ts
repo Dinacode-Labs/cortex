@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import { getSql } from "@cortex/database";
 import cron from "node-cron";
 import { runMaintenance, wireLlm } from "@cortex/agents";
 
@@ -25,6 +26,13 @@ export async function run(): Promise<void> {
     } catch {
       /* si no se puede escribir, el healthcheck lo dirá; no es motivo para no trabajar */
     }
+    // Y también a la base: el fichero solo lo ve el healthcheck de ESTE contenedor. Desde
+    // fuera nadie sabría que el worker ha muerto, y es quien mantiene la memoria viva.
+    // Fallar aquí tampoco puede parar el trabajo.
+    void getSql()`
+      INSERT INTO worker_heartbeats (name, beat_at) VALUES ('maintain', now())
+      ON CONFLICT (name) DO UPDATE SET beat_at = now()
+    `.catch(() => {});
   };
   const expr = process.env.CORTEX_MAINTAIN_CRON ?? "0 3 * * *";
   if (!cron.validate(expr)) {
