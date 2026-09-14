@@ -8,6 +8,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **`cortex doctor` daba una falsa alarma con varios servidores.** Cualquiera de ellos caído
+  producía «1 problem stopping Cortex from working» aunque el que usa esa carpeta estuviera
+  perfectamente. Ahora solo bloquea el servidor que la carpeta usa de verdad —el del
+  `.cortex.json`, o el de por defecto—; el resto es un aviso, con el comando exacto para
+  cerrar esa sesión si ya no hace falta. La primera vez que alguien ve una alarma que no es
+  verdad, deja de fiarse del diagnóstico entero.
+
 ### Changed
 - **El registro de decisiones, revisado de arriba abajo y en inglés.** Tenía doce decisiones
   **sin número**, escondidas dentro de otra con cabeceras sueltas: dos de ellas ya se citaban
