@@ -73,6 +73,15 @@ no hecho.
 
 ### Operación y escala
 
+- **Límite de inferencia compartido entre procesos.** El semáforo que evita pasarse de las
+  peticiones en paralelo que admite el proveedor es **por proceso**, y un despliegue corre
+  cuatro que llaman al modelo. El techo real es `procesos × CORTEX_LLM_CONCURRENCY`, así que
+  hoy hay que dividir a mano, y está documentado en `.env.example`. Un límite de verdad exige
+  estado compartido: `shared` no puede depender de la base de datos, así que la forma natural
+  es inyectarlo desde los entrypoints, como el clasificador o el reranker. Lo que hay que
+  medir antes de construirlo es si el reintento con backoff que ya existe absorbe el exceso en
+  la práctica; hoy no hay datos de 429 porque el uso es de una persona.
+
 - **Límite de peticiones por IP, general.** El envío de códigos **ya está cubierto** por IP
   además de por email, porque es el único sitio sin autenticar que provoca un efecto —y un
   coste— fuera del servidor. Para el resto del tráfico el sitio natural sigue siendo el borde:
