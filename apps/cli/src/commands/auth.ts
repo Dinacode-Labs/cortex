@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline/promises";
+import { resolveServidor } from "../servidor.js";
 import { getEnv } from "@cortex/shared";
 import {
   DEFAULT_SERVER_URL,
@@ -36,8 +37,14 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
   return { ok: res.ok, status: res.status, data };
 }
 
-async function login(): Promise<void> {
-  const server = normalizeServer(argOf("--server") || getEnv("CORTEX_SERVER_URL", DEFAULT_SERVER_URL));
+async function login(args: string[]): Promise<void> {
+  // Antes esto se iba al servidor de desarrollo por defecto aunque ya hubiera una sesión
+  // configurada, así que quien tuviera dos acababa autenticándose contra el que no era.
+  const server = await resolveServidor(args, { verbo: "sign in to", permitirDesconocido: true });
+  if (!server) {
+    process.exitCode = 1;
+    return;
+  }
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
     console.log(`Signing in to ${server}`);
@@ -104,7 +111,15 @@ async function status(): Promise<void> {
 
 async function logout(args: string[]): Promise<void> {
   const todos = args.includes("--all");
-  const server = argOf("--server");
+  let server: string | undefined;
+  if (!todos) {
+    const elegido = await resolveServidor(args, { verbo: "sign out of" });
+    if (!elegido) {
+      process.exitCode = 1;
+      return;
+    }
+    server = elegido;
+  }
   const objetivo = todos ? listCredentials() : [readCredentials(server)].filter((c) => c !== null);
 
   if (objetivo.length === 0) {
@@ -135,7 +150,7 @@ function use(args: string[]): void {
 
 export async function run(args: string[]): Promise<void> {
   const sub = args[0];
-  if (sub === "login") await login();
+  if (sub === "login") await login(args);
   else if (sub === "status" || sub === "whoami") await status();
   else if (sub === "logout") await logout(args);
   else if (sub === "use") use(args);
