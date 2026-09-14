@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-09-14
+
 ### Fixed
 - **Las sesiones largas se perdían enteras.** El servidor rechaza con 413 lo que pase de
   150.000 caracteres, y una sesión de trabajo con un agente los pasa de sobra — medido,
