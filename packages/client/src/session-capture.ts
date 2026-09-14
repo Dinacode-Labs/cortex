@@ -19,6 +19,28 @@ export type CapturePlatformName = CapturePlatform;
  * Vive en `client` y no en `agents` justamente por eso: ya no necesita el modelo.
  */
 
+/**
+ * Tope de lo que se manda por sesión. Coincide con el del servidor
+ * (`CORTEX_CAPTURE_SESSION_MAX_CHARS`), que responde 413 al pasarse.
+ *
+ * Importa recortar AQUÍ y no dejar que el servidor rechace: una sesión larga de trabajo con
+ * un agente pasa de sobra de este tamaño —medido, 154.000 caracteres en una— y son justo esas
+ * las que más conocimiento llevan. Rechazarlas entera significa perder el día entero.
+ */
+const MAX_CHARS = 150_000;
+
+/**
+ * Recorta por el PRINCIPIO, no por el final. Una sesión termina en conclusiones —qué se
+ * decidió, qué se arregló, qué quedó pendiente— y empieza en tanteos. Si hay que perder
+ * algo, que sea el tanteo. Se deja una marca para que la destilación no interprete el corte
+ * como el comienzo real de la conversación.
+ */
+export function limitaSesion(condensed: string, max = MAX_CHARS): string {
+  if (condensed.length <= max) return condensed;
+  const aviso = "[… el principio de esta sesión se ha omitido por tamaño …]\n\n";
+  return aviso + condensed.slice(condensed.length - (max - aviso.length));
+}
+
 export interface SessionCaptureOutcome {
   sessionId: string;
   status: string;
@@ -40,7 +62,7 @@ export async function sendCondensedSession(opts: {
       slug: opts.slug,
       platform: opts.platform,
       sessionId: opts.sessionId,
-      condensed: opts.condensed,
+      condensed: limitaSesion(opts.condensed),
       ...(opts.sourceType ? { sourceType: opts.sourceType } : {}),
     },
     { wait: opts.wait },
