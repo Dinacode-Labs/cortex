@@ -8,6 +8,16 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **Al agente solo le llegaban las decisiones del proyecto.** El pack de contexto que se
+  inyecta al abrir sesión se recortaba con un corte al final, así que en un proyecto grande
+  —medido en uno real: 28.389 caracteres— el tope de 6.000 se lo comía todo menos parte de la
+  primera sección. Las restricciones, los riesgos, la deuda técnica y las convenciones **no
+  llegaban nunca**, y nada lo decía: una sección ausente se lee como «aquí no hay nada de eso».
+  Ahora el recorte lo hace el servidor repartiendo el hueco entre secciones, cada una dice
+  cuántas entradas se ha dejado, y el orden dentro de cada sección va por confianza y no por
+  fecha de creación (que tras un backfill no ordena nada). Ver ADR-0049.
+
 ## [0.1.3] — 2026-09-15
 
 ### Fixed

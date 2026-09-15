@@ -43,10 +43,11 @@ integration, a real production deployment, a licence, and an explicit line betwe
 the code and publishing how it is run.
 
 **Using it for real — from 11 September 2026** ([0033](#adr-0033)–[0035](#adr-0035),
-[0048](#adr-0048)). Several
-Cortex servers at once, memory exposed as tools an agent already looks for, and contradictions
-surfaced instead of silently resolved. All three came out of running it daily and finding
-things that no amount of design would have predicted.
+[0048](#adr-0048)–[0049](#adr-0049)). Several
+Cortex servers at once, memory exposed as tools an agent already looks for, contradictions
+surfaced instead of silently resolved, something to point an alert at, and a context pack that
+shortens by sharing out the room rather than by cutting off the end. They came out of running
+it daily and finding things that no amount of design would have predicted.
 
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
@@ -1172,3 +1173,49 @@ things that no amount of design would have predicted.
   the natural place is a middleware feeding the same endpoint, and it is on the roadmap.
 - **Revisit when:** per-request metrics are wanted, or enough deployments want OpenTelemetry
   that maintaining one format stops being simpler than maintaining two.
+
+<a id="adr-0049"></a>
+
+## ADR-0049 · The context pack is budgeted per section, not cut at the end
+
+- **Status:** accepted (2026-09-15).
+- **Context:** the session-start hook injects the project's context pack and has a character
+  limit, because a system prompt is not free. The limit was applied as a `slice()` on the
+  rendered pack: take the first N characters, drop the rest.
+
+  On a project with two hundred entries that turns out to mean something quite different from
+  "a shorter pack". Measured on a real one — 28,389 characters across five sections — the
+  6,000-character cut delivered part of **Decisions in force** and nothing else. Constraints,
+  risks, technical debt and conventions never reached the agent at all. Not trimmed: absent.
+
+  That is the worst shape a failure can take here, because nothing announces it. The agent is
+  told it has the project's living memory, the pack looks well-formed, and a whole class of
+  knowledge — exactly the class that stops someone breaking something — is silently missing.
+  A section that isn't there reads as "there is nothing of that kind in this project".
+- **Decision:** the **server** renders within a budget the caller asks for
+  (`GET /context-pack?maxChars=`), instead of the caller cutting what it receives.
+
+  The budget is shared out between sections rather than spent in order: each gets an equal
+  share, whatever a section doesn't need goes back into the pot for the others, and then the
+  remainder is spent top-down by importance. Every section that has entries appears, and each
+  one says how many it left behind (`…and 15 more here. Ask Cortex for the rest.`) so the
+  agent knows the difference between "no constraints" and "constraints you haven't been
+  shown", and knows to ask.
+
+  Ordering changed with it. Entries came out `created_at DESC`, which after a backfill is no
+  order at all — everything was created within the same minute, so the twenty that survived a
+  cut were arbitrary. They now come out by confidence first: if the pack has to be shortened,
+  what survives is what the system trusts most.
+
+  The hook still slices what it gets, as a net. It is no longer how the pack is shortened.
+- **Alternatives:** raising the limit — the pack grows with the project, so it only moves the
+  cliff; summarising with an LLM at session start — latency and cost on every session, for
+  content that is already summaries; sending only the sections the agent asks for — the agent
+  doesn't know what it doesn't know, which is the whole point of injecting context.
+- **Consequences:** an agent starting a session on a large project now sees less of the
+  decisions than before and something of everything else, which is the trade this is making
+  deliberately. Callers that want the whole pack (the MCP tool, the web UI) pass no budget and
+  get it whole.
+- **Revisit when:** ranking within a section wants to be relevance-based rather than
+  confidence-based (it needs the session's topic, which the hook does not have yet), or a
+  section proves to deserve a different weight than an equal share.

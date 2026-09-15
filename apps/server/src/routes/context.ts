@@ -75,7 +75,11 @@ contextRoutes.get("/context-pack", async (c) => {
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
   try {
-    const text = renderContextPack(await getContextPack(project.name));
+    // Quien consume dice cuánto le cabe; recortar aquí reparte el hueco entre secciones en
+    // vez de cortar el pack por donde toque. Acotado, para que nadie pida un pack absurdo.
+    const pedido = Number(c.req.query("maxChars") ?? "");
+    const maxChars = Number.isFinite(pedido) && pedido > 0 ? Math.min(pedido, 200_000) : undefined;
+    const text = renderContextPack(await getContextPack(project.name), { maxChars });
     return c.json({ project: project.name, text });
   } catch (e) {
     // SOLO la carrera guard→consulta: el proyecto puede desaparecer/renombrarse entre
