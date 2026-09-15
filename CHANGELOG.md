@@ -8,6 +8,17 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **Un proyecto ya se puede gestionar después de crearlo.** Hasta ahora la visibilidad se
+  fijaba al crearlo y no había forma de cambiarla en ninguna interfaz —ni UI, ni API, ni CLI,
+  ni siquiera una función de dominio—, así que un proyecto nacido público lo era para siempre.
+  Ahora su **dueño** (no solo un admin global) puede volverlo privado o público, traspasar la
+  propiedad y gestionar los miembros, desde `PATCH /projects/:slug` y
+  `POST`/`DELETE /projects/:slug/members`. Ver ADR-0051.
+- **Todo proyecto tiene slug.** Una migración rellena los que faltaban, y los proyectos que
+  crea un `save` pasan por el mismo camino que `cortex link --create`: con slug y con dueño.
+  Antes nacían sin slug y sin dueño, imposibles de vincular, de adoptar y de cerrar.
+
 ### Fixed
 - **La portada de la UI salía vacía teniendo cientos de entradas visibles.** Se pedían las 60
   entradas más recientes de todos los proyectos y se descartaban después, en memoria, las de

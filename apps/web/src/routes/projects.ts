@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import { addProjectMember, listAccessibleProjects, listProjectMembers, removeProjectMember } from "@cortex/core";
+import { addProjectMember, listAccessibleProjects, listProjectMembers, NotAManagerError, removeProjectMember } from "@cortex/core";
 import { layout, type Html } from "../views/layout.js";
 import { joinHtml } from "../views/components.js";
 import type { WebEnv } from "../middleware/session.js";
@@ -47,18 +47,30 @@ projectsRoutes.get("/projects", async (c) => {
   return c.html(layout("Projects", body, user));
 });
 
+/** Quien manda ahora es el dominio (`canManageProject`): el dueño o un admin (ADR-0051). */
+function paginaNoGestor(e: unknown, user: { email: string; admin: boolean }): Html {
+  if (!(e instanceof NotAManagerError)) throw e;
+  return layout("Not allowed", html`<div class="empty">${e.message}</div>`, user);
+}
+
 projectsRoutes.post("/projects/:slug/members", async (c) => {
   const user = c.get("user")!;
-  if (!user.admin) return c.html(layout("Not allowed", html`<div class="empty">Only an admin can manage members.</div>`, user), 403);
   const email = String((await c.req.parseBody()).email ?? "").trim();
-  if (email) await addProjectMember(c.req.param("slug"), email);
+  try {
+    if (email) await addProjectMember(c.req.param("slug"), email, user.email);
+  } catch (e) {
+    return c.html(paginaNoGestor(e, user), 403);
+  }
   return c.redirect("/projects");
 });
 
 projectsRoutes.post("/projects/:slug/members/remove", async (c) => {
   const user = c.get("user")!;
-  if (!user.admin) return c.html(layout("Not allowed", html`<div class="empty">Only an admin can manage members.</div>`, user), 403);
   const email = String((await c.req.parseBody()).email ?? "").trim();
-  if (email) await removeProjectMember(c.req.param("slug"), email);
+  try {
+    if (email) await removeProjectMember(c.req.param("slug"), email, user.email);
+  } catch (e) {
+    return c.html(paginaNoGestor(e, user), 403);
+  }
   return c.redirect("/projects");
 });

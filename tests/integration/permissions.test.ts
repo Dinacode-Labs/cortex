@@ -17,7 +17,8 @@ describe("permisos de proyecto (público/privado, admin, miembros, cascada)", ()
     expect(await canAccessProject(prv, "bob@example.com")).toBe(false); // ajeno
     expect(await canAccessProject(prv, "admin@example.com")).toBe(true); // admin (env)
 
-    await addProjectMember(prv.slug!, "bob@example.com");
+    // Quien añade es el dueño: gestionar un proyecto ya no es solo cosa del admin (ADR-0051).
+    await addProjectMember(prv.slug!, "bob@example.com", "ana@example.com");
     const prv2 = (await findProjectBySlug(prv.slug!))!;
     expect(await canAccessProject(prv2, "bob@example.com")).toBe(true); // ahora miembro
   });
