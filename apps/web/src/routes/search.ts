@@ -35,10 +35,18 @@ searchRoutes.get("/search", async (c) => {
       )}</div>`
     : html`<div class="empty">${q ? "Nothing relevant found." : "Type a query."}</div>`;
 
+  // La caja de búsqueda va también AQUÍ, no solo en la página de la que vienes: buscar es
+  // afinar, y antes había que volver atrás para cambiar una palabra.
   const body = html`
-    <p><a class="back" href="/">← Home</a></p>
-    <h1>Results for "${q}"</h1>
-    <p class="sub">${hits.length} results${project ? html` · project ${project}` : ""} · ranked by similarity</p>
+    <h1>${q ? html`Results for "${q}"` : "Search"}</h1>
+    <p class="sub">${hits.length} ${hits.length === 1 ? "result" : "results"}${project ? html` in <b>${project}</b>` : ""} · ranked by meaning, not by words</p>
+    <div class="panel">
+      <form class="row" method="get" action="/search">
+        ${project ? html`<input type="hidden" name="project" value="${project}">` : ""}
+        <input type="text" name="q" value="${q}" placeholder="Search by meaning…" required>
+        <button type="submit">Search</button>
+      </form>
+    </div>
     ${results}`;
-  return c.html(layout(`Search: ${q}`, body, c.get("user")));
+  return c.html(layout(q ? `Search: ${q}` : "Search", body, { user: c.get("user"), q }));
 });

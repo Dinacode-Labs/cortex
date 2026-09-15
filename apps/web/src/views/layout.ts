@@ -9,6 +9,11 @@ import { getBrandLogoSvg, getBrandName } from "@cortex/shared";
  */
 export type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
 
+export interface Usuario {
+  email: string;
+  admin: boolean;
+}
+
 /** Marca del header: logo del operador si lo hay (CORTEX_BRAND_LOGO_*), o un wordmark de
  *  texto. `raw()` solo se aplica al SVG de configuración, nunca a datos de usuario/BD. */
 function brandMark(): Html {
@@ -19,31 +24,53 @@ function brandMark(): Html {
     : html`<span class="wordmark">${name}</span>`;
 }
 
-/** Documento completo: <head> (estilos en /styles.css estático) + header de marca + main. */
-export function layout(title: string, body: Html, user?: { email: string; admin: boolean } | null): Html {
+export interface OpcionesLayout {
+  user?: Usuario | null;
+  /** Qué enlace del header va marcado como actual. */
+  activo?: "projects" | "admin";
+  /** Texto en la caja de búsqueda global, para que no se pierda al ver los resultados. */
+  q?: string;
+}
+
+/**
+ * Documento completo.
+ *
+ * El header lleva **solo lo que es de verdad global**: la marca, la búsqueda —lo único que
+ * cruza proyectos— y por dónde se sale. Antes tenía ocho enlaces planos (Home, Projects, Ask,
+ * Graph, Code, Lint, AI cost, Capture), ninguno de los cuales se llevaba consigo el proyecto
+ * que estabas mirando: ir de una sección a otra te devolvía al primero de la lista. Las
+ * secciones ahora cuelgan del proyecto, que es la unidad de todo (ADR-0050).
+ */
+export function layout(title: string, body: Html, opts: OpcionesLayout | Usuario | null = {}): Html {
+  // Compatibilidad con las llamadas `layout(t, b, user)` que quedan por el código.
+  const o: OpcionesLayout = opts && "email" in opts ? { user: opts } : ((opts ?? {}) as OpcionesLayout);
+  const user = o.user;
+  const brand = getBrandName();
   return html`<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title} · ${getBrandName()}</title>
+  <title>${title} · ${brand}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header>
-    <span class="brand">${brandMark()}</span>
+    <a class="brand" href="/">${brandMark()}</a>
+    ${user
+      ? html`<form class="global-search" method="get" action="/search">
+          <input type="search" name="q" value="${o.q ?? ""}" placeholder="Search everything…" aria-label="Search ${brand}">
+        </form>`
+      : ""}
     <nav>
-      <a href="/">Home</a>
-      <a href="/projects">Projects</a>
-      <a href="/ask">Ask</a>
-      <a href="/graph">Graph</a>
-      <a href="/code">Code</a>
-      <a href="/lint">Lint</a>
-      <a href="/usage">AI cost</a>
-      <a href="/?capture=1">Capture</a>
-      ${user ? html`<span style="margin-left:12px;color:var(--color-text-muted)">${user.email}${user.admin ? html` <span class="pill" style="padding:1px 6px">admin</span>` : ""}</span> <a href="/logout">Sign out</a>` : ""}
+      ${user
+        ? html`<a class="${o.activo === "projects" ? "on" : ""}" href="/">Projects</a>
+            ${user.admin ? html`<a class="${o.activo === "admin" ? "on" : ""}" href="/admin/usage">Admin</a>` : ""}
+            <span class="whoami">${user.email}${user.admin ? html` <span class="pill tiny">admin</span>` : ""}</span>
+            <a href="/logout">Sign out</a>`
+        : ""}
     </nav>
   </header>
   <main>${body}</main>

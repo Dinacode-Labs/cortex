@@ -1,4 +1,4 @@
--- Migración inicial de Dinacode Cortex.
+-- Migración inicial de Cortex.
 -- Modelo de datos del §14 del documento de planteamiento (hipótesis a validar).
 -- Base única Postgres + pgvector: documental + vectorial + relacional (ADR-0003/4).
 

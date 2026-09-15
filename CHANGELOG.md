@@ -8,6 +8,28 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Changed
+- **La UI web gira ahora alrededor del proyecto.** Eran ocho enlaces planos y cada pantalla
+  tenía su propio selector, así que pasar de una sección a otra te devolvía al primer proyecto
+  de la lista. Ahora la portada son tus proyectos y cada uno tiene su dirección —`/p/<slug>`—
+  con sus secciones colgando: Memory, Ask, **What agents see**, **Health**, Map, Code y
+  Settings. Las etiquetas están escritas para quien las lee, no para el interior del sistema.
+  Todas las direcciones antiguas redirigen. Ver ADR-0050.
+- **Lo que ven los agentes y el informe de salud ahora enlazan.** El pack de contexto y cada
+  contradicción, hueco o duplicado llevan a las entradas implicadas: enseñar un problema sin
+  forma de abrirlo enseña a ignorar los avisos.
+- **Las entradas se pueden corregir**, no solo validar o rechazar. Como casi todo lo escribe un
+  agente, poder decir «esto está mal» sin poder arreglarlo dejaba la memoria sin forma de
+  mejorar.
+- **El coste de IA pasa a `/admin/usage` y solo lo ven los admins.** Lo que gasta la instalación
+  en inferencia no es asunto de cada developer que entra a revisar una decisión.
+- La UI está **en inglés** también en lo que se generaba sobre la marcha, y el nombre del
+  producto sale de `CORTEX_BRAND_NAME` también en los botones, no solo en la cabecera.
+- La interfaz **funciona en un móvil**.
+
+### Fixed
+- El checkbox del mapa de conocimiento no se podía desmarcar desde la interfaz.
+
 ### Added
 - **Un proyecto ya se puede gestionar después de crearlo.** Hasta ahora la visibilidad se
   fijaba al crearlo y no había forma de cambiarla en ninguna interfaz —ni UI, ni API, ni CLI,

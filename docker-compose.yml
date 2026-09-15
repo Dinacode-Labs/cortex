@@ -1,4 +1,4 @@
-# Infraestructura local de Dinacode Cortex.
+# Infraestructura local de Cortex.
 # Por ahora solo Postgres con la extensión pgvector (almacenamiento documental +
 # vectorial en una sola base, según la hipótesis de la demo). Un grafo dedicado
 # (Neo4j/Memgraph) o una vector DB dedicada (Qdrant) son alternativas a evaluar

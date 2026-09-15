@@ -52,6 +52,23 @@ describe("documentación", () => {
   });
 
   /**
+   * El producto se llama **Cortex**. Quien lo mantiene se llama Dinacode, y eso se firma donde
+   * toca —licencia, autoría, la organización de GitHub—, pero no es parte del nombre.
+   * «Dinacode Cortex» suena a producto de una empresa concreta justo donde queremos que suene
+   * a herramienta que cualquiera puede coger, así que se queda fuera de la documentación.
+   */
+  it("el producto se llama Cortex, no «Dinacode Cortex»", () => {
+    // Sensible a mayúsculas a propósito: `dinacode-cortex` en minúsculas es el identificador
+    // del marketplace del plugin y la ruta del clon antiguo (`~/.dinacode-cortex`). Son
+    // identidades técnicas que romperían instalaciones si cambiaran; lo que se prohíbe es
+    // usarlo como NOMBRE del producto. El CHANGELOG queda fuera: es historia, y reescribirla
+    // sería mentir sobre lo que se publicó.
+    const marcaPegada = /Dinacode[ -]Cortex/;
+    const ofensores = DOCS.filter((d) => d !== "CHANGELOG.md" && marcaPegada.test(read(d)));
+    expect(ofensores).toEqual([]);
+  });
+
+  /**
    * El repositorio es público. Quien encuentra un fallo de seguridad o quiere contribuir
    * abre estos ficheros, y si no puede leerlos da igual lo bien escritos que estén. El
    * registro de trabajo del equipo —ADRs, roadmap, comentarios— sigue en español a

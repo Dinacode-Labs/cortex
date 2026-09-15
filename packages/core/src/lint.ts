@@ -14,8 +14,13 @@ import type { Row } from "./map.js";
 export interface LintReport {
   project: string;
   totalEntries: number;
-  contradictions: { a: string; b: string }[];
-  duplicates: { a: string; b: string; score: number }[];
+  /**
+   * Los `*Id` son de ENTRADA, y pueden faltar: un extremo de una contradicción puede ser una
+   * entidad, que no tiene página propia. Sin ellos el informe era una lista de títulos que no
+   * llevaban a ninguna parte, y un hallazgo que no puedes abrir es un hallazgo que se ignora.
+   */
+  contradictions: { a: string; b: string; aId: string | null; bId: string | null }[];
+  duplicates: { a: string; b: string; score: number; aId: string; bId: string }[];
   orphanEntities: { name: string; type: string }[];
   lowConfidence: number;
   staleHistorical: number;
@@ -34,7 +39,8 @@ export async function lintProject(project: string): Promise<LintReport> {
 
   // Contradicciones: relaciones 'contradicts' con algún extremo en el proyecto.
   const contraRows = (await sql`
-    SELECT COALESCE(es.name, ces.title, '?') AS a, COALESCE(et.name, cet.title, '?') AS b
+    SELECT COALESCE(es.name, ces.title, '?') AS a, COALESCE(et.name, cet.title, '?') AS b,
+           ces.id AS a_id, cet.id AS b_id
     FROM relations r
     LEFT JOIN entities es ON es.id=r.source_id
     LEFT JOIN context_entries ces ON ces.id=r.source_id
@@ -49,7 +55,8 @@ export async function lintProject(project: string): Promise<LintReport> {
 
   // Duplicados casi idénticos por similitud vectorial (self-join sobre embeddings).
   const dupRows = (await sql`
-    SELECT ca.title AS a, cb.title AS b, (1 - (a.vector <=> b.vector)) AS score
+    SELECT ca.title AS a, cb.title AS b, ca.id AS a_id, cb.id AS b_id,
+           (1 - (a.vector <=> b.vector)) AS score
     FROM embeddings a
     JOIN embeddings b ON a.context_entry_id < b.context_entry_id
       AND a.embedding_model = b.embedding_model
@@ -105,8 +112,19 @@ export async function lintProject(project: string): Promise<LintReport> {
   return {
     project,
     totalEntries,
-    contradictions: contraRows.map((r) => ({ a: r.a, b: r.b })),
-    duplicates: dupRows.map((r) => ({ a: r.a, b: r.b, score: Number(r.score) })),
+    contradictions: contraRows.map((r) => ({
+      a: r.a,
+      b: r.b,
+      aId: (r.a_id as string | null) ?? null,
+      bId: (r.b_id as string | null) ?? null,
+    })),
+    duplicates: dupRows.map((r) => ({
+      a: r.a,
+      b: r.b,
+      score: Number(r.score),
+      aId: r.a_id as string,
+      bId: r.b_id as string,
+    })),
     orphanEntities: orphanRows.map((r) => ({ name: r.name, type: r.type })),
     lowConfidence,
     staleHistorical,
