@@ -226,7 +226,8 @@ async function entriesByType(
     WHERE project_id = ANY(${projectIds}) AND type = ${type}
       AND status NOT IN ('rejected', 'obsolete')
       ${temporal}
-    ORDER BY created_at DESC
+    ORDER BY CASE confidence WHEN 'verified' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+             created_at DESC
     LIMIT ${limit}
   `) as unknown as Row[];
   return rows.map(rowToContextEntry);

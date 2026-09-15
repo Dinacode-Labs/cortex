@@ -13,6 +13,11 @@ import { readHookStdin } from "../hook-stdin.js";
  * Uso: el hook lo invoca con el JSON por stdin. Manual: echo '{"cwd":"/ruta"}' | cortex hook-context
  */
 
+/**
+ * Lo que cabe de memoria en el arranque de una sesión. Es un presupuesto que se le PIDE al
+ * servidor, no una tijera: el servidor lo reparte entre secciones para que lleguen
+ * decisiones, restricciones, riesgos y deuda, en vez de decisiones y nada más.
+ */
 const MAX_CTX = Number(process.env.CORTEX_HOOK_CTX_CHARS ?? "6000");
 
 function argOf(name: string): string | undefined {
@@ -44,10 +49,12 @@ export async function run(): Promise<void> {
     if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
 
     // Vía API autenticada (no toca la BD): respeta permisos y no expone proyectos sin acceso.
-    const res = await apiGet<{ project: string; text: string }>(`/context-pack?slug=${encodeURIComponent(link.slug)}`);
+    const res = await apiGet<{ project: string; text: string }>(
+      `/context-pack?slug=${encodeURIComponent(link.slug)}&maxChars=${MAX_CTX}`,
+    );
     if (!res || !res.text.trim()) return; // sin sesión, sin servidor, sin acceso, o pack vacío
 
-    const additionalContext = `## ${getBrandName()} context — project "${res.project}"\nLiving project memory (current decisions, constraints, risks). Check it before touching a module, and capture what is new.\n\n${res.text.slice(0, MAX_CTX)}`;
+    const additionalContext = `## ${getBrandName()} context — project "${res.project}"\nLiving project memory (current decisions, constraints, risks). Check it before touching a module, and capture what is new.\n\n${res.text.slice(0, MAX_CTX)}`; // el slice es red de seguridad: el reparto lo hace el servidor
 
     if (format === "hermes") {
       process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call

@@ -41,7 +41,77 @@ export function renderDecisions(entries: ContextEntry[]): string {
   return entries.map(entryLine).join("\n");
 }
 
-export function renderContextPack(pack: ContextPack): string {
+interface Seccion {
+  titulo: string;
+  bloques: string[];
+}
+
+function nota(n: number): string {
+  return `- _…and ${n} more here. Ask Cortex for the rest._`;
+}
+
+/**
+ * Escribe una sección con sus `n` primeras entradas, diciendo cuántas se ha dejado.
+ *
+ * Cuando no cabe ninguna va igualmente el título y la cuenta: que el agente sepa que este
+ * proyecto tiene restricciones apuntadas vale mucho más que no mencionarlas, porque una
+ * sección ausente se lee como «aquí no hay nada».
+ */
+function escribe(s: Seccion, n: number): string {
+  const fuera = s.bloques.length - n;
+  const cuerpo = [...s.bloques.slice(0, n), ...(fuera > 0 ? [nota(fuera)] : [])];
+  return `\n## ${s.titulo}\n${cuerpo.join("\n")}`;
+}
+
+/**
+ * Reparte un presupuesto entre secciones que piden cantidades distintas, sin que las grandes
+ * ahoguen a las pequeñas: a cada una le toca lo mismo, y lo que una no gasta vuelve al bote
+ * para las demás (llenado por niveles). Devuelve cuánto le corresponde a cada una.
+ */
+function reparte(costes: number[], presupuesto: number): number[] {
+  const asignado = new Array<number>(costes.length).fill(0);
+  let pendientes = costes.map((_, i) => i);
+  let bote = presupuesto;
+  while (pendientes.length > 0 && bote > 0) {
+    const parte = Math.floor(bote / pendientes.length);
+    if (parte <= 0) break;
+    const satisfechos = pendientes.filter((i) => costes[i]! <= parte);
+    if (satisfechos.length === 0) {
+      // Nadie cabe entero: todos se quedan con su parte igual y aquí se acaba.
+      for (const i of pendientes) asignado[i] = parte;
+      return asignado;
+    }
+    for (const i of satisfechos) {
+      asignado[i] = costes[i]!;
+      bote -= costes[i]!;
+    }
+    pendientes = pendientes.filter((i) => costes[i]! > parte);
+  }
+  return asignado;
+}
+
+/** Cuántas entradas de la sección caben en lo que le ha tocado. */
+function cuantasCaben(s: Seccion, presupuesto: number): number {
+  let n = 0;
+  while (n < s.bloques.length && escribe(s, n + 1).length <= presupuesto) n++;
+  return n;
+}
+
+export interface RenderPackOptions {
+  /**
+   * Tope de caracteres. Sin él, el pack sale entero.
+   *
+   * Existe porque el hook cortaba el pack con un `slice()` al final: con un proyecto de
+   * doscientas entradas, al agente le llegaban las decisiones y **nada más** —las
+   * restricciones, los riesgos y la deuda se quedaban fuera de la tijera sin que nadie se
+   * enterara—. Un corte ciego no es un resumen: es perder justo lo que no cupo por orden
+   * alfabético del andamiaje. Con tope, cada sección recibe su parte y lo que una no gasta
+   * vuelve al bote, así que siempre llega algo de cada tipo de conocimiento.
+   */
+  maxChars?: number;
+}
+
+export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {}): string {
   // Aviso pegado a CADA entrada implicada, no en una sección aparte: si va al final, el
   // agente ya se ha creído la entrada cuando llega el aviso.
   const avisos = new Map<string, string>();
@@ -61,28 +131,55 @@ export function renderContextPack(pack: ContextPack): string {
     return aviso ? `${entryLine(e)}\n${aviso}` : entryLine(e);
   };
 
-  const section = (title: string, entries: ContextEntry[]) =>
-    entries.length > 0 ? `\n## ${title}\n${entries.map(linea).join("\n")}` : "";
+  const secciones: Seccion[] = [
+    { titulo: "Decisions in force", bloques: pack.decisions.map(linea) },
+    { titulo: "Active constraints", bloques: pack.constraints.map(linea) },
+    { titulo: "Known risks", bloques: pack.risks.map(linea) },
+    { titulo: "Technical debt", bloques: pack.technicalDebt.map(linea) },
+    { titulo: "Conventions", bloques: pack.conventions.map(linea) },
+    { titulo: "Sensitive modules", bloques: pack.sensitiveModules.map((m) => `- ${m}`) },
+    {
+      titulo: "Most relevant to the area you asked about",
+      bloques: pack.relevantToArea.map((h) => `- (${h.score.toFixed(2)}) ${h.entry.title} — ${h.entry.summary ?? ""}`),
+    },
+  ].filter((s) => s.bloques.length > 0);
 
-  const parts = [
+  const encabezado = [
     `# Context Pack — ${pack.project}`,
     `_${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total · generated ${pack.generatedAt.toISOString()}_`,
-    section("Decisions in force", pack.decisions),
-    section("Active constraints", pack.constraints),
-    section("Known risks", pack.risks),
-    section("Technical debt", pack.technicalDebt),
-    section("Conventions", pack.conventions),
-  ];
+  ].join("\n");
 
-  if (pack.sensitiveModules.length > 0) {
-    parts.push(`\n## Sensitive modules\n${pack.sensitiveModules.map((m) => `- ${m}`).join("\n")}`);
+  const junta = (piezas: string[]) => [encabezado, ...piezas].join("\n");
+  const tope = opts.maxChars;
+  if (!tope || tope <= 0) return junta(secciones.map((s) => escribe(s, s.bloques.length)));
+
+  // Reparto inicial a partes iguales: garantiza que de CADA tipo de conocimiento llegue algo.
+  const partes = reparte(
+    secciones.map((s) => escribe(s, s.bloques.length).length),
+    Math.max(tope - encabezado.length - secciones.length, 0),
+  );
+  const cuantas = secciones.map((s, i) => cuantasCaben(s, partes[i]!));
+
+  // Y luego se comprueba contra el tope de verdad, no contra la aritmética del reparto: se
+  // encoge por la cola si nos hemos pasado y se crece por la cabeza con lo que sobre. El
+  // orden de `secciones` es el de importancia para quien lo va a leer.
+  const cabe = () => junta(secciones.map((s, i) => escribe(s, cuantas[i]!))).length <= tope;
+  for (let i = secciones.length - 1; i >= 0 && !cabe(); i--) {
+    while (cuantas[i]! > 0 && !cabe()) cuantas[i] = cuantas[i]! - 1;
   }
-  if (pack.relevantToArea.length > 0) {
-    parts.push(
-      `\n## Most relevant to the area you asked about\n${pack.relevantToArea
-        .map((h) => `- (${h.score.toFixed(2)}) ${h.entry.title} — ${h.entry.summary ?? ""}`)
-        .join("\n")}`,
-    );
+  for (let vuelta = 0; vuelta < secciones.length; vuelta++) {
+    let movido = false;
+    for (let i = 0; i < secciones.length; i++) {
+      while (cuantas[i]! < secciones[i]!.bloques.length) {
+        cuantas[i] = cuantas[i]! + 1;
+        if (cabe()) movido = true;
+        else {
+          cuantas[i] = cuantas[i]! - 1;
+          break;
+        }
+      }
+    }
+    if (!movido) break;
   }
-  return parts.filter(Boolean).join("\n");
+  return junta(secciones.map((s, i) => escribe(s, cuantas[i]!)));
 }

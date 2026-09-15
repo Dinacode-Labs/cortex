@@ -428,14 +428,22 @@ everything into one bag, while still not duplicating what is shared. Permissions
 same way: being a member of "Acme" opens its subprojects.
 
 This pack, rendered to Markdown, is **exactly what the `SessionStart` hook injects** into
-your agent when you open a session. It goes through the authenticated API and is truncated to
-roughly 6000 characters, configurable with `CORTEX_HOOK_CTX_CHARS`.
+your agent when you open a session. It goes through the authenticated API within a character
+budget — roughly 6000, configurable with `CORTEX_HOOK_CTX_CHARS`.
+
+**How it shortens matters more than the number.** The budget is shared out between sections
+rather than spent from the top, so decisions, constraints, risks, technical debt and
+conventions all reach the agent, each saying how many entries it left behind
+(`…and 15 more here. Ask Cortex for the rest.`). Within a section, higher-confidence entries
+come first. The point is that a missing section reads as "this project has none of those",
+which is a far more expensive thing to be wrong about than seeing fewer decisions
+([ADR-0049](decisions.md#adr-0049)).
 
 > **⚠️ What to watch for.** Inheritance applies to the **context pack**, not to `search` or
-> `ask`. A search inside the subproject does not yet pull in the parent's knowledge. And the
-> pack is **truncated**: on very large projects, deciding *what makes the cut* within that
-> context budget is exactly the open question, a navigable or hierarchical index, that is
-> **still under study on the roadmap**.
+> `ask`. A search inside the subproject does not yet pull in the parent's knowledge. And on a
+> large project the pack is still **a sample**: ranking within a section is by confidence, not
+> by what this session is actually about, because the hook does not know that yet. A navigable
+> or hierarchical index is **still under study on the roadmap**.
 
 ## 10. Lint (knowledge health) and observability
 
