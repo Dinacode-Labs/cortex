@@ -88,6 +88,24 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     expect(entries[0]!.createdBy).toBe(USER); // atribución: created_by = email de la sesión
   });
 
+  it("web: la portada no se queda vacía porque lo más reciente sea de otros (ADR-0052)", async () => {
+    // El fallo real: se pedían las N entradas más recientes de TODOS los proyectos y se
+    // descartaban en memoria las inaccesibles. Bastaba con que las últimas N fueran ajenas
+    // para que la primera pantalla del producto saliera en blanco teniendo cientos visibles.
+    const mia = `Entrada visible de la portada ${RID}.`;
+    await saveContext({ content: mia, project: prvOwn.name, createdBy: USER });
+
+    // …y ahora 70 entradas más nuevas en un proyecto que este usuario NO puede ver.
+    for (let i = 0; i < 70; i++) {
+      await saveContext({ content: `Ruido ajeno ${RID} ${i}.`, project: prvForeign.name, createdBy: OWNER });
+    }
+
+    const web = createWebApp();
+    const html = await (await web.request("/", { headers: { cookie: `cortex_session=${token}` } })).text();
+    expect(html).toContain(mia.slice(0, 40)); // la suya sigue llegando
+    expect(html).not.toContain("Ruido ajeno"); // y la ajena no, que era la otra mitad del trato
+  }, 120_000);
+
   it("server: /context-pack — 401 sin Bearer, 404 slug inexistente, 403 privado ajeno", async () => {
     const srv = createServerApp();
     const auth = { authorization: `Bearer ${token}` };

@@ -24,6 +24,19 @@ export interface ListEntriesFilter {
   type?: ContextEntryType;
   status?: ContextEntryStatus;
   limit?: number;
+  /**
+   * A qué proyectos puede llegar quien mira. **El filtro va dentro de la consulta**, antes de
+   * ordenar y limitar (ADR-0052).
+   *
+   * Filtrarlo después no filtra: recorta. La portada pedía las 60 entradas más recientes de
+   * todos los proyectos y descartaba en memoria las inaccesibles, así que bastaba con que esas
+   * 60 fueran de proyectos ajenos —o de ninguno— para que la pantalla saliera vacía teniendo
+   * cientos de entradas que sí se podían ver. Medido: 452 accesibles, 0 mostradas.
+   *
+   * Sin este campo se listan todas: es para quien ya sabe que puede verlas (un admin, un
+   * proceso interno). Quien sirva a una persona, pásalo.
+   */
+  accessibleProjectIds?: string[];
 }
 
 /** Lista entradas de contexto con filtros opcionales, más recientes primero. */
@@ -34,6 +47,10 @@ export async function listEntries(filter: ListEntriesFilter = {}): Promise<Conte
     const projectId = await findProjectIdByName(sql, filter.project);
     if (!projectId) return [];
     where = sql`${where} AND ce.project_id = ${projectId}`;
+  } else if (filter.accessibleProjectIds) {
+    // Una entrada sin proyecto la ve cualquiera con sesión: no hay proyecto que la restrinja
+    // (misma regla que `checkEntryAccess`, que devuelve `ok` con `project: null`).
+    where = sql`${where} AND (ce.project_id IS NULL OR ce.project_id = ANY(${filter.accessibleProjectIds}))`;
   }
   if (filter.type) where = sql`${where} AND ce.type = ${filter.type}`;
   if (filter.status) where = sql`${where} AND ce.status = ${filter.status}`;
