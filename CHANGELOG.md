@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-09-15
+
 ### Fixed
 - **Un rediseño desplegado podía no llegar nunca al navegador.** `/styles.css` se servía sin
   `Cache-Control` ni `ETag` —solo `Last-Modified`—, así que el navegador se quedaba la copia
