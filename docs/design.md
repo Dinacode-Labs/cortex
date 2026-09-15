@@ -147,11 +147,23 @@ Ask, in order:
 
 ## 7. Visual language
 
-Deliberately plain, and it should stay that way: system-ish sans (Inter), monospace for
-identifiers and content, a single accent colour, badges carrying the only semantic colour in
-the page (type, status, confidence). Density over decoration — these are lists of claims to be
-scanned, and the reader is looking for the wrong one.
+Deliberately plain, and it should stay that way: Inter, monospace for identifiers and content,
+**one** accent colour, and badges carrying the only semantic colour on the page (type, status,
+confidence). Density over decoration — these are lists of claims to be scanned, and the reader
+is looking for the wrong one.
 
-One known deficit: no dark mode. It is not urgent for a tool opened on a laptop next to an
-editor, and the layout does now work on a phone — which matters the day someone wants to check
-a decision in a meeting.
+It is a design system in one stylesheet, no framework ([ADR-0053](decisions.md#adr-0053)). The
+tokens at the top are the contract: one accent, a five-step ink ramp, spacing in multiples of
+four, six type sizes. **A hardcoded value is an inconsistency six months from now** — if a
+number is not in the scale, the scale is wrong or the design is.
+
+Components live in `views/components.ts` and the routes compose them. A route writing its own
+`<div class="panel">` is how the same idea ends up looking different on four screens, which is
+exactly what this replaced.
+
+Two tests hold the line: every class a page emits must have a rule behind it, and the
+stylesheet's braces must balance. And the stylesheet URL carries the release version, because
+without it a browser keeps the old copy and a deployed redesign simply does not arrive.
+
+One known deficit: no dark mode. Now a matter of redefining tokens under a media query rather
+than a rewrite.

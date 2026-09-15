@@ -10,16 +10,19 @@ export type WebEnv = { Variables: { user: AuthUser | null } };
 
 /** Página de login: la respuesta del gate sin sesión (y de /auth/cli y /logout). */
 export function loginPage(msg = ""): Html {
+  // No hay formulario a propósito: se entra desde la terminal, y el token de larga vida del
+  // CLI nunca viaja por una URL (ADR-0025). Así que esta pantalla solo tiene un trabajo,
+  // que es decir exactamente qué teclear.
   return layout(
     "Sign in",
-    html`<div class="empty" style="max-width:560px;margin:48px auto;text-align:center">
-       <h1>${getBrandName()}</h1>
-       <p>You need to sign in to see the project memory.</p>
-       ${msg ? html`<p style="color:#c0392b">${msg}</p>` : ""}
-       <p style="margin-top:16px">From your terminal:</p>
-       <pre style="text-align:left;display:inline-block">cortex auth login   # once per machine
+    html`<div class="signin stack">
+      <h1>${getBrandName()}</h1>
+      <p class="sub">Project memory for your coding agents. Sign in from your terminal:</p>
+      ${msg ? html`<div class="warn contradiction">${msg}</div>` : ""}
+      <pre class="content-block">cortex auth login   # once per machine
 cortex ui           # opens this UI, already signed in</pre>
-     </div>`,
+      <p class="sub">No CLI yet? <code>npm install -g @dinacodelabs/cortex</code></p>
+    </div>`,
   );
 }
 

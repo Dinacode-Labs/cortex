@@ -56,7 +56,7 @@ projectsRoutes.get("/", async (c) => {
           <h2>${p.name}</h2>
           ${visibilityPill(p.visibility)}
         </div>
-        <div class="sub"><code>${p.slug}</code>${p.ownerEmail ? html` · ${p.ownerEmail}` : html` · <span class="unclaimed">unclaimed</span>`}</div>
+        <div class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</div>
         <div class="card-foot">
           <span>${p.entryCount} ${p.entryCount === 1 ? "entry" : "entries"}</span>
           ${saludes[i]!}
@@ -66,23 +66,24 @@ projectsRoutes.get("/", async (c) => {
 
   // Un listado vacío no es un error: casi siempre es alguien que acaba de entrar. Decirle
   // "no tienes proyectos" no le sirve de nada; decirle cómo se crea el primero, sí.
-  const vacio = html`
-    <div class="panel onboarding">
-      <h2>Nothing here yet</h2>
-      <p class="sub">
-        ${getBrandName()} fills itself from your coding sessions. Link a repository from its folder and your
-        agents start feeding it:
-      </p>
-      <pre class="content-block">npm install -g @dinacodelabs/cortex
+  const vacio = html`<section class="panel onboarding">
+    <h2>Nothing here yet</h2>
+    <p class="sub">
+      ${getBrandName()} fills itself from your coding sessions. Link a repository from its folder and your agents
+      start feeding it:
+    </p>
+    <pre class="content-block">npm install -g @dinacodelabs/cortex
 cortex auth login
 cortex link --create "My Project"
 cortex setup --all</pre>
-      <p class="sub">If a project already exists and you cannot see it, it is private: ask its owner for access.</p>
-    </div>`;
+    <p class="sub">If a project already exists and you cannot see it, it is private: ask its owner for access.</p>
+  </section>`;
 
   const body = html`
-    <h1>Projects</h1>
-    <p class="sub">What ${getBrandName()} remembers, one project at a time.</p>
+    <div class="page-head">
+      <h1>Projects</h1>
+      <p class="sub">What ${getBrandName()} remembers, one project at a time.</p>
+    </div>
     ${cards.length ? html`<div class="project-grid">${cards}</div>` : vacio}`;
   return c.html(layout("Projects", body, { user, activo: "projects" }));
 });

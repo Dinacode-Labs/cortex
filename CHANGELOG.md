@@ -8,6 +8,21 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **Un rediseño desplegado podía no llegar nunca al navegador.** `/styles.css` se servía sin
+  `Cache-Control` ni `ETag` —solo `Last-Modified`—, así que el navegador se quedaba la copia
+  anterior sin preguntar: quien ya había entrado veía el HTML nuevo con los estilos viejos, a
+  medio pintar, que es indistinguible de un despliegue roto. La hoja lleva ahora la versión
+  pegada a la URL.
+
+### Changed
+- **Repaso visual completo.** Una escala coherente (un acento, cinco tonos de tinta, espaciado
+  en múltiplos de cuatro, seis tamaños de texto) y una capa de componentes de verdad en
+  `views/components.ts` que las pantallas **componen** en vez de escribir HTML suelto — antes
+  la misma idea salía distinta en cada sitio. Sin framework de CSS: lo que faltaba era una
+  escala, no una herramienta. Ver ADR-0053.
+- Sello de marca propio en lugar de la palabra con la primera letra en azul.
+
 ## [0.1.5] — 2026-09-15
 
 ### Changed

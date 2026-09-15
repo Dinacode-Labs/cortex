@@ -11,7 +11,7 @@ import {
   validateEntry,
 } from "@cortex/core";
 import { layout } from "../views/layout.js";
-import { badge, confidenceBadge, statusBadge, typeBadge } from "../views/components.js";
+import { badge, confidenceBadge, panel, statusBadge, typeBadge } from "../views/components.js";
 import { deniedPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -32,9 +32,9 @@ entriesRoutes.get("/entry/:id", async (c) => {
     : html`<span class="sub">No linked entities.</span>`;
 
   const validateForm = (status: ContextEntryStatus, label: string) =>
-    html`<form method="post" action="/entry/${entry.id}/validate" style="display:inline">
+    html`<form method="post" action="/entry/${entry.id}/validate">
       <input type="hidden" name="status" value="${status}">
-      <button class="secondary" type="submit">${label}</button>
+      <button class="${status === "rejected" ? "danger" : "secondary"}" type="submit">${label}</button>
     </form>`;
 
   const iso = (d: unknown) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? "").slice(0, 10));
@@ -50,25 +50,25 @@ entriesRoutes.get("/entry/:id", async (c) => {
     <p><a class="back" href="${volver}">← ${projectName ?? "Projects"}</a></p>
     <div class="card-head" style="margin-bottom:8px">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)} ${temporalBadge}</div>
     ${editando
-      ? html`<div class="panel">
-          <h2>Edit</h2>
-          <p class="sub">Correcting what an agent wrote is the point of this screen. The change is re-indexed, so it stays findable.</p>
-          <form method="post" action="/entry/${entry.id}/edit">
+      ? panel(
+          "Edit",
+          html`<form method="post" action="/entry/${entry.id}/edit">
             <input type="text" name="title" value="${entry.title}" required style="width:100%;margin-bottom:8px">
             <textarea name="content" rows="14" required>${entry.content}</textarea>
-            <div class="row" style="margin-top:8px">
+            <div class="row" style="margin-top:12px">
               <button type="submit">Save changes</button>
-              <a class="button secondary" href="/entry/${entry.id}">Cancel</a>
+              <a class="button quiet" href="/entry/${entry.id}">Cancel</a>
             </div>
-          </form>
-        </div>`
-      : html`<h1>${entry.title}</h1>
-          <div class="content-block">${entry.content}</div>
-          <p style="margin-top:10px"><a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a></p>`}
+          </form>`,
+          { ayuda: "Correcting what an agent wrote is the point of this screen. The change is re-indexed, so it stays findable." },
+        )
+      : html`<div class="page-head row-between">
+            <h1>${entry.title}</h1>
+            <a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a>
+          </div>
+          <div class="content-block">${entry.content}</div>`}
 
-    <div class="panel" style="margin-top:18px">
-      <h2>Metadata</h2>
-      <dl class="meta">
+    ${panel("Metadata", html`<dl class="meta">
         <dt>Project</dt><dd>${projectName ?? "—"}</dd>
         <dt>Type</dt><dd>${entry.type}</dd>
         <dt>Status</dt><dd>${statusBadge(entry.status)}</dd>
@@ -78,23 +78,19 @@ entriesRoutes.get("/entry/:id", async (c) => {
         <dt>Validity</dt><dd>${entry.validTo ? html`closed on ${iso(entry.validTo)} (${entry.validity})` : "in force"}</dd>
         <dt>Valid from</dt><dd>${iso(entry.validFrom)}</dd>
         <dt>Created</dt><dd>${entry.createdAt instanceof Date ? entry.createdAt.toISOString() : entry.createdAt}</dd>
-      </dl>
-    </div>
+    </dl>`)}
+    ${panel("Related entities", entityTags)}
 
-    <div class="panel">
-      <h2>Related entities</h2>
-      ${entityTags}
-    </div>
-
-    ${source?.rawContent ? html`<div class="panel"><h2>Original source</h2><div class="content-block">${source.rawContent}</div></div>` : ""}
-
-    <div class="panel">
-      <h2>Is this still true?</h2>
-      <p class="sub">An agent wrote this. Saying so is what makes the rest of the memory worth trusting.</p>
-      ${validateForm("validated", "✅ Yes, it holds")}
-      ${validateForm("rejected", "✖ No, it is wrong")}
-      ${validateForm("obsolete", "🗄 It was true, not any more")}
-    </div>`;
+    ${source?.rawContent ? panel("Original source", html`<div class="content-block">${source.rawContent}</div>`) : ""}
+    ${panel(
+      "Is this still true?",
+      html`<div class="row">
+        ${validateForm("validated", "Yes, it holds")}
+        ${validateForm("rejected", "No, it is wrong")}
+        ${validateForm("obsolete", "It was, not any more")}
+      </div>`,
+      { ayuda: "An agent wrote this. Saying so is what makes the rest of the memory worth trusting." },
+    )}`;
   return c.html(layout(entry.title, body, c.get("user")));
 });
 
