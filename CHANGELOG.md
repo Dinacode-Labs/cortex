@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-09-15
+
 ### Fixed
 - **`cortex ui` abría el navegador en `localhost`.** Se autenticaba correctamente contra tu
   servidor, pedía el ticket de un solo uso, decía «Opening the Cortex UI, already signed in»…
