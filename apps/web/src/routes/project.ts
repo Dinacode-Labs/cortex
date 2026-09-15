@@ -15,7 +15,7 @@ import {
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
-import { badge, entryCard, joinHtml, statusBadge, typeBadge } from "../views/components.js";
+import { badge, empty, entryCard, joinHtml, panel, scoreBadge, searchForm, statusBadge, typeBadge } from "../views/components.js";
 import { mdLite } from "../views/md.js";
 import { projectHeader } from "../views/project-nav.js";
 import { requireProjectPage } from "../middleware/access.js";
@@ -57,38 +57,38 @@ projectRoutes.get("/p/:slug", async (c) => {
   ];
 
   const captureForm = showCapture
-    ? html`<div class="panel">
-        <h2>Add to memory</h2>
-        <p class="sub">Normally your agents write here. This is for what you know and they do not.</p>
-        <form method="post" action="/save">
+    ? panel(
+        "Add to memory",
+        html`<form method="post" action="/save">
           <input type="hidden" name="project" value="${project.name}">
-          <textarea name="content" placeholder="What should ${getBrandName()} remember? A decision, a constraint, an incident…" required></textarea>
-          <div class="row" style="margin-top:8px">
+          <textarea name="content" placeholder="What should ${getBrandName()} remember? A decision, a constraint, an incident…" required autofocus></textarea>
+          <div class="row" style="margin-top:12px">
             <select name="type">
-              <option value="">(classify automatically)</option>
+              <option value="">Classify automatically</option>
               ${contextEntryType.options.map((t) => html`<option value="${t}">${t}</option>`)}
             </select>
             <button type="submit">Save</button>
+            <a class="button quiet" href="${base}">Cancel</a>
           </div>
-        </form>
-      </div>`
+        </form>`,
+        { ayuda: "Normally your agents write here. This is for what you know and they do not." },
+      )
     : html``;
 
   const body = html`
     ${projectHeader(project, "memory", gestor)}
     <div class="section-bar">
-      <form class="row" method="get" action="/search">
-        <input type="hidden" name="project" value="${project.name}">
-        <input type="text" name="q" placeholder="Search this project by meaning…" required>
-        <button type="submit">Search</button>
-      </form>
+      ${searchForm("/search", "", "Search this project by meaning…", { project: project.name })}
       <a class="button secondary" href="${base}?capture=1">+ Add</a>
     </div>
     ${captureForm}
     <div class="filters">${joinHtml(typePills, "")}</div>
     ${entries.length
       ? html`<div class="grid">${entries.map(entryCard)}</div>`
-      : html`<div class="empty">Nothing here yet${type ? html` of type <b>${type}</b>` : ""}.</div>`}`;
+      : empty(
+          type ? html`Nothing of type <b>${type}</b> here yet.` : "Nothing here yet.",
+          type ? html`<a class="button secondary" href="${base}">Show all types</a>` : html`<a class="button" href="${base}?capture=1">Add the first entry</a>`,
+        )}`;
   return c.html(layout(project.name, body, { user }));
 });
 
@@ -107,10 +107,13 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
       restrictToAccessibleOf: user.email,
     });
     const sources = hits.length
-      ? html`<div class="panel"><h2>Sources used</h2>${hits.map(
-          (h) => html`<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#0099ff")} ${linkEntry(h.entry.id, h.entry.title)}</div>`,
-        )}</div>`
-      : html`<div class="empty">No relevant context.</div>`;
+      ? panel(
+          "Sources used",
+          html`<ul class="findings">${hits.map(
+            (h) => html`<li>${scoreBadge(h.score)} ${linkEntry(h.entry.id, h.entry.title)}</li>`,
+          )}</ul>`,
+        )
+      : empty("Nothing relevant was found for this question.");
     answerHtml = answer
       ? html`<div class="answer">${mdLite(answer)}</div>${sources}`
       : html`<div class="warn">⚠️ No language model is configured, so this is search only.</div>${sources}`;
@@ -118,13 +121,14 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
 
   const body = html`
     ${projectHeader(project, "ask", gestor)}
-    <p class="sub">The retrieval agent answers from what is saved, and cites what it used.</p>
-    <div class="panel">
-      <form class="row" method="get" action="/p/${project.slug}/ask">
-        <input type="text" name="q" placeholder="e.g. what should I watch out for in the billing module?" value="${q}" required>
+    ${panel(
+      null,
+      html`<form class="row" method="get" action="/p/${project.slug}/ask">
+        <input type="text" name="q" placeholder="e.g. what should I watch out for in the billing module?" value="${q}" required autofocus>
         <button type="submit">Ask</button>
-      </form>
-    </div>
+      </form>`,
+      { ayuda: "The retrieval agent answers from what is saved, and cites what it used." },
+    )}
     ${q ? html`<h2 style="font-size:17px">${q}</h2>${answerHtml}` : ""}`;
   return c.html(layout(`${project.name} · Ask`, body, { user }));
 });
@@ -144,11 +148,17 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
 
   const sec = (title: string, entries: typeof pack.decisions): Html =>
     entries.length
-      ? html`<div class="panel"><h2>${title}</h2>${entries.map(
-          (e) => html`<div class="pack-entry">${typeBadge(e.type)} ${statusBadge(e.status)}<br>
-            <b>${linkEntry(e.id, e.title)}</b><br>
-            <span class="sub">${e.summary ?? e.content}</span></div>`,
-        )}</div>`
+      ? panel(
+          title,
+          html`${entries.map(
+            (e) => html`<div class="pack-entry">
+              <div class="card-head">${typeBadge(e.type)} ${statusBadge(e.status)}</div>
+              <b>${linkEntry(e.id, e.title)}</b>
+              <p class="sub">${e.summary ?? e.content}</p>
+            </div>`,
+          )}`,
+          { acciones: html`<span class="sub">${entries.length}</span>` },
+        )
       : html``;
 
   const body = html`
@@ -172,8 +182,17 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
     ${sec("Known risks", pack.risks)}
     ${sec("Technical debt", pack.technicalDebt)}
     ${sec("Conventions", pack.conventions)}
-    ${pack.sensitiveModules.length ? html`<div class="panel"><h2>Sensitive modules</h2>${joinHtml(pack.sensitiveModules.map((m) => badge(m, "#bc4c00")), " ")}</div>` : ""}
-    ${pack.relevantToArea.length ? html`<div class="panel"><h2>Most relevant to "${area ?? ""}"</h2>${pack.relevantToArea.map((h) => html`<div style="margin-bottom:8px">${badge(h.score.toFixed(2), "#0099ff")} ${linkEntry(h.entry.id, h.entry.title)}</div>`)}</div>` : ""}`;
+    ${pack.sensitiveModules.length
+      ? panel("Sensitive modules", html`<div class="row">${joinHtml(pack.sensitiveModules.map((m) => badge(m, "#8a4b00")), " ")}</div>`)
+      : ""}
+    ${pack.relevantToArea.length
+      ? panel(
+          `Most relevant to "${area ?? ""}"`,
+          html`<ul class="findings">${pack.relevantToArea.map(
+            (h) => html`<li>${scoreBadge(h.score)} ${linkEntry(h.entry.id, h.entry.title)}</li>`,
+          )}</ul>`,
+        )
+      : ""}`;
   return c.html(layout(`${project.name} · What agents see`, body, { user }));
 });
 
@@ -197,14 +216,14 @@ projectRoutes.get("/p/:slug/health", async (c) => {
   const buscar = (texto: string) =>
     `/search?q=${encodeURIComponent(texto)}&project=${encodeURIComponent(project.name)}`;
 
-  const card = (title: string, ayuda: string, color: string, items: Html[]) => html`
-    <div class="panel">
-      <h2>${title} <span class="badge" style="background:${color}1a;color:${color};border:1px solid ${color}55">${items.length}</span></h2>
-      <p class="sub">${ayuda}</p>
-      ${items.length
+  const card = (title: string, ayuda: string, color: string, items: Html[]) =>
+    panel(
+      title,
+      items.length
         ? html`<ul class="findings">${items.map((i) => html`<li>${i}</li>`)}</ul>`
-        : html`<span class="sub">Nothing to report.</span>`}
-    </div>`;
+        : html`<p class="sub">Nothing to report.</p>`,
+      { ayuda, acciones: badge(String(items.length), items.length ? color : "#5b6673") },
+    );
 
   const body = html`
     ${projectHeader(project, "health", gestor)}
@@ -233,13 +252,13 @@ projectRoutes.get("/p/:slug/health", async (c) => {
       "#57606a",
       r.orphanEntities.map((e) => html`<a href="${buscar(e.name)}">${e.name}</a> <span class="sub">(${e.type})</span>`),
     )}
-    <div class="panel">
-      <h2>📉 Other</h2>
-      <p class="sub">
+    ${panel(
+      "Other numbers",
+      html`<p class="sub">
         Low confidence: <b>${r.lowConfidence}</b> · superseded or obsolete: <b>${r.staleHistorical}</b> ·
         total entries: <b>${r.totalEntries}</b>
-      </p>
-    </div>`;
+      </p>`,
+    )}`;
   return c.html(layout(`${project.name} · Health`, body, { user }));
 });
 
@@ -257,13 +276,14 @@ projectRoutes.get("/p/:slug/map", async (c) => {
   const body = html`
     ${projectHeader(project, "map", gestor)}
     <p class="sub">How this project's knowledge connects, and where it does not.</p>
-    <div class="panel">
-      <form class="row" method="get" action="/p/${project.slug}/map">
+    ${panel(
+      null,
+      html`<form class="row" method="get" action="/p/${project.slug}/map">
         <input type="hidden" name="entries" value="0">
         <label class="check"><input type="checkbox" name="entries" value="1" ${incluirEntradas ? "checked" : ""}> Include entries</label>
         <button type="submit">Update</button>
-      </form>
-    </div>
+      </form>`,
+    )}
     <div id="legend"></div>
     <div id="net" data-project="${project.name}" data-entries="${incluirEntradas ? "1" : "0"}"></div>
     <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
@@ -286,20 +306,20 @@ projectRoutes.get("/p/:slug/code", async (c) => {
     results = hits.length
       ? html`${hits.map((h) => {
           const cuerpo = h.content.startsWith("// ") ? h.content.slice(h.content.indexOf("\n") + 1) : h.content;
-          return html`<div class="panel"><div class="card-head">${badge(h.score.toFixed(2), "#0099ff")} <b>${h.path}</b> <span class="sub">:${h.startLine}-${h.endLine} · ${h.language ?? ""}</span></div><pre class="content-block" style="overflow:auto"><code>${cuerpo}</code></pre></div>`;
+          return html`<section class="panel">
+            <div class="card-head">${scoreBadge(h.score)} <b>${h.path}</b>
+              <span class="sub">:${h.startLine}-${h.endLine} · ${h.language ?? ""}</span></div>
+            <pre class="content-block" style="overflow:auto"><code>${cuerpo}</code></pre>
+          </section>`;
         })}`
-      : html`<div class="empty">No results. Has this repository been indexed? An operator runs <code>cortex-admin index-code</code>.</div>`;
+      : empty(html`No results. Has this repository been indexed? An operator runs <code>cortex-admin index-code</code>.`);
   }
 
   const body = html`
     ${projectHeader(project, "code", gestor)}
-    <p class="sub">Hybrid search, semantic and lexical, over this project's indexed code.</p>
-    <div class="panel">
-      <form class="row" method="get" action="/p/${project.slug}/code">
-        <input type="text" name="q" placeholder="e.g. where is the user's phone number verified" value="${q}" required>
-        <button type="submit">Search</button>
-      </form>
-    </div>
+    ${panel(null, searchForm(`/p/${project.slug}/code`, q, "e.g. where is the user's phone number verified"), {
+      ayuda: "Hybrid search, semantic and lexical, over this project's indexed code.",
+    })}
     ${q ? html`<h2 style="font-size:16px">"${q}"</h2>${results}` : ""}`;
   return c.html(layout(`${project.name} · Code`, body, { user }));
 });

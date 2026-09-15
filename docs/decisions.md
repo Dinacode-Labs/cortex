@@ -52,8 +52,9 @@ it daily and finding things that no amount of design would have predicted.
 **The web UI gets a job — 15 September 2026** ([0050](#adr-0050)–[0052](#adr-0052)). A
 full pass over the running interface: what it is for (audit and repair), how it is organised
 (around the project), what a project's life looks like after creation (visibility, owner and
-members can change; nothing is born without a slug), and the rule that made the landing page
-empty (scope in the query, never after a limit).
+members can change; nothing is born without a slug), the rule that made the landing page empty
+(scope in the query, never after a limit), and how it is styled — one stylesheet as a design
+system, a component layer, and no framework ([0053](#adr-0053)).
 
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
@@ -1335,3 +1336,54 @@ empty (scope in the query, never after a limit).
   admin" pass no scope explicitly rather than by omission, so the default is the safe one.
 - **Revisit when:** listings are paginated (the same rule applies to cursors) or a listing
   needs to span visibility boundaries for a legitimate reason.
+
+<a id="adr-0053"></a>
+
+## ADR-0053 · A design system in one stylesheet, and no CSS framework
+
+- **Status:** accepted (2026-09-15).
+- **Context:** the UI rework ([0050](#adr-0050)) moved every screen around and left the styling
+  behind. Screens were assembling their own markup, so the same idea — a card, a panel, a
+  warning — came out slightly different in each place and the whole thing read as if four
+  people had built it without talking. The reasonable question came up: should this use
+  Tailwind, build components, and look professional?
+
+  Two separate things were wrong, and only one of them is about tooling.
+
+  First, a bug that made it look far worse than it was: `/styles.css` is served with no
+  `Cache-Control` and no `ETag`, only `Last-Modified`. Browsers apply heuristic freshness to
+  that and keep the old copy without asking. Anyone who had opened the UI before a deploy saw
+  new markup with the previous stylesheet — a half-painted page that looks exactly like a
+  broken redesign.
+
+  Second, the real one: there was no scale and no component layer. Spacing values were picked
+  per screen, there were two shades of grey doing the same job, and `views/` held four helpers
+  while the routes wrote raw HTML.
+- **Decision:** **no CSS framework.** One stylesheet, organised as a design system: tokens
+  (one accent, a five-step ink ramp, a spacing scale in multiples of four, a type scale of six
+  sizes), then base, layout, components, screens, responsive. Plus a real component layer in
+  `views/components.ts` — `panel`, `empty`, `warn`, `entryCard`, `hitCard`, `searchForm`,
+  badges — that the routes **compose** instead of hand-writing markup.
+
+  Tailwind was considered seriously and rejected on the specifics of this app, not on taste.
+  It would add a build step to a product whose whole deployment story is `docker compose up`
+  ([0027](#adr-0027)), and its main benefit — consistency without naming things — is worth most
+  where many people touch many components. Here the entire UI is ~1,200 lines of server-rendered
+  templates, the stylesheet is 12 KB, and design tokens already existed. In `hono/html` template
+  literals, utility classes also mean long strings inline where a semantic class reads better.
+  What was missing was a scale and a component layer, and neither of those needs a framework.
+
+  The stylesheet URL carries the release version (`/styles.css?v=<version>`), which is the
+  cheap, dependency-free way to make a deploy invalidate the cache.
+
+  Two tests hold the line: every class that any rendered page emits must have a rule behind it,
+  and the stylesheet's braces must balance — a stray one silently voids the rest of the file.
+- **Alternatives:** Tailwind with a CLI build in the Docker image (real option; revisit if the
+  UI grows past what one stylesheet can hold, or if contributors start arriving); the Tailwind
+  play CDN (compiles in the browser, explicitly not for production); a CSS-in-JS layer (needs a
+  bundler and buys nothing server-side).
+- **Consequences:** contributors write CSS rather than utility classes, so the tokens section
+  is the contract — a hardcoded value is a future inconsistency. Dark mode is still absent and
+  is now a matter of redefining tokens under a media query rather than a rewrite.
+- **Revisit when:** more than a couple of people work on the UI regularly, the stylesheet stops
+  fitting in one file, or a component library becomes worth its build step.
