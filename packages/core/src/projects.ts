@@ -188,17 +188,69 @@ export async function listAccessibleProjects(email: string | null): Promise<Acce
   return out;
 }
 
-/** Añade un miembro a un proyecto privado (operación de admin). */
-export async function addProjectMember(slug: string, email: string): Promise<void> {
+/**
+ * Quién puede **gestionar** un proyecto: su dueño o un admin global (ADR-0051).
+ *
+ * Antes solo mandaba el admin, y el guard vivía en la web —el dominio se fiaba de que el
+ * llamante hubiera mirado—. Eso convertía al admin en cuello de botella de cualquier equipo y
+ * dejaba al dueño de un proyecto privado sin poder añadir a nadie al suyo. Ahora la pregunta
+ * se responde una sola vez y aquí, que es donde no se puede olvidar.
+ *
+ * Gestionar es cambiar la visibilidad, traspasar la propiedad y tocar la lista de miembros.
+ * No es leer: eso lo decide `canAccessProject`, que es otra pregunta.
+ */
+export async function canManageProject(email: string | null, slug: string): Promise<boolean> {
+  if (!email) return false;
+  if (isAdmin(email)) return true;
+  const p = await findProjectBySlug(slug);
+  return !!p && p.ownerEmail?.toLowerCase() === email.toLowerCase();
+}
+
+/** Lo que `canManageProject` deja hacer, para no repetir el mensaje en cada llamante. */
+export class NotAManagerError extends Error {
+  constructor(slug: string) {
+    super(`Only the owner of "${slug}" or an administrator can change this.`);
+    this.name = "NotAManagerError";
+  }
+}
+
+async function exigeGestion(slug: string, byEmail: string | null): Promise<ProjectRef> {
   const p = await findProjectBySlug(slug);
   if (!p) throw new Error(`Proyecto "${slug}" no encontrado.`);
+  if (!(await canManageProject(byEmail, slug))) throw new NotAManagerError(slug);
+  return p;
+}
+
+/**
+ * Cambia lo que un proyecto puede cambiar después de nacer: su visibilidad y su dueño.
+ *
+ * Que esto no existiera era el agujero grande de ADR-0036: un proyecto creado público lo era
+ * para siempre, en cualquier interfaz, porque el único `UPDATE ... visibility` del repositorio
+ * corría al crearlo. Volver privado es inmediato y afecta a todo —búsqueda, packs, listados—
+ * porque la política los consulta en vivo; no toca ninguna entrada.
+ */
+export async function updateProject(
+  slug: string,
+  cambios: { visibility?: "public" | "private"; ownerEmail?: string | null },
+  byEmail: string | null,
+): Promise<ProjectRef> {
+  const p = await exigeGestion(slug, byEmail);
+  const visibility = cambios.visibility ?? p.visibility;
+  const ownerEmail =
+    cambios.ownerEmail === undefined ? p.ownerEmail : cambios.ownerEmail ? cambios.ownerEmail.toLowerCase() : null;
+  await getSql()`UPDATE entities SET visibility = ${visibility}, owner_email = ${ownerEmail} WHERE id = ${p.id}`;
+  return { ...p, visibility, ownerEmail };
+}
+
+/** Añade un miembro. Solo el dueño o un admin (ADR-0051). */
+export async function addProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
+  const p = await exigeGestion(slug, byEmail);
   await getSql()`INSERT INTO project_members (project_id, email) VALUES (${p.id}, ${email.toLowerCase()}) ON CONFLICT DO NOTHING`;
 }
 
-/** Quita un miembro de un proyecto (operación de admin). */
-export async function removeProjectMember(slug: string, email: string): Promise<void> {
-  const p = await findProjectBySlug(slug);
-  if (!p) throw new Error(`Proyecto "${slug}" no encontrado.`);
+/** Quita un miembro. Solo el dueño o un admin (ADR-0051). */
+export async function removeProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
+  const p = await exigeGestion(slug, byEmail);
   await getSql()`DELETE FROM project_members WHERE project_id = ${p.id} AND email = ${email.toLowerCase()}`;
 }
 

@@ -34,6 +34,20 @@ export const projectSummary = z.object({
 });
 export type ProjectSummary = z.infer<typeof projectSummary>;
 
+/**
+ * Lo que un proyecto puede cambiar después de nacer (ADR-0051). Los dos campos son
+ * opcionales y se aplican solo si vienen: mandar `{}` no borra el dueño. Para quitarlo
+ * hay que decirlo con `ownerEmail: null`, que es una decisión distinta de no mencionarlo.
+ */
+export const updateProjectRequest = z.object({
+  visibility: z.enum(["public", "private"]).optional(),
+  ownerEmail: z.string().email().nullable().optional(),
+});
+export type UpdateProjectRequest = z.infer<typeof updateProjectRequest>;
+
+export const projectMemberRequest = z.object({ email: z.string().email() });
+export type ProjectMemberRequest = z.infer<typeof projectMemberRequest>;
+
 export const createProjectRequest = z.object({
   name: z.string().min(1).max(120),
   visibility: z.enum(["public", "private"]).optional(),

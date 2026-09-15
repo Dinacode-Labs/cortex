@@ -1,14 +1,20 @@
 import { Hono } from "hono";
 import {
+  addProjectMember,
   canAccessProject,
+  canManageProject,
   createProject,
   findProjectBySlug,
   listAccessibleProjects,
   listAdmins,
+  listProjectMembers,
+  NotAManagerError,
+  removeProjectMember,
   slugify,
+  updateProject,
   type ProjectRef,
 } from "@cortex/core";
-import { createProjectRequest, type ProjectSummary } from "@cortex/shared";
+import { createProjectRequest, projectMemberRequest, updateProjectRequest, type ProjectSummary } from "@cortex/shared";
 import { currentUser } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
@@ -85,4 +91,73 @@ projectRoutes.post("/projects", async (c) => {
     // servidor, así que 400 con el motivo en vez de un 500 opaco.
     return c.json({ error: (e as Error).message }, 400);
   }
+});
+
+/**
+ * Cambia la visibilidad o el dueño de un proyecto (ADR-0051).
+ *
+ * El agujero que tapa: hasta ahora la visibilidad se fijaba al crear y no había forma de
+ * cambiarla en ninguna interfaz, así que un proyecto nacido público lo era para siempre.
+ * Quien puede hacerlo lo decide el dominio (`canManageProject`): el dueño o un admin.
+ */
+projectRoutes.patch("/projects/:slug", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const body = await parseBody(c, updateProjectRequest);
+  if (body instanceof Response) return body;
+  const slug = c.req.param("slug");
+  // Un proyecto que no puedes ni ver responde 404, no 403: lo contrario diría que existe.
+  const project = await findProjectBySlug(slug);
+  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  try {
+    return c.json({ project: toSummary(await updateProject(slug, body, user.email)) });
+  } catch (e) {
+    if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
+    return c.json({ error: (e as Error).message }, 400);
+  }
+});
+
+/** Miembros de un proyecto. Ver la lista exige poder gestionarlo: es quién tiene acceso. */
+projectRoutes.get("/projects/:slug/members", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const slug = c.req.param("slug");
+  const project = await findProjectBySlug(slug);
+  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  if (!(await canManageProject(user.email, slug))) return c.json({ error: new NotAManagerError(slug).message }, 403);
+  return c.json({ members: await listProjectMembers(slug) });
+});
+
+projectRoutes.post("/projects/:slug/members", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const body = await parseBody(c, projectMemberRequest);
+  if (body instanceof Response) return body;
+  const slug = c.req.param("slug");
+  const project = await findProjectBySlug(slug);
+  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  try {
+    await addProjectMember(slug, body.email, user.email);
+  } catch (e) {
+    if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
+    throw e;
+  }
+  return c.json({ members: await listProjectMembers(slug) });
+});
+
+projectRoutes.delete("/projects/:slug/members", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const body = await parseBody(c, projectMemberRequest);
+  if (body instanceof Response) return body;
+  const slug = c.req.param("slug");
+  const project = await findProjectBySlug(slug);
+  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  try {
+    await removeProjectMember(slug, body.email, user.email);
+  } catch (e) {
+    if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
+    throw e;
+  }
+  return c.json({ members: await listProjectMembers(slug) });
 });

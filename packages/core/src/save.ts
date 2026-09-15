@@ -10,7 +10,7 @@ import {
 } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "./entities.js";
 import { rowToContextEntry, type Row } from "./map.js";
-import { findProjectIdByName } from "./projects.js";
+import { createProject, findProjectIdByName } from "./projects.js";
 import {
   canonicalize,
   classifyType,
@@ -113,7 +113,12 @@ export async function saveContext(
 
   let projectId: string | null = null;
   if (parsed.project) {
-    projectId = (await resolveEntity(sql, parsed.project, "project")).id;
+    // Un proyecto nacido de un `save` pasa por el mismo sitio que `cortex link --create`: con
+    // slug y con dueño (ADR-0051). Antes se creaba con `resolveEntity`, que solo pone el
+    // nombre, y quedaba sin slug, sin dueño y público: imposible de vincular, de adoptar y de
+    // cerrar. `createProject` devuelve el que ya exista sin tocarlo, así que esto no cambia
+    // nada de los que ya están.
+    projectId = (await createProject(parsed.project, { ownerEmail: parsed.createdBy ?? null })).id;
   }
 
   const sourceRows = (await sql`
