@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-09-15
+
 ### Fixed
 - **`cortex auth login` se iba al servidor equivocado.** Con una sesión ya configurada,
   ejecutarlo sin `--server` intentaba autenticar contra el servidor de desarrollo por defecto
