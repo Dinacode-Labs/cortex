@@ -49,6 +49,12 @@ surfaced instead of silently resolved, something to point an alert at, and a con
 shortens by sharing out the room rather than by cutting off the end. They came out of running
 it daily and finding things that no amount of design would have predicted.
 
+**The web UI gets a job — 15 September 2026** ([0050](#adr-0050)–[0052](#adr-0052)). A
+full pass over the running interface: what it is for (audit and repair), how it is organised
+(around the project), what a project's life looks like after creation (visibility, owner and
+members can change; nothing is born without a slug), and the rule that made the landing page
+empty (scope in the query, never after a limit).
+
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
 > to by title alone. They were numbered on 2026-09-12, taking the next free identifiers. The
@@ -1219,3 +1225,113 @@ it daily and finding things that no amount of design would have predicted.
 - **Revisit when:** ranking within a section wants to be relevance-based rather than
   confidence-based (it needs the session's topic, which the hook does not have yet), or a
   section proves to deserve a different weight than an equal share.
+
+<a id="adr-0050"></a>
+
+## ADR-0050 · The web UI is organised around the project, and its job is audit and repair
+
+- **Status:** proposed (2026-09-15). Design in [`design.md`](design.md).
+- **Context:** the web UI was the one part of Cortex whose job was never written down. It
+  grew into eight top-level screens on a flat navigation bar, each with its own project
+  selector, none remembering which project you were looking at. Meanwhile almost everything
+  in the memory is written by agents; nobody types entries. A full pass over the running UI
+  (2026-09-15) found the screens that matter most for that reality — the lint report and the
+  context pack — were the ones that offered nothing to do: text without links, findings
+  without actions. And the landing page, with no project selected, rendered empty on a
+  database with hundreds of accessible entries ([0052](#adr-0052)).
+- **Decision:** two things, one about purpose and one about shape.
+
+  **Purpose.** The web is where a person **audits and repairs a memory written by machines**.
+  Not a data-entry tool, not a dashboard, not the primary way anyone uses Cortex. Three rules
+  follow: reading beats writing; nothing is shown without a way to act on it; anything that
+  wants a terminal stays in the terminal (`cortex-admin`, the CLI).
+
+  **Shape.** The project is the unit of everything — of access, of context packs, of what a
+  developer has in mind when they open the UI — so the UI is organised around it. The landing
+  page lists the projects you can reach. A project has one address, `/p/<slug>`, and its
+  sections are tabs on that page: what the memory holds, ask, what agents see at session
+  start, health, map, code, and settings for whoever manages it. The project is in the URL,
+  so it cannot be lost by navigating. Global search is the one thing that lives above
+  projects. Operator screens (usage and cost) sit in an admin area, visible only to admins.
+  Old URLs redirect.
+- **Alternatives:** keep the flat navigation and add a sticky project cookie — fixes the
+  symptom, keeps the eight-way split and the per-screen selectors; a client-side app — ruled
+  out by [0042](#adr-0042), and nothing here needs it.
+- **Consequences:** every project needs a slug to have an address, which [0051](#adr-0051)
+  guarantees. Section labels are chosen for a person, not for the internals: "Health" rather
+  than "Lint", "What agents see" rather than "Context pack". The design document owns the
+  detail and the list of known gaps; this record owns the decision.
+- **Revisit when:** a second kind of user appears whose unit is not the project — a
+  client-level view across projects, say — or the number of sections makes tabs the wrong
+  control.
+
+<a id="adr-0051"></a>
+
+## ADR-0051 · A project has a life after creation: visibility, owner and members are managed, and every project has a slug
+
+- **Status:** proposed (2026-09-15).
+- **Context:** [0036](#adr-0036) gave projects an owner, members and a visibility, and
+  [0037](#adr-0037) made permissions cascade down the hierarchy. What neither said — and what
+  turned out to be missing entirely — is how any of it changes afterwards. The only
+  `UPDATE … visibility` in the repository runs at creation. There is no domain function, no
+  endpoint, no command and no screen that changes a project's visibility or owner. Members can
+  be managed only by a global admin, and only through a block that appears when the project is
+  already private — so on a deployment where every project was born public, the block has
+  never been shown. Projects that `save` creates on the fly have no slug, no owner and are
+  public; the CLI already knows they exist and lists them as unlinkable.
+
+  The effect from the outside is "there is no way to manage public and private projects", which
+  is very nearly true.
+- **Decision:**
+  1. **Managers.** A project is managed by its **owner** or by a **global admin**. Managing
+     means changing visibility, transferring ownership, and adding or removing members. Members
+     stay binary (no roles): the case for roles has not appeared.
+  2. **Visibility is mutable**, both ways. Going private hides the project from everyone but
+     its managers and members, immediately, including in packs and search; going public does
+     the reverse. Neither touches the entries.
+  3. **Every project has a slug.** A migration backfills slugs for projects that have none,
+     from their name, disambiguating collisions with a short suffix. Projects that `save`
+     creates go through the same path as `cortex link --create`: they get a slug and are
+     **owned by whoever saved**. Nothing is born ownerless from now on.
+  4. **Existing ownerless projects** are shown as unclaimed; an admin assigns an owner.
+  5. The operations exist as domain functions guarded by a single `canManageProject`, are
+     exposed on the HTTP API (`PATCH /projects/:slug`, `/projects/:slug/members`), and in the
+     web under the project's Settings section — visible to managers regardless of visibility.
+- **Alternatives:** per-project roles (owner/maintainer/member) — more than anyone has asked
+  for; keep member management admin-only — makes the global admin a bottleneck for every team,
+  which is exactly what an owner is for; leave `save`-created projects ownerless — keeps
+  producing the orphans this record exists to stop.
+- **Consequences:** an owner can lock a project that others were reading; that is the point,
+  and the UI says who to ask. `listAccessibleProjects` and every gate keep working unchanged
+  because the policy ([0046](#adr-0046)) does not move — only the data it reads can now
+  change. The CLI gains nothing in this batch beyond what the API makes possible; a
+  `cortex project` command is the obvious follow-up.
+- **Revisit when:** someone needs a member who can read but not validate, or a project needs
+  more than one owner.
+
+<a id="adr-0052"></a>
+
+## ADR-0052 · Access scoping happens in the query, never after a limit
+
+- **Status:** proposed (2026-09-15).
+- **Context:** the dashboard asked the database for the sixty most recent entries across all
+  projects and then dropped the ones the viewer could not see. On any database where the
+  sixty newest happen to belong to projects the viewer cannot reach — or to no project — the
+  page is empty while hundreds of accessible entries exist. Measured on a local copy: 452
+  accessible entries, 0 shown. It is the first screen of the product.
+
+  [0047](#adr-0047) had already made the same move for search, for a different reason
+  (leaking other people's entries). This is the mirror failure: filtering late does not leak,
+  it hides.
+- **Decision:** any listing that a viewer sees is scoped to what the viewer may see **inside
+  the query**, before ordering and limiting. `listEntries` takes the set of accessible project
+  ids (and whether project-less entries are included, which the access policy says they are —
+  an entry with no project is readable by anyone signed in) and applies it in SQL. No caller
+  filters a limited result set in memory for access. A test asserts the dashboard shows
+  entries when accessible ones exist beyond the newest N.
+- **Alternatives:** raise the limit — moves the cliff; filter first then limit in memory —
+  reads every entry to show sixty.
+- **Consequences:** one more parameter on `listEntries`; callers that want "everything, as
+  admin" pass no scope explicitly rather than by omission, so the default is the safe one.
+- **Revisit when:** listings are paginated (the same rule applies to cursors) or a listing
+  needs to span visibility boundaries for a legitimate reason.
