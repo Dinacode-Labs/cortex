@@ -17,6 +17,7 @@ the distillation runs on the server.
 Apache-2.0. Found a vulnerability? See [`SECURITY.md`](./SECURITY.md).
 
 - Decisions (ADRs): [`docs/decisions.md`](./docs/decisions.md) · Roadmap: [`docs/roadmap.md`](./docs/roadmap.md)
+- Web UI design: [`docs/design.md`](./docs/design.md) — what the interface is for, and what it is not
 - Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 - **[How Cortex works](./docs/how-it-works.md)**, a guide to the internals from first
   principles. What an embedding is, what RAG is, what a knowledge graph buys you, what each
@@ -454,7 +455,7 @@ plugin/      claude-code/ (hooks + MCP + cortex-capture skill + /cortex-save)
 deploy/      docker-compose.yml · local.yml · Caddyfile · restore.sh · README.md
 config/      toolbelt.json (schema for third-party registries)
 scripts/     install.sh · set-version.mjs · changelog-notes.mjs
-docs/        how-it-works.md · decisions.md (ADRs) · roadmap.md · research/
+docs/        how-it-works.md · decisions.md (ADRs) · design.md (web UI) · roadmap.md · research/
 ```
 
 The **dependency rules** between packages, which one may import which, are in

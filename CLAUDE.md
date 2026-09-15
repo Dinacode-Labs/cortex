@@ -66,6 +66,7 @@ config/        # solo el esquema del registry de TERCEROS (toolbelt de la organi
 tests/         # unit + integration (Postgres real; ver CONTRIBUTING.md)
 docs/
   decisions.md # ADR ligero: decisiones = hipótesis a revisar
+  design.md    # para qué sirve la UI web y para qué no; léelo ANTES de tocar apps/web
   roadmap.md   # qué falta (solo el QUÉ técnico; prioridades y responsables, fuera)
   research/    # investigación técnica de interés general
   toolbelt-registry.md
