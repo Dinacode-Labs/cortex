@@ -1,7 +1,8 @@
 # Design — the web UI
 
 What the web interface is for, what it deliberately is not, and how to decide whether
-something belongs in it. Written after a full pass over the running UI on 2026-09-15.
+something belongs in it. Written after a full pass over the running UI on 2026-09-15, and
+updated the same day when the rework landed ([ADR-0050](decisions.md#adr-0050)).
 
 The rest of Cortex has a clear owner: the MCP tools and the hooks serve agents, the CLI
 serves the terminal, `cortex-admin` serves whoever runs the server. The web UI is the piece
@@ -68,19 +69,36 @@ These are settled and not up for renegotiation without an ADR:
 - **Access is one policy.** `checkProjectAccess` ([ADR-0046](decisions.md#adr-0046)); the UI
   never invents its own rule, and "you cannot see it" renders as "not found".
 
-## 4. The screens and the job each one does
+## 4. The shape: everything hangs off a project
 
-| Screen | The job | Belongs here because |
-|---|---|---|
-| `/` Dashboard | See what the memory holds, filter it, open an entry | The entry point; answers "what does Cortex know?" |
-| `/entry/:id` | Judge one entry and act on it | The only screen where a human changes the truth |
-| `/search` · `/ask` | Find something by meaning; ask a question of the memory | The same retrieval the agent gets, visible to a person |
-| `/pack` | See exactly what an agent receives at session start | Makes the injection auditable — nothing else does |
-| `/projects` | See and manage who can reach what | Access is a human decision, not an agent one |
-| `/lint` | Find memory that has gone bad: contradictions, gaps, duplicates | Quality control; the reason the whole thing stays trustworthy |
-| `/graph` | See the shape of the knowledge and its holes | Spatial questions a list cannot answer |
-| `/code` | Search the indexed repository | Adjacent, and cheap to expose |
-| `/usage` | What the inference is costing | Operator concern, not a developer one |
+The project is the unit of access, of context packs, and of what a developer has in mind when
+they open the UI. So it is the unit of the interface too, and it lives in the URL where it
+cannot be lost.
+
+```
+[Cortex]   [ Search everything… ]              Projects · Admin* · you · Sign out
+
+/                       the projects you can reach — entries, visibility, health
+/p/<slug>               Memory           what is remembered, filtered, plus "Add"
+/p/<slug>/ask           Ask
+/p/<slug>/agents        What agents see  the pack, with every entry linked
+/p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked
+/p/<slug>/map           Map
+/p/<slug>/code          Code
+/p/<slug>/settings      Settings         visibility, owner, members (managers only)
+
+/entry/<id>             read, edit, and say whether it still holds
+/search?q=              across everything you can see
+/admin/usage            what the inference costs (admins only)
+```
+
+Labels are written for the person reading them, not for the internals: **Health**, not "Lint";
+**What agents see**, not "Context pack". Old URLs redirect permanently — a link someone pasted
+in a chat three weeks ago still works.
+
+Two things stay above the project, because they genuinely are: **search**, which is the only
+question that crosses projects, and the **admin** area, which is about the installation rather
+than about any project in it.
 
 **What is not here, and should not be:** creating or deleting projects wholesale, running
 maintenance or indexing, editing configuration, administering users or tokens. Those live in
@@ -88,40 +106,30 @@ the CLI and in `cortex-admin`, where they belong.
 
 ## 5. Known gaps
 
-Honest list, as of 2026-09-15. These are failures against the thesis above, not wishes.
+The list this document opened with had ten entries. Nine are closed; what follows is what is
+still true, plus what the rework did not touch.
 
-1. **The dashboard shows nothing when it should show everything.** Without a project selected,
-   `listEntries` takes the newest 60 across all projects and *then* filters by access in
-   memory. On any install where recent entries belong to projects the viewer cannot see — or
-   have no project at all — the landing page is empty while hundreds of accessible entries
-   exist. Measured locally: 452 accessible entries, 0 shown. The filter has to move into the
-   query, before the limit.
-2. **Visibility cannot be changed.** Anywhere. Not in the UI, not in the API, not in the CLI,
-   not even as a domain function: the only `UPDATE ... visibility` in the repo runs when a
-   project is created. A project born public stays public forever. Since `save` auto-creates
-   projects as public with no slug and no owner, an install accumulates projects nobody can
-   close, adopt, or tidy away.
-3. **Member management is invisible in practice.** It appears only when the viewer is an admin
-   *and* the project is private. Combined with (2), a deployment where everything was born
-   public never shows it at all — which is exactly why it reads as "there is no way to manage
-   this". The owner of a private project cannot manage its members either; only the global
-   admin can.
-4. **`/lint` reports and offers nothing.** Contradictions, duplicates and gaps are listed as
-   plain text — not links, no actions — while `core` has the functions to act on them. This is
-   the clearest violation of "nothing visible without being actionable".
-5. **`/pack` does not link its entries.** You can see what the agent will be told and cannot
-   click through to fix any of it. The one screen whose purpose is auditing dead-ends.
-6. **Project context does not survive navigation.** Eight header links, none of which carry
-   the project you were looking at, and no active-page indicator.
-7. **`/usage` shows the whole installation's spend to any signed-in user**, with no project
-   filter and no admin check.
-8. **Spanish leaks into an English UI**: the dashboard subtitle, the lint section headings,
-   the pack section headings, several pills. The rule is in `CLAUDE.md`; the UI breaks it.
-9. **Hardcoded product name.** Around forty strings say "Cortex" literally instead of going
-   through `getBrandName()` — including "Save to Cortex" sitting directly under a header that
-   correctly renders the operator's brand.
-10. **The graph checkbox cannot be unchecked.** An unchecked box sends nothing; the handler
-    tests for `!== "0"`. The only way to turn entries off is to edit the URL.
+**Still open:**
+
+1. **`/health` links but does not act.** Every finding now opens the entries behind it, which
+   was the worst of it — but merging a duplicate or resolving a contradiction still means
+   editing each entry by hand. `core` has `planLintActions` and `saveWithReconciliation`; the
+   screen does not use them yet.
+2. **No entity pages.** Entities appear as tags that run a search. `resolveEntity`, `relate`
+   and the graph all know more than the UI shows.
+3. **No pagination anywhere.** Fixed limits (60 entries, 15 results, 10 code hits) with no
+   indication that there is more.
+4. **No dark mode.** The palette is light-only. The layout is responsive as of the rework, so
+   a phone works; a dark room does not.
+5. **Editing has no history.** A correction overwrites, leaving only `updated_at`. For a system
+   whose whole argument is traceability, that is a gap worth closing when someone needs it.
+
+**Closed on 2026-09-15:** the empty landing page ([0052](decisions.md#adr-0052)); visibility
+and owner being unchangeable and member management being invisible
+([0051](decisions.md#adr-0051)); the pack not linking its entries; project context being lost
+on navigation; `/usage` being visible to everyone; Spanish in an English UI; the hardcoded
+product name; the graph checkbox that could not be unchecked; and entries that could be judged
+but not corrected.
 
 ## 6. How to decide whether something belongs here
 
@@ -144,6 +152,6 @@ identifiers and content, a single accent colour, badges carrying the only semant
 the page (type, status, confidence). Density over decoration — these are lists of claims to be
 scanned, and the reader is looking for the wrong one.
 
-Two known deficits: no dark mode, and no responsive breakpoints beyond a self-filling grid.
-Neither is urgent for a tool opened on a laptop next to an editor, but a phone-sized screen is
-currently unusable, and that matters the day someone wants to check a decision in a meeting.
+One known deficit: no dark mode. It is not urgent for a tool opened on a laptop next to an
+editor, and the layout does now work on a phone — which matters the day someone wants to check
+a decision in a meeting.

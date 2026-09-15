@@ -1230,7 +1230,7 @@ empty (scope in the query, never after a limit).
 
 ## ADR-0050 · The web UI is organised around the project, and its job is audit and repair
 
-- **Status:** proposed (2026-09-15). Design in [`design.md`](design.md).
+- **Status:** accepted (2026-09-15). Design in [`design.md`](design.md).
 - **Context:** the web UI was the one part of Cortex whose job was never written down. It
   grew into eight top-level screens on a flat navigation bar, each with its own project
   selector, none remembering which project you were looking at. Meanwhile almost everything
@@ -1269,7 +1269,7 @@ empty (scope in the query, never after a limit).
 
 ## ADR-0051 · A project has a life after creation: visibility, owner and members are managed, and every project has a slug
 
-- **Status:** proposed (2026-09-15).
+- **Status:** accepted (2026-09-15).
 - **Context:** [0036](#adr-0036) gave projects an owner, members and a visibility, and
   [0037](#adr-0037) made permissions cascade down the hierarchy. What neither said — and what
   turned out to be missing entirely — is how any of it changes afterwards. The only
@@ -1313,7 +1313,7 @@ empty (scope in the query, never after a limit).
 
 ## ADR-0052 · Access scoping happens in the query, never after a limit
 
-- **Status:** proposed (2026-09-15).
+- **Status:** accepted (2026-09-15).
 - **Context:** the dashboard asked the database for the sixty most recent entries across all
   projects and then dropped the ones the viewer could not see. On any database where the
   sixty newest happen to belong to projects the viewer cannot reach — or to no project — the

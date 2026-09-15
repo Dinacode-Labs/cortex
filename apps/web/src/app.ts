@@ -8,15 +8,12 @@ import { sessionGate, type WebEnv } from "./middleware/session.js";
 import { layout } from "./views/layout.js";
 import { authRoutes } from "./routes/auth.js";
 import { projectsRoutes } from "./routes/projects.js";
-import { dashboardRoutes } from "./routes/dashboard.js";
+import { projectRoutes } from "./routes/project.js";
 import { searchRoutes } from "./routes/search.js";
 import { entriesRoutes } from "./routes/entries.js";
-import { askRoutes } from "./routes/ask.js";
-import { packRoutes } from "./routes/pack.js";
-import { codeRoutes } from "./routes/code.js";
-import { lintRoutes } from "./routes/lint.js";
 import { usageRoutes } from "./routes/usage.js";
 import { graphRoutes } from "./routes/graph.js";
+import { redirectRoutes } from "./routes/redirects.js";
 
 /**
  * UI mínima de demo (§16). Renderizado en servidor (Hono), sin build de
@@ -56,14 +53,12 @@ export function createApp(): Hono<WebEnv> {
   // Gate: el resto de rutas requieren sesión (resuelve c.var.user desde la cookie).
   app.use("*", sessionGate);
 
+  // Las redirecciones van PRIMERO: una ruta vieja no debe caer en el 404 de una nueva.
+  app.route("/", redirectRoutes);
   app.route("/", projectsRoutes);
-  app.route("/", dashboardRoutes);
+  app.route("/", projectRoutes);
   app.route("/", searchRoutes);
   app.route("/", entriesRoutes);
-  app.route("/", askRoutes);
-  app.route("/", packRoutes);
-  app.route("/", codeRoutes);
-  app.route("/", lintRoutes);
   app.route("/", usageRoutes);
   app.route("/", graphRoutes);
 
@@ -72,7 +67,7 @@ export function createApp(): Hono<WebEnv> {
   app.onError((err, c) => {
     console.error("[cortex-web] error no controlado:", err);
     return c.html(
-      layout("Error", html`<p><a class="back" href="/">← Home</a></p><div class="empty">Something went wrong. Try again.</div>`, c.get("user") ?? null),
+      layout("Error", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Something went wrong. Try again.</div>`, c.get("user") ?? null),
       500,
     );
   });

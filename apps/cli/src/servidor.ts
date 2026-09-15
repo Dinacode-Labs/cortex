@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline/promises";
 import { DEFAULT_SERVER_URL, defaultServer, listCredentials, normalizeServer } from "@cortex/client";
-import { getEnv } from "@cortex/shared";
+import { getEnv, getBrandName } from "@cortex/shared";
 
 /**
  * A qué Cortex va un comando que **no** trabaja dentro de un repositorio.
@@ -47,7 +47,7 @@ export async function resolveServidor(args: string[], opts: OpcionesServidor): P
   // Varias sesiones y nadie ha dicho cuál. Adivinar aquí es lo que hacía que el conocimiento
   // de un cliente acabara en el servidor de otro, así que o se pregunta o se para.
   if (!process.stdin.isTTY) {
-    console.error(`There is more than one Cortex configured. Say which one to ${opts.verbo}:`);
+    console.error(`There is more than one ${getBrandName()} configured. Say which one to ${opts.verbo}:`);
     for (const c of sesiones) {
       console.error(`  --server ${c.server}${normalizeServer(c.server) === defaultServer() ? "   (default)" : ""}`);
     }
@@ -56,7 +56,7 @@ export async function resolveServidor(args: string[], opts: OpcionesServidor): P
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
-    console.log(`Which Cortex do you want to ${opts.verbo}?`);
+    console.log(`Which ${getBrandName()} do you want to ${opts.verbo}?`);
     sesiones.forEach((c, i) => {
       const marca = normalizeServer(c.server) === defaultServer() ? "  (default)" : "";
       console.log(`  ${i + 1}) ${c.server}${marca}  —  ${c.email}`);

@@ -60,6 +60,6 @@ export function entryCard(entry: ContextEntry): Html {
       </div>
       <h3>${entry.title}</h3>
       <p>${entry.summary ?? entry.content}</p>
-      ${entry.sourceReference ? html`<div class="src">fuente: ${entry.sourceReference}</div>` : ""}
+      ${entry.sourceReference ? html`<div class="src">from: ${entry.sourceReference}</div>` : ""}
     </a>`;
 }

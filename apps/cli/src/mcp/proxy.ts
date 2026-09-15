@@ -1,3 +1,4 @@
+import { getBrandName } from "@cortex/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -41,7 +42,7 @@ function isConnectionError(e: unknown): boolean {
 }
 
 const AUTH_HINT =
-  "Cortex: you are not signed in, or your token expired. Run `cortex auth login` and restart your agent.";
+  `${getBrandName()}: you are not signed in, or your token expired. Run \`cortex auth login\` and restart your agent.`;
 
 export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () => Promise<void> } {
   const log = opts.log ?? ((m: string) => console.error(`[cortex mcp] ${m}`));
@@ -105,7 +106,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
     } catch (e) {
       // Un error de tool se responde como resultado con `isError`, no como excepción de
       // protocolo: el agente lo enseña al usuario y sigue trabajando.
-      const text = isAuthError(e) ? AUTH_HINT : `Cortex: the tool failed (${(e as Error).message}).`;
+      const text = isAuthError(e) ? AUTH_HINT : `${getBrandName()}: the tool failed (${(e as Error).message}).`;
       log(text);
       return { content: [{ type: "text", text }], isError: true };
     }

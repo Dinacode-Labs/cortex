@@ -1,4 +1,4 @@
-# Guion de demo — Dinacode Cortex
+# Guion de demo — Cortex
 
 Secuencia para enseñar la demo funcional (§15 y §20.8 del plan). Asume Postgres
 levantado y datos sembrados (`pnpm db:up && pnpm db:migrate && pnpm db:seed`) y el

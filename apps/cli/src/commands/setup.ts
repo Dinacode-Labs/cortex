@@ -1,3 +1,4 @@
+import { getBrandName } from "@cortex/shared";
 import { AGENT_IDS, agentBin, defaultCtx, detectAgents, getAdapter, runSetup, type AgentId } from "../setup/index.js";
 
 /**
@@ -16,7 +17,7 @@ function usage(): void {
   console.log("       cortex setup --status\n");
   console.log(`Agents: ${AGENT_IDS.join(", ")}\n`);
   console.log("  --dry-run     show what it would do, without writing anything");
-  console.log("  --remove      remove the Cortex integration (the CLI stays installed)");
+  console.log(`  --remove      remove the ${getBrandName()} integration (the CLI stays installed)`);
   console.log("  --no-plugin   Claude Code: hooks in settings.json instead of the plugin");
 }
 

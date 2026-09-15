@@ -103,3 +103,88 @@ button.secondary:hover { background:var(--color-background-muted); }
 .empty { color:var(--color-text-muted); padding:24px; text-align:center;
   background:var(--color-background); border:1px dashed var(--color-border); border-radius:var(--radius-xl); }
 a.back { color:var(--color-text-muted); font-size:13px; }
+
+/* === Estructura por proyecto (ADR-0050) ================================================= */
+
+/* Búsqueda global: lo único que de verdad cruza proyectos, así que es lo único que va en el
+   header junto a la marca. */
+header .global-search { flex:1; max-width:420px; }
+header .global-search input { width:100%; padding:7px 12px; font-size:13px;
+  border:1px solid var(--color-border); border-radius:var(--radius-full);
+  background:var(--color-background-muted); font-family:inherit; }
+header .global-search input:focus { background:var(--color-background); }
+header nav a.on { color:var(--color-text); background:var(--color-background-muted); font-weight:600; }
+header nav .whoami { display:flex; align-items:center; gap:6px; margin-left:8px;
+  color:var(--color-text-muted); font-size:12px; }
+.pill.tiny { padding:1px 6px; font-size:10px; }
+
+/* Portada: elegir proyecto es la primera decisión, así que es la primera pantalla. */
+.project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+.project-card { display:block; padding:16px 18px; background:var(--color-background);
+  border:1px solid var(--color-border); border-radius:var(--radius-xl); box-shadow:var(--shadow-sm);
+  color:inherit; transition:all var(--dur-fast) var(--ease-brand); }
+.project-card:hover { color:inherit; border-color:var(--primary-ring); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+.project-card h2 { margin:0; font-size:1rem; }
+.project-card .card-head { display:flex; align-items:center; gap:8px; justify-content:space-between; }
+.project-card .sub { margin:6px 0 14px; font-size:12px; }
+.project-card .card-foot { display:flex; justify-content:space-between; align-items:center;
+  font-size:12px; color:var(--color-text-muted); }
+.unclaimed { color:#bc4c00; }
+.health.ok { color:#1f883d; }
+.health.warn { color:#bc4c00; font-weight:600; }
+.onboarding pre { margin:12px 0; }
+
+/* Cabecera del proyecto + pestañas: el proyecto está en la URL, así que no se pierde al
+   cambiar de sección — que era el problema de la navegación plana anterior. */
+.project-head { margin-bottom:22px; border-bottom:1px solid var(--color-border); }
+.project-title { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.project-title h1 { margin:0; }
+.project-title .sub { margin:0; font-size:13px; }
+.tabs { display:flex; gap:2px; margin-top:14px; overflow-x:auto; }
+.tabs a { padding:8px 14px; font-size:13px; font-weight:500; white-space:nowrap;
+  color:var(--color-text-muted); border-bottom:2px solid transparent; border-radius:var(--radius-sm) var(--radius-sm) 0 0; }
+.tabs a:hover { color:var(--color-text); background:var(--color-background-muted); }
+.tabs a.on { color:var(--color-primary); border-bottom-color:var(--color-primary); font-weight:600; }
+
+.pill.vis { background:var(--color-background-muted); color:var(--color-text-muted);
+  border:1px solid var(--color-border); font-size:11px; }
+.pill.vis.private { background:#ffeff5; color:#bf3989; border-color:#f9d0e3; }
+
+.section-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+.section-bar form { flex:1; min-width:240px; margin:0; }
+a.button { display:inline-block; padding:8px 14px; border-radius:var(--radius-md);
+  font-size:13px; font-weight:600; border:1px solid var(--color-border);
+  background:var(--color-background); color:var(--color-text); }
+a.button:hover { color:var(--color-text); border-color:var(--primary-ring); }
+
+/* Health: cada hallazgo lleva a lo que lo causó. Un aviso que no puedes abrir es un aviso
+   que se aprende a ignorar. */
+.findings { margin:0; padding-left:18px; }
+.findings li { margin-bottom:6px; }
+.pack-entry { margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--color-border); }
+.pack-entry:last-child { border-bottom:none; padding-bottom:0; margin-bottom:0; }
+
+.chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.chip { display:inline-flex; align-items:center; gap:6px; margin:0;
+  background:var(--color-background-muted); border:1px solid var(--color-border);
+  border-radius:var(--radius-full); padding:3px 4px 3px 12px; font-size:12px; }
+.chip button { background:none; border:none; color:var(--color-text-muted); cursor:pointer;
+  font-size:15px; line-height:1; padding:2px 7px; border-radius:var(--radius-full); }
+.chip button:hover { background:#ffeff5; color:#bf3989; }
+label.check { display:inline-flex; align-items:center; gap:7px; font-size:13px; }
+
+#net { height:72vh; border:1px solid var(--color-border); border-radius:var(--radius-xl);
+  background:#0d1117; margin-top:12px; }
+#legend { font-size:12px; color:var(--color-text-muted); }
+
+/* Un portátil no es el único sitio donde alguien abre esto: una decisión se consulta también
+   desde el móvil, en una reunión. */
+@media (max-width:720px) {
+  header { flex-wrap:wrap; gap:10px; padding:10px 16px; }
+  header .global-search { order:3; flex-basis:100%; max-width:none; }
+  header nav { margin-left:auto; }
+  header nav .whoami { display:none; }
+  main { padding:20px 16px 48px; }
+  h1 { font-size:1.4rem; }
+  .project-grid { grid-template-columns:1fr; }
+}

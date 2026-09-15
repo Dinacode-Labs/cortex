@@ -1,4 +1,4 @@
-import type { ContextEntry } from "@cortex/shared";
+import { getBrandName, type ContextEntry } from "@cortex/shared";
 import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "./vectors.js";
@@ -18,7 +18,7 @@ function entryLine(e: ContextEntry): string {
 export function renderSaveResult(result: SaveContextResult): string {
   const { entry, warnings } = result;
   const lines = [
-    `✅ Saved to Cortex as **${entry.type}** (id: \`${entry.id}\`).`,
+    `✅ Saved to ${getBrandName()} as **${entry.type}** (id: \`${entry.id}\`).`,
     `Title: ${entry.title}`,
     `Status: ${entry.status} · Confidence: ${entry.confidence}`,
   ];
@@ -30,7 +30,7 @@ export function renderSaveResult(result: SaveContextResult): string {
 }
 
 export function renderSearchHits(hits: SearchHit[]): string {
-  if (hits.length === 0) return "Nothing relevant in Cortex.";
+  if (hits.length === 0) return `Nothing relevant in ${getBrandName()}.`;
   return hits
     .map((h, i) => `${i + 1}. (${h.score.toFixed(2)}) ${entryLine(h.entry)}`)
     .join("\n");
@@ -47,7 +47,7 @@ interface Seccion {
 }
 
 function nota(n: number): string {
-  return `- _…and ${n} more here. Ask Cortex for the rest._`;
+  return `- _…and ${n} more here. Ask ${getBrandName()} for the rest._`;
 }
 
 /**

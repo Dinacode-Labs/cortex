@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { closeSql } from "@cortex/database";
-import { createProject, listEntries, requestOtp, verifyOtp, saveContext, type ProjectRef } from "@cortex/core";
+import {
+  createProject,
+  listAccessibleProjects,
+  listEntries,
+  requestOtp,
+  verifyOtp,
+  saveContext,
+  type ProjectRef,
+} from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 import { createApp as createServerApp } from "../../apps/server/src/app.js";
 import { createMcpHttpApp } from "../../apps/mcp-server/src/http-app.js";
@@ -62,9 +70,7 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
 
   it("web: con sesión, proyecto inexistente → 404", async () => {
     const web = createWebApp();
-    const res = await web.request(`/?project=${encodeURIComponent(`NoExiste${RID}`)}`, {
-      headers: { cookie: `cortex_session=${token}` },
-    });
+    const res = await web.request(`/p/no-existe-${RID}`, { headers: { cookie: `cortex_session=${token}` } });
     expect(res.status).toBe(404);
   });
 
@@ -88,11 +94,11 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
     expect(entries[0]!.createdBy).toBe(USER); // atribución: created_by = email de la sesión
   });
 
-  it("web: la portada no se queda vacía porque lo más reciente sea de otros (ADR-0052)", async () => {
+  it("listar con acceso no recorta: el filtro va en la consulta (ADR-0052)", async () => {
     // El fallo real: se pedían las N entradas más recientes de TODOS los proyectos y se
-    // descartaban en memoria las inaccesibles. Bastaba con que las últimas N fueran ajenas
-    // para que la primera pantalla del producto saliera en blanco teniendo cientos visibles.
-    const mia = `Entrada visible de la portada ${RID}.`;
+    // descartaban en memoria las inaccesibles, así que bastaba con que las últimas N fueran
+    // ajenas para no ver ninguna de las propias. Filtrar después no filtra: recorta.
+    const mia = `Entrada visible del listado ${RID}.`;
     await saveContext({ content: mia, project: prvOwn.name, createdBy: USER });
 
     // …y ahora 70 entradas más nuevas en un proyecto que este usuario NO puede ver.
@@ -100,11 +106,11 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
       await saveContext({ content: `Ruido ajeno ${RID} ${i}.`, project: prvForeign.name, createdBy: OWNER });
     }
 
-    const web = createWebApp();
-    const html = await (await web.request("/", { headers: { cookie: `cortex_session=${token}` } })).text();
-    expect(html).toContain(mia.slice(0, 40)); // la suya sigue llegando
-    expect(html).not.toContain("Ruido ajeno"); // y la ajena no, que era la otra mitad del trato
-  }, 120_000);
+    const accesibles = (await listAccessibleProjects(USER)).map((p) => p.id);
+    const vistas = await listEntries({ limit: 60, accessibleProjectIds: accesibles });
+    expect(vistas.some((e) => e.content === mia), "la propia se quedó fuera del límite").toBe(true);
+    expect(vistas.some((e) => e.content.includes("Ruido ajeno"))).toBe(false);
+  }, 180_000);
 
   it("server: /context-pack — 401 sin Bearer, 404 slug inexistente, 403 privado ajeno", async () => {
     const srv = createServerApp();
@@ -218,7 +224,7 @@ describe("apps HTTP (guards end-to-end, sin servidor real)", () => {
 
     // El mismo contenido pasa por entryCard (dashboard) y por la vista de búsqueda:
     // cubre los sinks del árbol de vistas, no solo el detalle.
-    const dash = await web.request(`/?project=${encodeURIComponent(prvOwn.name)}`, { headers: { cookie: `cortex_session=${token}` } });
+    const dash = await web.request(`/p/${prvOwn.slug}`, { headers: { cookie: `cortex_session=${token}` } });
     expect(dash.status).toBe(200);
     expect(await dash.text()).not.toContain("<script>alert");
     const search = await web.request(`/search?q=${encodeURIComponent(`Restricción de seguridad ${RID}`)}&project=${encodeURIComponent(prvOwn.name)}`, { headers: { cookie: `cortex_session=${token}` } });

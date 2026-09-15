@@ -1,4 +1,4 @@
-# Panorama competitivo y análisis de huecos — Dinacode Cortex
+# Panorama competitivo y análisis de huecos — Cortex
 
 > Investigación realizada con 4 agentes en paralelo (junio 2026) sobre proyectos
 > de memoria/contexto para agentes de IA, comparados con Cortex. Cada afirmación

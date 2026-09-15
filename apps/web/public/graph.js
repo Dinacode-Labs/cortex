@@ -1,6 +1,6 @@
-/* Grafo de conocimiento (página /graph): pinta /api/graph con vis-network.
-   Los parámetros llegan por la URL de la PÁGINA (URLSearchParams) — sin
-   interpolación del servidor dentro del <script>. */
+/* Mapa del conocimiento (sección `/p/<slug>/map`): pinta /api/graph con vis-network.
+   El proyecto y el filtro los deja el servidor en data-* del contenedor — sin
+   interpolación del servidor dentro del <script>, y sin depender de la URL. */
 const COLORS = {
   client:"#cf222e", project:"#8250df", service:"#0969da", integration:"#1f883d",
   vendor:"#bf3989", technology:"#9a6700", module:"#bc4c00", person:"#57606a",
@@ -12,11 +12,9 @@ function colorFor(group){
   return COLORS[group] || "#768390";
 }
 (async () => {
-  const qs = new URLSearchParams(location.search);
-  // Mismos defaults que el servidor: sin ?project vale el proyecto que el servidor
-  // dejó `selected` en el <select> (el primero accesible); entries !== "0" → 1.
-  const project = qs.get("project") || document.querySelector('select[name="project"]')?.value || "";
-  const entries = qs.get("entries") !== "0" ? 1 : 0;
+  const net = document.getElementById("net");
+  const project = net?.dataset.project || "";
+  const entries = net?.dataset.entries === "0" ? 0 : 1;
   const res = await fetch("/api/graph?project="+encodeURIComponent(project)+"&entries="+entries);
   const g = await res.json();
   const deg = {};
@@ -36,19 +34,19 @@ function colorFor(group){
     dashes: e.kind==="mention",
   }));
   const data={nodes:new vis.DataSet(nodes), edges:new vis.DataSet(edges)};
-  const net=new vis.Network(document.getElementById("net"), data, {
+  const red=new vis.Network(document.getElementById("net"), data, {
     physics:{barnesHut:{gravitationalConstant:-8000, springLength:120, springConstant:0.03}, stabilization:{iterations:200}},
     interaction:{hover:true, tooltipDelay:120},
     nodes:{borderWidth:1},
   });
-  net.on("click", p => {
+  red.on("click", p => {
     if(!p.nodes.length) return;
     const n = data.nodes.get(p.nodes[0]);
     if(n && n._kind==="entry") window.location = "/entry/"+n.id;
   });
   const types=[...new Set(g.nodes.map(n=>n._group||n.group).filter(x=>x&&!x.startsWith("entry:")))];
   document.getElementById("legend").innerHTML =
-    "Nodos: "+g.nodes.length+" · Aristas: "+g.edges.length+" &nbsp; | &nbsp; " +
+    "Nodes: "+g.nodes.length+" · Edges: "+g.edges.length+" &nbsp; | &nbsp; " +
     types.map(t=>'<span style="color:'+colorFor(t)+'">●</span> '+t).join(" &nbsp; ") +
     ' &nbsp; <span style="color:'+entryColor+'">▦</span> entrada';
 })();

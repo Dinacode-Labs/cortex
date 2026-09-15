@@ -4,13 +4,26 @@ import { getRecentTraces, getUsageSummary } from "@cortex/core";
 import { layout, type Html } from "../views/layout.js";
 import type { WebEnv } from "../middleware/session.js";
 
-/** Coste / uso de IA: tokens y coste por operación/modelo + trazas (ADR-0016). */
+/**
+ * Coste / uso de IA: tokens y coste por operación/modelo + trazas (ADR-0016).
+ *
+ * Vive bajo `/admin` y **solo lo ven los admins** (ADR-0050). Es una cifra de toda la
+ * instalación, sin filtrar por proyecto: lo que gasta la empresa en inferencia no es asunto de
+ * cada developer que entra a revisar una decisión, y antes lo era.
+ */
 export const usageRoutes = new Hono<WebEnv>();
 
-usageRoutes.get("/usage", async (c) => {
+usageRoutes.get("/admin/usage", async (c) => {
+  const user = c.get("user")!;
+  if (!user.admin) {
+    return c.html(
+      layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Not found.</div>`, user),
+      404,
+    );
+  }
   const u = await getUsageSummary();
   const traces = await getRecentTraces(12);
-  const num = (n: number) => n.toLocaleString("es-ES");
+  const num = (n: number) => n.toLocaleString("en-US");
   const money = (n: number) => (n > 0 ? `$${n.toFixed(4)}` : "—");
   // raw(): fragmentos de ATRIBUTOS literales de este fichero (estilos de tabla
   // repetidos); no contienen datos de usuario/BD.
@@ -52,7 +65,7 @@ usageRoutes.get("/usage", async (c) => {
     : html`<div class="panel"><span class="sub">No traces yet. Run something that uses the LLM (ask, enrich…).</span></div>`;
 
   const body = html`
-    <p><a class="back" href="/">← Home</a></p>
+    <p><a class="back" href="/">← Projects</a></p>
     <h1>AI cost and usage</h1>
     <p class="sub">Tokens and estimated cost per operation and model (ADR-0016). Prices come from a table you can override with <code>CORTEX_PRICING_JSON</code>, so a model priced at zero shows up as zero.</p>
     <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
@@ -66,5 +79,5 @@ usageRoutes.get("/usage", async (c) => {
     <div class="panel"><h2>Latest calls</h2>${table(html`<tr><th ${th}>Date</th><th ${th}>Operation</th><th ${th}>Model</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Cost</th></tr>`, recentRows)}</div>
     <h2 style="margin-top:28px">Recent traces <span class="sub">· AI tracing, as a span tree</span></h2>
     ${tracesHtml}`;
-  return c.html(layout("AI cost", body, c.get("user")));
+  return c.html(layout("AI cost", body, { user, activo: "admin" }));
 });
