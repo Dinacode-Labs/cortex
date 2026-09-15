@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-09-15
+
 ### Fixed
 - **Al agente solo le llegaban las decisiones del proyecto.** El pack de contexto que se
   inyecta al abrir sesión se recortaba con un corte al final, así que en un proyecto grande
