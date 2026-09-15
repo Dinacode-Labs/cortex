@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-09-15
+
 ### Changed
 - **La UI web gira ahora alrededor del proyecto.** Eran ocho enlaces planos y cada pantalla
   tenía su propio selector, así que pasar de una sección a otra te devolvía al primer proyecto
