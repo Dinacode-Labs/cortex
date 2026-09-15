@@ -390,7 +390,8 @@ pnpm admin maintain-worker    # scheduled maintenance
   to know before authenticating including the MCP URL, `/version`, `/toolbelt.json`,
   `/install.sh` and `/auth/request|verify`. Bearer-authenticated: `/auth/me`, `/auth/logout`,
   `/auth/ui-ticket`, `/context-pack`, `/capture`, `/capture/batch`, `/capture/session` and
-  `/capture/session/:id`, `/relate`, `/projects` and `/projects/:slug`.
+  `/capture/session/:id`, `/relate`, `/projects`, `/projects/:slug` (`GET`/`PATCH`) and
+  `/projects/:slug/members`.
 - **Auth.** Sign-in by email and one-time code, no passwords. A user **is** their email
   address. `CORTEX_AUTH_DOMAIN` is the allowed-domains list and **has no default**: empty
   means anyone in the world can sign up, so set it in production. The server warns on start if

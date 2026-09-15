@@ -467,7 +467,7 @@ nothing** to external systems. Actually creating tasks is a separate, supervised
 `llm_usage` table, with a pricing table to **estimate cost**. Costs are estimates, and the
 pricing table can be corrected without a deploy through `CORTEX_PRICING_JSON`. On top of
 that, each agent run emits a **trace tree** (`agent_run → model_generation → …`) into the
-`ai_traces` table. The `/usage` page in the UI shows cost per operation, agent and model,
+`ai_traces` table. The `/admin/usage` page in the UI shows cost per operation, agent and model,
 alongside the trace tree.
 
 > **⚠️ What to watch for.** The lint is **deterministic and cheap**, but its thresholds and
@@ -498,7 +498,7 @@ where it should improve. When you try it, look at these things above all:
    returns the right snapshot and that the current view excludes the old one.
 6. **Does auto-capture distil well?** Close a session and look at what it stored. Useful
    typed knowledge, or noise? Did any secret slip through? It should not have.
-7. **Cost and latency:** look at `/usage`. How many tokens does it cost to classify, rerank
+7. **Cost and latency:** look at `/admin/usage`. How many tokens does it cost to classify, rerank
    and distil? Does the LLM earn its keep against the heuristics for your case?
 
 All of the above is a **hypothesis to be validated**. If you find a weak spot, write it down.

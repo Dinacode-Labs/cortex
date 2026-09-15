@@ -49,7 +49,10 @@ apps/
   mcp-server/  # servidor MCP con las 8 tools (stdio + Streamable HTTP autenticado)
   server/      # API HTTP + auth email/OTP (Hono) — la usan CLI, hooks y conectores
   web/         # UI web (Hono SSR, cookie de sesión): src/routes/ + views/ (hono/html,
-               # autoescape) + middleware/ + public/ (estáticos)
+               # autoescape) + middleware/ + public/ (estáticos). Gira alrededor del
+               # proyecto: `/` lista proyectos y `/p/<slug>/…` son sus secciones
+               # (ADR-0050). LEE `docs/design.md` antes de tocarla: dice para qué es
+               # y para qué no, y evita volver a meter pantallas que no se pueden usar
   cli/         # CLI `cortex` de DEVELOPER (auth, link, ui, setup, toolbelt, doctor,
                # hooks, `mem`, `mcp`). Ligero: solo depende de client+shared, para poder
                # instalarlo con npm i -g.
