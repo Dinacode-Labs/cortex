@@ -8,6 +8,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **La portada de la UI salía vacía teniendo cientos de entradas visibles.** Se pedían las 60
+  entradas más recientes de todos los proyectos y se descartaban después, en memoria, las de
+  proyectos sin acceso: bastaba con que esas 60 fueran ajenas —o no tuvieran proyecto— para
+  que la primera pantalla del producto apareciera en blanco. Medido sobre datos reales: 452
+  entradas accesibles, 0 mostradas. El filtro de acceso pasa a ir dentro de la consulta, antes
+  de ordenar y limitar. Ver ADR-0052.
+
 ## [0.1.4] — 2026-09-15
 
 ### Fixed

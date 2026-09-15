@@ -21,15 +21,12 @@ dashboardRoutes.get("/", async (c) => {
   const denied = await requireProject(c, project);
   if (denied) return denied;
   const projects = await listAccessibleProjects(email);
-  let entries = await listEntries({
+  const entries = await listEntries({
     project: project || undefined,
     type,
     limit: 60,
+    accessibleProjectIds: projects.map((p) => p.id), // en la consulta, no después (ADR-0052)
   });
-  if (!project) {
-    const ok = new Set(projects.map((p) => p.id));
-    entries = entries.filter((e) => e.projectId && ok.has(e.projectId)); // no filtrar entre proyectos sin acceso
-  }
 
   const projectPills = [
     html`<a class="pill ${!project ? "active" : ""}" href="/">All</a>`,
