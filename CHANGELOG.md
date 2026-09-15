@@ -8,6 +8,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **`cortex ui` abría el navegador en `localhost`.** Se autenticaba correctamente contra tu
+  servidor, pedía el ticket de un solo uso, decía «Opening the Cortex UI, already signed in»…
+  y abría una dirección que no existe. Es de los fallos más desconcertantes que hay, porque
+  todo el flujo parece ir bien. La causa: la dirección de la web salía de una variable con un
+  default de desarrollo, y no de lo que el propio servidor publica en `/client-config` —que
+  está justo para esto. Ahora manda el servidor; `CORTEX_WEB_URL` sigue pudiendo forzarla y
+  `localhost` queda como último recurso.
+
 ## [0.1.2] — 2026-09-15
 
 ### Fixed

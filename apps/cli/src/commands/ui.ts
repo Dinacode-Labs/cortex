@@ -1,8 +1,7 @@
 import { spawn } from "node:child_process";
 import { resolveServidor } from "../servidor.js";
 import { platform } from "node:os";
-import { getEnv } from "@cortex/shared";
-import { readCredentials } from "@cortex/client";
+import { getClientConfig, readCredentials } from "@cortex/client";
 
 /**
  * `cortex ui` — abre la UI web YA AUTENTICADA. Pide al servidor un **ticket de un solo
@@ -10,12 +9,18 @@ import { readCredentials } from "@cortex/client";
  * por una sesión propia. Así el token de larga vida del CLI nunca viaja en la URL.
  */
 export async function run(args: string[] = []): Promise<void> {
-  const WEB = getEnv("CORTEX_WEB_URL", "http://localhost:8080");
   const elegido = await resolveServidor(args, { verbo: "open" });
   if (!elegido) {
     process.exitCode = 1;
     return;
   }
+  // La dirección de la web la dice el SERVIDOR (`/client-config`), no una variable con un
+  // default de desarrollo. Antes `ui` se autenticaba correctamente contra el servidor bueno y
+  // luego abría el navegador en localhost, que es de los fallos más desconcertantes que hay:
+  // todo parece ir bien y la ventana que se abre no existe.
+  const cfg = await getClientConfig(elegido);
+  const WEB = process.env.CORTEX_WEB_URL?.trim() || cfg?.webUrl || "http://localhost:8080";
+
   const c = readCredentials(elegido);
   if (!c?.token) {
     console.error("Not signed in. Run: cortex auth login");
