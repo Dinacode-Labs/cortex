@@ -10,6 +10,8 @@ import {
   isNearDuplicate,
   listEntries,
   listAccessibleProjects,
+  listDecisions,
+  checkProjectAccess,
   resolveEntity,
   relate,
   resolveEntities,
@@ -391,5 +393,48 @@ describe("un proyecto se crea, no se extrae (BD real)", () => {
     await expect(
       sql`INSERT INTO entities (name, canonical_name, type) VALUES (${`IT Raw ${RID}`}, ${`it raw ${RID}`}, 'project')`,
     ).rejects.toThrow(/entities_project_has_slug_check/);
+  });
+});
+
+describe("el slug identifica al proyecto también al leer (BD real)", () => {
+  /**
+   * El slug es la identidad del proyecto en todo el producto (`cortex link`, `.cortex.json`,
+   * `/p/<slug>`, la API), pero las lecturas resolvían `project` solo por nombre canónico, y
+   * `canonicalize` no toca los guiones: escribir con el slug acertaba (createProject mira el
+   * slug) y leer con el mismo valor decía «no encontrado» (#136).
+   */
+  it("pack, búsqueda, decisiones y guard aceptan el slug igual que el nombre", async () => {
+    const p = await createProject(`IT Slug Read ${RID}`);
+    expect(p.slug).toBe(`it-slug-read-${RID}`);
+    const opts = { detectImprovements: false, useClassifier: false } as const;
+    // Escribir con el slug ya caía en el proyecto correcto; queda fijado para que no se mueva.
+    await saveContext({ content: "Decisión: las facturas se numeran por serie y año.", project: p.slug!, type: "decision", title: "Numeración de facturas" }, opts);
+    expect((await listEntries({ project: p.name })).length).toBe(1);
+
+    // …y ahora leer con el slug ve lo mismo que leer con el nombre.
+    const pack = await getContextPack(p.slug!);
+    expect(pack.project).toBe(p.name);
+    expect(pack.sections.flatMap((s) => s.entries).map((e) => e.title)).toContain("Numeración de facturas");
+    expect((await listDecisions(p.slug!)).length).toBe(1);
+    expect((await listEntries({ project: p.slug! })).length).toBe(1);
+    const hits = await searchContext({ query: "numeración facturas serie", project: p.slug!, limit: 5 });
+    expect(hits.map((h) => h.entry.title)).toContain("Numeración de facturas");
+
+    // El guard del MCP pasa por aquí con `{ name }`: con slug, con el nombre exacto y con otra
+    // capitalización del nombre tiene que responder lo mismo.
+    for (const ref of [p.slug!, p.name, p.name.toUpperCase()]) {
+      const access = await checkProjectAccess(null, { name: ref });
+      expect(access.status, ref).toBe("ok");
+      if (access.status === "ok") expect(access.project.id).toBe(p.id);
+    }
+    expect((await checkProjectAccess(null, { name: `no-existe-${RID}` })).status).toBe("not_found");
+  });
+
+  it("si un nombre coincide con el slug de otro proyecto, gana el slug: es la identidad", async () => {
+    const real = await createProject(`IT Colision ${RID}`); // slug it-colision-<rid>
+    const homonimo = await createProject(`IT-Colision-${RID}-x`); // otro proyecto, otro slug
+    expect(homonimo.id).not.toBe(real.id);
+    const access = await checkProjectAccess(null, { name: real.slug! });
+    expect(access.status === "ok" && access.project.id).toBe(real.id);
   });
 });

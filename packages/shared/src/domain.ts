@@ -218,8 +218,8 @@ export type Source = z.infer<typeof source>;
 export const saveContextInput = z.object({
   /** Texto libre del conocimiento a guardar. */
   content: z.string().min(1, "content no puede estar vacío"),
-  /** Nombre o slug del proyecto. Se resuelve a entidad de tipo `project`. */
-  project: z.string().min(1).optional(),
+  /** Slug o nombre del proyecto. Se resuelve a entidad de tipo `project`; si no existe, se crea. */
+  project: z.string().min(1).optional().describe("Project slug (what `cortex link` shows) or name; a new project is created if neither matches"),
   /** Título corto opcional; si falta, se deriva del contenido. */
   title: z.string().optional(),
   /** Tipo de conocimiento; si falta, lo propone el agente de clasificación. */
@@ -238,7 +238,7 @@ export type SaveContextInput = z.infer<typeof saveContextInput>;
 /** Parámetros de búsqueda de contexto (tool MCP search_project_context). */
 export const searchContextInput = z.object({
   query: z.string().min(1),
-  project: z.string().optional(),
+  project: z.string().optional().describe("Project slug (what `cortex link` shows) or name"),
   type: contextEntryType.optional(),
   limit: z.number().int().positive().max(50).default(10),
 });

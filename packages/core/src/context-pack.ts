@@ -5,7 +5,7 @@ import {
   type ContextEntryType,
   type ContextEntryStatus,
 } from "@cortex/shared";
-import { findProjectIdByName, projectIdsWithAncestors } from "./projects.js";
+import { findProjectByName, projectIdsWithAncestors } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import { vectorSearch, type SearchHit } from "./vectors.js";
 
@@ -104,8 +104,11 @@ export interface EntryConflict {
  */
 export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
   const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
-  if (!projectId) {
+  // Se resuelve por slug o nombre (#136); el pack lleva el NOMBRE del proyecto, no lo que se
+  // tecleó, para que la cabecera no diga «acme-portal» cuando el proyecto se llama Acme Portal.
+  const resolved = await findProjectByName(project);
+  const projectId = resolved?.id;
+  if (!resolved || !projectId) {
     throw new Error(`Proyecto no encontrado: "${project}".`);
   }
 
@@ -144,7 +147,7 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   }
 
   return {
-    project,
+    project: resolved.name,
     generatedAt: new Date(),
     sections,
     sensitiveModules,
