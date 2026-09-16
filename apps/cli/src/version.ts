@@ -7,14 +7,33 @@ declare const __CORTEX_VERSION__: string | undefined;
 
 export const CLI_VERSION: string = typeof __CORTEX_VERSION__ === "string" ? __CORTEX_VERSION__ : "dev";
 
-/** Compara dos versiones semver sencillas. `dev` nunca se considera antigua. */
-export function isOlderThan(version: string, min: string): boolean {
-  if (version === "dev") return false;
-  const a = version.split(".").map(Number);
-  const b = min.split(".").map(Number);
+/**
+ * Los tres números de un semver, ignorando el prefijo `v` y cualquier sufijo de prerelease o
+ * build (`0.1.12-beta.1` → 0.1.12). Con más precisión no hace falta: las versiones de Cortex
+ * son `x.y.z` y lo que se compara es «¿va por delante o por detrás?».
+ */
+function parts(version: string): [number, number, number] {
+  const m = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(version.trim());
+  if (!m) return [0, 0, 0];
+  return [Number(m[1]), Number(m[2] ?? 0), Number(m[3] ?? 0)];
+}
+
+/**
+ * Compara dos versiones: negativo si `a` < `b`, 0 si iguales, positivo si `a` > `b`.
+ * `dev` (el CLI ejecutado desde el repo, o un servidor sin `package.json`) no es comparable:
+ * se trata como igual a cualquier cosa, para que nunca bloquee ni avise.
+ */
+export function compareVersions(a: string, b: string): number {
+  if (a === "dev" || b === "dev") return 0;
+  const pa = parts(a);
+  const pb = parts(b);
   for (let i = 0; i < 3; i++) {
-    if ((a[i] ?? 0) < (b[i] ?? 0)) return true;
-    if ((a[i] ?? 0) > (b[i] ?? 0)) return false;
+    if (pa[i]! !== pb[i]!) return pa[i]! - pb[i]!;
   }
-  return false;
+  return 0;
+}
+
+/** `version` es anterior a `min`. `dev` nunca se considera antigua. */
+export function isOlderThan(version: string, min: string): boolean {
+  return compareVersions(version, min) < 0;
 }

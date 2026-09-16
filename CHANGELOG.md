@@ -8,6 +8,30 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **El CLI avisa cuando se queda atrás, y se niega a escribir cuando se queda demasiado atrás**
+  (ADR-0060). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
+  son dos relojes distintos y esta semana se vio, con tres despliegues seguidos y gente días
+  con un CLI viejo sin enterarse. El aviso existía en `cortex doctor`, donde nadie mira. Ahora:
+  - Los comandos interactivos consultan `/client-config` **una vez cada 24 h** por servidor
+    (caché en `~/.cortex/version-check.json`) y, si hay versión nueva, sueltan **una línea a
+    stderr** al terminar: `Cortex 0.1.9 → 0.1.12 · cortex upgrade`. Solo con una terminal
+    delante; en un script, en CI o en una tubería no dicen nada. Los hooks y `cortex mcp` **no
+    pasan por ahí jamás** (stdout es protocolo), y hay un test que lo garantiza.
+  - Si el CLI está **por debajo de `minClientVersion`**, los comandos que escriben (`mem save`,
+    `mem update`, `link --create`, `connect-*`) fallan con un mensaje claro en vez de guardar
+    algo a medias. Los de lectura siguen funcionando. Es el único número que bloquea, y lo sube
+    el operador cuando algo se rompe de verdad (`CORTEX_MIN_CLIENT_VERSION`).
+  - El caso contrario, que era invisible: si el **CLI es más nuevo que el servidor**, lo dice y
+    manda avisar a quien lo opera. Es el que nos va a pasar a nosotros: npm va más rápido que un
+    despliegue.
+  - `CORTEX_NO_VERSION_CHECK=1` apaga las tres cosas. La comparación de versiones vive en un solo
+    sitio y ya tolera prefijos `v` y prereleases; `doctor` y `version` la reutilizan.
+- **Regla escrita para quien añada un endpoint**: el CLI trata lo que no conoce como «esa función
+  no está», no como error. Un campo ausente o un 404 en un endpoint nuevo es un servidor viejo y
+  se degrada. Ya pasaba en varios sitios; ahora está dicho en el ADR, en `CONTRIBUTING.md` y en
+  la cabecera del cliente HTTP.
+
 ### Fixed
 - **`search` y `ask` dentro de un proyecto hijo ya miran también lo del padre.** El context pack
   heredaba de sus ancestros y la búsqueda no, así que lo transversal de un cliente —contratos,

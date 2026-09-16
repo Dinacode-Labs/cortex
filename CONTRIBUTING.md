@@ -98,6 +98,13 @@ are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
   and validity. Do not turn inferences into facts — anything automatic gets low confidence.
 - **zod is split:** `agents` uses **zod v4** (Mastra requires it); everything else uses **v3**.
   Do not pass schemas between them.
+- **The CLI may be talking to a server from months ago** ([ADR-0060](./docs/decisions.md#adr-0060)).
+  They are not versioned together: the contract is the HTTP API. When you add an endpoint or a
+  response field, the reading side must treat its absence as "this server does not have it yet",
+  never as an error: type new fields as optional where they are read, treat a 404 on a new
+  endpoint as an old server, and degrade (skip the feature, keep the old behaviour, or say so
+  plainly). If a change really does break old clients, raise `minClientVersion` on the server
+  and say so in the release notes; that is the only thing that blocks a client.
 - **Quality:** `pnpm typecheck` and `pnpm test` must pass. Tests live in `tests/`:
   - **Unit** (`pnpm test`): pure, deterministic logic — auth and permissions, project linking
     and slugs, session parsers, schemas. No database, no network.
