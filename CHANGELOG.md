@@ -10,6 +10,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [0.1.8] — 2026-09-16
 
+### Fixed
+- **El título repetido sale también de los resúmenes que ya estaban guardados.** El arreglo de
+  la 0.1.7 actuaba al guardar, así que la memoria existente —donde están casi todas las
+  entradas— seguía gastando una cuarta parte de cada línea del pack en repetir su propio
+  título. Migración `0018`, con la misma regla que el código: se quita solo si el resumen
+  empieza de verdad por el título y queda un resumen que merezca la pena.
+
 ## [0.1.7] — 2026-09-16
 
 ### Added
