@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.9] — 2026-09-16
+
 ### Added
 - **Un proyecto se puede colgar de un padre después de crearlo.** El padre solo se fijaba al
   crear, así que quien vinculaba un repositorio con prisa creaba un proyecto suelto y no había
