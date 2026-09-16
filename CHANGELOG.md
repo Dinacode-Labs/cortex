@@ -9,6 +9,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Fixed
+- **`search` y `ask` dentro de un proyecto hijo ya miran también lo del padre.** El context pack
+  heredaba de sus ancestros y la búsqueda no, así que lo transversal de un cliente —contratos,
+  convenciones, con quién se habla— se guardaba una vez en el proyecto padre y **no se
+  encontraba desde el repo del hijo**, que es justo donde hace falta. Subir es seguro: el acceso
+  al hijo ya exige acceso a toda la cadena, así que por herencia no se ve nada que no se pudiera
+  ver directamente. Y no baja: desde el padre no se ve lo de un hijo.
+
+### Fixed
 - **«No has iniciado sesión» era mentira la mayoría de las veces.** Cuando el MCP no podía
   autenticarse decía eso y mandaba a repetir un `cortex auth login` ya hecho. El caso real es
   otro: la carpeta apunta —por su `.cortex.json` o por `CORTEX_SERVER_URL`— a un servidor del
