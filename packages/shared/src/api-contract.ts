@@ -42,6 +42,8 @@ export type ProjectSummary = z.infer<typeof projectSummary>;
 export const updateProjectRequest = z.object({
   visibility: z.enum(["public", "private"]).optional(),
   ownerEmail: z.string().email().nullable().optional(),
+  /** Colgar de otro proyecto, o `null` para dejarlo suelto. */
+  parentSlug: z.string().nullable().optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequest>;
 

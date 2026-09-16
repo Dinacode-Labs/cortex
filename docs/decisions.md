@@ -1481,3 +1481,36 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   test: is it a thing you can name, or a claim about the project?
 - **Revisit when:** legitimate entities are being rejected by the name filter, or contradiction
   detection between entries needs to be built out now that the entity noise is gone.
+
+<a id="adr-0056"></a>
+
+## ADR-0056 · A project can be re-parented after it is created
+
+- **Status:** accepted (2026-09-16).
+- **Context:** [0051](#adr-0051) made visibility and ownership changeable and left the parent
+  out — it was listed as a known gap and it bit within a day. A client with several
+  repositories that are not a monorepo is modelled as a parent project with one child per
+  repository ([0037](#adr-0037)), and the parent is only set at creation, by whoever runs
+  `cortex link --create … --parent <slug>`.
+
+  So the first person on the team to link a repository in a hurry creates a top-level project,
+  and there is no way back: not by re-parenting, which did not exist, and not by recreating it,
+  because the slug is taken and `createProject` returns the existing project rather than
+  inventing a second one. The client's memory stays split, permanently, because of one missing
+  flag.
+- **Decision:** `updateProject` takes `parentSlug`, so a manager can attach a project to a
+  parent, move it, or detach it (`null`). Exposed on `PATCH /projects/:slug` and in the web
+  under Settings, next to visibility and owner — where someone looking for it will look.
+
+  Cycles are refused. Permissions and the context pack both walk the ancestor chain, so a cycle
+  would not be a wrong answer, it would be an infinite loop; the chain is checked before the
+  write, not after.
+- **Alternatives:** allow deleting a project so it can be recreated with the right parent —
+  much more dangerous for the same outcome, and it would take its entries with it; only allow
+  it at creation and document the constraint — which is what we had, and it cost a client's
+  memory its structure on day one.
+- **Consequences:** moving a project changes who can see it, immediately, in both directions:
+  attaching to a private parent closes it, detaching from one opens it. That is the same rule
+  as everywhere else, applied live, and the Settings screen says so.
+- **Revisit when:** someone needs to move a subtree rather than a single project, or per-project
+  roles arrive and moving a project has to reconcile two member lists.
