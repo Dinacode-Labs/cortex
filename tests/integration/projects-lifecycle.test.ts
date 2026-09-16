@@ -23,18 +23,24 @@ const OWNER = `owner-${RID}@example.com`;
 const OTRO = `otro-${RID}@example.com`;
 
 async function tokenDe(email: string): Promise<string> {
-  const logs: string[] = [];
+  // El código se busca en la línea de ESTE email: varios ficheros de integración interceptan
+  // `console.log` a la vez, y coger el primer número de seis cifras se lleva el de otro.
+  let cap = "";
   const orig = console.log;
-  console.log = (...a: unknown[]) => logs.push(a.join(" "));
+  console.log = ((...a: unknown[]) => {
+    cap += a.join(" ") + "\n";
+  }) as typeof console.log;
   try {
     await requestOtp(email);
   } finally {
     console.log = orig;
   }
-  const code = logs.join("\n").match(/(\d{6})/)?.[1];
-  if (!code) throw new Error("sin OTP en el log");
+  const linea = cap.split("\n").find((l) => l.includes(email));
+  const code = linea?.match(/(\d{6})/)?.[1];
+  if (!code) throw new Error(`no se capturo el OTP de ${email}`);
   return (await verifyOtp(email, code)).token;
 }
+
 
 let tokOwner: string;
 let tokOtro: string;
