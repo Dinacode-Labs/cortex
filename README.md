@@ -319,8 +319,9 @@ directly and applies no permissions. It is for developing the server, not for da
 
 ## How Cortex reaches your agents
 
-Cortex ships **its own** pieces, the MCP with the 8 tools, the `cortex-capture` skill and the
-`/cortex-save` command, in the [Claude Code plugin](./plugin/claude-code), which
+Cortex ships **its own** pieces, the MCP with the 8 tools, the `cortex-capture` and
+`cortex-report` skills and the `/cortex-save` command, in the
+[Claude Code plugin](./plugin/claude-code), which
 `cortex setup` installs. Codex reads the same marketplace and takes the same plugin. The
 other agents are configured through their own native mechanism by the same command. The
 plugin also carries the two hooks that close the loop.
@@ -461,7 +462,7 @@ credentials, are in [`deploy/README.md`](./deploy/README.md).
 apps/        mcp-server (MCP stdio + HTTP) · web (UI) · server (API + auth)
              cli (@dinacodelabs/cortex, published to npm) · admin (operator, lives in the image)
 packages/    shared · client (client side) · database · embeddings · core · agents
-plugin/      claude-code/ (hooks + MCP + cortex-capture skill + /cortex-save)
+plugin/      claude-code/ (hooks + MCP + cortex-capture & cortex-report skills + /cortex-save)
 deploy/      docker-compose.yml · local.yml · Caddyfile · restore.sh · README.md
 config/      toolbelt.json (schema for third-party registries)
 scripts/     install.sh · set-version.mjs · changelog-notes.mjs

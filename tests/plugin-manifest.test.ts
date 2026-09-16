@@ -58,8 +58,9 @@ describe("plugin de Claude Code", () => {
     expect(mcp.mcpServers.cortex).toEqual({ command: "cortex", args: ["mcp"] });
   });
 
-  it("la skill y el comando viven dentro del plugin", () => {
+  it("las skills y el comando viven dentro del plugin", () => {
     expect(existsSync(resolve(root, "plugin/claude-code/skills/cortex-capture/SKILL.md"))).toBe(true);
+    expect(existsSync(resolve(root, "plugin/claude-code/skills/cortex-report/SKILL.md"))).toBe(true);
     expect(existsSync(resolve(root, "plugin/claude-code/commands/cortex-save.md"))).toBe(true);
   });
 });
