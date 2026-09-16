@@ -100,7 +100,7 @@ Two things stay above the project, because they genuinely are: **search**, which
 question that crosses projects, and the **admin** area, which is about the installation rather
 than about any project in it.
 
-**What is not here, and should not be:** creating or deleting projects wholesale, running
+**What is not here, and should not be:** creating projects wholesale, running
 maintenance or indexing, editing configuration, administering users or tokens. Those live in
 the CLI and in `cortex-admin`, where they belong.
 

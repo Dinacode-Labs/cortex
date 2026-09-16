@@ -1514,3 +1514,38 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   as everywhere else, applied live, and the Settings screen says so.
 - **Revisit when:** someone needs to move a subtree rather than a single project, or per-project
   roles arrive and moving a project has to reconcile two member lists.
+
+<a id="adr-0057"></a>
+
+## ADR-0057 · An empty project can be deleted; one with memory in it cannot
+
+- **Status:** accepted (2026-09-16).
+- **Context:** there was no way to delete a project anywhere — not in the API, the CLI,
+  `cortex-admin` or the web. `docs/design.md` even listed it under what deliberately does not
+  belong in the UI.
+
+  That reads as caution, and for a project holding knowledge it is. But it also meant a typo was
+  permanent. `cortex link --create "Nombre Equivicado"` produced a project that could not be
+  renamed, could not be recreated under the right name — the slug was taken — and could not be
+  removed. On a shared server that accumulates ghost projects in everyone's list, and only
+  someone with database access can clean them.
+- **Decision:** a project with **no entries and no children** can be deleted by its owner or an
+  admin. Anything else is refused with `409` and stays exactly as it was.
+
+  The line is drawn at *memory*, not at permissions. Deleting an empty project undoes creating
+  it and destroys nothing; deleting one with entries destroys knowledge, and in a product whose
+  first principle is that invalidating is not deleting ([0012](#adr-0012)), that cannot sit
+  behind a button. For that there is a database, a backup, and a decision taken slowly.
+
+  It is the **owner**, not only an admin: the person who mistypes a name should be able to fix
+  it without messaging anybody, and there is nothing there to destroy. Making it admin-only
+  would add friction exactly where the risk is zero.
+- **Alternatives:** admin-only for every deletion — a bottleneck on the harmless case and no
+  safer on the dangerous one, which stays closed either way; allow deleting anything with a
+  confirmation — confirmations are clicked through, and this one would take a client's memory
+  with it; a soft delete — the project list is the problem and a hidden project still holds its
+  slug, which is what blocks recreating it.
+- **Consequences:** a project's entries have to be moved or invalidated before it can go, which
+  is the intended order. The slug is freed on deletion, so the name becomes available again.
+- **Revisit when:** somebody legitimately needs to retire a project that holds memory — the
+  answer is probably archiving rather than deleting, which is a different feature.

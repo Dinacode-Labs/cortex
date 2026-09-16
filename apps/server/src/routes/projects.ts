@@ -4,11 +4,13 @@ import {
   canAccessProject,
   canManageProject,
   createProject,
+  deleteProject,
   findProjectBySlug,
   listAccessibleProjects,
   listAdmins,
   listProjectMembers,
   NotAManagerError,
+  ProjectNotEmptyError,
   removeProjectMember,
   slugify,
   updateProject,
@@ -160,4 +162,26 @@ projectRoutes.delete("/projects/:slug/members", async (c) => {
     throw e;
   }
   return c.json({ members: await listProjectMembers(slug) });
+});
+
+/**
+ * Borra un proyecto vacío: deshace un `cortex link --create` equivocado y nada más.
+ *
+ * Con memoria dentro responde 409 y no lo toca. Un producto cuyo principio es que invalidar
+ * no es borrar no puede tener «borrar toda la memoria de un cliente» a un clic (ADR-0057).
+ */
+projectRoutes.delete("/projects/:slug", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const slug = c.req.param("slug");
+  const project = await findProjectBySlug(slug);
+  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  try {
+    await deleteProject(slug, user.email);
+  } catch (e) {
+    if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
+    if (e instanceof ProjectNotEmptyError) return c.json({ error: e.message }, 409);
+    throw e;
+  }
+  return c.json({ deleted: slug });
 });

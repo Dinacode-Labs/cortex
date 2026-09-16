@@ -269,6 +269,40 @@ export async function updateProject(
   return { ...p, visibility, ownerEmail, parentId };
 }
 
+/**
+ * Borra un proyecto VACÍO.
+ *
+ * Se puede deshacer un `cortex link --create` equivocado, y nada más (ADR-0057). Si el
+ * proyecto tiene una sola entrada o un solo hijo, esto se niega: borrarlo sería destruir
+ * memoria, y en un producto cuyo principio es que invalidar no es borrar, eso no puede estar
+ * a un clic. Para ese caso hay una base de datos, una copia de seguridad y una decisión
+ * tomada despacio.
+ *
+ * Lo puede hacer el dueño, no solo un admin: quien se equivoca escribiendo un nombre debería
+ * poder arreglarlo sin escribirle a nadie, y aquí no hay nada que destruir.
+ */
+export async function deleteProject(slug: string, byEmail: string | null): Promise<void> {
+  const p = await exigeGestion(slug, byEmail);
+  const sql = getSql();
+  const [entradas] = (await sql`SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${p.id}`) as unknown as Row[];
+  if (Number(entradas?.n ?? 0) > 0) {
+    throw new ProjectNotEmptyError(`"${slug}" has ${entradas!.n} entries. Only an empty project can be deleted.`);
+  }
+  const [hijos] = (await sql`SELECT count(*)::int AS n FROM entities WHERE parent_id = ${p.id}`) as unknown as Row[];
+  if (Number(hijos?.n ?? 0) > 0) {
+    throw new ProjectNotEmptyError(`"${slug}" still has ${hijos!.n} child project(s). Move them out first.`);
+  }
+  await sql`DELETE FROM entities WHERE id = ${p.id}`;
+}
+
+/** Se niega a borrar algo que contiene memoria. Es un 409, no un error del servidor. */
+export class ProjectNotEmptyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ProjectNotEmptyError";
+  }
+}
+
 /** Añade un miembro. Solo el dueño o un admin (ADR-0051). */
 export async function addProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
   const p = await exigeGestion(slug, byEmail);

@@ -9,6 +9,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Un proyecto vacío se puede borrar.** No había forma de borrar un proyecto en ninguna
+  interfaz, así que un `cortex link --create` con el nombre mal escrito era permanente: no se
+  podía renombrar, ni recrear —el slug quedaba cogido— ni quitar. En un servidor compartido eso
+  acumula proyectos fantasma en la lista de todos. Ahora su dueño o un admin puede borrarlo
+  **si no tiene ni entradas ni hijos**; con memoria dentro responde 409 y no se toca. La línea
+  está en la memoria, no en los permisos: invalidar no es borrar, y eso no puede estar a un
+  clic. Ver ADR-0057.
+
+### Added
 - **Un proyecto se puede colgar de un padre después de crearlo.** El padre solo se fijaba al
   crear, así que quien vinculaba un repositorio con prisa creaba un proyecto suelto y no había
   vuelta atrás: ni reengancharlo ni recrearlo, porque el slug ya estaba cogido. Para un cliente
