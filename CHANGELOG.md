@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-09-16
+
 ### Added
 - **Revisar la memoria deja de ser invisible.** El informe de salud dice cuántas entradas
   vigentes no ha confirmado ni corregido nunca una persona —en un proyecto real eran **348 de
