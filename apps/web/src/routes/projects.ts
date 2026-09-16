@@ -114,6 +114,9 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
 
   const members = await listProjectMembers(project.slug!);
   const aviso = c.req.query("error");
+  // Candidatos a padre: cualquier otro accesible con slug. La comprobación de ciclos la hace
+  // el dominio, que es quien conoce toda la cadena de ancestros.
+  const otros = (await listAccessibleProjects(user.email)).filter((o) => o.slug && o.id !== project.id);
 
   const body = html`
     ${projectHeader(project, "settings", true)}
@@ -140,6 +143,22 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
       <p class="sub">The owner manages this project without needing to be an administrator.</p>
       <form class="row" method="post" action="/p/${project.slug}/settings/owner">
         <input type="email" name="ownerEmail" value="${project.ownerEmail ?? ""}" placeholder="nobody@example.com">
+        <button type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Parent project</h2>
+      <p class="sub">
+        A child inherits its parent's knowledge in what agents see, and its permissions: whoever can reach the
+        parent can reach every child. Use it for a client with several repositories that are not a monorepo — the
+        things that hold for all of them live once, in the parent.
+      </p>
+      <form class="row" method="post" action="/p/${project.slug}/settings/parent">
+        <select name="parentSlug">
+          <option value="">(none — top level)</option>
+          ${otros.map((o) => html`<option value="${o.slug}" ${project.parentId === o.id ? "selected" : ""}>${o.name}</option>`)}
+        </select>
         <button type="submit">Save</button>
       </form>
     </div>
@@ -182,6 +201,20 @@ projectsRoutes.post("/p/:slug/settings/visibility", async (c) => {
     await updateProject(slug, { visibility: v }, user.email);
   } catch (e) {
     return c.redirect(vuelveConError(slug, e));
+  }
+  return c.redirect(`/p/${slug}/settings`);
+});
+
+projectsRoutes.post("/p/:slug/settings/parent", async (c) => {
+  const user = c.get("user")!;
+  const slug = c.req.param("slug");
+  const parentSlug = String((await c.req.parseBody()).parentSlug ?? "").trim() || null;
+  try {
+    await updateProject(slug, { parentSlug }, user.email);
+  } catch (e) {
+    if (e instanceof NotAManagerError) return c.redirect(vuelveConError(slug, e));
+    // Padre inexistente o ciclo: el motivo se lee, no se traga.
+    return c.redirect(`/p/${slug}/settings?error=${encodeURIComponent((e as Error).message)}`);
   }
   return c.redirect(`/p/${slug}/settings`);
 });

@@ -8,6 +8,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **Un proyecto se puede colgar de un padre después de crearlo.** El padre solo se fijaba al
+  crear, así que quien vinculaba un repositorio con prisa creaba un proyecto suelto y no había
+  vuelta atrás: ni reengancharlo ni recrearlo, porque el slug ya estaba cogido. Para un cliente
+  con varios repos que no son monorepo, eso partía su memoria para siempre por una bandera que
+  faltaba. Ahora está en `PATCH /projects/:slug` y en Settings, al lado de visibilidad y dueño.
+  Los ciclos se rechazan: los permisos y el pack suben por la cadena de ancestros y un ciclo no
+  sería una respuesta equivocada, sería un bucle infinito. Ver ADR-0056.
+
 ## [0.1.8] — 2026-09-16
 
 ### Fixed

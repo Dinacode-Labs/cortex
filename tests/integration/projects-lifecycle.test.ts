@@ -106,6 +106,45 @@ describe("vida de un proyecto (ADR-0051)", () => {
     expect(p!.ownerEmail).toBe(OWNER);
   }, 60_000);
 
+  it("un proyecto se puede colgar de un padre DESPUÉS de crearlo", async () => {
+    // El caso real: un cliente con varios repos que no son monorepo, y alguien del equipo crea
+    // uno de los hijos sin `--parent`. Sin esto no había arreglo: ni reengancharlo ni recrearlo,
+    // porque el slug ya estaba cogido.
+    const padre = await createProject(`Cliente ${RID}`, { ownerEmail: OWNER });
+    const huerfano = await createProject(`Repo Suelto ${RID}`, { ownerEmail: OWNER });
+    expect(huerfano.parentId).toBeNull();
+
+    const srv = createServerApp();
+    const res = await srv.request(`/projects/${huerfano.slug}`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
+      body: JSON.stringify({ parentSlug: padre.slug }),
+    });
+    expect(res.status).toBe(200);
+    expect((await findProjectBySlug(huerfano.slug!))!.parentId).toBe(padre.id);
+
+    // Y el hijo hereda el acceso del padre: volver privado el padre cierra los dos.
+    await srv.request(`/projects/${padre.slug}`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
+      body: JSON.stringify({ visibility: "private" }),
+    });
+    expect(await canAccessProject((await findProjectBySlug(huerfano.slug!))!, OTRO)).toBe(false);
+  }, 60_000);
+
+  it("no se puede montar un ciclo de padres, que dejaría los permisos dando vueltas", async () => {
+    const a = await createProject(`Ciclo A ${RID}`, { ownerEmail: OWNER });
+    const b = await createProject(`Ciclo B ${RID}`, { ownerEmail: OWNER, parentSlug: a.slug! });
+    const srv = createServerApp();
+    const res = await srv.request(`/projects/${a.slug}`, {
+      method: "PATCH",
+      headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
+      body: JSON.stringify({ parentSlug: b.slug }),
+    });
+    expect(res.status).toBe(400);
+    expect((await findProjectBySlug(a.slug!))!.parentId).toBeNull(); // no tocó nada
+  }, 60_000);
+
   it("un proyecto que no puedes ver responde 404 al intentar gestionarlo, no 403", async () => {
     const privado = await createProject(`Privado Ajeno ${RID}`, { visibility: "private", ownerEmail: OWNER });
     const srv = createServerApp();

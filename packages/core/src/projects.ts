@@ -231,15 +231,42 @@ async function exigeGestion(slug: string, byEmail: string | null): Promise<Proje
  */
 export async function updateProject(
   slug: string,
-  cambios: { visibility?: "public" | "private"; ownerEmail?: string | null },
+  cambios: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
   byEmail: string | null,
 ): Promise<ProjectRef> {
   const p = await exigeGestion(slug, byEmail);
   const visibility = cambios.visibility ?? p.visibility;
   const ownerEmail =
     cambios.ownerEmail === undefined ? p.ownerEmail : cambios.ownerEmail ? cambios.ownerEmail.toLowerCase() : null;
-  await getSql()`UPDATE entities SET visibility = ${visibility}, owner_email = ${ownerEmail} WHERE id = ${p.id}`;
-  return { ...p, visibility, ownerEmail };
+
+  // Colgar de un padre después de crearlo (ADR-0056). El caso que lo pide es el de siempre:
+  // un cliente con varios repos que no son un monorepo, y alguien del equipo que crea uno de
+  // los hijos sin `--parent` porque iba con prisa. Sin esto no había arreglo — ni reengancharlo
+  // ni recrearlo, porque el slug ya estaba cogido — y la memoria del cliente quedaba partida.
+  let parentId = p.parentId;
+  if (cambios.parentSlug !== undefined) {
+    if (cambios.parentSlug === null) parentId = null;
+    else {
+      const padre = await findProjectBySlug(cambios.parentSlug);
+      if (!padre) throw new Error(`Proyecto padre "${cambios.parentSlug}" no encontrado.`);
+      if (padre.id === p.id) throw new Error("Un proyecto no puede ser su propio padre.");
+      // Los permisos y el pack suben por la cadena de ancestros: un ciclo los dejaría dando
+      // vueltas para siempre, así que se comprueba antes de escribir y no después.
+      const sql = getSql();
+      let cursor: string | null = padre.parentId;
+      while (cursor) {
+        if (cursor === p.id) throw new Error(`"${cambios.parentSlug}" ya cuelga de "${slug}": sería un ciclo.`);
+        const filas = (await sql`SELECT parent_id FROM entities WHERE id = ${cursor}`) as unknown as Row[];
+        cursor = (filas[0]?.parent_id as string | null) ?? null;
+      }
+      parentId = padre.id;
+    }
+  }
+
+  await getSql()`
+    UPDATE entities SET visibility = ${visibility}, owner_email = ${ownerEmail}, parent_id = ${parentId}
+    WHERE id = ${p.id}`;
+  return { ...p, visibility, ownerEmail, parentId };
 }
 
 /** Añade un miembro. Solo el dueño o un admin (ADR-0051). */
