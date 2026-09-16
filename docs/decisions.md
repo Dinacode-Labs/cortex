@@ -1068,7 +1068,8 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   There is an integration test demonstrating it.
 - **Intended behaviour change:** captures that used to fail deduplication on spelling now
   reconcile.
-- **Revisit when:** resolving by slug and by name needs to happen in one function.
+- **Revisit when:** resolving by slug and by name needs to happen in one function. **Reached**
+  (2026-09-16): see [0061](#adr-0061).
 
 <a id="adr-0044"></a>
 
@@ -1669,3 +1670,43 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   constraint forbids "insert the name, fill in the slug later". The seed uses it too.
 - **Revisit when:** projects move to their own table, or a legitimate reason appears to link an
   entry to a project it merely mentions.
+
+---
+
+<a id="adr-0061"></a>
+
+## ADR-0061 · What you type in `project` resolves by slug first, then by name, everywhere
+
+- **Status:** accepted (2026-09-16). Extends [0043](#adr-0043).
+- **Context:** the slug is the project's identity across the product: it is what `cortex link`
+  prints, what `.cortex.json` stores, what the web puts in `/p/<slug>/…` and what the HTTP API
+  takes ([0036](#adr-0036), [0051](#adr-0051)). The MCP tools, however, take a free-text
+  `project`, and that went through two different resolutions. Writes went through
+  `createProject`, which looks the slug up first, so `save_project_context` with `acme-portal`
+  landed in Acme Portal. Reads went through the canonical-name lookup of [0043](#adr-0043),
+  and canonicalisation does not touch hyphens, so `get_project_context_pack` with the same
+  value answered "Project not found". A third path, the MCP permission guard, compared the
+  **exact** name, and so rejected spellings that the data operations accepted.
+
+  Verified against a real server: the pack for `cortex` failed and the pack for `Cortex`
+  worked. The asymmetry is the worst part: the identifier the user has in front of them works
+  in one direction and fails silently in the other, with nothing explaining why.
+- **Decision:** one function resolves whatever someone types in `project`: **by slug first,
+  then by canonical name**. `findProjectIdByName`, `findProjectByName` and therefore
+  `checkProjectAccess` all go through it; `findProjectBySlug` stays as the strict form for
+  routes and the API, where the slug is already the identifier. The context pack reports the
+  project's **name**, not the string it was asked with. Tool descriptions say "slug or name".
+
+  If a project's *name* happens to equal another project's *slug*, the slug wins: it is the
+  identifier, the name is a label. Such collisions only exist because of the bug this fixes
+  (a project literally named after another's slug, created by a write that missed).
+- **Alternatives:** detect slug-shaped input and return "that is a slug, use the name" — cheaper,
+  and leaves the product contradicting itself; make canonicalisation treat hyphens as spaces —
+  would make `acme-portal` and `Acme Portal` collide in the *entity* dedup too, which is a
+  different question; require the slug everywhere — right in principle, but agents pass names
+  and every existing transcript does.
+- **Consequences:** the [0043](#adr-0043) "revisit when" condition is met and this record is its
+  continuation. The exact-name guard is gone, so a private project is now protected under any
+  spelling of its name, which it was not before.
+- **Revisit when:** the MCP tools take a `slug` field of their own, or projects get their own
+  table with the slug as key.
