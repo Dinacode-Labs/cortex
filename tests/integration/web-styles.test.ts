@@ -17,18 +17,23 @@ const RID = Math.random().toString(36).slice(2, 8);
 const USER = `styles-${RID}@example.com`;
 
 async function otpDe(email: string): Promise<string> {
+  // El emisor `log` imprime `[email:log] (asunto) to <email>: …`. Se busca el código EN LA
+  // LÍNEA DE ESTE EMAIL, no el primer número de seis cifras que pase: varios ficheros de
+  // integración interceptan `console.log` a la vez y, sin esto, uno se lleva el código de otro
+  // y falla con «Código incorrecto» en un sitio que no tiene nada que ver.
   let cap = "";
   const orig = console.log;
   console.log = ((...a: unknown[]) => {
-    cap += a.join(" ");
+    cap += a.join(" ") + "\n";
   }) as typeof console.log;
   try {
     await requestOtp(email);
   } finally {
     console.log = orig;
   }
-  const m = cap.match(/(\d{6})/);
-  if (!m) throw new Error("no se capturó el OTP");
+  const linea = cap.split("\n").find((l) => l.includes(email));
+  const m = linea?.match(/(\d{6})/);
+  if (!m) throw new Error(`no se capturo el OTP de ${email}`);
   return m[1]!;
 }
 
