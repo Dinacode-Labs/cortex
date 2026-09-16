@@ -1549,3 +1549,44 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   is the intended order. The slug is freed on deletion, so the name becomes available again.
 - **Revisit when:** somebody legitimately needs to retire a project that holds memory — the
   answer is probably archiving rather than deleting, which is a different feature.
+
+<a id="adr-0058"></a>
+
+## ADR-0058 · Ingesting documentation is part of the CLI; heavy extraction stays on the server
+
+- **Status:** accepted (2026-09-16).
+- **Context:** `connect-docs` lived only in `cortex-admin`, which ships inside the Docker image
+  and is not published to npm. So ingesting a folder of documentation — one of the first things
+  anybody wants to do after seeing what Cortex is for — required cloning the monorepo and
+  getting its workspace to install. Someone on the team hit exactly that this week and stopped,
+  reasonably, at "I can't connect documentation".
+
+  It was in `cortex-admin` for a real reason: extraction pulls mammoth, xlsx and unpdf, roughly
+  95 MB of dependencies, plus a vision model for images and transcription for audio. Keeping
+  that off every laptop is the whole point of the thin client ([0025](#adr-0025)).
+
+  But that reason only covers **some** formats. `connect-docs` writes through the authenticated
+  API, not the database, and Markdown and plain text need nothing but `readFileSync` — and they
+  are most of any team's documentation, and everything a Notion export produces.
+- **Decision:** `cortex connect-docs "<slug>" <folder>` ships in the CLI and handles the
+  formats that need no dependencies. Chunking, the ignore list and the extension classification
+  move to `@cortex/shared` so both connectors agree by construction rather than by memory.
+
+  Files it cannot read are **counted and reported**, grouped by extension, with the command that
+  does handle them. A connector that silently skips what it did not upload is worse than one
+  that does not upload it: the first leaves you believing the memory is complete.
+
+  The operator connector in `cortex-admin` stays exactly as it is, and remains the answer for
+  documents, spreadsheets, images and audio.
+- **Alternatives:** publish `cortex-admin` to npm — puts 95 MB and an unused database client on
+  every laptop, which is the thing [0025](#adr-0025) exists to prevent; extract on the server by
+  uploading the file — architecturally the better end state, since the server already has the
+  dependencies and the keys, but it needs an upload endpoint, size limits and a transfer of
+  every byte, and it was not going to ship today; bundle only the light extractors into the CLI
+  — `unpdf` alone is most of the weight, so the saving is small and the rule stops being simple.
+- **Consequences:** two connectors with the same name and different reach, which the CLI's own
+  output has to keep explaining — it does. `chunkDocument` moving to `shared` means chunking is
+  now client-side for this path; it is deterministic and has no dependencies, so the result is
+  identical either way.
+- **Revisit when:** extraction moves server-side, at which point the CLI connector handles
+  everything and this split disappears — that is the direction, not a permanent shape.

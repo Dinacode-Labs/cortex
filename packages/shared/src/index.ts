@@ -5,3 +5,4 @@ export * from "./concurrency.js";
 export * from "./scrub.js";
 export * from "./llm-config.js";
 export * from "./api-contract.js";
+export * from "./chunk.js";

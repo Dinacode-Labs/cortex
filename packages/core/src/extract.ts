@@ -4,7 +4,7 @@ import { inflateRawSync } from "node:zlib";
 import mammoth from "mammoth";
 import * as XLSX from "xlsx";
 import { extractText, getDocumentProxy } from "unpdf";
-import { getEnvNum } from "@cortex/shared";
+import { getEnvNum, PLAIN_TEXT_EXTS } from "@cortex/shared";
 
 /**
  * Capa de extracción de ficheros REUTILIZABLE por todos los conectores (la idea
@@ -20,13 +20,14 @@ import { getEnvNum } from "@cortex/shared";
  * hook, esos formatos devuelven null, igual que antes sin API keys.
  */
 
-const TEXT_EXTS = ["md", "markdown", "txt", "text"];
+// La lista canónica vive en `@cortex/shared`, porque el CLI ligero también necesita saber qué
+// puede leer él y qué no (ADR-0058). Aquí solo se agrupa para decidir CÓMO se extrae cada uno.
+const TEXT_EXTS = PLAIN_TEXT_EXTS;
 const DOC_EXTS = ["docx", "pdf", "xlsx"];
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
 const DRAWIO_EXTS = ["drawio", "xml"];
 const AUDIO_EXTS = ["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga"];
 const VIDEO_EXTS = ["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"];
-export const SUPPORTED_EXTS = new Set([...TEXT_EXTS, ...DOC_EXTS, ...IMAGE_EXTS, ...DRAWIO_EXTS, ...AUDIO_EXTS, ...VIDEO_EXTS]);
 
 // Por debajo de esto, una imagen suele ser ruido (iconos, separadores) → no se captiona.
 const MIN_IMAGE_BYTES = getEnvNum("CORTEX_IMAGE_MIN_BYTES", 8000);

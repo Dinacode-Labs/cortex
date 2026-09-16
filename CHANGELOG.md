@@ -8,6 +8,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **`cortex connect-docs` ya está en el CLI.** Ingerir una carpeta de documentación exigía
+  clonar el monorepo entero, porque el conector vivía solo en `cortex-admin`, que no se publica
+  en npm — y es de las primeras cosas que alguien quiere hacer. Ahora el CLI lee Markdown y
+  texto plano, que es la mayor parte de la documentación de cualquier equipo y todo lo que
+  exporta Notion. Lo que necesita dependencias pesadas (docx, pdf, xlsx, imágenes, audio,
+  vídeo) **no se ignora en silencio**: se cuenta por tipo y se dice qué comando lo hace. Ver
+  ADR-0058.
+
 ## [0.1.9] — 2026-09-16
 
 ### Added

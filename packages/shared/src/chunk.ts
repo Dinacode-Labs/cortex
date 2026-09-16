@@ -124,3 +124,43 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
   });
   return out;
 }
+
+
+/**
+ * Directorios que ningún conector debe recorrer. Apuntar un conector a la raíz de un repo sin
+ * este filtro arrastra `vendor/` y `node_modules/` enteros a la memoria del proyecto.
+ */
+export const IGNORE_DIRS = new Set([
+  "node_modules", "vendor", "dist", "build", "out", "target", "coverage", ".git", ".next",
+  ".nuxt", ".svelte-kit", ".venv", "venv", "__pycache__", ".pytest_cache", ".gradle",
+  ".idea", ".vscode", "bin", "obj", "Pods", "DerivedData",
+]);
+
+/**
+ * Qué hace falta para sacarle texto a un fichero.
+ *
+ * `texto` solo necesita leerlo: lo puede hacer el CLI que se instala con npm. `pesado` necesita
+ * mammoth/xlsx/unpdf, o un modelo de visión o de transcripción — unos 95 MB de dependencias y,
+ * en algunos casos, claves. Eso vive en la imagen del servidor, no en el portátil de nadie
+ * (ADR-0025), así que el CLI los detecta, los cuenta y dice qué hacer con ellos en vez de
+ * fingir que no existen.
+ */
+export type ExtractionKind = "texto" | "pesado" | "no-soportado";
+
+export const PLAIN_TEXT_EXTS = ["md", "markdown", "txt", "text"];
+const HEAVY_EXTS = [
+  "docx", "pdf", "xlsx",
+  "png", "jpg", "jpeg", "webp", "gif",
+  "drawio", "xml",
+  "opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga",
+  "mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv",
+];
+
+export const SUPPORTED_EXTS = new Set([...PLAIN_TEXT_EXTS, ...HEAVY_EXTS]);
+
+export function extractionKind(fileName: string): ExtractionKind {
+  const ext = fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase();
+  if (PLAIN_TEXT_EXTS.includes(ext)) return "texto";
+  if (HEAVY_EXTS.includes(ext)) return "pesado";
+  return "no-soportado";
+}

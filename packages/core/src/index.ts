@@ -5,7 +5,10 @@ export * from "./queries.js";
 export * from "./render.js";
 export { lintProject, renderLintReport, type LintReport } from "./lint.js";
 export { planLintActions, type LintAction } from "./lint-act.js";
-export { searchProjectCode, indexRepo, renderCodeHits, IGNORE_DIRS, type CodeHit } from "./code.js";
+export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./code.js";
+// Chunking, listas de extensiones y directorios a ignorar viven en `shared` desde que el
+// CLI ligero también los necesita (ADR-0058). Se re-exportan para no romper a los llamantes.
+export { chunkDocument, IGNORE_DIRS, SUPPORTED_EXTS, type ChunkOptions, type DocChunk } from "@cortex/shared";
 export { applyTemporalInvalidation } from "./temporal.js";
 export { storeEmbeddingsBatch } from "./vectors.js";
 export { recordUsage, registerUsageSink, getUsageSummary, getRecentTraces, estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./usage.js";
@@ -43,8 +46,7 @@ export {
   type EmailMessage,
 } from "./email.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture.js";
-export { chunkDocument, type DocChunk, type ChunkOptions } from "./chunk.js";
-export { extractFileText, setMediaExtractor, SUPPORTED_EXTS, type ExtractedFile, type MediaExtractorHooks } from "./extract.js";
+export { extractFileText, setMediaExtractor, type ExtractedFile, type MediaExtractorHooks } from "./extract.js";
 export {
   classifyType,
   extractEntities,

@@ -32,6 +32,7 @@ const COMMANDS: Record<string, Cmd> = {
   version: { help: "this CLI's version and the server's", load: () => import("./commands/version.js") },
   upgrade: { help: "install the latest published version of this CLI", load: () => import("./commands/upgrade.js") },
   doctor: { help: "check every piece is in place, and say what to do if not", load: () => import("./commands/doctor.js") },
+  "connect-docs": { help: "ingest a folder of documentation into a project", load: () => import("./commands/connect-docs.js") },
   "connect-github": { help: "ingest pull requests and issues from a GitHub repo", load: () => import("./commands/connect-github.js") },
   "connect-sessions": { help: "backfill past agent sessions into a project", load: () => import("./commands/connect-sessions.js") },
   "hook-context": { help: "session-start hook: emit the linked project's context pack", managed: false, load: () => import("./commands/hook-context.js") },

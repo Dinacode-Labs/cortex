@@ -349,11 +349,20 @@ attribution, permissions and batched embedding. They need `cortex auth login` an
 server. The first argument is the project **slug** from `cortex link`:
 
 ```bash
+cortex connect-docs     "<slug>" <dir>          # a folder: Markdown and plain text
 cortex connect-github   "<slug>" <owner/repo>   # pull requests and issues, via gh
-cortex-admin connect-docs    "<slug>" <dir>     # a folder: documents, images, audio, video
-cortex-admin connect-notion  "<slug>" <export>  # a Notion export, pages and attachments linked
 cortex connect-sessions "<slug>" <repo-path> [claude|codex|opencode|hermes|pi]
+
+cortex-admin connect-docs    "<slug>" <dir>     # the same, plus documents, images, audio, video
+cortex-admin connect-notion  "<slug>" <export>  # a Notion export, pages and attachments linked
 ```
+
+`connect-docs` exists in both. The CLI one reads what needs no dependencies — Markdown and plain
+text, which is most documentation and all of a Notion export — and **reports what it left out**,
+grouped by extension. Documents, spreadsheets, images and audio need extraction libraries and a
+model, which stay on the server side rather than on every laptop
+([ADR-0058](./docs/decisions.md#adr-0058)); for those, an operator runs the `cortex-admin`
+version.
 
 By default capture types each item **heuristically**, which is cheap, and the intelligence,
 re-typing with an LLM, the graph, reconciliation and curation, is applied afterwards by
