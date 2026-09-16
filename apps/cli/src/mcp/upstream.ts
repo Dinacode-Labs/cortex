@@ -1,6 +1,13 @@
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { DEFAULT_SERVER_URL, apiBase, getClientConfig, readCredentials, useProjectServer } from "@cortex/client";
+import {
+  DEFAULT_SERVER_URL,
+  apiBase,
+  getClientConfig,
+  listCredentials,
+  readCredentials,
+  useProjectServer,
+} from "@cortex/client";
 
 /**
  * Cómo encuentra el CLI el MCP del servidor y con qué credenciales habla.
@@ -36,12 +43,41 @@ function guessFromServer(server: string): string {
  */
 export async function resolveUpstream(cwd = process.cwd()): Promise<UpstreamTarget | null> {
   useProjectServer(cwd);
-  const creds = readCredentials(apiBase());
-  if (!creds?.token) return null;
+  const buscado = apiBase();
+  const creds = readCredentials(buscado);
+  if (!creds?.token) throw new SinSesionError(buscado, cwd);
   const override = process.env.CORTEX_MCP_URL?.trim();
   if (override) return { url: override, token: creds.token };
   const cfg = await getClientConfig(creds.server);
   return { url: cfg?.mcpUrl?.trim() || guessFromServer(creds.server), token: creds.token };
+}
+
+/**
+ * No hay sesión **para este servidor**, que no es lo mismo que no haber iniciado sesión.
+ *
+ * El mensaje anterior decía «no has iniciado sesión o tu token ha caducado» en los dos casos, y
+ * eso manda a quien lo lee a hacer un `cortex auth login` que ya había hecho. El caso real es
+ * otro: la carpeta apunta a un servidor —por su `.cortex.json` o por `CORTEX_SERVER_URL`— del
+ * que no hay credenciales, mientras sí las hay de otro. Un error que dirige mal cuesta más que
+ * uno que no dice nada, porque parece que sabe.
+ */
+export class SinSesionError extends Error {
+  constructor(
+    readonly servidor: string,
+    readonly cwd: string,
+  ) {
+    const sesiones = listCredentials();
+    const tengo = sesiones.length
+      ? `Signed in to: ${sesiones.map((c) => `${c.server} (${c.email})`).join(", ")}.`
+      : "There are no sessions on this machine.";
+    const arreglo = sesiones.some((c) => c.server !== servidor)
+      ? `If "${servidor}" is not where this project lives, fix the "server" field in .cortex.json ` +
+        "(or unset CORTEX_SERVER_URL). If it is, sign in to it: " +
+        `cortex auth login --server ${servidor}`
+      : `Run: cortex auth login --server ${servidor}`;
+    super(`No session for ${servidor} (resolved from ${cwd}). ${tengo} ${arreglo}`);
+    this.name = "SinSesionError";
+  }
 }
 
 /** Transporte HTTP autenticado. El SDK gestiona el `mcp-session-id` por dentro. */

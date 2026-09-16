@@ -8,6 +8,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **«No has iniciado sesión» era mentira la mayoría de las veces.** Cuando el MCP no podía
+  autenticarse decía eso y mandaba a repetir un `cortex auth login` ya hecho. El caso real es
+  otro: la carpeta apunta —por su `.cortex.json` o por `CORTEX_SERVER_URL`— a un servidor del
+  que no hay credenciales, mientras sí las hay de otro. Ahora el mensaje dice **qué servidor**
+  buscó, desde qué carpeta lo resolvió y **qué sesiones sí existen**. Un error que dirige mal
+  cuesta más que uno que calla, porque parece que sabe.
+
 ### Changed
 - **Este repositorio deja de versionar su `.cortex.json`.** Al ser público, un vínculo commiteado
   convierte *nuestro* proyecto en el que traen por defecto todos los clones del mundo, y obliga a
