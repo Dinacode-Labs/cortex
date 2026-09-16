@@ -9,6 +9,7 @@ import {
   saveWithReconciliation,
   isNearDuplicate,
   listEntries,
+  listAccessibleProjects,
   resolveEntity,
   relate,
   resolveEntities,
@@ -340,5 +341,55 @@ describe("integridad del grafo (UNIQUE parcial de aristas activas, D-5)", () => 
       SELECT id FROM entities WHERE id IN (${vendor.id}, ${service.id})
     `) as unknown as { id: string }[];
     expect(rows.length).toBe(2); // ambas siguen vivas
+  });
+});
+
+describe("un proyecto se crea, no se extrae (BD real)", () => {
+  /**
+   * El clasificador ofrecía `project` entre los tipos de entidad, así que cualquier nombre propio
+   * acababa en `entities` con `type='project'`: la misma fila que un proyecto de verdad, pero
+   * sin slug ni dueño, y salía en `cortex link` y en la UI como si lo fuera. En una instalación
+   * real, 26 fantasmas frente a 10 proyectos (#135).
+   */
+  it("una entidad `project` devuelta por el LLM no se convierte en proyecto", async () => {
+    const p = await createProject(`IT Ghost ${RID}`);
+    const ghost = `ghost-svc-${RID}`;
+    setClassifier(async () => ({
+      type: "decision",
+      title: "T",
+      summary: "s",
+      entities: [
+        { name: ghost, type: "project" },
+        { name: `Stripe ${RID}`, type: "integration" },
+      ],
+    }));
+    try {
+      await saveContext(
+        { content: `El servicio ${ghost} consume la API de pagos.`, project: p.name, sourceReference: "ghost" } as never,
+        { detectImprovements: false, useClassifier: true },
+      );
+    } finally {
+      setClassifier(null);
+    }
+    const sql = getSql();
+    const rows = (await sql`SELECT type FROM entities WHERE canonical_name = ${ghost}`) as unknown as { type: string }[];
+    expect(rows.map((r) => r.type)).toEqual([]); // ni como project ni recolocada en otro tipo
+    const listed = await listAccessibleProjects(null);
+    expect(listed.map((x) => x.name)).not.toContain(ghost);
+    expect(listed.find((x) => x.id === p.id)?.slug).toBeTruthy(); // el de verdad sigue ahí, con slug
+    // La entidad legítima de la misma respuesta sí entra.
+    const ok = (await sql`SELECT 1 FROM entities WHERE canonical_name = ${`stripe ${RID}`} AND type = 'integration'`) as unknown as unknown[];
+    expect(ok.length).toBe(1);
+  });
+
+  it("resolveEntity se niega a crear proyectos: eso es de createProject", async () => {
+    await expect(resolveEntity(getSql(), `IT Refused ${RID}`, "project")).rejects.toThrow(/createProject/);
+  });
+
+  it("la base tampoco admite un proyecto sin slug, ni por SQL a mano", async () => {
+    const sql = getSql();
+    await expect(
+      sql`INSERT INTO entities (name, canonical_name, type) VALUES (${`IT Raw ${RID}`}, ${`it raw ${RID}`}, 'project')`,
+    ).rejects.toThrow(/entities_project_has_slug_check/);
   });
 });
