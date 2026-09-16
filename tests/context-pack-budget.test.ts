@@ -23,16 +23,20 @@ function entrada(tipo: string, i: number): ContextEntry {
 
 const lista = (tipo: string, n: number) => Array.from({ length: n }, (_, i) => entrada(tipo, i));
 
+const SECCIONES: [string, string, number, number][] = [
+  ["decision", "Decisions in force", 2, 20],
+  ["constraint", "Active constraints", 2, 8],
+  ["risk", "Known risks", 2, 6],
+  ["technical_debt", "Technical debt", 2, 5],
+  ["convention", "Conventions", 2, 4],
+];
+
 const pack = (): ContextPack =>
   ({
     project: "Epic",
     totalEntries: 200,
     generatedAt: new Date("2026-09-15T00:00:00Z"),
-    decisions: lista("decision", 20),
-    constraints: lista("constraint", 8),
-    risks: lista("risk", 6),
-    technicalDebt: lista("technical_debt", 5),
-    conventions: lista("convention", 4),
+    sections: SECCIONES.map(([type, titulo, peso, n]) => ({ type, titulo, peso, entries: lista(type, n) })),
     sensitiveModules: ["payments", "auth"],
     relevantToArea: [],
     conflicts: [],
@@ -73,7 +77,7 @@ describe("renderContextPack con presupuesto", () => {
 
   it("lo que una sección no gasta se reparte: una pequeña no se lleva hueco de más", () => {
     const p = pack();
-    p.sensitiveModules = ["payments"]; // una sección diminuta
+    (p as { sensitiveModules: string[] }).sensitiveModules = ["payments"]; // una sección diminuta
     const txt = renderContextPack(p, { maxChars: 6000 });
     expect(txt).toContain("- payments");
     expect(txt).not.toMatch(/## Sensitive modules[\s\S]*…and/); // no recorta una lista que cabía

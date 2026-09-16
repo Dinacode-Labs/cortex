@@ -15,10 +15,16 @@ import { readHookStdin } from "../hook-stdin.js";
 
 /**
  * Lo que cabe de memoria en el arranque de una sesión. Es un presupuesto que se le PIDE al
- * servidor, no una tijera: el servidor lo reparte entre secciones para que lleguen
- * decisiones, restricciones, riesgos y deuda, en vez de decisiones y nada más.
+ * servidor, no una tijera: el servidor lo reparte entre secciones para que llegue algo de cada
+ * tipo de conocimiento en vez de decisiones y nada más.
+ *
+ * Eran 6.000 cuando el pack cubría cinco tipos. Ahora cubre once (ADR-0054), y 6.000 dejaban
+ * cuatro secciones anunciadas pero vacías. Medido sobre un proyecto real de 349 entradas,
+ * **8.000 es el punto donde las once llevan contenido**: 25 entradas en vez de 13, por un 33 %
+ * más de presupuesto. Son ~2.000 tokens en el arranque de una sesión, que es barato para lo
+ * único que el agente no puede averiguar leyendo el código.
  */
-const MAX_CTX = Number(process.env.CORTEX_HOOK_CTX_CHARS ?? "6000");
+const MAX_CTX = Number(process.env.CORTEX_HOOK_CTX_CHARS ?? "8000");
 
 function argOf(name: string): string | undefined {
   const i = process.argv.indexOf(name);

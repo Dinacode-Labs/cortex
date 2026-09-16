@@ -40,7 +40,7 @@ describe("persistencia y búsqueda (BD real, embeddings local)", () => {
     await saveContext({ content: "Convención: todas las APIs usan OAuth2 corporativo.", project: parent.name, type: "convention", confidence: "high" });
     await saveContext({ content: "Decisión: el endpoint de facturas usa paginación cursor.", project: child.name, type: "decision", confidence: "high" });
     const pack = await getContextPack(child.name);
-    const text = [...pack.decisions, ...pack.conventions].map((e) => e.content).join(" \n ");
+    const text = pack.sections.flatMap((s) => s.entries).map((e) => e.content).join(" \n ");
     expect(text).toMatch(/OAuth2/); // heredado del padre
     expect(text).toMatch(/facturas/); // propio del subproyecto
   });

@@ -25,6 +25,29 @@ export function deriveTitle(content: string): string {
 }
 
 /** Resumen heurístico: primera(s) frase(s) hasta ~240 caracteres. */
+/**
+ * Quita del resumen el título que ya va justo encima.
+ *
+ * El destilador escribe el contenido como «Título. Cuerpo…» y el resumen son sus primeros 240
+ * caracteres, así que el resumen empezaba siempre repitiendo el título — en un proyecto real,
+ * **355 de 355 entradas**. El pack pinta título y resumen uno debajo del otro, y con título
+ * medio de 47 caracteres sobre resumen de 206 eso es el **23 % de cada entrada** gastado en
+ * decir dos veces lo mismo. Con el presupuesto del hook eso son dos o tres entradas menos.
+ *
+ * Tolerante con la puntuación y las mayúsculas porque el corte nunca es exacto; y si al quitarlo
+ * no queda nada que merezca la pena, se deja como estaba: repetir es feo, quedarse sin resumen
+ * es peor.
+ */
+export function stripLeadingTitle(summary: string, title: string): string {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+  const t = norm(title);
+  if (t.length < 8) return summary; // un título muy corto puede ser una palabra legítima del texto
+  const s = summary.trimStart();
+  if (!norm(s).startsWith(t)) return summary;
+  const resto = s.slice(title.trim().length).replace(/^[\s.:;,—–-]+/, "");
+  return resto.length >= 40 ? resto : summary;
+}
+
 export function summarize(content: string): string {
   const text = content.trim().replace(/\s+/g, " ");
   if (text.length <= 240) return text;

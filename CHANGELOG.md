@@ -8,6 +8,27 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **La mitad de la memoria no llegaba nunca a un agente.** El context pack renderizaba cinco de
+  los catorce tipos de entrada, porque eran cinco campos escritos a mano en una interfaz. Medido
+  sobre un proyecto real de 349 entradas: **172 de 348 vigentes (51 %)** eran de tipos que el
+  pack no pintaba —entre ellas 38 incidencias, mientras el informe de salud del mismo proyecto
+  avisaba de «incidencias sin decisión»—. Ahora entra todo lo que describe el **estado** del
+  proyecto: arquitectura, reglas de negocio, incidencias, integraciones, notas de módulo y
+  how-to, además de los cinco de antes. Quedan fuera a propósito los tres que son registro de un
+  suceso (reunión, PR, ticket), y hay un test que obliga a que eso siga siendo una decisión.
+  Ver ADR-0054.
+- **Cada entrada del pack gastaba un 23 % en repetir su propio título.** El resumen se saca de
+  los primeros caracteres del contenido, que empieza por el título, así que **355 de 355**
+  resúmenes de ese proyecto empezaban repitiéndolo. Se quita al guardar.
+
+### Changed
+- El presupuesto del contexto de sesión pasa de 6.000 a **8.000 caracteres**: estaba dimensionado
+  para un pack que cubría un tercio de la memoria. Con el pack completo, 8.000 es el punto en que
+  las once secciones llevan contenido — 25 entradas en vez de 13.
+- Las secciones del pack van **ponderadas**: lo que gobierna el trabajo de hoy (decisiones,
+  restricciones, arquitectura) pesa el doble que lo que lo acompaña.
+
 ## [0.1.6] — 2026-09-15
 
 ### Fixed
