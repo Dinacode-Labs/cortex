@@ -81,7 +81,8 @@ describe("documentación", () => {
       const sospechosas = read(doc)
         .split("\n")
         .filter((l) => español.test(l) && !l.trimStart().startsWith("```"));
-      expect(sospechosas.slice(0, 3), `${doc} parece tener español`).toEqual([]);
+      // Sin `slice`: se enseñan todas. Con tres, arreglabas tres y el cuarto seguía ahí.
+      expect(sospechosas, `${doc} parece tener español`).toEqual([]);
     }
   });
 

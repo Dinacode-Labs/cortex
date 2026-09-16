@@ -8,6 +8,13 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **Revisar la memoria deja de ser invisible.** El informe de salud dice cuántas entradas
+  vigentes no ha confirmado ni corregido nunca una persona —en un proyecto real eran **348 de
+  348**— y enlaza directamente a esa lista. La sección Memory gana filtro por estado, que es lo
+  que convierte «348 sin revisar» en algo por lo que empezar. Mientras nadie valide, el estado y
+  la confianza no distinguen nada y el pack no puede priorizar por fiabilidad aunque sepa.
+
 ### Fixed
 - **El informe de salud estaba medio lleno de ruido, y el ruido venía del grafo.** `entities.type`
   admitía `decision` e `incident`, que son tipos de **entrada**, así que la misma decisión se

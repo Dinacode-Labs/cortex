@@ -102,6 +102,19 @@ describe("estructura de la UI (ADR-0050)", () => {
     }
   }, 120_000);
 
+  it("se puede filtrar por estado, que es lo que hace revisable una memoria grande", async () => {
+    const html = await (await get(`/p/${proyecto.slug}?status=pending_validation`)).text();
+    expect(html).toContain("pending_validation");
+    // El filtro conserva el otro: elegir un tipo no puede perder el estado elegido.
+    expect(html).toMatch(/href="[^"]*status=pending_validation[^"]*type=decision|href="[^"]*type=decision[^"]*status=pending_validation/);
+  }, 60_000);
+
+  it("Health dice cuántas no ha mirado nadie y por dónde empezar", async () => {
+    const html = await (await get(`/p/${proyecto.slug}/health`)).text();
+    expect(html).toContain("Nobody has reviewed these");
+    expect(html).toContain(`/p/${proyecto.slug}?status=pending_validation`);
+  }, 60_000);
+
   it("la marca es configurable también en los botones, no solo en la cabecera", async () => {
     const html = await (await get(`/p/${proyecto.slug}?capture=1`)).text();
     expect(html).toContain("Cortex"); // default
