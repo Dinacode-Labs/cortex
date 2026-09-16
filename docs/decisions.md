@@ -1590,3 +1590,38 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   identical either way.
 - **Revisit when:** extraction moves server-side, at which point the CLI connector handles
   everything and this split disappears — that is the direction, not a permanent shape.
+
+<a id="adr-0059"></a>
+
+## ADR-0059 · `.cortex.json` belongs to the clone, not to a public repository
+
+- **Status:** accepted (2026-09-16).
+- **Context:** `.cortex.json` links a folder to a project by slug ([0036](#adr-0036)), and
+  committing it is usually right: everyone on a team clones the repository and their agents are
+  linked with no further setup. That is what this repository did, with `{"slug": "cortex"}`.
+
+  It stopped being right when this repository became public. A committed link makes **our**
+  project identity the default for every clone in the world, and it makes a contributor's first
+  act be editing a tracked file — with the working tree dirty, and their own slug one `git add
+  -A` away from a pull request.
+
+  Nothing leaks: the file holds a slug and no server, and an unknown slug resolves to nothing
+  ([0036](#adr-0036) — linking is not creating). The cost is not exposure, it is that we put our
+  own configuration in everybody else's way.
+- **Decision:** this repository ignores `.cortex.json`. `cortex link` recreates it in one
+  command, which is the same command a contributor would run anyway.
+
+  The general rule, which is what someone adopting Cortex actually needs to know: **commit it in
+  a private repository that belongs to one organisation; ignore it in a public one.** The
+  question the file answers — "which project is this folder?" — has one answer for a team and a
+  different answer for each stranger who clones it.
+- **Alternatives:** keep it committed because it shows Cortex using Cortex — the slug alone
+  demonstrates nothing, and the memory behind it is on a server nobody outside can reach;
+  commit it with an explicit `server` field — worse, that really would point other people's
+  agents at our deployment.
+- **Consequences:** anyone cloning this repository runs `cortex link` to use it with Cortex,
+  which they would have to do anyway to point it at their own server. [0033](#adr-0033) still
+  holds — the server is a property of the repository — but a public repository does not belong
+  to one organisation, so its link belongs to each clone.
+- **Revisit when:** Cortex can link a folder without a file in it, or a public repository needs
+  to ship a default project for a demo.

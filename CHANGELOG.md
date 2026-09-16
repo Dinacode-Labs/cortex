@@ -8,6 +8,19 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Changed
+- **Este repositorio deja de versionar su `.cortex.json`.** Al ser público, un vínculo commiteado
+  convierte *nuestro* proyecto en el que traen por defecto todos los clones del mundo, y obliga a
+  quien contribuye a editar un fichero versionado para usar el suyo. La regla general, que es lo
+  que necesita saber quien adopte Cortex: **versiónalo en un repo privado de una organización;
+  ignóralo en uno público.** Ver ADR-0059.
+
+### Fixed
+- Siete variables de entorno que el código lee y no aparecían en ninguna plantilla
+  (`CORTEX_BIND_HOST`, `CORTEX_ENV_FILE`, `CORTEX_NPM_PACKAGE`, `CORTEX_OPENCODE_DB`,
+  `CORTEX_PI_DIR`, `CORTEX_SEARCH_TYPE_BOOST`, `CORTEX_WORKER_HEARTBEAT_FILE`). Existían,
+  funcionaban y no las conocía nadie. Hay un test que compara las dos listas.
+
 ## [0.1.10] — 2026-09-16
 
 ### Added
