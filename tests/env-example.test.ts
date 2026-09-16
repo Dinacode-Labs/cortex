@@ -19,6 +19,19 @@ const PLANTILLAS = ["/.env.example", "/deploy/.env.example"].map((f) => readFile
 /** Variables del entorno que no son de Cortex: del sistema, de node o de CI. */
 const AJENAS = /^(NODE_ENV|HOME|PATH|PWD|INIT_CWD|CI|TERM|USER|SHELL|LANG|TMPDIR|APPDATA|LOCALAPPDATA|COREPACK|PNPM|XDG|GITHUB|CLAUDE|npm)/;
 
+/**
+ * Nombres obsoletos que el código sigue aceptando y la plantilla **no ofrece**, a propósito.
+ *
+ * Siguen funcionando para que a nadie se le rompa un `.env` de hace meses, y avisan por consola
+ * cuando se usan. Pero una plantilla es lo que deberías poner hoy, no un registro de lo que se
+ * llamó de otra manera: eso vive en el CHANGELOG y en el ADR que lo cambió. Ofrecerlos aquí
+ * sería invitar a configuraciones nuevas con nombres muertos.
+ */
+const OBSOLETAS = new Set([
+  "NAN_API_KEY", "NAN_BASE_URL", "NAN_LLM_MODEL", "NAN_EMBEDDING_MODEL", "NAN_EMBEDDING_DIM",
+  "BREVO_SENDER", "BREVO_SENDER_NAME",
+]);
+
 function fuentes(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     if (name === "node_modules" || name === "dist" || name.startsWith(".")) continue;
@@ -34,7 +47,7 @@ for (const f of [...fuentes(join(RAIZ, "packages")), ...fuentes(join(RAIZ, "apps
   const src = readFileSync(f, "utf8");
   for (const m of src.matchAll(/(?:process\.env\.([A-Z][A-Z0-9_]{2,})|getEnv(?:Num|Bool)?\("([A-Z][A-Z0-9_]{2,})"|requireEnv\("([A-Z][A-Z0-9_]{2,})")/g)) {
     const v = m[1] ?? m[2] ?? m[3]!;
-    if (!AJENAS.test(v)) LEIDAS.add(v);
+    if (!AJENAS.test(v) && !OBSOLETAS.has(v)) LEIDAS.add(v);
   }
 }
 
@@ -48,6 +61,11 @@ describe("plantilla de configuración", () => {
     expect(huerfanas, "existen, funcionan y no las conoce nadie").toEqual([]);
   });
 
+  it("la plantilla no ofrece nombres obsoletos", () => {
+    const ofrecidos = [...OBSOLETAS].filter((v) => PLANTILLAS.includes(v)).sort();
+    expect(ofrecidos, "una plantilla es lo que deberías poner hoy, no lo que se llamó antes").toEqual([]);
+  });
+
   it("la plantilla de desarrollo deja un `.env` que arranca sin tocar nada", () => {
     // Lo que no está comentado es lo que acaba en tu `.env` al copiarlo. Debe ser poco y
     // debe bastar: si hiciera falta rellenar algo a mano, la promesa de «arranca sin claves»
@@ -56,7 +74,10 @@ describe("plantilla de configuración", () => {
       .split("\n")
       .filter((l) => /^[A-Z][A-Z0-9_]*=/.test(l));
     expect(activas.length, "demasiadas activas: es una plantilla, no un manual").toBeLessThan(25);
-    const vacias = activas.filter((l) => l.endsWith("=")).map((l) => l.split("=")[0]);
+    const vacias = activas
+      .map((l) => l.replace(/\s+#.*$/, "")) // una línea puede llevar comentario detrás
+      .filter((l) => l.endsWith("="))
+      .map((l) => l.split("=")[0]);
     // Solo pueden venir vacías las que el propio fichero explica que son opcionales.
     expect(vacias.sort()).toEqual(["CORTEX_ADMIN_EMAIL", "CORTEX_AUTH_DOMAIN", "CORTEX_EMAIL_FROM"]);
   });

@@ -15,6 +15,14 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   que necesita saber quien adopte Cortex: **versiónalo en un repo privado de una organización;
   ignóralo en uno público.** Ver ADR-0059.
 
+### Changed
+- **`.env.example` vuelve a ser una plantilla y no un documento.** Tenía 336 líneas de las que
+  **155 eran prosa**: explicaciones de por qué se decidió algo, qué se llamaba antes de otra
+  manera y qué se retira en qué versión. Eso es material de ADR y de CHANGELOG, no de un
+  fichero que copias a `.env`. Ahora son 167 líneas, una por variable con lo que hace y su
+  valor por defecto, y los nombres obsoletos (`NAN_*`, `BREVO_SENDER*`) dejan de ofrecerse —
+  siguen funcionando, con su aviso, pero una plantilla es lo que deberías poner hoy.
+
 ### Fixed
 - Siete variables de entorno que el código lee y no aparecían en ninguna plantilla
   (`CORTEX_BIND_HOST`, `CORTEX_ENV_FILE`, `CORTEX_NPM_PACKAGE`, `CORTEX_OPENCODE_DB`,
