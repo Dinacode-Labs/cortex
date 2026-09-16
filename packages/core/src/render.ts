@@ -44,6 +44,8 @@ export function renderDecisions(entries: ContextEntry[]): string {
 interface Seccion {
   titulo: string;
   bloques: string[];
+  /** Cuánto presupuesto le toca respecto a las demás. Ver `PACK_SECTIONS`. */
+  peso: number;
 }
 
 function nota(n: number): string {
@@ -65,27 +67,34 @@ function escribe(s: Seccion, n: number): string {
 
 /**
  * Reparte un presupuesto entre secciones que piden cantidades distintas, sin que las grandes
- * ahoguen a las pequeñas: a cada una le toca lo mismo, y lo que una no gasta vuelve al bote
+ * ahoguen a las pequeñas: cada una recibe según su peso, y lo que una no gasta vuelve al bote
  * para las demás (llenado por niveles). Devuelve cuánto le corresponde a cada una.
+ *
+ * El peso existe porque no todo el conocimiento vale lo mismo cuando hay que elegir: una
+ * decisión en vigor gobierna lo que el agente va a hacer ahora, y una incidencia de hace tres
+ * meses lo acompaña. Sin pesos, repartir entre once secciones dejaba a las decisiones con lo
+ * mismo que a los how-to.
  */
-function reparte(costes: number[], presupuesto: number): number[] {
+function reparte(costes: number[], pesos: number[], presupuesto: number): number[] {
   const asignado = new Array<number>(costes.length).fill(0);
   let pendientes = costes.map((_, i) => i);
   let bote = presupuesto;
   while (pendientes.length > 0 && bote > 0) {
-    const parte = Math.floor(bote / pendientes.length);
-    if (parte <= 0) break;
-    const satisfechos = pendientes.filter((i) => costes[i]! <= parte);
+    const pesoTotal = pendientes.reduce((a, i) => a + pesos[i]!, 0);
+    if (pesoTotal <= 0) break;
+    const porPeso = bote / pesoTotal;
+    if (porPeso < 1) break;
+    const satisfechos = pendientes.filter((i) => costes[i]! <= porPeso * pesos[i]!);
     if (satisfechos.length === 0) {
-      // Nadie cabe entero: todos se quedan con su parte igual y aquí se acaba.
-      for (const i of pendientes) asignado[i] = parte;
+      // Nadie cabe entero: cada una se queda con su parte proporcional y aquí se acaba.
+      for (const i of pendientes) asignado[i] = Math.floor(porPeso * pesos[i]!);
       return asignado;
     }
     for (const i of satisfechos) {
       asignado[i] = costes[i]!;
       bote -= costes[i]!;
     }
-    pendientes = pendientes.filter((i) => costes[i]! > parte);
+    pendientes = pendientes.filter((i) => costes[i]! > porPeso * pesos[i]!);
   }
   return asignado;
 }
@@ -132,14 +141,12 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
   };
 
   const secciones: Seccion[] = [
-    { titulo: "Decisions in force", bloques: pack.decisions.map(linea) },
-    { titulo: "Active constraints", bloques: pack.constraints.map(linea) },
-    { titulo: "Known risks", bloques: pack.risks.map(linea) },
-    { titulo: "Technical debt", bloques: pack.technicalDebt.map(linea) },
-    { titulo: "Conventions", bloques: pack.conventions.map(linea) },
-    { titulo: "Sensitive modules", bloques: pack.sensitiveModules.map((m) => `- ${m}`) },
+    ...pack.sections.map((s) => ({ titulo: s.titulo, peso: s.peso, bloques: s.entries.map(linea) })),
+    { titulo: "Sensitive modules", peso: 1, bloques: pack.sensitiveModules.map((m) => `- ${m}`) },
     {
       titulo: "Most relevant to the area you asked about",
+      // Lo que se ha pedido a mano pesa: alguien ha dicho explícitamente por dónde anda.
+      peso: 3,
       bloques: pack.relevantToArea.map((h) => `- (${h.score.toFixed(2)}) ${h.entry.title} — ${h.entry.summary ?? ""}`),
     },
   ].filter((s) => s.bloques.length > 0);
@@ -156,6 +163,7 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
   // Reparto inicial a partes iguales: garantiza que de CADA tipo de conocimiento llegue algo.
   const partes = reparte(
     secciones.map((s) => escribe(s, s.bloques.length).length),
+    secciones.map((s) => s.peso),
     Math.max(tope - encabezado.length - secciones.length, 0),
   );
   const cuantas = secciones.map((s, i) => cuantasCaben(s, partes[i]!));

@@ -18,6 +18,7 @@ import {
   extractEntities,
   polarityContradicts,
   polarityTags,
+  stripLeadingTitle,
   summarize,
 } from "./text.js";
 import { storeEmbedding, vectorSearch } from "./vectors.js";
@@ -98,7 +99,9 @@ export async function saveContext(
   const llm = useClassifier && classifier ? await classifier(parsed.content).catch(() => null) : null;
   const type = parsed.type ?? llm?.type ?? classifyType(parsed.content);
   const title = parsed.title ?? llm?.title ?? deriveTitle(parsed.content);
-  const summary = parsed.summary ?? llm?.summary ?? summarize(parsed.content);
+  // El resumen va justo debajo del título en el pack y en las tarjetas, así que empezar por
+  // el título es gastar presupuesto en decir dos veces lo mismo (ADR-0054).
+  const summary = stripLeadingTitle(parsed.summary ?? llm?.summary ?? summarize(parsed.content), title);
   const sourceType = parsed.sourceType ?? "manual";
   const embedText = `${title}\n\n${parsed.content}`;
   // metadata es JSON validado por zod; lo casteamos al tipo que espera sql.json.

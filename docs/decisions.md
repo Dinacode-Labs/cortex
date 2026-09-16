@@ -1387,3 +1387,54 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   is now a matter of redefining tokens under a media query rather than a rewrite.
 - **Revisit when:** more than a couple of people work on the UI regularly, the stylesheet stops
   fitting in one file, or a component library becomes worth its build step.
+
+<a id="adr-0054"></a>
+
+## ADR-0054 · The context pack carries every kind of knowledge that describes the project's state
+
+- **Status:** accepted (2026-09-16).
+- **Context:** a review of a real project — 349 entries captured from 13 agent sessions — found
+  that the context pack rendered **five** of the fourteen entry types in use, because those five
+  were hand-written fields on an interface. The other nine were classified, stored, counted and
+  searchable, and **never reached an agent at session start**.
+
+  Measured there: **172 of 348 current entries, 51 %**, belonged to types the pack could not
+  render. Among them 38 incidents — while the same project's health report was flagging
+  "incidents with no decision". The entries were not lost; `search` and `ask` reach them. But
+  the promise is that an agent *starts out knowing*, and half the memory was outside that.
+
+  A second finding compounded it. The distiller writes content as "Title. Body…", and the
+  summary is its first 240 characters, so **355 of 355 summaries began by repeating the title**.
+  The pack prints title and summary one under the other: with titles averaging 47 characters
+  against summaries of 206, **23 % of every entry was spent saying the same thing twice**.
+- **Decision:** the pack carries every type that describes the **state** of the project —
+  decisions, constraints, risks, technical debt, conventions, architecture, business rules,
+  incidents, integration notes, module notes, how-tos — declared in one list, `PACK_SECTIONS`,
+  which is the single place that answers "what does an agent get told".
+
+  Three types stay out, deliberately: meeting, PR and ticket summaries. They record **an event**,
+  not a state. Someone opening a session needs to know how the project stands, not what was said
+  in a meeting in March; that is a question you ask when you have it. A test asserts the excluded
+  set, so leaving a type out stays a decision rather than becoming an oversight again.
+
+  Sections are **weighted**, because breadth alone would give a how-to the same room as a
+  decision in force. What governs today's work weighs double; what accompanies it weighs one; an
+  explicitly requested area weighs three.
+
+  The repeated title is stripped when an entry is saved, so every consumer benefits and nothing
+  has to be re-rendered.
+
+  The hook's default budget goes from 6,000 to **8,000 characters**. It was sized for a pack
+  covering a third of the memory; at 6,000 the wider pack left four sections announced but empty.
+  On the real project 8,000 is the point where all eleven carry content — 25 entries instead of
+  13, for 33 % more budget, about 2,000 tokens at session start.
+- **Alternatives:** keep five sections and let the rest be searchable — that is the status quo,
+  and it relies on an agent asking about something it does not know exists; one section per type
+  with no weights — a how-to displacing a constraint; summarising the whole memory with an LLM
+  per session — latency and cost on every session, over content that is already summaries.
+- **Consequences:** a session-start injection is roughly a third larger and much broader. Any new
+  entry type must be added to `PACK_SECTIONS` or explicitly excluded — the test forces the choice.
+  Entries saved before this keep their duplicated summaries until they are next updated.
+- **Revisit when:** the weights prove wrong on a project with a different shape, the excluded
+  event types turn out to be wanted, or ranking within a section can use the session's topic
+  rather than confidence.

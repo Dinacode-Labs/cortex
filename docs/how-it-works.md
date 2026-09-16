@@ -429,14 +429,21 @@ same way: being a member of "Acme" opens its subprojects.
 
 This pack, rendered to Markdown, is **exactly what the `SessionStart` hook injects** into
 your agent when you open a session. It goes through the authenticated API within a character
-budget — roughly 6000, configurable with `CORTEX_HOOK_CTX_CHARS`.
+budget — roughly 8000, configurable with `CORTEX_HOOK_CTX_CHARS`.
+
+**What goes in it.** Everything that describes the **state** of the project: decisions,
+constraints, risks, technical debt, conventions, architecture, business rules, past incidents,
+integrations, module notes and how-tos. Left out on purpose are the three types that record an
+**event** rather than a state — meeting, PR and ticket summaries — which `search` and `ask`
+still reach ([ADR-0054](decisions.md#adr-0054)).
 
 **How it shortens matters more than the number.** The budget is shared out between sections
-rather than spent from the top, so decisions, constraints, risks, technical debt and
-conventions all reach the agent, each saying how many entries it left behind
-(`…and 15 more here. Ask Cortex for the rest.`). Within a section, higher-confidence entries
-come first. The point is that a missing section reads as "this project has none of those",
-which is a far more expensive thing to be wrong about than seeing fewer decisions
+rather than spent from the top, so every kind of knowledge reaches the agent, each section
+saying how many entries it left behind (`…and 15 more here. Ask Cortex for the rest.`).
+Sections that govern today's work — decisions, constraints, architecture — carry twice the
+weight of the ones that merely accompany it. Within a section, higher-confidence entries come
+first. The point is that a missing section reads as "this project has none of those", which is
+a far more expensive thing to be wrong about than seeing fewer decisions
 ([ADR-0049](decisions.md#adr-0049)).
 
 > **⚠️ What to watch for.** Inheritance applies to the **context pack**, not to `search` or

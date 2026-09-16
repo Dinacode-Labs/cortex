@@ -146,18 +146,18 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
   const asOf = asOfStr ? new Date(asOfStr) : undefined;
   const pack = await getContextPack(project.name, area, asOf);
 
-  const sec = (title: string, entries: typeof pack.decisions): Html =>
-    entries.length
+  const sec = (s: (typeof pack.sections)[number]): Html =>
+    s.entries.length
       ? panel(
-          title,
-          html`${entries.map(
+          s.titulo,
+          html`${s.entries.map(
             (e) => html`<div class="pack-entry">
               <div class="card-head">${typeBadge(e.type)} ${statusBadge(e.status)}</div>
               <b>${linkEntry(e.id, e.title)}</b>
               <p class="sub">${e.summary ?? e.content}</p>
             </div>`,
           )}`,
-          { acciones: html`<span class="sub">${entries.length}</span>` },
+          { acciones: html`<span class="sub">${s.entries.length}</span>` },
         )
       : html``;
 
@@ -177,11 +177,7 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
       <a class="button secondary" href="/p/${project.slug}/agents.md${area ? `?area=${encodeURIComponent(area)}` : ""}">Copy as Markdown</a>
     </div>
     ${asOf ? html`<div class="warn">⏳ Point-in-time view: what was in force on ${asOfStr ?? ""}, including what was invalidated later.</div>` : ""}
-    ${sec("Decisions in force", pack.decisions)}
-    ${sec("Active constraints", pack.constraints)}
-    ${sec("Known risks", pack.risks)}
-    ${sec("Technical debt", pack.technicalDebt)}
-    ${sec("Conventions", pack.conventions)}
+    ${pack.sections.map(sec)}
     ${pack.sensitiveModules.length
       ? panel("Sensitive modules", html`<div class="row">${joinHtml(pack.sensitiveModules.map((m) => badge(m, "#8a4b00")), " ")}</div>`)
       : ""}

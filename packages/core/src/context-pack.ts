@@ -25,14 +25,50 @@ export async function validateEntry(
 
 // --- get_project_context_pack ------------------------------------------------
 
+/**
+ * Qué tipos de conocimiento entran en el pack, en qué orden y con cuánto peso.
+ *
+ * Esta lista es la razón de ser de este fichero, así que conviene leerla despacio. Antes el
+ * pack solo llevaba cinco tipos —decisiones, restricciones, riesgos, deuda y convenciones—
+ * porque eran cinco campos escritos a mano en la interfaz. Los otros nueve existían, se
+ * guardaban y se contaban… y no llegaban nunca a un agente. Medido en un proyecto real: **172
+ * de 348 entradas vigentes, el 51 %**, de tipos que el pack no renderizaba. Entre ellas 38
+ * incidencias, mientras el lint del mismo proyecto avisaba de «incidencias sin decisión».
+ *
+ * Fuera se quedan, a propósito, los tres tipos que son **registro de un suceso** y no estado
+ * del proyecto: resúmenes de reunión, de PR y de ticket. Un agente que abre sesión necesita
+ * saber cómo está el proyecto, no qué pasó en una reunión de marzo; eso se busca cuando hace
+ * falta. Es una decisión, no un olvido — que era justo el problema de antes.
+ *
+ * El peso reparte el presupuesto: lo que gobierna el trabajo de hoy pesa el doble que lo que
+ * lo acompaña. Ver ADR-0054.
+ */
+export const PACK_SECTIONS: { type: ContextEntryType; titulo: string; peso: number }[] = [
+  { type: "decision", titulo: "Decisions in force", peso: 2 },
+  { type: "constraint", titulo: "Active constraints", peso: 2 },
+  { type: "risk", titulo: "Known risks", peso: 2 },
+  { type: "technical_debt", titulo: "Technical debt", peso: 2 },
+  { type: "convention", titulo: "Conventions", peso: 2 },
+  { type: "architecture", titulo: "Architecture", peso: 2 },
+  { type: "business_rule", titulo: "Business rules", peso: 2 },
+  { type: "incident", titulo: "Past incidents", peso: 1 },
+  { type: "integration_note", titulo: "Integrations", peso: 1 },
+  { type: "module_note", titulo: "Module notes", peso: 1 },
+  { type: "how_to", titulo: "How to", peso: 1 },
+];
+
+export interface PackSection {
+  type: ContextEntryType;
+  titulo: string;
+  peso: number;
+  entries: ContextEntry[];
+}
+
 export interface ContextPack {
   project: string;
   generatedAt: Date;
-  decisions: ContextEntry[];
-  constraints: ContextEntry[];
-  risks: ContextEntry[];
-  technicalDebt: ContextEntry[];
-  conventions: ContextEntry[];
+  /** Una por tipo de `PACK_SECTIONS` que tenga entradas. */
+  sections: PackSection[];
   sensitiveModules: string[];
   relevantToArea: SearchHit[];
   totalEntries: number;
@@ -75,13 +111,10 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
 
   // Herencia: el pack incluye el conocimiento del proyecto + el de sus ancestros (padre).
   const ids = await projectIdsWithAncestors(sql, projectId);
-  const [decisions, constraints, risks, technicalDebt, conventions] = await Promise.all([
-    entriesByType(sql, ids, "decision", asOf),
-    entriesByType(sql, ids, "constraint", asOf),
-    entriesByType(sql, ids, "risk", asOf),
-    entriesByType(sql, ids, "technical_debt", asOf),
-    entriesByType(sql, ids, "convention", asOf),
-  ]);
+  const porTipo = await Promise.all(PACK_SECTIONS.map((s) => entriesByType(sql, ids, s.type, asOf)));
+  const sections: PackSection[] = PACK_SECTIONS.map((s, i) => ({ ...s, entries: porTipo[i]! })).filter(
+    (s) => s.entries.length > 0,
+  );
 
   const moduleRows = (await sql`
     SELECT DISTINCT e.name
@@ -113,11 +146,7 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   return {
     project,
     generatedAt: new Date(),
-    decisions,
-    constraints,
-    risks,
-    technicalDebt,
-    conventions,
+    sections,
     sensitiveModules,
     relevantToArea,
     totalEntries,
