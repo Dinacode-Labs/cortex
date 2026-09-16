@@ -1,5 +1,4 @@
 import { getSql, type Sql } from "@cortex/database";
-import { resolveEntity } from "./entities.js";
 import { isAdmin } from "./auth.js";
 import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
@@ -77,12 +76,22 @@ export async function createProject(
   // existente para que el caller decida (acceso/solicitar permiso). Ver link.ts.
   const bySlug = await findProjectBySlug(slug);
   if (bySlug) return bySlug;
-  const ent = await resolveEntity(sql, name, "project");
-  const cur = (await sql`SELECT slug, visibility, owner_email, parent_id FROM entities WHERE id = ${ent.id}`) as unknown as Row[];
-  if (cur[0]?.slug) return toRef({ ...cur[0], id: ent.id, name: ent.name })!; // ya existía (por nombre)
+  // El proyecto nace de una pieza, con su slug: la base no admite un `project` sin slug
+  // (#135), así que no vale insertar el nombre y rellenar después. Si el nombre canónico ya
+  // existe con otro slug, se devuelve ese tal cual, como antes.
   const visibility = opts?.visibility ?? "public";
-  await sql`UPDATE entities SET slug = ${slug}, visibility = ${visibility}, owner_email = ${opts?.ownerEmail ?? null}, parent_id = ${parentId} WHERE id = ${ent.id}`;
-  return { id: ent.id, name: ent.name, slug, visibility, ownerEmail: opts?.ownerEmail ?? null, parentId };
+  const inserted = (await sql`
+    INSERT INTO entities (name, canonical_name, type, slug, visibility, owner_email, parent_id)
+    VALUES (${name}, ${canonicalize(name)}, 'project', ${slug}, ${visibility}, ${opts?.ownerEmail ?? null}, ${parentId})
+    ON CONFLICT (type, canonical_name) DO NOTHING
+    RETURNING id, name, slug, visibility, owner_email, parent_id
+  `) as unknown as Row[];
+  if (inserted[0]) return toRef(inserted[0])!;
+  const byName = (await sql`
+    SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
+    WHERE type = 'project' AND canonical_name = ${canonicalize(name)} LIMIT 1
+  `) as unknown as Row[];
+  return toRef(byName[0])!; // ya existía (por nombre)
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {

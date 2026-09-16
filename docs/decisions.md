@@ -1625,3 +1625,47 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   to one organisation, so its link belongs to each clone.
 - **Revisit when:** Cortex can link a folder without a file in it, or a public repository needs
   to ship a default project for a demo.
+
+---
+
+<a id="adr-0060"></a>
+
+## ADR-0060 · A project is created, never extracted
+
+- **Status:** accepted (2026-09-16). Sibling of [0055](#adr-0055).
+- **Context:** `project` is a legitimate entity type — it is the row that represents the
+  project, the one entries hang from and the one `cortex link` and the web list. The classifier
+  that runs on every save offered the full `entityType` enum to the LLM, `project` included, so
+  any proper noun the model read as a project became an `entities` row with `type='project'`:
+  ticket codes, git branches, file names, microservices. The graph extractor already excluded
+  `project` for exactly this reason, but only for itself.
+
+  Those rows were indistinguishable from real projects to everything that lists "all entities
+  of type project". On a real installation: **26 phantom projects next to 10 real ones**, every
+  phantom with zero entries and no slug or owner, all born from one ingestion session into a
+  single existing project. `isUsableEntityName` ([0055](#adr-0055)) does not help: it judges
+  the shape of a name, not the type.
+- **Decision:** a project is **created**, by `createProject`, with a slug and an owner. It is
+  never a side effect of extraction.
+  1. What the extractors are offered is `extractableEntityType` — the enum minus `project` —
+     and the rule lives in `shared`, so every extractor gets it rather than each one remembering
+     to filter.
+  2. `core` drops any detected entity of type `project` before resolving it, whatever produced
+     it, and `resolveEntity` refuses the type outright: the only way to a project row is
+     `createProject`.
+  3. The database states the invariant: a `project` has a slug, or it is not a project
+     (`CHECK`). This is what tells a real project from a mention, and it is what
+     [0051](#adr-0051) had already made true for every project created on purpose.
+  4. A migration removes the phantoms — only those with no entries, children or members
+     hanging from them — with their links and relations. **No entry is touched.** Anything that
+     did have something hanging from it would be given a slug instead, as
+     [0051](#adr-0051)'s backfill did.
+- **Alternatives:** filter `project` out of the listing only — leaves the rows and the
+  `belongs_to` noise, and the next listing forgets; remove `project` from `entityType` as
+  [0055](#adr-0055) did with `decision` — impossible, the project *is* an entity of that type;
+  keep a separate `projects` table — the right long-term shape, but a large migration for a
+  problem that a filter plus a constraint closes.
+- **Consequences:** `createProject` inserts the row with its slug in one statement, since the
+  constraint forbids "insert the name, fill in the slug later". The seed uses it too.
+- **Revisit when:** projects move to their own table, or a legitimate reason appears to link an
+  entry to a project it merely mentions.

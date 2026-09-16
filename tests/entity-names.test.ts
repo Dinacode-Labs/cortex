@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { entityType, isUsableEntityName } from "@cortex/shared";
+import { entityType, extractableEntityType, isUsableEntityName } from "@cortex/shared";
 
 /**
  * Una entidad es una COSA QUE SE NOMBRA, no una afirmación sobre el proyecto.
@@ -14,6 +14,13 @@ describe("qué puede ser una entidad", () => {
     for (const t of ["decision", "incident"]) {
       expect(entityType.options as readonly string[], `"${t}" duplicaría entradas en el grafo`).not.toContain(t);
     }
+  });
+
+  it("`project` es tipo de entidad, pero no se le ofrece al extractor: el proyecto se crea, no se extrae (#135)", () => {
+    expect(entityType.options).toContain("project");
+    expect(extractableEntityType.options as readonly string[]).not.toContain("project");
+    // Y no falta ninguno de los demás: quitar `project` es lo único que hace.
+    expect([...extractableEntityType.options, "project"].sort()).toEqual([...entityType.options].sort());
   });
 
   it("los nombres de verdad pasan", () => {

@@ -1,6 +1,6 @@
 import { getSql } from "@cortex/database";
 import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shared";
-import { registerUsageSink, relate, resolveEntity, saveContext } from "@cortex/core";
+import { createProject, registerUsageSink, relate, resolveEntity, saveContext } from "@cortex/core";
 
 /**
  * Datos de demo: proyecto ficticio "Acme Portal" del cliente "Acme Corp"
@@ -129,7 +129,7 @@ export async function run(): Promise<void> {
   await sql`TRUNCATE context_entry_entities, embeddings, relations, context_entries, sources, entities RESTART IDENTITY CASCADE`;
 
   const client = await resolveEntity(sql, CLIENT, "client");
-  const project = await resolveEntity(sql, PROJECT, "project");
+  const project = await createProject(PROJECT); // con slug: la base no admite proyectos sin él (#135)
   await relate(sql, {
     sourceId: project.id,
     sourceType: "entity",
