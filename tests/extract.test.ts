@@ -2,7 +2,8 @@ import { describe, it, expect, afterAll } from "vitest";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { extractFileText, SUPPORTED_EXTS } from "../packages/core/src/extract";
+import { extractFileText } from "../packages/core/src/extract";
+import { SUPPORTED_EXTS } from "@cortex/shared";
 
 /**
  * La capa `extract` la usan los conectores de documentos (connect-docs recorre una

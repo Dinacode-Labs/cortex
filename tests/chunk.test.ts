@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chunkDocument } from "../packages/core/src/chunk";
+import { chunkDocument } from "../packages/shared/src/chunk.js";
 
 /**
  * El chunker estructural (ADR-0023, Fase 1) desbloquea la ingesta de documentos largos:
