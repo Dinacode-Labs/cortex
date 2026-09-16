@@ -1,6 +1,6 @@
 {
   "name": "cortex",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "private": true,
   "description": "Cortex: memoria de contexto para proyectos software (documental + vectorial + grafo + bi-temporal), con MCP para agentes de IA",
   "type": "module",

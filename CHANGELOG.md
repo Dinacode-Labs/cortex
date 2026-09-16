@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.9] — 2026-09-16
+
 ### Added
 - **Un proyecto vacío se puede borrar.** No había forma de borrar un proyecto en ninguna
   interfaz, así que un `cortex link --create` con el nombre mal escrito era permanente: no se
