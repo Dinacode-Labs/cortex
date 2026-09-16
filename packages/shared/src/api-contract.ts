@@ -89,6 +89,11 @@ export const captureSessionCounters = z.object({
   noop: z.number(),
   failed: z.number(),
   windows: z.number(),
+  /**
+   * Caracteres de la sesión que no se han destilado, cuando no cabía entera. Opcional porque
+   * las capturas anteriores a esto no lo tienen: su ausencia significa «no se sabe», no «cero».
+   */
+  droppedChars: z.number().optional(),
 });
 export type CaptureSessionCounters = z.infer<typeof captureSessionCounters>;
 

@@ -1,5 +1,5 @@
 import { scrub, type CaptureSessionCounters, type SourceType } from "@cortex/shared";
-import { windows } from "@cortex/client";
+import { trocea } from "@cortex/client";
 import { saveWithReconciliation } from "@cortex/core";
 import { distill } from "./distill.js";
 
@@ -43,7 +43,18 @@ export const distillSession: DistillSessionFn = async (input) => {
   const sourceReference = `${input.platform}:${input.sessionId}`;
   const seen = new Set<string>();
 
-  for (const window of windows(condensed)) {
+  const { ventanas, descartados } = trocea(condensed);
+  if (descartados > 0) {
+    // Que se note: una sesión recortada terminaba en `done` igual que una que cupo entera.
+    counters.droppedChars = descartados;
+    console.warn(
+      `[session-distill] ${sourceReference}: ${descartados} caracteres fuera del destilado ` +
+        `(${ventanas.length} ventanas repartidas a lo largo de la sesión). ` +
+        `Sube CORTEX_SESSIONS_MAX_WINDOWS si quieres cubrirla entera.`,
+    );
+  }
+
+  for (const window of ventanas) {
     counters.windows++;
     let items: Awaited<ReturnType<typeof distill>>;
     try {

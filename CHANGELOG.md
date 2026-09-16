@@ -9,6 +9,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Fixed
+- **Una sesión larga perdía siempre su final, y nadie se enteraba.** El destilado trocea la
+  sesión en ventanas y se queda con ocho; al llegar al tope cortaba, así que de una sesión de
+  128.000 caracteres se destilaban los primeros 72.000 y se tiraba el resto — y en una sesión
+  de trabajo las conclusiones están al final. La captura además terminaba en `done` con sus
+  contadores, idéntica a una que sí había cabido. Ahora, cuando no cabe entera, las ventanas se
+  reparten a lo largo de toda la sesión (primera y última siempre incluidas) y la captura
+  guarda cuántos caracteres se han quedado fuera.
+
+### Fixed
 - **La mitad de la memoria no llegaba nunca a un agente.** El context pack renderizaba cinco de
   los catorce tipos de entrada, porque eran cinco campos escritos a mano en una interfaz. Medido
   sobre un proyecto real de 349 entradas: **172 de 348 vigentes (51 %)** eran de tipos que el
