@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Cortex: project memory for AI coding agents.",
-    "version": "0.1.7"
+    "version": "0.1.8"
   },
   "plugins": [
     {
       "name": "cortex",
       "source": "./plugin/claude-code",
       "description": "Project memory for AI coding agents: context on session start, capture on session end, and 8 MCP tools.",
-      "version": "0.1.7"
+      "version": "0.1.8"
     }
   ]
 }
