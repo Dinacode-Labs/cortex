@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import {
+  contextEntryStatus,
   contextEntryType,
   getBrandName,
+  type ContextEntryStatus,
   type ContextEntryType,
 } from "@cortex/shared";
 import {
@@ -44,15 +46,30 @@ projectRoutes.get("/p/:slug", async (c) => {
 
   const typeParsed = contextEntryType.safeParse(c.req.query("type"));
   const type: ContextEntryType | undefined = typeParsed.success ? typeParsed.data : undefined;
+  const statusParsed = contextEntryStatus.safeParse(c.req.query("status"));
+  const status: ContextEntryStatus | undefined = statusParsed.success ? statusParsed.data : undefined;
   const showCapture = c.req.query("capture") === "1";
 
-  const entries = await listEntries({ project: project.name, type, limit: 60 });
+  const entries = await listEntries({ project: project.name, type, status, limit: 60 });
   const base = `/p/${project.slug}`;
+  const conFiltros = (extra: Record<string, string>) => {
+    const qs = new URLSearchParams({ ...(type ? { type } : {}), ...(status ? { status } : {}), ...extra });
+    for (const [k, v] of [...qs]) if (!v) qs.delete(k);
+    return qs.toString() ? `${base}?${qs}` : base;
+  };
 
   const typePills = [
-    html`<a class="pill ${!type ? "active" : ""}" href="${base}">All types</a>`,
+    html`<a class="pill ${!type ? "active" : ""}" href="${conFiltros({ type: "" })}">All types</a>`,
     ...contextEntryType.options.map(
-      (t) => html`<a class="pill ${type === t ? "active" : ""}" href="${base}?type=${t}">${t}</a>`,
+      (x) => html`<a class="pill ${type === x ? "active" : ""}" href="${conFiltros({ type: x })}">${x}</a>`,
+    ),
+  ];
+
+  // Filtrar por estado es lo que convierte «348 sin revisar» en una lista por la que empezar.
+  const statusPills = [
+    html`<a class="pill ${!status ? "active" : ""}" href="${conFiltros({ status: "" })}">Any status</a>`,
+    ...contextEntryStatus.options.map(
+      (x) => html`<a class="pill ${status === x ? "active" : ""}" href="${conFiltros({ status: x })}">${x}</a>`,
     ),
   ];
 
@@ -83,6 +100,7 @@ projectRoutes.get("/p/:slug", async (c) => {
     </div>
     ${captureForm}
     <div class="filters">${joinHtml(typePills, "")}</div>
+    <div class="filters">${joinHtml(statusPills, "")}</div>
     ${entries.length
       ? html`<div class="grid">${entries.map(entryCard)}</div>`
       : empty(
@@ -247,6 +265,18 @@ projectRoutes.get("/p/:slug/health", async (c) => {
       "Names mentioned once and never connected to anything. Usually a typo or a one-off.",
       "#57606a",
       r.orphanEntities.map((e) => html`<a href="${buscar(e.name)}">${e.name}</a> <span class="sub">(${e.type})</span>`),
+    )}
+    ${panel(
+      "Nobody has reviewed these",
+      r.neverReviewed
+        ? html`<p class="sub">
+              <b>${r.neverReviewed}</b> of this project's current entries have never been confirmed or corrected by a
+              person. Agents wrote them; until somebody says whether they hold, confidence and status carry no
+              information and the pack cannot favour what is trustworthy.
+            </p>
+            <a class="button secondary" href="/p/${project.slug}?status=pending_validation">Start reviewing</a>`
+        : html`<p class="sub">Everything current has been through a person. That is what makes the rest worth trusting.</p>`,
+      { acciones: badge(String(r.neverReviewed), r.neverReviewed ? "#9a5b00" : "#0f7b3d") },
     )}
     ${panel(
       "Other numbers",

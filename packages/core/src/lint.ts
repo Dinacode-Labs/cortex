@@ -24,6 +24,15 @@ export interface LintReport {
   orphanEntities: { name: string; type: string }[];
   lowConfidence: number;
   staleHistorical: number;
+  /**
+   * Entradas vigentes que nadie ha mirado nunca.
+   *
+   * Es el hallazgo más grande de casi cualquier proyecto y no salía en ningún sitio: en uno
+   * real, **348 de 348**. Mientras nadie valide, el estado y la confianza no distinguen nada,
+   * así que el pack no puede priorizar por fiabilidad aunque sepa hacerlo. No es un fallo del
+   * código —esta mitad del bucle es de personas— pero callarlo tampoco ayuda.
+   */
+  neverReviewed: number;
   gaps: { area: string; type: string; incidents: number }[];
 }
 
@@ -88,6 +97,9 @@ export async function lintProject(project: string): Promise<LintReport> {
     LIMIT 40
   `) as unknown as Row[];
 
+  const neverReviewed = Number(
+    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND status='pending_validation' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
+  );
   const lowConfidence = Number(
     ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND confidence='low' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
@@ -128,6 +140,7 @@ export async function lintProject(project: string): Promise<LintReport> {
     orphanEntities: orphanRows.map((r) => ({ name: r.name, type: r.type })),
     lowConfidence,
     staleHistorical,
+    neverReviewed,
     gaps: gapRows.map((r) => ({ area: r.name, type: r.type, incidents: Number(r.incidents) })),
   };
 }
