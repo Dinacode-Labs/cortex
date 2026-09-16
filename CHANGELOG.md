@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.8] — 2026-09-16
+
 ## [0.1.7] — 2026-09-16
 
 ### Added
