@@ -1,116 +1,106 @@
 # Roadmap — Cortex
 
-Lo que queda por hacer en el producto. Las decisiones técnicas firmes viven en
-[`decisions.md`](./decisions.md), y lo que cambia en cada versión, en
-[`CHANGELOG.md`](../CHANGELOG.md).
+Lo que queda por hacer. Las decisiones firmes viven en [`decisions.md`](./decisions.md), lo que
+cambió en cada versión en [`CHANGELOG.md`](../CHANGELOG.md), y para qué sirve la UI en
+[`design.md`](./design.md).
 
 > Aquí solo va el **qué** técnico. Las prioridades de negocio, los responsables y la
-> configuración concreta de cada despliegue son de cada operador y no se documentan en este
-> repo (ADR-0031).
+> configuración de cada despliegue son de cada operador y no se documentan aquí (ADR-0031).
 
-## Estado (septiembre 2026, v0.1.0)
+## Estado (16 de septiembre de 2026, v0.1.10)
 
-Hecho y en el producto:
+Funcionando y en uso diario por un equipo:
 
-- **Identidad, atribución y permisos.** Login por email y código, sin contraseñas. Cada
-  entrada lleva el email de quien la escribió. Proyectos públicos o privados, con dueño y
-  miembros, y jerarquía cliente → proyecto.
-- **El bucle automático en cinco agentes.** Claude Code, Codex, OpenCode, Hermes y Pi
-  reciben el contexto del proyecto al abrir sesión y lo capturan al cerrarla. Se instala con
-  `cortex setup`, en Claude Code y Codex a través de un plugin (ADR-0032).
-- **Destilación en el servidor** (ADR-0025). El hook condensa y limpia en local; el servidor
-  destila con su clave. Ningún portátil necesita credenciales de modelo. Idempotente por
-  sesión, y si la sesión creció solo se destila la parte nueva.
-- **Cliente ligero en npm**: `@dinacodelabs/cortex`, un bundle de ~110 KB, 24 MB instalado.
-  Antes había que clonar el monorepo entero.
-- **MCP por HTTP autenticado**, con las 8 tools aplicando los permisos de quien llama, y
-  `cortex mcp` como puente stdio para los agentes.
-- **Ingesta multimodal v1**: documentos, imágenes, audio y vídeo, con chunking estructural.
-- **Proveedores enchufables** (`openai-compatible`), routing por rol y semáforo de
-  concurrencia compartido.
-- **Producción**: imagen compilada en un registro, Caddy con TLS, healthchecks reales,
-  copias de seguridad diarias y restauración con simulacro (ADR-0027).
-- **Gobernanza**: Apache-2.0, política de seguridad, plantillas y Dependabot.
+- **Identidad, permisos y jerarquía.** Login por email y código. Cada entrada lleva quién la
+  escribió. Proyectos públicos o privados con dueño y miembros, y cliente → proyecto con
+  herencia. Visibilidad, dueño, padre y borrado de proyectos vacíos se gestionan en caliente.
+- **El bucle automático en cinco agentes** (Claude Code, Codex, OpenCode, Hermes, Pi): reciben
+  el contexto al abrir sesión y capturan al cerrarla, con `cortex setup`.
+- **Destilación en el servidor**: ningún portátil necesita claves de modelo. Idempotente por
+  sesión, incremental si la sesión creció, y si no cabe entera reparte las ventanas a lo largo
+  de toda la conversación en vez de quedarse con el principio.
+- **Cliente ligero en npm** (`@dinacodelabs/cortex`), con `connect-docs`, `connect-github` y
+  `connect-sessions`. MCP por HTTP autenticado con las 8 tools aplicando permisos.
+- **Context pack completo**: los once tipos que describen el estado del proyecto, repartidos por
+  presupuesto y ponderados, con avisos de contradicción pegados a cada entrada.
+- **UI web alrededor del proyecto**: memoria, preguntar, lo que ven los agentes, salud, mapa,
+  código y ajustes, con sistema de diseño propio.
+- **Producción**: imagen en un registro, Caddy con TLS, healthchecks, copias diarias con
+  simulacro de restauración, y `/metrics` en formato Prometheus.
+- **Retrieval medido**: `pnpm admin eval`, 40 preguntas con evidencia anotada. recall@5 **0.987**,
+  MRR **0.928**. Contextual Retrieval sigue aplazado **por una medida y no por una intuición**:
+  las preguntas parafraseadas recuperan 1.000, que es justo donde se vería el fallo.
 
 ## Qué queda
 
-### El retrieval ya se mide — HECHO (2026-09-12)
+### Lo que ya está doliendo
 
-`pnpm admin eval` corre 40 preguntas en español con la evidencia anotada contra un corpus fijo
-(`tests/fixtures/eval/`), y da recall@5 y MRR por tipo de pregunta. El corpus va en el repo y
-no sale de la memoria real a propósito: un eval sirve para comparar ejecuciones, y la memoria
-real cambia todos los días.
+- **Nadie valida.** 608 entradas vigentes, **608 sin revisar**. Estado y confianza son los dos
+  campos que existen para que un agente sepa de qué fiarse, y mientras no se usen no distinguen
+  nada: el pack no puede priorizar por fiabilidad aunque sabe hacerlo. La mitad de este bucle es
+  de personas, no de código; lo que el código podía hacer —que se vea y que se pueda filtrar—
+  ya está.
+- **`search` y `ask` no heredan del padre.** El context pack sube por la cadena de ancestros y
+  la búsqueda no, así que dentro de un proyecto hijo no encuentras lo que está guardado en el
+  cliente. Con jerarquías reales montándose ahora mismo, esto se nota ya.
+- **Salud enseña y no arregla.** Contradicciones, duplicados y huecos enlazan a sus entradas,
+  pero fusionar o resolver sigue siendo editar a mano, teniendo `core` las funciones
+  (`planLintActions`, `saveWithReconciliation`).
+- **No se puede renombrar un proyecto.** El nombre y el slug se fijan al crear; equivocarse
+  obliga a borrar y rehacer, y solo si está vacío.
 
-**Línea base:** recall@5 **0.961**, MRR **0.901** con `qwen3-embedding`. Lo parafraseado se
-recupera entero; se cae en las preguntas repartidas entre varias entradas.
+### Ingesta
 
-**Qué desbloquea, y cómo queda:** Contextual Retrieval estaba aplazado hasta que el eval
-mostrara fallos por pérdida de contexto. **No los muestra**: el recall de las preguntas
-parafraseadas es 1.000, que es justo donde se vería. Sigue aplazado, y ahora por una medida y
-no por una intuición. La investigación está en
-[`research/chunking-strategies.md`](./research/chunking-strategies.md).
-
-### Deducir el tipo de entrada de la pregunta — HECHO (2026-09-12)
-
-Lo primero que sacó el eval, y arreglado midiendo. La búsqueda deduce la categoría cuando la
-pregunta la nombra («deuda técnica», «restricciones», «riesgos») y empuja ese tipo hacia
-arriba, **sin filtrar**: filtrar perdería la respuesta cuando está guardada con otro tipo.
-
-recall@5 0.961 → **0.987**, MRR 0.901 → **0.928**, y las preguntas repartidas 0.850 → 0.950,
-sin mover el resto. El tamaño del empujón se eligió por la curva del eval, no a ojo.
-
-### Índice navegable dentro de un proyecto (a estudiar)
-
-En un proyecto con mucha información, un mapa por área con resúmenes que el agente pueda
-recorrer, en vez de depender solo de la búsqueda.
-
-**El contraargumento, que hay que resolver antes de escribir código:** un índice siempre
-presente compite por el presupuesto de contexto y se desactualiza en cada cambio; la búsqueda
-evita las dos cosas. Habría que demostrar que gana en algún régimen concreto —proyectos
-enormes, navegación estructural, «saber qué existe» frente a «encontrar lo relevante»—. Si
-sale a favor, se generaría en `maintain`, nunca a mano, y con trazabilidad: sería inferencia,
-no hecho.
+- **Extracción en el servidor.** Hoy el CLI lee Markdown y texto plano y los formatos que
+  necesitan mammoth/unpdf/xlsx o un modelo se quedan en `cortex-admin` (ADR-0058). El servidor
+  ya tiene las dependencias y las claves: subir el fichero y extraer allí hace que el conector
+  del CLI lo cubra todo y esta división desaparezca.
 
 ### Operación y escala
 
-- **Límite de inferencia compartido entre procesos.** El semáforo que evita pasarse de las
-  peticiones en paralelo que admite el proveedor es **por proceso**, y un despliegue corre
-  cuatro que llaman al modelo. El techo real es `procesos × CORTEX_LLM_CONCURRENCY`, así que
-  hoy hay que dividir a mano, y está documentado en `.env.example`. Un límite de verdad exige
-  estado compartido: `shared` no puede depender de la base de datos, así que la forma natural
-  es inyectarlo desde los entrypoints, como el clasificador o el reranker. Lo que hay que
-  medir antes de construirlo es si el reintento con backoff que ya existe absorbe el exceso en
-  la práctica; hoy no hay datos de 429 porque el uso es de una persona.
-
-- **Límite de peticiones por IP, general.** El envío de códigos **ya está cubierto** por IP
-  además de por email, porque es el único sitio sin autenticar que provoca un efecto —y un
-  coste— fuera del servidor. Para el resto del tráfico el sitio natural sigue siendo el borde:
-  un plugin de Caddy o el CDN, donde se puede parar antes de gastar un proceso.
-- **Cola de captura persistente.** Ahora vive en memoria: si el servidor se reinicia con
-  trabajos encolados, se pierden. Con el volumen actual no compensa; con varios equipos
-  capturando a la vez, sí.
+- **Límite de inferencia compartido entre procesos.** El semáforo es **por proceso** y un
+  despliegue corre cuatro que llaman al modelo, así que el techo real es
+  `procesos × CORTEX_LLM_CONCURRENCY` y hoy hay que dividir a mano. Un límite de verdad exige
+  estado compartido: `shared` no puede depender de la base de datos, así que se inyectaría desde
+  los entrypoints, como el clasificador. Antes de construirlo hay que medir si el backoff que ya
+  existe absorbe el exceso; hoy no hay datos de 429 porque el uso es de pocas personas.
+- **Cola de captura persistente.** Vive en memoria: un reinicio con trabajos encolados los
+  pierde. Con el volumen actual no compensa; con varios equipos capturando a la vez, sí.
 - **Sesiones del MCP en memoria**, lo que ata el despliegue a un solo nodo.
-- **Observabilidad HTTP**: hoy se mide el uso de modelo y embeddings, y `/metrics` expone el
-  estado del sistema en formato Prometheus, pero no hay métricas por petición (latencia,
-  códigos de respuesta). El sitio natural es un middleware que alimente el mismo endpoint.
-- **Índice ANN** en pgvector. A partir de unas decenas de miles de vectores, el escaneo
-  secuencial deja de ser suficiente.
+- **Métricas por petición** (latencia, códigos de respuesta). `/metrics` expone el estado del
+  sistema, no el del tráfico. El sitio natural es un middleware que alimente el mismo endpoint.
+- **Límite de peticiones por IP, general.** El envío de códigos ya está cubierto por IP además
+  de por email, que es el único sitio sin autenticar con efecto —y coste— fuera del servidor.
+  Para el resto el sitio natural sigue siendo el borde: Caddy o el CDN.
+- **Índice ANN** en pgvector. Hoy son 609 vectores y el escaneo secuencial sobra; el umbral está
+  en decenas de miles.
+
+### Interfaz
+
+- **Páginas de entidad.** Las entidades se ven como etiquetas que lanzan una búsqueda; el grafo
+  sabe más de lo que la UI enseña.
+- **Paginación.** Ninguna lista la tiene: límites fijos y ninguna señal de que haya más.
+- **Historial de ediciones.** Corregir una entrada sobrescribe y deja solo `updated_at`. Para un
+  sistema cuyo argumento es la trazabilidad, es un hueco que se cerrará cuando alguien lo pida.
+- **Modo oscuro.** Ahora es redefinir tokens bajo una media query, no una reescritura.
 
 ### Producto
 
 - **Registry de toolbelt por proyecto**, además del de la organización.
-- **Config de IA por proyecto** (qué modelos y qué fuentes usa cada proyecto), en el registry
-  externo.
+- **Config de IA por proyecto** (qué modelos y qué fuentes usa cada uno), en el registry externo.
+- **Índice navegable dentro de un proyecto (a estudiar).** Un mapa por área que el agente
+  recorra, en vez de depender solo de la búsqueda. El contraargumento sigue sin resolver: un
+  índice siempre presente compite por el presupuesto de contexto y se desactualiza en cada
+  cambio, y la búsqueda evita las dos cosas. Habría que demostrar que gana en algún régimen
+  concreto —proyectos enormes, «saber qué existe» frente a «encontrar lo relevante»—. Si sale a
+  favor, se generaría en `maintain` y con trazabilidad: sería inferencia, no hecho.
 
 ## Camino a abrir el código
 
-1. **Instantánea limpia.** El repositorio no se abre publicando este historial: se abre desde
-   un commit inicial en un repositorio nuevo (ADR-0026). El procedimiento va en
-   `CONTRIBUTING.md`.
-2. **Los ADRs, el roadmap y la investigación siguen en español.** Son el registro de
-   trabajo del equipo. Decidir si se traducen es una decisión aparte: traducirlos congela lo
-   que está pensado para seguir vivo.
-3. **Binario compilado y Homebrew.** Hoy el CLI exige Node ≥ 20; un binario evita ese
-   requisito, a cambio de firma, notarización y cuatro objetivos de compilación. Se pospuso a
-   propósito hasta tener el producto en manos de alguien (ADR-0025).
-4. **v0.2.0**: retirar el alias `LLM_PROVIDER=nan` y la variable `BREVO_SENDER`.
+El repositorio **ya es público** y los ADR están en inglés. Lo que queda:
+
+1. **Binario compilado y Homebrew.** Hoy el CLI exige Node ≥ 20; un binario evita ese requisito,
+   a cambio de firma, notarización y cuatro objetivos de compilación. Se pospuso a propósito
+   hasta tener el producto en manos de alguien (ADR-0025), y ya lo está.
+2. **v0.2.0**: retirar el alias `LLM_PROVIDER=nan` y la variable `BREVO_SENDER`. El código los
+   acepta con aviso y las plantillas ya no los ofrecen.
