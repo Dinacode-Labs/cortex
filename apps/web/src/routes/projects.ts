@@ -2,10 +2,12 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import {
   addProjectMember,
+  deleteProject,
   lintProject,
   listAccessibleProjects,
   listProjectMembers,
   NotAManagerError,
+  ProjectNotEmptyError,
   removeProjectMember,
   updateProject,
 } from "@cortex/core";
@@ -182,6 +184,23 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
             </form>`,
           )}</div>`
         : html`<span class="sub">No members yet. Only the owner and administrators.</span>`}
+    </div>
+
+    <div class="panel">
+      <h2>Delete this project</h2>
+      <p class="sub">
+        ${project.entryCount === 0
+          ? html`It holds nothing, so this only undoes creating it. A project with any memory in it cannot be
+              deleted here — that is a decision to take slowly, with a backup.`
+          : html`It holds <b>${project.entryCount}</b> ${project.entryCount === 1 ? "entry" : "entries"}, so it
+              cannot be deleted here. Invalidating is not deleting: that is the whole point of the memory.`}
+      </p>
+      ${project.entryCount === 0
+        ? html`<form method="post" action="/p/${project.slug}/settings/delete"
+                 onsubmit="return confirm('Delete ${project.name}? It is empty, so nothing is lost.')">
+              <button class="danger" type="submit">Delete project</button>
+            </form>`
+        : ""}
     </div>`;
   return c.html(layout(`${project.name} · Settings`, body, { user }));
 });
@@ -203,6 +222,20 @@ projectsRoutes.post("/p/:slug/settings/visibility", async (c) => {
     return c.redirect(vuelveConError(slug, e));
   }
   return c.redirect(`/p/${slug}/settings`);
+});
+
+projectsRoutes.post("/p/:slug/settings/delete", async (c) => {
+  const user = c.get("user")!;
+  const slug = c.req.param("slug");
+  try {
+    await deleteProject(slug, user.email);
+  } catch (e) {
+    if (e instanceof NotAManagerError || e instanceof ProjectNotEmptyError) {
+      return c.redirect(`/p/${slug}/settings?error=${encodeURIComponent((e as Error).message)}`);
+    }
+    throw e;
+  }
+  return c.redirect("/");
 });
 
 projectsRoutes.post("/p/:slug/settings/parent", async (c) => {

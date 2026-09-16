@@ -145,6 +145,51 @@ describe("vida de un proyecto (ADR-0051)", () => {
     expect((await findProjectBySlug(a.slug!))!.parentId).toBeNull(); // no tocó nada
   }, 60_000);
 
+  it("un proyecto vacío se puede borrar: deshacer un `link --create` equivocado", async () => {
+    const error = await createProject(`Nombre Equivocado ${RID}`, { ownerEmail: OWNER });
+    const srv = createServerApp();
+    const res = await srv.request(`/projects/${error.slug}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokOwner}` },
+    });
+    expect(res.status).toBe(200);
+    expect(await findProjectBySlug(error.slug!)).toBeNull();
+  }, 60_000);
+
+  it("uno CON memoria dentro no: invalidar no es borrar, y eso no puede estar a un clic", async () => {
+    const conMemoria = await createProject(`Con Memoria ${RID}`, { ownerEmail: OWNER });
+    await saveContext({ content: `Una decisión que no queremos perder ${RID}.`, project: conMemoria.name, createdBy: OWNER });
+    const srv = createServerApp();
+    const res = await srv.request(`/projects/${conMemoria.slug}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokOwner}` },
+    });
+    expect(res.status).toBe(409);
+    expect(await findProjectBySlug(conMemoria.slug!), "sigue ahí").toBeTruthy();
+  }, 60_000);
+
+  it("uno con hijos tampoco, que dejaría a los hijos colgando", async () => {
+    const padre = await createProject(`Padre Con Hijos ${RID}`, { ownerEmail: OWNER });
+    await createProject(`Hijo De ${RID}`, { ownerEmail: OWNER, parentSlug: padre.slug! });
+    const srv = createServerApp();
+    const res = await srv.request(`/projects/${padre.slug}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokOwner}` },
+    });
+    expect(res.status).toBe(409);
+  }, 60_000);
+
+  it("y quien no lo gestiona no puede borrarlo aunque esté vacío", async () => {
+    const mio = await createProject(`Solo Mio ${RID}`, { ownerEmail: OWNER });
+    const srv = createServerApp();
+    const res = await srv.request(`/projects/${mio.slug}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${tokOtro}` },
+    });
+    expect(res.status).toBe(403);
+    expect(await findProjectBySlug(mio.slug!)).toBeTruthy();
+  }, 60_000);
+
   it("un proyecto que no puedes ver responde 404 al intentar gestionarlo, no 403", async () => {
     const privado = await createProject(`Privado Ajeno ${RID}`, { visibility: "private", ownerEmail: OWNER });
     const srv = createServerApp();
