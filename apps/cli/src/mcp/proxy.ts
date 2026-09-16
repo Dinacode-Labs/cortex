@@ -31,8 +31,9 @@ export interface ProxyOptions {
 export function isAuthError(e: unknown): boolean {
   const err = e as { code?: unknown; message?: unknown };
   if (err?.code === 401) return true;
+  if ((e as { name?: string })?.name === "SinSesionError") return true;
   const msg = String(err?.message ?? e ?? "");
-  return /\b401\b|unauthorized|no autenticado/i.test(msg);
+  return /\b401\b|unauthorized|no autenticado|No session for/i.test(msg);
 }
 
 /** ¿Se cayó la conexión con el servidor? Entonces merece la pena reintentar una vez. */
@@ -41,8 +42,18 @@ function isConnectionError(e: unknown): boolean {
   return /connection closed|not connected|socket hang up|ECONNRESET|ECONNREFUSED|fetch failed|session/i.test(msg);
 }
 
-const AUTH_HINT =
-  `${getBrandName()}: you are not signed in, or your token expired. Run \`cortex auth login\` and restart your agent.`;
+/**
+ * Lo que se le enseña a la persona cuando no se puede autenticar.
+ *
+ * Se usa el mensaje del error si lo trae, porque `resolveUpstream` sabe **qué servidor** buscó
+ * y qué sesiones hay, y eso es lo que resuelve el problema. El texto genérico solo queda para
+ * el caso en que el fallo venga del otro lado (un token caducado de verdad).
+ */
+function authHint(e: unknown): string {
+  const propio = (e as { name?: string; message?: string } | undefined);
+  if (propio?.name === "SinSesionError" && propio.message) return `${getBrandName()}: ${propio.message}`;
+  return `${getBrandName()}: your session is not valid for this server. Run \`cortex doctor\` to see which one this folder points at, then \`cortex auth login --server <it>\`, and restart your agent.`;
+}
 
 export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () => Promise<void> } {
   const log = opts.log ?? ((m: string) => console.error(`[cortex mcp] ${m}`));
@@ -95,7 +106,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
       // Devolver una lista vacía en vez de fallar: así el agente ARRANCA aunque el
       // servidor esté caído o el token haya caducado, y el usuario ve el aviso en el log
       // en lugar de un error de inicialización.
-      log(isAuthError(e) ? AUTH_HINT : `could not list the tools: ${(e as Error).message}`);
+      log(isAuthError(e) ? authHint(e) : `could not list the tools: ${(e as Error).message}`);
       return { tools: [] };
     }
   });
@@ -106,7 +117,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
     } catch (e) {
       // Un error de tool se responde como resultado con `isError`, no como excepción de
       // protocolo: el agente lo enseña al usuario y sigue trabajando.
-      const text = isAuthError(e) ? AUTH_HINT : `${getBrandName()}: the tool failed (${(e as Error).message}).`;
+      const text = isAuthError(e) ? authHint(e) : `${getBrandName()}: the tool failed (${(e as Error).message}).`;
       log(text);
       return { content: [{ type: "text", text }], isError: true };
     }
