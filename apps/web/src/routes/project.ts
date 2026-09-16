@@ -296,8 +296,10 @@ projectRoutes.get("/p/:slug/map", async (c) => {
   if (res instanceof Response) return res;
   const { project, gestor } = res;
   // El checkbox manda "1" o nada; leerlo como `!== "0"` hacía IMPOSIBLE desmarcarlo desde la
-  // UI. Un campo oculto con el valor por defecto delante del checkbox lo arregla sin JS.
-  const incluirEntradas = (c.req.query("entries") ?? "1") !== "0";
+  // UI. Un campo oculto con el valor por defecto delante del checkbox lo arregla sin JS, pero
+  // entonces llegan los dos (`?entries=0&entries=1`) y `query()` devuelve el PRIMERO: hay que
+  // quedarse con el último o la casilla ya no se puede volver a marcar.
+  const incluirEntradas = (c.req.queries("entries")?.at(-1) ?? "1") !== "0";
 
   const body = html`
     ${projectHeader(project, "map", gestor)}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as yamlParse } from "yaml";
 
@@ -64,6 +64,17 @@ describe("Caddyfile", () => {
 
   it("recorta el prefijo /api: el servidor no sabe que vive bajo él", () => {
     expect(caddy).toContain("handle_path /api/*");
+  });
+
+  it("ninguna ruta de la web cuelga de /api: ese prefijo es del servidor", () => {
+    // `handle_path /api/*` se lleva esas URLs a la API, así que una ruta de la web bajo ese
+    // prefijo responde 404 en el despliegue aunque funcione al levantar `apps/web` sola. Pasó
+    // con `/api/graph`, que dejaba el mapa en negro sin un solo error en la página.
+    const dir = "apps/web/src/routes";
+    const infractoras = readdirSync(resolve(root, dir)).filter((f) =>
+      /\.(get|post|put|patch|delete|all)\(\s*"\/api/.test(read(`${dir}/${f}`)),
+    );
+    expect(infractoras).toEqual([]);
   });
 
   it("el MCP va sin buffering, porque habla por streaming", () => {
