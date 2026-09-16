@@ -61,18 +61,49 @@ export function condenseSession(file: string): string {
   return scrub(turns.join("\n\n"));
 }
 
-/** Trocea el diálogo en ventanas (~WINDOW_CHARS), cap MAX_WINDOWS. */
+export interface Troceado {
+  ventanas: string[];
+  /** Caracteres de la sesión que NO se han destilado. 0 si cupo entera. */
+  descartados: number;
+}
+
+/**
+ * Trocea el diálogo en ventanas (~WINDOW_CHARS) y se queda con MAX_WINDOWS.
+ *
+ * El tope existe porque cada ventana es una llamada al modelo, y una sesión larga con el tope
+ * quitado son veinte. Lo que estaba mal no era el tope: era **cuáles** se quedaban y que nadie
+ * se enterara.
+ *
+ * - **Cuáles.** Antes se cortaba al llegar al tope, así que de una sesión de 128.000 caracteres
+ *   se destilaban los primeros 72.000 y se tiraba el resto. En una sesión de trabajo las
+ *   conclusiones están al final: lo que se descartaba era justo lo que había que recordar.
+ *   Ahora, cuando no cabe entera, las ventanas se reparten a lo largo de toda la sesión —
+ *   primera y última incluidas siempre—, así que llegan el arranque, el recorrido y el cierre.
+ * - **Que nadie se enterara.** La captura quedaba en `done` con sus contadores, idéntica a una
+ *   que sí cupo. Ahora se devuelve cuánto se ha quedado fuera y el servidor lo guarda.
+ */
 export function windows(text: string): string[] {
-  const out: string[] = [];
+  return trocea(text).ventanas;
+}
+
+export function trocea(text: string): Troceado {
+  const todas: string[] = [];
   let buf = "";
   for (const turn of text.split("\n\n")) {
     if (buf.length + turn.length > WINDOW_CHARS && buf) {
-      out.push(buf);
-      if (out.length >= MAX_WINDOWS) return out;
+      todas.push(buf);
       buf = "";
     }
     buf += (buf ? "\n\n" : "") + turn;
   }
-  if (buf && out.length < MAX_WINDOWS) out.push(buf);
-  return out;
+  if (buf) todas.push(buf);
+  if (todas.length <= MAX_WINDOWS) return { ventanas: todas, descartados: 0 };
+
+  // Reparto uniforme conservando los extremos: el primer índice es 0 y el último es el último.
+  const paso = (todas.length - 1) / (MAX_WINDOWS - 1);
+  const elegidos = Array.from({ length: MAX_WINDOWS }, (_, i) => Math.round(i * paso));
+  const unicos = [...new Set(elegidos)];
+  const ventanas = unicos.map((i) => todas[i]!);
+  const descartados = todas.reduce((n, w, i) => (unicos.includes(i) ? n : n + w.length), 0);
+  return { ventanas, descartados };
 }
