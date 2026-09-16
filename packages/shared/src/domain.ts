@@ -53,7 +53,17 @@ export type ConfidenceLevel = z.infer<typeof confidenceLevel>;
 export const validity = z.enum(["current", "historical", "unknown"]);
 export type Validity = z.infer<typeof validity>;
 
-/** Tipo de entidad del grafo relacional. §14 entities.type */
+/**
+ * Tipo de entidad del grafo relacional. §14 entities.type
+ *
+ * Una entidad es una **cosa que se nombra** —un módulo, un servicio, una tecnología, un
+ * cliente—, no una afirmación sobre el proyecto. Aquí hubo `decision` e `incident`, que son
+ * tipos de ENTRADA, y el resultado fue un grafo en sombra: la misma decisión guardada dos
+ * veces, una como entrada y otra como nodo cuyo nombre era la frase entera. En una instalación
+ * real, 222 nodos así, con nombres como «Publicar Cortex en abierto y monetizar la
+ * implementación». Ensuciaban las huérfanas, el mapa y —sobre todo— las contradicciones, que
+ * salían entre nombres de nodo en vez de entre entradas. Ver ADR-0055.
+ */
 export const entityType = z.enum([
   "client",
   "project",
@@ -63,11 +73,28 @@ export const entityType = z.enum([
   "technology",
   "person",
   "integration",
-  "decision",
-  "incident",
   "vendor",
 ]);
 export type EntityType = z.infer<typeof entityType>;
+
+/**
+ * Si un nombre sirve como entidad del grafo.
+ *
+ * Las entidades son nombres, no frases. El extractor devolvía cosas como «opción C», «No asumir
+ * rutas del origen en el destino» o «package», que luego aparecían como huérfanas y se
+ * emparejaban entre sí en el informe de contradicciones. Un informe con la mitad de ruido
+ * enseña a no mirarlo, así que el listón se pone aquí: si no parece un nombre propio de algo
+ * del dominio, no entra.
+ */
+export function isUsableEntityName(name: string): boolean {
+  const n = name.trim();
+  if (n.length < 3 || n.length > 60) return false;
+  if (n.split(/\s+/).length > 6) return false; // una frase, no un nombre
+  if (/[.;]$/.test(n) || n.includes(": ")) return false;
+  // Deícticos: "opción C", "la opción a", "v3", "caso 2"… no nombran nada por sí solos.
+  if (/^(la |el |una? )?(opci[oó]n|alternativa|caso|punto|paso|fase|v)\s*\d*[a-z]?$/i.test(n)) return false;
+  return /[a-zA-Z]/.test(n);
+}
 
 /** Tipo de relación entre entidades o entradas. §14 relations.relation_type */
 export const relationType = z.enum([

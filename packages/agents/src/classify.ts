@@ -1,4 +1,4 @@
-import { contextEntryType, entityType } from "@cortex/shared";
+import { contextEntryType, entityType, isUsableEntityName } from "@cortex/shared";
 import type { ContextEntryType, EntityType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
@@ -64,6 +64,7 @@ export async function classifyEntry(content: string): Promise<ClassificationResu
       const entities = (parsed.entities ?? [])
         .filter((e): e is { name: string; type: string } => Boolean(e?.name && e?.type))
         .filter((e) => (ENTITY_TYPES as readonly string[]).includes(e.type))
+        .filter((e) => isUsableEntityName(e.name))
         .map((e) => ({ name: e.name.trim(), type: e.type as EntityType }));
 
       return {

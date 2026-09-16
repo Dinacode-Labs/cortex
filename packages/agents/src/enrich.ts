@@ -1,4 +1,4 @@
-import { entityType, relationType } from "@cortex/shared";
+import { entityType, isUsableEntityName, relationType } from "@cortex/shared";
 import type { EntityType, RelationType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
@@ -66,6 +66,7 @@ export async function extractGraph(content: string): Promise<GraphExtraction | n
       const entities = (parsed.entities ?? [])
         .filter((e): e is { name: string; type: string } => Boolean(e?.name && e?.type))
         .filter((e) => (ETYPES as readonly string[]).includes(e.type))
+        .filter((e) => isUsableEntityName(e.name))
         .map((e) => ({ name: e.name.trim().slice(0, 120), type: e.type as EntityType }));
 
       const names = new Set(entities.map((e) => e.name.toLowerCase()));

@@ -1438,3 +1438,47 @@ system, a component layer, and no framework ([0053](#adr-0053)).
 - **Revisit when:** the weights prove wrong on a project with a different shape, the excluded
   event types turn out to be wanted, or ranking within a section can use the session's topic
   rather than confidence.
+
+<a id="adr-0055"></a>
+
+## ADR-0055 · An entity is a thing you name, not a claim about the project
+
+- **Status:** accepted (2026-09-16).
+- **Context:** `entities.type` accepted `decision` and `incident` — which are **entry** types.
+  The extractor duly created entities of those types, using the whole sentence as the name, so
+  the same decision was stored twice: once as an entry, with its content, source, author and
+  temporal validity, and once as a graph node called *"Publicar Cortex en abierto y monetizar
+  la implementación (sin hosting propio)"*.
+
+  On a real installation: **222 such nodes**. The cost was not storage, it was the noise in the
+  two screens people actually look at. Those nodes turned up as orphan entities, and
+  contradictions were detected **between them** — all 18 `contradicts` relations were
+  entity-to-entity and **none** were entry-to-entry, producing pairs as useless as
+  *"opción C ⟷ opción A"*. Four of the six contradictions on one project had no entry behind
+  them at all.
+
+  The extractor was also emitting fragments as entities: `opción C`, `package`, `v3`,
+  `No asumir rutas del origen en el destino`. A health report that is half noise teaches people
+  to stop reading the health report — which then costs us the real findings too.
+- **Decision:** an entity is a **thing that gets named** — a module, a service, a technology, a
+  client, a vendor. `decision` and `incident` leave `entityType`, so nothing can create them
+  again, and a database constraint refuses them even by hand.
+
+  Names are filtered by shape (`isUsableEntityName`): three to sixty characters, at most six
+  words, no trailing full stop, and no bare deictics — "opción C" names nothing on its own. The
+  bar is deliberately on the side of dropping a real entity rather than admitting a fragment,
+  because a missing node costs a link and a junk node costs the report's credibility.
+
+  A migration removes the existing shadow nodes, their links and their relations. **No entry is
+  touched**: the knowledge lives there and stays, with its history. What goes is the degraded
+  copy.
+- **Alternatives:** keep the types and filter them out of lint and the graph — leaves dead rows
+  forever and every new consumer has to remember the exclusion; keep them and rely on better
+  prompting — the shape of the data was inviting the mistake, not the wording; delete the junk
+  names only and keep the types — the sentence-named nodes would come straight back.
+- **Consequences:** contradiction detection now works where it belongs, between entries and
+  between real entities; it will report **fewer** findings, and that is the point. Projects lose
+  some entry↔entity links that carried a weak signal. Any future entity type must pass the same
+  test: is it a thing you can name, or a claim about the project?
+- **Revisit when:** legitimate entities are being rejected by the name filter, or contradiction
+  detection between entries needs to be built out now that the entity noise is gone.

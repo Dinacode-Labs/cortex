@@ -9,6 +9,16 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Fixed
+- **El informe de salud estaba medio lleno de ruido, y el ruido venía del grafo.** `entities.type`
+  admitía `decision` e `incident`, que son tipos de **entrada**, así que la misma decisión se
+  guardaba dos veces: una como entrada y otra como nodo del grafo con la frase entera por
+  nombre. En una instalación real, **222 nodos así**, y las 18 contradicciones detectadas eran
+  todas entre nodos y ninguna entre entradas, con pares tan poco útiles como «opción C ⟷ opción
+  A». Una entidad vuelve a ser **una cosa que se nombra**: los dos tipos salen del enum, los
+  nombres se filtran por forma (nada de frases ni de deícticos) y una migración limpia los que
+  había. No se toca ninguna entrada. Ver ADR-0055.
+
+### Fixed
 - **Una sesión larga perdía siempre su final, y nadie se enteraba.** El destilado trocea la
   sesión en ventanas y se queda con ocho; al llegar al tope cortaba, así que de una sesión de
   128.000 caracteres se destilaban los primeros 72.000 y se tiraba el resto — y en una sesión
