@@ -115,6 +115,26 @@ export async function canAccessProject(project: ProjectRef, email: string | null
   return false;
 }
 
+/**
+ * El proyecto y toda su cadena de ancestros, de hijo a raíz.
+ *
+ * Lo usan el context pack y la búsqueda: un proyecto hijo hereda lo que sabe su cliente. Subir
+ * es seguro porque `canAccessProject` mira la cadena entera —si un ancestro es privado, el hijo
+ * queda restringido—, así que tener acceso al hijo implica tenerlo a todos sus padres. No se
+ * puede ver por herencia algo que no se pudiera ver directamente.
+ */
+export async function projectIdsWithAncestors(projectId: string): Promise<string[]> {
+  const rows = (await getSql()`
+    WITH RECURSIVE chain AS (
+      SELECT id, parent_id FROM entities WHERE id = ${projectId}
+      UNION ALL
+      SELECT e.id, e.parent_id FROM entities e JOIN chain c ON e.id = c.parent_id
+    )
+    SELECT id FROM chain
+  `) as unknown as Row[];
+  return rows.map((r) => r.id as string);
+}
+
 /** Resultado del guard único de acceso a proyecto. */
 export type AccessCheck =
   | { status: "ok"; project: ProjectRef }

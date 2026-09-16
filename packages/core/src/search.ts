@@ -6,7 +6,7 @@ import {
   type SearchContextInput,
   searchContextInput,
 } from "@cortex/shared";
-import { findProjectIdByName, listAccessibleProjects } from "./projects.js";
+import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import { hybridSearch, type SearchHit } from "./vectors.js";
 import { inferTypeFromQuery } from "./query-intent.js";
@@ -54,13 +54,21 @@ export async function searchContext(
   const parsed = searchContextInput.parse(input);
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const projectId = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
+  const proyectoPedido = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
+  // Buscar dentro de un hijo mira también lo del cliente: el context pack ya heredaba de sus
+  // ancestros y la búsqueda no, así que lo transversal —contratos, convenciones, con quién se
+  // habla— estaba guardado en el padre y no se encontraba desde el repo donde hacía falta.
+  // Subir es seguro: `canAccessProject` restringe el hijo si cualquier ancestro es privado, de
+  // modo que tener acceso al hijo implica tenerlo a toda la cadena.
+  const cadena = proyectoPedido ? await projectIdsWithAncestors(proyectoPedido) : null;
+  const projectId = cadena && cadena.length === 1 ? proyectoPedido : null;
 
   // Scoping por accesibles: solo cuando NO hay proyecto concreto Y el caller ha pedido
   // restringir (distinguimos "opts ausente" = llamada confiable, de "restrictToAccessibleOf:
   // null" = usuario anónimo → solo proyectos públicos).
   let projectIds: string[] | null | undefined;
-  if (!projectId && opts && "restrictToAccessibleOf" in opts) {
+  if (cadena && cadena.length > 1) projectIds = cadena;
+  else if (!proyectoPedido && opts && "restrictToAccessibleOf" in opts) {
     const accessible = await listAccessibleProjects(opts.restrictToAccessibleOf ?? null);
     projectIds = accessible.map((p) => p.id); // array vacío permitido → cero resultados
   }
