@@ -8,6 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+## [0.1.10] — 2026-09-16
+
 ### Added
 - **`cortex connect-docs` ya está en el CLI.** Ingerir una carpeta de documentación exigía
   clonar el monorepo entero, porque el conector vivía solo en `cortex-admin`, que no se publica
