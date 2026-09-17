@@ -8,12 +8,8 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
-### Fixed
-- **El mapa de un proyecto vuelve a pintarse.** `/p/<slug>/map` se quedaba en negro en
-  cualquier despliegue: pedía sus datos a `/api/graph`, y ese prefijo se lo lleva entero el
-  servidor de API, que no tiene esa ruta. El endpoint pasa a `/graph.json`. De paso, la casilla
-  «Include entries» no se podía volver a marcar —el formulario manda dos valores y se leía el
-  primero—, y sin entradas el grafo no tiene ni una arista que pintar.
+## [0.1.11] — 2026-09-17
+
 ### Added
 - **«Across this client»: un proyecto padre ya se puede leer, no solo abrir.** La herencia
   SUBE —un repo ve lo de su cliente, nunca lo de un hermano— y eso deja sin responder justo la
@@ -27,8 +23,6 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   los dos) y **buscar hacia abajo**: una casilla «include child projects» que solo aparece en el
   padre, apagada por defecto, y que dice de qué repo es cada resultado. Todo lo que cruza hacia
   abajo filtra por permisos antes de mirar nada. ADR-0063.
-
-### Added
 - **El CLI avisa cuando se queda atrás, y se niega a escribir cuando se queda demasiado atrás**
   (ADR-0062). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
   son dos relojes distintos y esta semana se vio, con tres despliegues seguidos y gente días
@@ -61,7 +55,25 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   silencio. Lo que cruza hacia abajo filtra por permisos: un hijo privado del que no eres
   miembro no aparece por ver al padre.
 
+### Changed
+- **Este repositorio deja de versionar su `.cortex.json`.** Al ser público, un vínculo commiteado
+  convierte *nuestro* proyecto en el que traen por defecto todos los clones del mundo, y obliga a
+  quien contribuye a editar un fichero versionado para usar el suyo. La regla general, que es lo
+  que necesita saber quien adopte Cortex: **versiónalo en un repo privado de una organización;
+  ignóralo en uno público.** Ver ADR-0059.
+- **`.env.example` vuelve a ser una plantilla y no un documento.** Tenía 336 líneas de las que
+  **155 eran prosa**: explicaciones de por qué se decidió algo, qué se llamaba antes de otra
+  manera y qué se retira en qué versión. Eso es material de ADR y de CHANGELOG, no de un
+  fichero que copias a `.env`. Ahora son 167 líneas, una por variable con lo que hace y su
+  valor por defecto, y los nombres obsoletos (`NAN_*`, `BREVO_SENDER*`) dejan de ofrecerse —
+  siguen funcionando, con su aviso, pero una plantilla es lo que deberías poner hoy.
+
 ### Fixed
+- **El mapa de un proyecto vuelve a pintarse.** `/p/<slug>/map` se quedaba en negro en
+  cualquier despliegue: pedía sus datos a `/api/graph`, y ese prefijo se lo lleva entero el
+  servidor de API, que no tiene esa ruta. El endpoint pasa a `/graph.json`. De paso, la casilla
+  «Include entries» no se podía volver a marcar —el formulario manda dos valores y se leía el
+  primero—, y sin entradas el grafo no tiene ni una arista que pintar.
 - **El clasificador ya no fabrica proyectos.** Ofrecía `project` entre los tipos de entidad, así
   que cualquier nombre propio que el LLM tomara por un proyecto —tickets, ramas, ficheros,
   microservicios— acababa en `entities` con `type='project'`: la misma fila que un proyecto de
@@ -85,31 +97,12 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   encontraba desde el repo del hijo**, que es justo donde hace falta. Subir es seguro: el acceso
   al hijo ya exige acceso a toda la cadena, así que por herencia no se ve nada que no se pudiera
   ver directamente. Y no baja: desde el padre no se ve lo de un hijo.
-
-### Fixed
 - **«No has iniciado sesión» era mentira la mayoría de las veces.** Cuando el MCP no podía
   autenticarse decía eso y mandaba a repetir un `cortex auth login` ya hecho. El caso real es
   otro: la carpeta apunta —por su `.cortex.json` o por `CORTEX_SERVER_URL`— a un servidor del
   que no hay credenciales, mientras sí las hay de otro. Ahora el mensaje dice **qué servidor**
   buscó, desde qué carpeta lo resolvió y **qué sesiones sí existen**. Un error que dirige mal
   cuesta más que uno que calla, porque parece que sabe.
-
-### Changed
-- **Este repositorio deja de versionar su `.cortex.json`.** Al ser público, un vínculo commiteado
-  convierte *nuestro* proyecto en el que traen por defecto todos los clones del mundo, y obliga a
-  quien contribuye a editar un fichero versionado para usar el suyo. La regla general, que es lo
-  que necesita saber quien adopte Cortex: **versiónalo en un repo privado de una organización;
-  ignóralo en uno público.** Ver ADR-0059.
-
-### Changed
-- **`.env.example` vuelve a ser una plantilla y no un documento.** Tenía 336 líneas de las que
-  **155 eran prosa**: explicaciones de por qué se decidió algo, qué se llamaba antes de otra
-  manera y qué se retira en qué versión. Eso es material de ADR y de CHANGELOG, no de un
-  fichero que copias a `.env`. Ahora son 167 líneas, una por variable con lo que hace y su
-  valor por defecto, y los nombres obsoletos (`NAN_*`, `BREVO_SENDER*`) dejan de ofrecerse —
-  siguen funcionando, con su aviso, pero una plantilla es lo que deberías poner hoy.
-
-### Fixed
 - Siete variables de entorno que el código lee y no aparecían en ninguna plantilla
   (`CORTEX_BIND_HOST`, `CORTEX_ENV_FILE`, `CORTEX_NPM_PACKAGE`, `CORTEX_OPENCODE_DB`,
   `CORTEX_PI_DIR`, `CORTEX_SEARCH_TYPE_BOOST`, `CORTEX_WORKER_HEARTBEAT_FILE`). Existían,
