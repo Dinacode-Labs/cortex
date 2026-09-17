@@ -74,7 +74,7 @@ async function save(args: string[], json: boolean): Promise<void> {
   if (!content) return emite({ json, ok: false, data: { error: "Missing content" }, texto: 'Usage: cortex mem save "<content>" [--title t] [--type decision]' });
   const p = slugDe(args);
   if ("error" in p) return emite({ json, ok: false, data: p, texto: `✗ ${p.error}` });
-  // Escribe: si este CLI está por debajo del mínimo del servidor, mejor no guardar a medias (ADR-0060).
+  // Escribe: si este CLI está por debajo del mínimo del servidor, mejor no guardar a medias (ADR-0062).
   const bloqueo = await writeBlocker();
   if (bloqueo) return emite({ json, ok: false, data: { error: bloqueo }, texto: `✗ ${bloqueo}` });
 

@@ -5,7 +5,7 @@ import type { ClientConfig } from "@cortex/shared";
 import { CLI_VERSION, compareVersions } from "./version.js";
 
 /**
- * Compatibilidad entre este CLI y el servidor al que habla (ADR-0060).
+ * Compatibilidad entre este CLI y el servidor al que habla (ADR-0062).
  *
  * El CLI lo actualiza cada persona desde npm; el servidor, un operador, a su ritmo. Son dos
  * relojes distintos y no se atan: el contrato es la API HTTP, no el número de versión. Lo que
@@ -79,7 +79,7 @@ function writeCache(cache: CacheFile): void {
 /**
  * La conclusión, a partir de lo que anuncia el servidor. Separado de la red y del disco para
  * poder probarlo con una tabla de casos. Un campo ausente es un servidor anterior a ese campo,
- * no un error: se degrada a «no se sabe» (regla de escritura del ADR-0060).
+ * no un error: se degrada a «no se sabe» (regla de escritura del ADR-0062).
  */
 export function classify(server: string, cli: string, cfg: Partial<Pick<ClientConfig, "version" | "minClientVersion">> | null): Compat {
   if (!cfg || !cfg.version || cli === "dev" || cfg.version === "dev") return { kind: "unknown", server };

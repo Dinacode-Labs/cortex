@@ -5,7 +5,7 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Versionado entre CLI y servidor (ADR-0060). Son dos relojes distintos: el CLI lo actualiza
+ * Versionado entre CLI y servidor (ADR-0062). Son dos relojes distintos: el CLI lo actualiza
  * cada persona desde npm y el servidor, un operador. No se atan; se comparan los dos números
  * que el servidor publica y de ahí salen tres comportamientos:
  *

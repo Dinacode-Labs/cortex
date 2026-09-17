@@ -156,7 +156,7 @@ claves** (embeddings `local`, no semánticos); conecta un endpoint real
   `.cortex.json` del repo, no de una variable global: quien vaya a llamar a la API desde una
   carpeta debe pasar antes por `useProjectServer(cwd)`. El token se busca **por servidor**;
   no asumas que `readCredentials()` sin argumento es el correcto.
-- **CLI y servidor no van en lockstep** (ADR-0060). El contrato es la API HTTP. Si añades un
+- **CLI y servidor no van en lockstep** (ADR-0062). El contrato es la API HTTP. Si añades un
   endpoint o un campo, el lado que lo lee tolera su ausencia: campo opcional, 404 = servidor
   viejo, y se degrada en vez de fallar. `minClientVersion` es lo único que bloquea (solo
   escrituras) y lo sube el operador cuando algo rompe de verdad. La comparación de versiones

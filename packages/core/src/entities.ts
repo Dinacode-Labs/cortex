@@ -12,6 +12,9 @@ export async function resolveEntity(
   name: string,
   type: EntityType,
 ): Promise<Entity> {
+  // Un proyecto no se «resuelve»: se crea con slug y dueño en `createProject`. Por aquí
+  // nacían los fantasmas de #135 (26 en una instalación real), y la base ya no los admite.
+  if (type === "project") throw new Error(`resolveEntity: "${name}" es un proyecto; usa createProject.`);
   const canonical = canonicalize(name);
   const rows = (await sql`
     INSERT INTO entities (name, canonical_name, type)

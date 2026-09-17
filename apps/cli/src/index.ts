@@ -90,7 +90,7 @@ async function main(): Promise<void> {
     console.error(`cortex ${sub} failed:`, e instanceof Error ? e.message : e);
     process.exitCode = 1;
   }
-  // Aviso pasivo de versión (ADR-0060): una línea a stderr, solo con terminal delante y como
+  // Aviso pasivo de versión (ADR-0062): una línea a stderr, solo con terminal delante y como
   // mucho una vez al día. Solo llega aquí un comando interactivo; los `managed: false` ya
   // salieron arriba.
   if (cmd.versionNotice !== false) await printVersionNotice();

@@ -21,7 +21,7 @@ export const clientConfig = z.object({
   webUrl: z.string(),
   /** Versión del servidor. Solo informativa: el CLI la compara con la suya para avisar. */
   version: z.string(),
-  /** Versión mínima de CLI que este servidor admite; por debajo, el CLI se niega a escribir (ADR-0060). */
+  /** Versión mínima de CLI que este servidor admite; por debajo, el CLI se niega a escribir (ADR-0062). */
   minClientVersion: z.string(),
 });
 export type ClientConfig = z.infer<typeof clientConfig>;

@@ -78,6 +78,20 @@ export const entityType = z.enum([
 export type EntityType = z.infer<typeof entityType>;
 
 /**
+ * Los tipos que se le OFRECEN al extractor (clasificador y grafo). `project` no está: el
+ * proyecto es el contenedor de la memoria y nace por `createProject` —con slug y dueño—, no
+ * de un nombre propio que el LLM haya interpretado como proyecto. Cuando se ofrecía, cada
+ * ticket, rama o microservicio mencionado acababa en `entities` con `type='project'`: la
+ * misma fila que un proyecto real, y salía en `cortex link` y en la UI como tal (#135).
+ * Mismo patrón que ADR-0055 con `decision`/`incident`, pero aquí el tipo sí es legítimo, así
+ * que se quita de lo que se extrae, no del enum.
+ */
+export const extractableEntityType = z.enum(
+  entityType.options.filter((t) => t !== "project") as [Exclude<EntityType, "project">, ...Exclude<EntityType, "project">[]],
+);
+export type ExtractableEntityType = z.infer<typeof extractableEntityType>;
+
+/**
  * Si un nombre sirve como entidad del grafo.
  *
  * Las entidades son nombres, no frases. El extractor devolvía cosas como «opción C», «No asumir
@@ -204,8 +218,8 @@ export type Source = z.infer<typeof source>;
 export const saveContextInput = z.object({
   /** Texto libre del conocimiento a guardar. */
   content: z.string().min(1, "content no puede estar vacío"),
-  /** Nombre o slug del proyecto. Se resuelve a entidad de tipo `project`. */
-  project: z.string().min(1).optional(),
+  /** Slug o nombre del proyecto. Se resuelve a entidad de tipo `project`; si no existe, se crea. */
+  project: z.string().min(1).optional().describe("Project slug (what `cortex link` shows) or name; a new project is created if neither matches"),
   /** Título corto opcional; si falta, se deriva del contenido. */
   title: z.string().optional(),
   /** Tipo de conocimiento; si falta, lo propone el agente de clasificación. */
@@ -224,7 +238,7 @@ export type SaveContextInput = z.infer<typeof saveContextInput>;
 /** Parámetros de búsqueda de contexto (tool MCP search_project_context). */
 export const searchContextInput = z.object({
   query: z.string().min(1),
-  project: z.string().optional(),
+  project: z.string().optional().describe("Project slug (what `cortex link` shows) or name"),
   type: contextEntryType.optional(),
   limit: z.number().int().positive().max(50).default(10),
 });

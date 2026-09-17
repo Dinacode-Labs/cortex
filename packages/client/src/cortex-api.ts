@@ -22,7 +22,7 @@ import { readCredentials, writeCredentials, clearCredentials } from "./credentia
  * Todo lo que hay aquí es HTTP puro: ni Postgres, ni LLM, ni nada que impida empaquetar
  * esto en un CLI que se instala con `npm i -g` (ADR-0025).
  *
- * **Regla al añadir un endpoint o un campo (ADR-0060):** el CLI y el servidor NO van en
+ * **Regla al añadir un endpoint o un campo (ADR-0062):** el CLI y el servidor NO van en
  * lockstep; este cliente puede estar hablando con un servidor de hace meses. Lo que el
  * servidor no conoce es «esa función no está», no un error: un 404 en un endpoint nuevo o un
  * campo ausente en la respuesta significa «servidor viejo» y el llamador se degrada (omite la

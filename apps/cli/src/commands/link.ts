@@ -113,7 +113,7 @@ export async function run(args: string[]): Promise<void> {
     }
     if (!requireExplicitServerToCreate(explicit ? server : undefined)) return;
     if (!requireSession()) return;
-    await requireCompatibleServer(); // crear un proyecto es escribir (ADR-0060)
+    await requireCompatibleServer(); // crear un proyecto es escribir (ADR-0062)
     const pi = args.indexOf("--parent");
     const res = await createProject({
       name,

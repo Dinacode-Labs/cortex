@@ -1,5 +1,4 @@
 import { getSql, type Sql } from "@cortex/database";
-import { resolveEntity } from "./entities.js";
 import { isAdmin } from "./auth.js";
 import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
@@ -29,25 +28,43 @@ function toRef(r: Row | undefined): ProjectRef | null {
 }
 
 /**
- * Id de un proyecto por nombre con la semántica CANÓNICA del repo (`canonical_name`:
- * minúsculas, sin acentos) — la ÚNICA resolución por nombre para operaciones de datos;
- * mayúsculas o acentos distintos no deben crear proyectos nuevos ni saltarse el dedup.
+ * La ÚNICA resolución de un proyecto a partir de lo que escribe alguien en `project`
+ * (ADR-0043, ADR-0061): primero por **slug** —la identidad del proyecto en todo el producto:
+ * `cortex link`, `.cortex.json`, `/p/<slug>`, la API— y, si no, por nombre con la semántica
+ * CANÓNICA (minúsculas, sin acentos). Antes las escrituras resolvían por slug (`createProject`)
+ * y las lecturas solo por nombre canónico, y como `canonicalize` no toca los guiones el mismo
+ * valor funcionaba al guardar y decía «no encontrado» al leer (#136). Si el nombre de un
+ * proyecto coincide con el slug de otro, gana el slug: es el identificador, el nombre no.
  */
-export async function findProjectIdByName(sql: Sql, project: string): Promise<string | null> {
+async function findProjectRow(sql: Sql, ref: string): Promise<Row | undefined> {
   const rows = (await sql`
-    SELECT id FROM entities WHERE type = 'project' AND canonical_name = ${canonicalize(project)} LIMIT 1
+    SELECT id, name, slug, visibility, owner_email, parent_id
+      FROM entities
+     WHERE type = 'project' AND (slug = ${ref} OR canonical_name = ${canonicalize(ref)})
+     ORDER BY (slug = ${ref}) DESC
+     LIMIT 1
   `) as unknown as Row[];
-  return rows[0] ? (rows[0].id as string) : null;
+  return rows[0];
 }
 
+/** Id de un proyecto por slug o nombre canónico (ver `findProjectRow`). Para operaciones de
+ * datos: mayúsculas o acentos distintos no deben crear proyectos nuevos ni saltarse el dedup. */
+export async function findProjectIdByName(sql: Sql, project: string): Promise<string | null> {
+  const row = await findProjectRow(sql, project);
+  return row ? (row.id as string) : null;
+}
+
+/** Solo por slug: lo usan las rutas y la API, donde el slug ya es el identificador. */
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {
   const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND slug = ${slug} LIMIT 1`) as unknown as Row[];
   return toRef(rows[0]);
 }
 
+/** Por slug o nombre canónico (ver `findProjectRow`): lo que un agente o una persona escribe
+ * en `project`. Comparaba el nombre EXACTO, así que el guard del MCP rechazaba lo que las
+ * operaciones de datos sí encontraban (otra capitalización, el slug). */
 export async function findProjectByName(name: string): Promise<ProjectRef | null> {
-  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND name = ${name} LIMIT 1`) as unknown as Row[];
-  return toRef(rows[0]);
+  return toRef(await findProjectRow(getSql(), name));
 }
 
 export async function getEntryProject(entryId: string): Promise<ProjectRef | null> {
@@ -77,12 +94,22 @@ export async function createProject(
   // existente para que el caller decida (acceso/solicitar permiso). Ver link.ts.
   const bySlug = await findProjectBySlug(slug);
   if (bySlug) return bySlug;
-  const ent = await resolveEntity(sql, name, "project");
-  const cur = (await sql`SELECT slug, visibility, owner_email, parent_id FROM entities WHERE id = ${ent.id}`) as unknown as Row[];
-  if (cur[0]?.slug) return toRef({ ...cur[0], id: ent.id, name: ent.name })!; // ya existía (por nombre)
+  // El proyecto nace de una pieza, con su slug: la base no admite un `project` sin slug
+  // (#135), así que no vale insertar el nombre y rellenar después. Si el nombre canónico ya
+  // existe con otro slug, se devuelve ese tal cual, como antes.
   const visibility = opts?.visibility ?? "public";
-  await sql`UPDATE entities SET slug = ${slug}, visibility = ${visibility}, owner_email = ${opts?.ownerEmail ?? null}, parent_id = ${parentId} WHERE id = ${ent.id}`;
-  return { id: ent.id, name: ent.name, slug, visibility, ownerEmail: opts?.ownerEmail ?? null, parentId };
+  const inserted = (await sql`
+    INSERT INTO entities (name, canonical_name, type, slug, visibility, owner_email, parent_id)
+    VALUES (${name}, ${canonicalize(name)}, 'project', ${slug}, ${visibility}, ${opts?.ownerEmail ?? null}, ${parentId})
+    ON CONFLICT (type, canonical_name) DO NOTHING
+    RETURNING id, name, slug, visibility, owner_email, parent_id
+  `) as unknown as Row[];
+  if (inserted[0]) return toRef(inserted[0])!;
+  const byName = (await sql`
+    SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
+    WHERE type = 'project' AND canonical_name = ${canonicalize(name)} LIMIT 1
+  `) as unknown as Row[];
+  return toRef(byName[0])!; // ya existía (por nombre)
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {

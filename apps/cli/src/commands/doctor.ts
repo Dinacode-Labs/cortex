@@ -126,7 +126,7 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
       checks.push({ nombre: et("MCP"), nivel: "aviso", detalle: "the server does not publish its URL", arreglo: "Older server: the URL will be guessed from the port." });
     }
 
-    // Las dos versiones se comparan en un solo sitio (ADR-0060): aquí solo se traduce.
+    // Las dos versiones se comparan en un solo sitio (ADR-0062): aquí solo se traduce.
     const compat = classify(creds.server, CLI_VERSION, cfg);
     if (compat.kind === "blocked") {
       checks.push({ nombre: et("CLI version"), nivel: "aviso", detalle: `you have ${CLI_VERSION}, the server accepts ${compat.minClientVersion} or newer: writing is disabled`, arreglo: "cortex upgrade" });

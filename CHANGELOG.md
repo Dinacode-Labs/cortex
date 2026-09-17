@@ -10,7 +10,7 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ### Added
 - **El CLI avisa cuando se queda atrás, y se niega a escribir cuando se queda demasiado atrás**
-  (ADR-0060). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
+  (ADR-0062). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
   son dos relojes distintos y esta semana se vio, con tres despliegues seguidos y gente días
   con un CLI viejo sin enterarse. El aviso existía en `cortex doctor`, donde nadie mira. Ahora:
   - Los comandos interactivos consultan `/client-config` **una vez cada 24 h** por servidor
@@ -33,6 +33,23 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   la cabecera del cliente HTTP.
 
 ### Fixed
+- **El clasificador ya no fabrica proyectos.** Ofrecía `project` entre los tipos de entidad, así
+  que cualquier nombre propio que el LLM tomara por un proyecto —tickets, ramas, ficheros,
+  microservicios— acababa en `entities` con `type='project'`: la misma fila que un proyecto de
+  verdad, pero sin slug ni dueño, y salía en `cortex link` y en la UI mezclado con los reales
+  (en una instalación real, 26 fantasmas frente a 10 proyectos). Ahora el proyecto **se crea,
+  no se extrae**: `project` sigue siendo un tipo de entidad —es la fila del proyecto— pero no se
+  le ofrece a ningún extractor, `core` descarta lo que llegue con ese tipo, y la base exige slug
+  a todo `project`. La migración `0019` borra los fantasmas (solo los que no tienen nada
+  colgando; ninguna entrada se toca) y deja el CHECK. ADR-0060. (#135)
+- **El slug del proyecto vale para leer, no solo para escribir.** El slug es la identidad del
+  proyecto en todo el producto (`cortex link`, `.cortex.json`, `/p/<slug>`, la API), pero en las
+  tools MCP `project` se resolvía por nombre canónico al leer y por slug al escribir, y como la
+  normalización no toca los guiones, `save_project_context` con `acme-portal` guardaba en Acme
+  Portal y `get_project_context_pack` con el mismo valor decía «Project not found». Ahora hay
+  **una sola** resolución para todo (slug primero, nombre canónico después), que usan también el
+  guard de permisos —que además comparaba el nombre exacto, así que rechazaba lo que las
+  operaciones de datos sí encontraban— y el pack lleva el nombre real del proyecto. ADR-0061. (#136)
 - **`search` y `ask` dentro de un proyecto hijo ya miran también lo del padre.** El context pack
   heredaba de sus ancestros y la búsqueda no, así que lo transversal de un cliente —contratos,
   convenciones, con quién se habla— se guardaba una vez en el proyecto padre y **no se

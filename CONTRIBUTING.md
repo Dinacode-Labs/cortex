@@ -98,7 +98,7 @@ are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
   and validity. Do not turn inferences into facts — anything automatic gets low confidence.
 - **zod is split:** `agents` uses **zod v4** (Mastra requires it); everything else uses **v3**.
   Do not pass schemas between them.
-- **The CLI may be talking to a server from months ago** ([ADR-0060](./docs/decisions.md#adr-0060)).
+- **The CLI may be talking to a server from months ago** ([ADR-0062](./docs/decisions.md#adr-0062)).
   They are not versioned together: the contract is the HTTP API. When you add an endpoint or a
   response field, the reading side must treat its absence as "this server does not have it yet",
   never as an error: type new fields as optional where they are read, treat a 404 on a new
