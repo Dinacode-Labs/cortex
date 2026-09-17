@@ -113,7 +113,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "technical debt, conventions and sensitive modules, plus whatever is most relevant to " +
         "an area if you name one. Read this before touching a module.",
       inputSchema: {
-        project: z.string().describe("Project name, e.g. 'Acme Portal'"),
+        project: z.string().describe("Project slug (what `cortex link` shows) or name, e.g. 'acme-portal' or 'Acme Portal'"),
         area: z.string().optional().describe("Optional area or module, e.g. 'billing'"),
         asOf: z.string().optional().describe("ISO date (YYYY-MM-DD) to see the project as it was known then; defaults to now"),
       },
@@ -135,7 +135,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       title: "List project decisions",
       description: "List the technical decisions recorded for a project, most recent first.",
       inputSchema: {
-        project: z.string().describe("Project name"),
+        project: z.string().describe("Project slug or name"),
         limit: z.number().int().positive().max(50).optional(),
       },
     },
@@ -188,7 +188,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "without one it falls back to search results.",
       inputSchema: {
         question: z.string().describe("The question, in plain language"),
-        project: z.string().optional().describe("Project name"),
+        project: z.string().optional().describe("Project slug or name"),
       },
     },
     async ({ question, project }) => {
@@ -220,7 +220,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "and line range. Use it to find where something is implemented before you change it.",
       inputSchema: {
         query: z.string().describe("What to look for: plain language or an identifier"),
-        project: z.string().describe("Project name"),
+        project: z.string().describe("Project slug or name"),
         limit: z.number().int().positive().max(20).optional(),
       },
     },
@@ -243,7 +243,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "Report on the health of a project's memory: contradictions, likely duplicates, orphan " +
         "entities, low-confidence entries, superseded history, and gaps (areas with incidents " +
         "but no documented decisions).",
-      inputSchema: { project: z.string().describe("Project name") },
+      inputSchema: { project: z.string().describe("Project slug or name") },
     },
     async ({ project }) => {
       try {

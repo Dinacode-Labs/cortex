@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { apiPost, useProjectServer } from "@cortex/client";
+import { requireCompatibleServer } from "../compat.js";
 import type { BatchItem } from "@cortex/shared";
 
 /**
@@ -41,6 +42,7 @@ interface Issue {
 
 export async function run(args: string[]): Promise<void> {
   useProjectServer(process.env.INIT_CWD || process.cwd());
+  await requireCompatibleServer();
   const slug = args[0];
   const repo = args[1];
   const max = Number(args[2] ?? "100");

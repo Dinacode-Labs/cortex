@@ -14,6 +14,106 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   servidor de API, que no tiene esa ruta. El endpoint pasa a `/graph.json`. De paso, la casilla
   «Include entries» no se podía volver a marcar —el formulario manda dos valores y se leía el
   primero—, y sin entradas el grafo no tiene ni una arista que pintar.
+### Added
+- **«Across this client»: un proyecto padre ya se puede leer, no solo abrir.** La herencia
+  SUBE —un repo ve lo de su cliente, nunca lo de un hermano— y eso deja sin responder justo la
+  pregunta para la que existe un proyecto padre: qué comparten sus repos y dónde uno decidió lo
+  contrario que otro. Ahora un proyecto con hijos tiene una sección más con tres cosas:
+  **stack compartido** (entidades `technology`/`module`/`service`/`integration`/`vendor`
+  enlazadas desde entradas vigentes de dos o más hijos, y de cuáles; fuera `client`, `project` y
+  `repository`, que hoy son ruido del extractor), **contradicciones entre proyectos** (las
+  relaciones `contradicts` cuyos dos extremos están en proyectos distintos del subárbol — el
+  lint es por proyecto, así que un choque entre hermanos no salía en el informe de ninguno de
+  los dos) y **buscar hacia abajo**: una casilla «include child projects» que solo aparece en el
+  padre, apagada por defecto, y que dice de qué repo es cada resultado. Todo lo que cruza hacia
+  abajo filtra por permisos antes de mirar nada. ADR-0063.
+
+### Added
+- **El CLI avisa cuando se queda atrás, y se niega a escribir cuando se queda demasiado atrás**
+  (ADR-0062). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
+  son dos relojes distintos y esta semana se vio, con tres despliegues seguidos y gente días
+  con un CLI viejo sin enterarse. El aviso existía en `cortex doctor`, donde nadie mira. Ahora:
+  - Los comandos interactivos consultan `/client-config` **una vez cada 24 h** por servidor
+    (caché en `~/.cortex/version-check.json`) y, si hay versión nueva, sueltan **una línea a
+    stderr** al terminar: `Cortex 0.1.9 → 0.1.12 · cortex upgrade`. Solo con una terminal
+    delante; en un script, en CI o en una tubería no dicen nada. Los hooks y `cortex mcp` **no
+    pasan por ahí jamás** (stdout es protocolo), y hay un test que lo garantiza.
+  - Si el CLI está **por debajo de `minClientVersion`**, los comandos que escriben (`mem save`,
+    `mem update`, `link --create`, `connect-*`) fallan con un mensaje claro en vez de guardar
+    algo a medias. Los de lectura siguen funcionando. Es el único número que bloquea, y lo sube
+    el operador cuando algo se rompe de verdad (`CORTEX_MIN_CLIENT_VERSION`).
+  - El caso contrario, que era invisible: si el **CLI es más nuevo que el servidor**, lo dice y
+    manda avisar a quien lo opera. Es el que nos va a pasar a nosotros: npm va más rápido que un
+    despliegue.
+  - `CORTEX_NO_VERSION_CHECK=1` apaga las tres cosas. La comparación de versiones vive en un solo
+    sitio y ya tolera prefijos `v` y prereleases; `doctor` y `version` la reutilizan.
+- **Regla escrita para quien añada un endpoint**: el CLI trata lo que no conoce como «esa función
+  no está», no como error. Un campo ausente o un 404 en un endpoint nuevo es un servidor viejo y
+  se degrada. Ya pasaba en varios sitios; ahora está dicho en el ADR, en `CONTRIBUTING.md` y en
+  la cabecera del cliente HTTP.
+- **La jerarquía de proyectos se ve, no solo existe.** Un cliente con varios repos es un
+  proyecto padre con un hijo por repo (ADR-0037, ADR-0056), y de ahí cuelgan la herencia del
+  context pack y los permisos — pero en la web eso no se notaba en ninguna pantalla. Ahora la
+  cabecera de un proyecto lleva **miga de pan hasta la raíz** (`Acme › Acme Portal`, cada
+  nivel enlazado), un padre lista **sus repos** con las mismas tarjetas de la portada, la
+  **portada agrupa** a los hijos bajo su padre en vez de ponerlos de hermanos, y **What agents
+  see** marca cada entrada heredada con el proyecto del que viene, que antes se mezclaba en
+  silencio. Lo que cruza hacia abajo filtra por permisos: un hijo privado del que no eres
+  miembro no aparece por ver al padre.
+
+### Fixed
+- **El clasificador ya no fabrica proyectos.** Ofrecía `project` entre los tipos de entidad, así
+  que cualquier nombre propio que el LLM tomara por un proyecto —tickets, ramas, ficheros,
+  microservicios— acababa en `entities` con `type='project'`: la misma fila que un proyecto de
+  verdad, pero sin slug ni dueño, y salía en `cortex link` y en la UI mezclado con los reales
+  (en una instalación real, 26 fantasmas frente a 10 proyectos). Ahora el proyecto **se crea,
+  no se extrae**: `project` sigue siendo un tipo de entidad —es la fila del proyecto— pero no se
+  le ofrece a ningún extractor, `core` descarta lo que llegue con ese tipo, y la base exige slug
+  a todo `project`. La migración `0019` borra los fantasmas (solo los que no tienen nada
+  colgando; ninguna entrada se toca) y deja el CHECK. ADR-0060. (#135)
+- **El slug del proyecto vale para leer, no solo para escribir.** El slug es la identidad del
+  proyecto en todo el producto (`cortex link`, `.cortex.json`, `/p/<slug>`, la API), pero en las
+  tools MCP `project` se resolvía por nombre canónico al leer y por slug al escribir, y como la
+  normalización no toca los guiones, `save_project_context` con `acme-portal` guardaba en Acme
+  Portal y `get_project_context_pack` con el mismo valor decía «Project not found». Ahora hay
+  **una sola** resolución para todo (slug primero, nombre canónico después), que usan también el
+  guard de permisos —que además comparaba el nombre exacto, así que rechazaba lo que las
+  operaciones de datos sí encontraban— y el pack lleva el nombre real del proyecto. ADR-0061. (#136)
+- **`search` y `ask` dentro de un proyecto hijo ya miran también lo del padre.** El context pack
+  heredaba de sus ancestros y la búsqueda no, así que lo transversal de un cliente —contratos,
+  convenciones, con quién se habla— se guardaba una vez en el proyecto padre y **no se
+  encontraba desde el repo del hijo**, que es justo donde hace falta. Subir es seguro: el acceso
+  al hijo ya exige acceso a toda la cadena, así que por herencia no se ve nada que no se pudiera
+  ver directamente. Y no baja: desde el padre no se ve lo de un hijo.
+
+### Fixed
+- **«No has iniciado sesión» era mentira la mayoría de las veces.** Cuando el MCP no podía
+  autenticarse decía eso y mandaba a repetir un `cortex auth login` ya hecho. El caso real es
+  otro: la carpeta apunta —por su `.cortex.json` o por `CORTEX_SERVER_URL`— a un servidor del
+  que no hay credenciales, mientras sí las hay de otro. Ahora el mensaje dice **qué servidor**
+  buscó, desde qué carpeta lo resolvió y **qué sesiones sí existen**. Un error que dirige mal
+  cuesta más que uno que calla, porque parece que sabe.
+
+### Changed
+- **Este repositorio deja de versionar su `.cortex.json`.** Al ser público, un vínculo commiteado
+  convierte *nuestro* proyecto en el que traen por defecto todos los clones del mundo, y obliga a
+  quien contribuye a editar un fichero versionado para usar el suyo. La regla general, que es lo
+  que necesita saber quien adopte Cortex: **versiónalo en un repo privado de una organización;
+  ignóralo en uno público.** Ver ADR-0059.
+
+### Changed
+- **`.env.example` vuelve a ser una plantilla y no un documento.** Tenía 336 líneas de las que
+  **155 eran prosa**: explicaciones de por qué se decidió algo, qué se llamaba antes de otra
+  manera y qué se retira en qué versión. Eso es material de ADR y de CHANGELOG, no de un
+  fichero que copias a `.env`. Ahora son 167 líneas, una por variable con lo que hace y su
+  valor por defecto, y los nombres obsoletos (`NAN_*`, `BREVO_SENDER*`) dejan de ofrecerse —
+  siguen funcionando, con su aviso, pero una plantilla es lo que deberías poner hoy.
+
+### Fixed
+- Siete variables de entorno que el código lee y no aparecían en ninguna plantilla
+  (`CORTEX_BIND_HOST`, `CORTEX_ENV_FILE`, `CORTEX_NPM_PACKAGE`, `CORTEX_OPENCODE_DB`,
+  `CORTEX_PI_DIR`, `CORTEX_SEARCH_TYPE_BOOST`, `CORTEX_WORKER_HEARTBEAT_FILE`). Existían,
+  funcionaban y no las conocía nadie. Hay un test que compara las dos listas.
 
 ## [0.1.10] — 2026-09-16
 

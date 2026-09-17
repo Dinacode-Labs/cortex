@@ -286,6 +286,11 @@ a.back:hover { color:var(--ink); text-decoration:none; }
 /* --- Cabecera de proyecto y pestañas ------------------------------------- */
 
 .project-head { margin-bottom:var(--s-5); border-bottom:1px solid var(--line); }
+/* Miga de pan: el camino hasta la raíz, por encima del título y sin competir con él. */
+.crumbs { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-1);
+  margin-bottom:var(--s-2); font-size:var(--t-sm); color:var(--muted); }
+.crumbs .sep { color:var(--faint); }
+.crumbs .here { color:var(--muted); font-weight:500; }
 .project-title { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
 .project-title .sub { margin-left:auto; }
 .tabs { display:flex; gap:var(--s-1); margin-top:var(--s-4); overflow-x:auto; scrollbar-width:none; }
@@ -327,6 +332,13 @@ a.back:hover { color:var(--ink); text-decoration:none; }
 .health.warn { color:var(--warn); }
 .onboarding .content-block { margin:var(--s-4) 0; }
 
+/* Un cliente y sus repos: el padre a lo ancho y los hijos dentro, sangrados, para que se lea
+   que cuelgan de él y no que son sus hermanos. */
+.project-group { margin-bottom:var(--s-5); }
+.project-children { margin:var(--s-3) 0 0 var(--s-5); padding-left:var(--s-4);
+  border-left:2px solid var(--line); }
+.project-children .sub { margin-bottom:var(--s-2); }
+
 /* --- Health -------------------------------------------------------------- */
 
 .findings { margin:0; padding:0; list-style:none; }
@@ -336,6 +348,13 @@ a.back:hover { color:var(--ink); text-decoration:none; }
 .pack-entry:first-of-type { border-top:none; padding-top:0; }
 .pack-entry .card-head { margin-bottom:var(--s-2); }
 .pack-entry b { display:block; margin-bottom:2px; }
+/* De qué proyecto viene algo que se mira desde otro: una entrada heredada del cliente en el
+   pack de un hijo, un choque entre hermanos, o un resultado de un hijo al buscar desde el
+   padre. Es siempre la misma pregunta —«¿esto de quién es?»— así que es la misma marca. */
+.from-project { display:inline-flex; align-items:center; height:20px; padding:0 var(--s-2);
+  font-size:var(--t-xs); font-weight:600; color:var(--muted);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); }
+a.from-project:hover { color:var(--ink); border-color:var(--line-strong); text-decoration:none; }
 
 /* --- Mapa ---------------------------------------------------------------- */
 
@@ -369,6 +388,7 @@ tr:last-child td { border-bottom:none; }
   main { padding:var(--s-5) var(--s-4) var(--s-6); }
   h1 { font-size:22px; }
   .grid, .project-grid { grid-template-columns:1fr; }
+  .project-children { margin-left:0; padding-left:var(--s-3); }
   .project-title .sub { margin-left:0; flex-basis:100%; }
   .meta { grid-template-columns:1fr; gap:0; }
   .meta dt { margin-top:var(--s-3); }

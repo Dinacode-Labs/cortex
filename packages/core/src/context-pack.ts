@@ -5,7 +5,7 @@ import {
   type ContextEntryType,
   type ContextEntryStatus,
 } from "@cortex/shared";
-import { findProjectIdByName } from "./projects.js";
+import { findProjectByName, projectIdsWithAncestors } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import { vectorSearch, type SearchHit } from "./vectors.js";
 
@@ -104,13 +104,16 @@ export interface EntryConflict {
  */
 export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
   const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
-  if (!projectId) {
+  // Se resuelve por slug o nombre (#136); el pack lleva el NOMBRE del proyecto, no lo que se
+  // tecleó, para que la cabecera no diga «acme-portal» cuando el proyecto se llama Acme Portal.
+  const resolved = await findProjectByName(project);
+  const projectId = resolved?.id;
+  if (!resolved || !projectId) {
     throw new Error(`Proyecto no encontrado: "${project}".`);
   }
 
   // Herencia: el pack incluye el conocimiento del proyecto + el de sus ancestros (padre).
-  const ids = await projectIdsWithAncestors(sql, projectId);
+  const ids = await projectIdsWithAncestors(projectId);
   const porTipo = await Promise.all(PACK_SECTIONS.map((s) => entriesByType(sql, ids, s.type, asOf)));
   const sections: PackSection[] = PACK_SECTIONS.map((s, i) => ({ ...s, entries: porTipo[i]! })).filter(
     (s) => s.entries.length > 0,
@@ -144,7 +147,7 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   }
 
   return {
-    project,
+    project: resolved.name,
     generatedAt: new Date(),
     sections,
     sensitiveModules,
@@ -163,30 +166,58 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
  * "src/webhook.js"), que es el caso frecuente; ahí solo se puede decir que la zona está en
  * disputa, porque una entrada colgada de "README" no contradice necesariamente nada.
  */
-async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConflict[]> {
-  const directos = new Map<string, { label: string; recordedLater: boolean }[]>();
-  const zonas = new Map<string, Map<string, Set<string>>>();
+/** Un lado de un choque entrada ↔ entrada, con su proyecto: quién lo dice importa. */
+export interface ContradictingSide {
+  id: string;
+  title: string;
+  createdAt: Date;
+  projectId: string | null;
+}
 
-  // 1) Entrada ↔ entrada: además de con qué choca, cuál se registró antes.
-  const entreEntradas = (await sql`
-    SELECT ca.id AS a_id, ca.title AS a_title, ca.created_at AS a_at,
-           cb.id AS b_id, cb.title AS b_title, cb.created_at AS b_at
+/**
+ * Los pares de entradas VIGENTES relacionadas con `contradicts` dentro de unos proyectos.
+ *
+ * Es la consulta base de todas las contradicciones del producto, y vive en un solo sitio a
+ * propósito: el pack la usa para avisar a cada entrada de con qué choca, y la vista de cliente
+ * para enseñar los choques ENTRE proyectos del mismo subárbol. Dos consultas parecidas sobre
+ * `relations` acabarían diciendo cosas distintas sobre los mismos datos.
+ */
+export async function contradictingEntryPairs(
+  sql: Sql,
+  projectIds: string[],
+  limit = 25,
+): Promise<{ a: ContradictingSide; b: ContradictingSide }[]> {
+  const rows = (await sql`
+    SELECT ca.id AS a_id, ca.title AS a_title, ca.created_at AS a_at, ca.project_id AS a_project,
+           cb.id AS b_id, cb.title AS b_title, cb.created_at AS b_at, cb.project_id AS b_project
     FROM relations r
     JOIN context_entries ca ON ca.id = r.source_id AND ca.valid_to IS NULL
     JOIN context_entries cb ON cb.id = r.target_id AND cb.valid_to IS NULL
     WHERE r.relation_type = 'contradicts'
       AND ca.project_id = ANY(${projectIds}) AND cb.project_id = ANY(${projectIds})
-    LIMIT 25
+    LIMIT ${limit}
   `) as unknown as Row[];
+  return rows.map((r) => ({
+    a: { id: r.a_id as string, title: r.a_title as string, createdAt: new Date(r.a_at as string), projectId: (r.a_project as string) ?? null },
+    b: { id: r.b_id as string, title: r.b_title as string, createdAt: new Date(r.b_at as string), projectId: (r.b_project as string) ?? null },
+  }));
+}
+
+async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConflict[]> {
+  const directos = new Map<string, { label: string; recordedLater: boolean }[]>();
+  const zonas = new Map<string, Map<string, Set<string>>>();
+
+  // 1) Entrada ↔ entrada: además de con qué choca, cuál se registró antes.
+  const entreEntradas = await contradictingEntryPairs(sql, projectIds);
   const anotaDirecto = (id: string, label: string, recordedLater: boolean): void => {
     const lista = directos.get(id) ?? [];
     if (!lista.some((x) => x.label === label)) lista.push({ label, recordedLater });
     directos.set(id, lista);
   };
-  for (const r of entreEntradas) {
-    const aNueva = new Date(r.a_at as string) >= new Date(r.b_at as string);
-    anotaDirecto(r.a_id as string, r.b_title as string, !aNueva);
-    anotaDirecto(r.b_id as string, r.a_title as string, aNueva);
+  for (const { a, b } of entreEntradas) {
+    const aNueva = a.createdAt >= b.createdAt;
+    anotaDirecto(a.id, b.title, !aNueva);
+    anotaDirecto(b.id, a.title, aNueva);
   }
 
   // 2) Entidades en disputa. Se excluyen las entradas colgadas de AMBOS lados: esas no están
@@ -228,17 +259,6 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
 // --- helpers -----------------------------------------------------------------
 
 /** IDs del proyecto + todos sus ancestros (jerarquía padre). Para herencia de contexto. */
-async function projectIdsWithAncestors(sql: Sql, projectId: string): Promise<string[]> {
-  const rows = (await sql`
-    WITH RECURSIVE chain AS (
-      SELECT id, parent_id FROM entities WHERE id = ${projectId}
-      UNION ALL
-      SELECT e.id, e.parent_id FROM entities e JOIN chain c ON e.id = c.parent_id
-    )
-    SELECT id FROM chain
-  `) as unknown as Row[];
-  return rows.map((r) => r.id as string);
-}
 
 async function entriesByType(
   sql: Sql,

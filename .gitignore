@@ -42,3 +42,8 @@ dinacode-*.md
 config/skills/*/*.zip
 # Local Pi runtime state
 .atl/
+
+# El vínculo de ESTA carpeta con un proyecto de Cortex. Es de cada clon, no del repositorio
+# (ADR-0059): quien clone esto y quiera su propia memoria no debería tener que pelearse con un
+# fichero versionado. Se crea solo con `cortex link`.
+.cortex.json

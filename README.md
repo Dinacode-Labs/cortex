@@ -175,6 +175,13 @@ at any point in between.
   membership of the private ones.
 - All you need is a **Cortex server running somewhere**. Whoever handles your infrastructure
   runs it.
+- **Two clocks, compared rather than tied.** You update the CLI from npm; an operator updates
+  the server. They do not have to match ([ADR-0062](./docs/decisions.md#adr-0062)). When the
+  server is newer, commands end with one line on stderr, once a day: `Cortex 0.1.9 → 0.1.12 ·
+  cortex upgrade`. When your CLI is newer, they tell you the server is behind so you can tell
+  whoever runs it. Only if your CLI is older than the server's `minClientVersion` do the
+  commands that **write** refuse; reading keeps working. `CORTEX_NO_VERSION_CHECK=1` turns it
+  off. Hooks and `cortex mcp` never print any of this.
 
 ### Or let your agent do it
 

@@ -14,6 +14,8 @@ import { httpTransport, resolveUpstream } from "../mcp/upstream.js";
 export async function run(): Promise<void> {
   const { server, close } = createMcpProxy({
     connect: async () => {
+      // `resolveUpstream` lanza `SinSesionError` con el servidor concreto y las sesiones que
+      // sí hay: el proxy lo enseña tal cual en vez de traducirlo a «no has iniciado sesión».
       const target = await resolveUpstream();
       if (!target) throw Object.assign(new Error("no autenticado"), { code: 401 });
       return httpTransport(target);

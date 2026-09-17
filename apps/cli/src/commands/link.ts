@@ -12,6 +12,7 @@ import {
   writeCortexLink,
   type CortexLink,
 } from "@cortex/client";
+import { requireCompatibleServer } from "../compat.js";
 
 /**
  * `cortex link`: vincula la carpeta actual a un proyecto de Cortex escribiendo
@@ -112,6 +113,7 @@ export async function run(args: string[]): Promise<void> {
     }
     if (!requireExplicitServerToCreate(explicit ? server : undefined)) return;
     if (!requireSession()) return;
+    await requireCompatibleServer(); // crear un proyecto es escribir (ADR-0062)
     const pi = args.indexOf("--parent");
     const res = await createProject({
       name,

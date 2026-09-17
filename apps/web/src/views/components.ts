@@ -1,5 +1,7 @@
 import { html, raw } from "hono/html";
+import type { AccessibleProject } from "@cortex/core";
 import type { ContextEntry } from "@cortex/shared";
+import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
 
 /**
@@ -103,22 +105,60 @@ export function entryCard(entry: ContextEntry): Html {
   </a>`;
 }
 
-/** Resultado de búsqueda: lo mismo con la puntuación delante, para no tener dos tarjetas. */
-export function hitCard(entry: ContextEntry, score: number): Html {
+/**
+ * Resultado de búsqueda: lo mismo con la puntuación delante, para no tener dos tarjetas.
+ * `origen` lo rellena quien busca en más de un proyecto a la vez — sin él, los resultados de
+ * tres repos distintos se leen como si fueran del mismo.
+ */
+export function hitCard(entry: ContextEntry, score: number, origen?: Html): Html {
   return html`<a class="card" href="/entry/${entry.id}">
-    <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)}</div>
+    <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)} ${origen ?? ""}</div>
     <h3>${entry.title}</h3>
     <p>${entry.summary ?? entry.content}</p>
   </a>`;
 }
 
+// --- Tarjeta de proyecto ------------------------------------------------------------------
+
+/**
+ * La tarjeta con la que se elige un proyecto.
+ *
+ * Vive aquí y no en la portada porque un cliente la enseña también dentro de sí mismo, para
+ * sus repos: si fueran dos tarjetas distintas, elegir «Acme Portal» desde la portada y
+ * elegirlo desde «Acme» parecerían dos cosas distintas, y son la misma.
+ */
+export function projectCard(p: AccessibleProject, salud: Html): Html {
+  return html`<a class="project-card" href="/p/${p.slug}">
+    <div class="card-head">
+      <h2>${p.name}</h2>
+      ${visibilityPill(p.visibility)}
+    </div>
+    <div class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</div>
+    <div class="card-foot">
+      <span>${p.entryCount} ${p.entryCount === 1 ? "entry" : "entries"}</span>
+      ${salud}
+    </div>
+  </a>`;
+}
+
 // --- Formularios --------------------------------------------------------------------------
 
-/** Caja de búsqueda con su botón: aparece en cinco sitios y debe ser la misma en los cinco. */
-export function searchForm(action: string, q: string, placeholder: string, ocultos: Record<string, string> = {}): Html {
+/**
+ * Caja de búsqueda con su botón: aparece en cinco sitios y debe ser la misma en los cinco.
+ * `extra` es para lo que solo tiene sentido en uno —hoy, la casilla que baja a los hijos desde
+ * un cliente—, y va entre el campo y el botón para que se lea antes de pulsar.
+ */
+export function searchForm(
+  action: string,
+  q: string,
+  placeholder: string,
+  ocultos: Record<string, string> = {},
+  extra?: Html,
+): Html {
   return html`<form class="row" method="get" action="${action}">
     ${Object.entries(ocultos).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
     <input type="text" name="q" value="${q}" placeholder="${placeholder}" required>
+    ${extra ?? ""}
     <button type="submit">Search</button>
   </form>`;
 }
