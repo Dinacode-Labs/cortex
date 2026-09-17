@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { apiPost, useProjectServer } from "@cortex/client";
+import { requireCompatibleServer } from "../compat.js";
 import {
   chunkDocument,
   extractionKind,
@@ -74,6 +75,7 @@ export async function run(args: string[]): Promise<void> {
   // El servidor sale del `.cortex.json` de la carpeta desde la que se lanza (ADR-0033), no de
   // la carpeta de documentos, que puede estar en cualquier sitio.
   useProjectServer(process.cwd());
+  await requireCompatibleServer();
 
   if (hallazgo.texto.length === 0 && hallazgo.pesados.length === 0) {
     console.error(`Nothing readable in ${root}.`);

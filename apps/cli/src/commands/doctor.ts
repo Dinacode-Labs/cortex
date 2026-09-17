@@ -1,7 +1,8 @@
 import { defaultServer, getClientConfig, listCredentials, normalizeServer, readCortexLink, useProjectServer } from "@cortex/client";
 import { defaultCtx, detectAgents, getAdapter } from "../setup/index.js";
 import type { SetupCtx } from "../setup/types.js";
-import { CLI_VERSION, isOlderThan } from "../version.js";
+import { classify } from "../compat.js";
+import { CLI_VERSION } from "../version.js";
 
 /**
  * `cortex doctor` — por qué no funciona.
@@ -125,9 +126,14 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
       checks.push({ nombre: et("MCP"), nivel: "aviso", detalle: "the server does not publish its URL", arreglo: "Older server: the URL will be guessed from the port." });
     }
 
-    const min = cfg?.minClientVersion;
-    if (min && isOlderThan(CLI_VERSION, min)) {
-      checks.push({ nombre: et("CLI version"), nivel: "aviso", detalle: `you have ${CLI_VERSION}, the server asks for ${min}`, arreglo: "cortex upgrade" });
+    // Las dos versiones se comparan en un solo sitio (ADR-0062): aquí solo se traduce.
+    const compat = classify(creds.server, CLI_VERSION, cfg);
+    if (compat.kind === "blocked") {
+      checks.push({ nombre: et("CLI version"), nivel: "aviso", detalle: `you have ${CLI_VERSION}, the server accepts ${compat.minClientVersion} or newer: writing is disabled`, arreglo: "cortex upgrade" });
+    } else if (compat.kind === "cli-behind") {
+      checks.push({ nombre: et("CLI version"), nivel: "aviso", detalle: `you have ${CLI_VERSION}, the server runs ${compat.serverVersion}`, arreglo: "cortex upgrade" });
+    } else if (compat.kind === "server-behind") {
+      checks.push({ nombre: et("Server version"), nivel: "aviso", detalle: `${compat.serverVersion}, older than this CLI (${CLI_VERSION})`, arreglo: "Newer features stay off until whoever operates the server updates it." });
     }
   }
 

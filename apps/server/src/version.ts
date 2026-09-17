@@ -20,7 +20,10 @@ function readVersion(): string {
 export const SERVER_VERSION = readVersion();
 
 /**
- * Por debajo de esta versión, el CLI avisa de que hay que actualizar. Se sube cuando un
- * cambio del servidor rompe a los clientes viejos, no en cada release.
+ * El CLI más viejo que ESTE servidor admite (ADR-0062). Es el único número que puede bloquear:
+ * por debajo, el CLI se niega a escribir (leer sigue funcionando). Lo sube el operador cuando
+ * un cambio del servidor rompe de verdad a los clientes viejos, no en cada release; por eso el
+ * default es tan bajo. `SERVER_VERSION`, en cambio, es solo informativa: el CLI la usa para
+ * avisar de que hay versión nueva, o de que el servidor se ha quedado atrás.
  */
 export const MIN_CLIENT_VERSION = process.env.CORTEX_MIN_CLIENT_VERSION?.trim() || "0.1.0";

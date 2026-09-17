@@ -56,6 +56,11 @@ members can change; nothing is born without a slug), the rule that made the land
 (scope in the query, never after a limit), and how it is styled — one stylesheet as a design
 system, a component layer, and no framework ([0053](#adr-0053)).
 
+**Living with several clocks — 16 September 2026** ([0059](#adr-0059), [0062](#adr-0062)). The
+repository went public and the CLI went to npm, and both brought the same lesson: what is
+right for one team is not right for every clone. The link file belongs to each clone, and the
+CLI and the server are two clocks that are compared, not tied.
+
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
 > to by title alone. They were numbered on 2026-09-12, taking the next free identifiers. The
@@ -1710,3 +1715,123 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   spelling of its name, which it was not before.
 - **Revisit when:** the MCP tools take a `slug` field of their own, or projects get their own
   table with the slug as key.
+
+<a id="adr-0062"></a>
+
+## ADR-0062 · The CLI and the server are not versioned in lockstep
+
+- **Status:** accepted (2026-09-16).
+- **Context:** the CLI is installed from npm and updated by each person, when they get round
+  to it. The server is updated by an operator, on their own schedule, and anyone can run their
+  own. Those are two clocks, and this week they drifted visibly: three deployments in a row and
+  people kept working for days on a CLI that did not know about any of them. The server already
+  published `version` and `minClientVersion` on `/client-config`, and `cortex doctor` already
+  compared them, but nothing a person runs day to day ever said a word, and `minClientVersion`
+  had never been raised from its default. The warning existed where nobody looked.
+- **Decision:** the versions are **not tied together**. The contract between the CLI and the
+  server is the HTTP API, not the version number. Tying them would force every developer to
+  update the day the operator does, and the other way round, which does not hold with several
+  independent deployments. Instead the two numbers the server already publishes each get one
+  meaning:
+  1. **`minClientVersion`** is the oldest CLI *this* server supports. It is the **only number
+     that can block**: below it, the commands that **write** (`mem save`, `mem update`, `link
+     --create`, the connectors) refuse with a clear message rather than saving something
+     half-way. Reading keeps working. The operator raises it when a change really breaks old
+     clients, not on every release, which is why the default is so low.
+  2. **`version`** of the server is **informative only**. The CLI compares it with its own and
+     says which side is behind: if the server is newer, there is a newer CLI on npm (`Cortex
+     0.1.9 → 0.1.12 · cortex upgrade`); if the CLI is newer, the server has fallen behind and
+     the person is told to tell whoever operates it, because they are the only one who can act
+     on it. That second case was invisible before, and it is the one that will happen to us
+     most often: npm moves faster than a deployment.
+
+  The notice is **passive**: one request per server every 24 hours, cached under `~/.cortex/`,
+  and **one line on stderr** at the end of an interactive command, only when stdout is a
+  terminal, at most once a day. Hooks and `cortex mcp` **never** print it: there stdout is the
+  agent's protocol and one extra byte breaks the session. A test guarantees it.
+
+  And one rule of writing, which was already practised in places but written down nowhere:
+  **the CLI treats what it does not know as "that feature is not there", not as an error.** A
+  missing field in `/client-config`, or a 404 on an endpoint that did not exist last month, is
+  an older server, and the caller degrades: skips the feature, uses the previous value, or says
+  so plainly. Not knowing never blocks; when the server cannot be reached, the real request will
+  say what happened.
+- **Alternatives:** the same version on both sides, rejected above; asking npm directly whether
+  there is a newer CLI, which is a network call to a third party from every developer's machine,
+  wrong for forks, and unnecessary because the server's own version already answers it;
+  enforcing `minClientVersion` on the server by rejecting old clients, which would be the only
+  guard that cannot be skipped, but needs the client to send its version on every request and
+  is a change to the API rather than to the CLI; and a prompt to update on every command, which
+  is how warnings get ignored.
+- **Consequences:** every write command in the CLI makes one short, unauthenticated request
+  before writing. Whoever adds an endpoint or a field must make the reading side tolerate its
+  absence, and whoever raises `minClientVersion` is choosing to stop old CLIs from writing, so
+  it goes with a release note. `cortex doctor` and `cortex version` say the same thing as the
+  passive notice, using the same comparison.
+- **Revisit when:** the server enforces the minimum itself, which would make the client-side
+  check a courtesy rather than the guard; or a deployment needs to pin an exact CLI, which is
+  lockstep and should then be argued for as such.
+
+---
+
+<a id="adr-0063"></a>
+
+## ADR-0063 · Inheritance goes up; crossing down is a deliberate act, from the parent only
+
+- **Status:** accepted (2026-09-17). Builds on [0037](#adr-0037), [0046](#adr-0046) and
+  [0056](#adr-0056).
+- **Context:** a client with several repositories that are not a monorepo is modelled as a
+  parent project with one child per repository. Children inherit **upwards**: the context pack
+  ([0037](#adr-0037)) and, since PR #134, search and ask include the parent's knowledge. That
+  direction is safe by construction, because access cascades the same way — if any ancestor is
+  private the child is restricted, so reaching a child implies reaching all of its parents.
+
+  Inheritance never goes sideways, and that is on purpose: a repository should not carry its
+  sibling's context into every session. But it leaves a real question unanswered, and it is
+  exactly the question a parent project exists to answer: **what do these repositories have in
+  common, and where has one of them decided the opposite of another?** `lintProject` looks at
+  one project at a time, so a decision in the frontend that contradicts one in the backend
+  appears in neither report. Nobody is looking.
+
+  The data for this already exists. Entities are global — one row per (type, canonical name)
+  across the installation, linked to entries of any project — so the crossing has been there
+  all along. On a real server, 152 entities span more than one project. What was missing was a
+  place to look at it.
+- **Decision:** a project that has children gets one more section, **Across this client**, and
+  it holds two things plus an explicit affordance:
+
+  1. **Shared stack** — entities of type `technology`, `module`, `service`, `integration` or
+     `vendor` linked from current entries of **two or more** children, with which ones. The
+     three types that name the hierarchy itself — `client`, `project`, `repository` — are
+     excluded: today's extractor produces the client's own name as a `client` entity in each of
+     its repositories, so including them would answer "these repositories share… the client
+     they belong to", which is noise dressed as insight (see [0060](#adr-0060)). `person` is
+     out too: who worked on something is not stack.
+  2. **Contradictions between projects** — `contradicts` relations whose two current entries
+     live in *different* projects of the subtree. The pair query is the one the context pack
+     already uses, extracted so both read the same thing; only the cross-project ones are kept,
+     because within a project Health already reports them.
+  3. **Searching downwards** — an explicit "include child projects" checkbox, offered **only**
+     on a parent. It is not inheritance and does not behave like it: it is off by default, it
+     changes what you are looking at, and every result says which project it came from.
+
+  Everything that crosses downwards filters by access first: the children come from
+  `listChildProjects`, which goes through `listAccessibleProjects`, so a private child you are
+  not a member of contributes nothing — not to the shared stack, not to the contradictions, not
+  to the search. Being able to see a parent has never implied being able to see all of it, and
+  this does not change that.
+- **Alternatives:** make search and the pack descend into children by default — it would turn
+  every client session into every repository's session, which is the monorepo we deliberately
+  did not model; a cross-project graph — unreadable with the entity noise the extractor
+  produces today; entity pages, so each shared name has a home — the right general primitive
+  and the better long-term answer, but it is a different piece of work and this view does not
+  depend on it.
+- **Consequences:** a parent project stops being a container and becomes something you read.
+  The shared stack is honest about what it is: what the memory has linked from more than one
+  repository, noise included, ordered by how many of them and cut off at a length a person
+  actually reads. And the contradictions list is expected to be **empty** on a healthy client —
+  it is a watchpost, not a report.
+- **Revisit when:** entity pages exist, at which point the shared stack should link to them
+  instead of listing project names; or the extractor stops producing `client`/`repository`
+  noise ([0060](#adr-0060) is the first half of that), at which point the type filter can be
+  relaxed and argued for on its merits rather than as a workaround.

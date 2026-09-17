@@ -1,4 +1,5 @@
 import { getClientConfig, getServerVersion, readCredentials } from "@cortex/client";
+import { classify, noticeLine } from "../compat.js";
 import { CLI_VERSION } from "../version.js";
 
 /**
@@ -20,4 +21,6 @@ export async function run(): Promise<void> {
   }
   console.log(`server ${creds.server} · ${version ?? cfg?.version ?? "?"}`);
   if (cfg?.minClientVersion) console.log(`minimum client version: ${cfg.minClientVersion}`);
+  const line = noticeLine(classify(creds.server, CLI_VERSION, cfg ?? (version ? { version } : null)));
+  if (line) console.log(line);
 }

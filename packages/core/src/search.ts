@@ -49,7 +49,17 @@ const TYPE_BOOST = getEnvNum("CORTEX_SEARCH_TYPE_BOOST", 0.15);
 
 export async function searchContext(
   input: SearchContextInput,
-  opts?: { restrictToAccessibleOf?: string | null },
+  opts?: {
+    restrictToAccessibleOf?: string | null;
+    /**
+     * Proyectos EXTRA a incluir además del pedido y sus ancestros. Es cómo se busca hacia
+     * abajo desde un padre (ADR-0063): una operación deliberada, no la herencia, que sube. El
+     * caller es responsable de haber filtrado esos ids por permisos —en la web salen de
+     * `listChildProjects`, que ya lo hace— porque aquí no hay forma de distinguir un id
+     * legítimo de uno inventado.
+     */
+    alsoProjectIds?: string[];
+  },
 ): Promise<SearchHit[]> {
   const parsed = searchContextInput.parse(input);
   const sql = getSql();
@@ -60,7 +70,8 @@ export async function searchContext(
   // habla— estaba guardado en el padre y no se encontraba desde el repo donde hacía falta.
   // Subir es seguro: `canAccessProject` restringe el hijo si cualquier ancestro es privado, de
   // modo que tener acceso al hijo implica tenerlo a toda la cadena.
-  const cadena = proyectoPedido ? await projectIdsWithAncestors(proyectoPedido) : null;
+  const extra = opts?.alsoProjectIds?.length ? opts.alsoProjectIds : [];
+  const cadena = proyectoPedido ? [...new Set([...(await projectIdsWithAncestors(proyectoPedido)), ...extra])] : null;
   const projectId = cadena && cadena.length === 1 ? proyectoPedido : null;
 
   // Scoping por accesibles: solo cuando NO hay proyecto concreto Y el caller ha pedido

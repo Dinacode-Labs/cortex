@@ -1,4 +1,5 @@
 import { backfillSessions, readCortexLink, useProjectServer, type CapturePlatformName } from "@cortex/client";
+import { requireCompatibleServer } from "../compat.js";
 
 /**
  * Backfill retroactivo: mete en la memoria las sesiones que ya tenías de un agente en este
@@ -48,6 +49,7 @@ export async function run(args: string[]): Promise<void> {
     return;
   }
 
+  await requireCompatibleServer();
   const limit = process.env.CORTEX_SESSIONS_LIMIT ? Number(process.env.CORTEX_SESSIONS_LIMIT) : undefined;
   await backfillSessions(slug, repoPath, platform as CapturePlatformName, { limit });
 }

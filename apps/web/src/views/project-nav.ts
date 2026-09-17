@@ -1,5 +1,6 @@
 import { html } from "hono/html";
-import type { AccessibleProject, ProjectRef } from "@cortex/core";
+import type { ProjectRef } from "@cortex/core";
+import type { ProyectoDeLaPagina } from "../middleware/access.js";
 import type { Html } from "./layout.js";
 
 /**
@@ -10,7 +11,7 @@ import type { Html } from "./layout.js";
  * saber si su memoria está sana y qué se le está contando a su agente; «lint» y «pack» son
  * cómo lo llamamos nosotros (ADR-0050).
  */
-export type Seccion = "memory" | "ask" | "agents" | "health" | "map" | "code" | "settings";
+export type Seccion = "memory" | "ask" | "agents" | "health" | "across" | "map" | "code" | "settings";
 
 const SECCIONES: { id: Seccion; etiqueta: string; sufijo: string }[] = [
   { id: "memory", etiqueta: "Memory", sufijo: "" },
@@ -27,17 +28,51 @@ export function visibilityPill(v: "public" | "private"): Html {
     : html`<span class="pill vis">public</span>`;
 }
 
-/** Cabecera del proyecto + pestañas. `gestor` añade Settings, que el resto no necesita ver. */
-export function projectHeader(
-  project: ProjectRef | AccessibleProject,
-  activa: Seccion,
-  gestor: boolean,
-): Html {
+/**
+ * Miga de pan hasta la raíz.
+ *
+ * Un hijo no se entiende solo: «Acme Portal» es un repo de un cliente, y lo que el pack le
+ * cuenta a un agente viene en parte de ese cliente. Se pintan TODOS los niveles, no solo el
+ * padre, porque la jerarquía no tiene por qué ser de dos. Los ancestros son siempre visibles
+ * para quien ve al hijo (`canAccessProject` mira la cadena entera), así que no hay nada que
+ * filtrar aquí.
+ */
+function crumbs(ancestros: ProjectRef[], actual: string): Html {
+  if (ancestros.length === 0) return html``;
+  return html`<nav class="crumbs" aria-label="Breadcrumb">
+    ${ancestros.map(
+      (a) => html`${a.slug ? html`<a href="/p/${a.slug}">${a.name}</a>` : html`<span>${a.name}</span>`}<span class="sep">›</span>`,
+    )}<span class="here">${actual}</span>
+  </nav>`;
+}
+
+/**
+ * Cabecera del proyecto + pestañas.
+ *
+ * Toma lo que el guard ya resolvió (`requireProjectPage`) en vez de cinco argumentos sueltos:
+ * quién mira, de dónde cuelga y qué cuelga de él son lo que decide qué pestañas hay. `Settings`
+ * sale solo para quien gestiona, y `Across this client` solo si hay hijos que mirar — una
+ * pestaña que lleva a una pantalla vacía es peor que no tenerla.
+ */
+export function projectHeader(pagina: ProyectoDeLaPagina, activa: Seccion): Html {
+  const { project, gestor, ancestros, hijos } = pagina;
   const base = `/p/${project.slug}`;
-  const tabs = [...SECCIONES, ...(gestor ? [{ id: "settings" as Seccion, etiqueta: "Settings", sufijo: "/settings" }] : [])];
+  const tabs = [...SECCIONES];
+  // Va justo después de Health, no al final: es la misma pregunta —¿me puedo fiar de esto?—
+  // pero mirando al cliente entero, y leerlo seguido es como se entiende. Map y Code son otra
+  // cosa, y Settings cierra siempre.
+  if (hijos.length) {
+    tabs.splice(tabs.findIndex((t) => t.id === "health") + 1, 0, {
+      id: "across",
+      etiqueta: "Across this client",
+      sufijo: "/across",
+    });
+  }
+  if (gestor) tabs.push({ id: "settings", etiqueta: "Settings", sufijo: "/settings" });
   const count = "entryCount" in project ? project.entryCount : null;
   return html`
     <div class="project-head">
+      ${crumbs(ancestros, project.name)}
       <div class="project-title">
         <h1>${project.name}</h1>
         ${visibilityPill(project.visibility)}

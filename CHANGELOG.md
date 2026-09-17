@@ -8,6 +8,53 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Added
+- **«Across this client»: un proyecto padre ya se puede leer, no solo abrir.** La herencia
+  SUBE —un repo ve lo de su cliente, nunca lo de un hermano— y eso deja sin responder justo la
+  pregunta para la que existe un proyecto padre: qué comparten sus repos y dónde uno decidió lo
+  contrario que otro. Ahora un proyecto con hijos tiene una sección más con tres cosas:
+  **stack compartido** (entidades `technology`/`module`/`service`/`integration`/`vendor`
+  enlazadas desde entradas vigentes de dos o más hijos, y de cuáles; fuera `client`, `project` y
+  `repository`, que hoy son ruido del extractor), **contradicciones entre proyectos** (las
+  relaciones `contradicts` cuyos dos extremos están en proyectos distintos del subárbol — el
+  lint es por proyecto, así que un choque entre hermanos no salía en el informe de ninguno de
+  los dos) y **buscar hacia abajo**: una casilla «include child projects» que solo aparece en el
+  padre, apagada por defecto, y que dice de qué repo es cada resultado. Todo lo que cruza hacia
+  abajo filtra por permisos antes de mirar nada. ADR-0063.
+
+### Added
+- **El CLI avisa cuando se queda atrás, y se niega a escribir cuando se queda demasiado atrás**
+  (ADR-0062). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
+  son dos relojes distintos y esta semana se vio, con tres despliegues seguidos y gente días
+  con un CLI viejo sin enterarse. El aviso existía en `cortex doctor`, donde nadie mira. Ahora:
+  - Los comandos interactivos consultan `/client-config` **una vez cada 24 h** por servidor
+    (caché en `~/.cortex/version-check.json`) y, si hay versión nueva, sueltan **una línea a
+    stderr** al terminar: `Cortex 0.1.9 → 0.1.12 · cortex upgrade`. Solo con una terminal
+    delante; en un script, en CI o en una tubería no dicen nada. Los hooks y `cortex mcp` **no
+    pasan por ahí jamás** (stdout es protocolo), y hay un test que lo garantiza.
+  - Si el CLI está **por debajo de `minClientVersion`**, los comandos que escriben (`mem save`,
+    `mem update`, `link --create`, `connect-*`) fallan con un mensaje claro en vez de guardar
+    algo a medias. Los de lectura siguen funcionando. Es el único número que bloquea, y lo sube
+    el operador cuando algo se rompe de verdad (`CORTEX_MIN_CLIENT_VERSION`).
+  - El caso contrario, que era invisible: si el **CLI es más nuevo que el servidor**, lo dice y
+    manda avisar a quien lo opera. Es el que nos va a pasar a nosotros: npm va más rápido que un
+    despliegue.
+  - `CORTEX_NO_VERSION_CHECK=1` apaga las tres cosas. La comparación de versiones vive en un solo
+    sitio y ya tolera prefijos `v` y prereleases; `doctor` y `version` la reutilizan.
+- **Regla escrita para quien añada un endpoint**: el CLI trata lo que no conoce como «esa función
+  no está», no como error. Un campo ausente o un 404 en un endpoint nuevo es un servidor viejo y
+  se degrada. Ya pasaba en varios sitios; ahora está dicho en el ADR, en `CONTRIBUTING.md` y en
+  la cabecera del cliente HTTP.
+- **La jerarquía de proyectos se ve, no solo existe.** Un cliente con varios repos es un
+  proyecto padre con un hijo por repo (ADR-0037, ADR-0056), y de ahí cuelgan la herencia del
+  context pack y los permisos — pero en la web eso no se notaba en ninguna pantalla. Ahora la
+  cabecera de un proyecto lleva **miga de pan hasta la raíz** (`Acme › Acme Portal`, cada
+  nivel enlazado), un padre lista **sus repos** con las mismas tarjetas de la portada, la
+  **portada agrupa** a los hijos bajo su padre en vez de ponerlos de hermanos, y **What agents
+  see** marca cada entrada heredada con el proyecto del que viene, que antes se mezclaba en
+  silencio. Lo que cruza hacia abajo filtra por permisos: un hijo privado del que no eres
+  miembro no aparece por ver al padre.
+
 ### Fixed
 - **El clasificador ya no fabrica proyectos.** Ofrecía `project` entre los tipos de entidad, así
   que cualquier nombre propio que el LLM tomara por un proyecto —tickets, ramas, ficheros,
