@@ -1,4 +1,5 @@
 import { getBrandName } from "@cortex/shared";
+import { printVersionNotice } from "./compat.js";
 import { CLI_VERSION } from "./version.js";
 
 /**
@@ -17,8 +18,14 @@ type CommandModule = { run: (args: string[]) => Promise<void> };
 interface Cmd {
   help: string;
   load: () => Promise<CommandModule>;
-  /** false = el comando gestiona su propio ciclo de vida (hooks, procesos largos). */
+  /**
+   * false = el comando gestiona su propio ciclo de vida (hooks, procesos largos). Además, NO
+   * recibe el aviso de versión al terminar: en los hooks y en `cortex mcp` stdout es
+   * protocolo y cualquier byte de más rompe la sesión del agente.
+   */
   managed?: boolean;
+  /** false = el comando ya habla de versiones por sí mismo; el aviso del final sobraría. */
+  versionNotice?: boolean;
 }
 
 const COMMANDS: Record<string, Cmd> = {
@@ -29,9 +36,9 @@ const COMMANDS: Record<string, Cmd> = {
   mem: { help: "project memory from the terminal: save, search, read and fix entries", load: () => import("./commands/mem.js") },
   mcp: { help: "MCP server over stdio for your agent (proxies to the Cortex server)", managed: false, load: () => import("./commands/mcp.js") },
   toolbelt: { help: "install your organisation's toolbelt (third-party MCPs and skills)", load: () => import("./commands/toolbelt.js") },
-  version: { help: "this CLI's version and the server's", load: () => import("./commands/version.js") },
-  upgrade: { help: "install the latest published version of this CLI", load: () => import("./commands/upgrade.js") },
-  doctor: { help: "check every piece is in place, and say what to do if not", load: () => import("./commands/doctor.js") },
+  version: { help: "this CLI's version and the server's", versionNotice: false, load: () => import("./commands/version.js") },
+  upgrade: { help: "install the latest published version of this CLI", versionNotice: false, load: () => import("./commands/upgrade.js") },
+  doctor: { help: "check every piece is in place, and say what to do if not", versionNotice: false, load: () => import("./commands/doctor.js") },
   "connect-docs": { help: "ingest a folder of documentation into a project", load: () => import("./commands/connect-docs.js") },
   "connect-github": { help: "ingest pull requests and issues from a GitHub repo", load: () => import("./commands/connect-github.js") },
   "connect-sessions": { help: "backfill past agent sessions into a project", load: () => import("./commands/connect-sessions.js") },
@@ -83,6 +90,10 @@ async function main(): Promise<void> {
     console.error(`cortex ${sub} failed:`, e instanceof Error ? e.message : e);
     process.exitCode = 1;
   }
+  // Aviso pasivo de versión (ADR-0062): una línea a stderr, solo con terminal delante y como
+  // mucho una vez al día. Solo llega aquí un comando interactivo; los `managed: false` ya
+  // salieron arriba.
+  if (cmd.versionNotice !== false) await printVersionNotice();
   process.exit(process.exitCode ?? 0);
 }
 

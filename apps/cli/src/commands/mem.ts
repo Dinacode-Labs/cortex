@@ -6,6 +6,7 @@ import {
   updateEntry,
   useProjectServer,
 } from "@cortex/client";
+import { writeBlocker } from "../compat.js";
 
 /**
  * `cortex mem` — memoria del proyecto desde la línea de órdenes: guardar, buscar, leer una
@@ -73,6 +74,9 @@ async function save(args: string[], json: boolean): Promise<void> {
   if (!content) return emite({ json, ok: false, data: { error: "Missing content" }, texto: 'Usage: cortex mem save "<content>" [--title t] [--type decision]' });
   const p = slugDe(args);
   if ("error" in p) return emite({ json, ok: false, data: p, texto: `✗ ${p.error}` });
+  // Escribe: si este CLI está por debajo del mínimo del servidor, mejor no guardar a medias (ADR-0062).
+  const bloqueo = await writeBlocker();
+  if (bloqueo) return emite({ json, ok: false, data: { error: bloqueo }, texto: `✗ ${bloqueo}` });
 
   const res = await capture({
     slug: p.slug,
@@ -145,6 +149,8 @@ async function update(args: string[], json: boolean): Promise<void> {
     return emite({ json, ok: false, data: { error: "Nothing to update" }, texto: "Nothing to update: pass --title, --content, or both." });
   }
   useProjectServer(flag(args, "cwd") || process.cwd());
+  const bloqueo = await writeBlocker();
+  if (bloqueo) return emite({ json, ok: false, data: { error: bloqueo }, texto: `✗ ${bloqueo}` });
   const res = await updateEntry(id, { title, content });
   if (!res.ok) {
     const error = (res.data as { error?: string })?.error ?? `HTTP ${res.status}`;

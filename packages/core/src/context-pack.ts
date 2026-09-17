@@ -5,7 +5,7 @@ import {
   type ContextEntryType,
   type ContextEntryStatus,
 } from "@cortex/shared";
-import { findProjectIdByName } from "./projects.js";
+import { findProjectByName, projectIdsWithAncestors } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import { vectorSearch, type SearchHit } from "./vectors.js";
 
@@ -104,13 +104,16 @@ export interface EntryConflict {
  */
 export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
   const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
-  if (!projectId) {
+  // Se resuelve por slug o nombre (#136); el pack lleva el NOMBRE del proyecto, no lo que se
+  // tecleó, para que la cabecera no diga «acme-portal» cuando el proyecto se llama Acme Portal.
+  const resolved = await findProjectByName(project);
+  const projectId = resolved?.id;
+  if (!resolved || !projectId) {
     throw new Error(`Proyecto no encontrado: "${project}".`);
   }
 
   // Herencia: el pack incluye el conocimiento del proyecto + el de sus ancestros (padre).
-  const ids = await projectIdsWithAncestors(sql, projectId);
+  const ids = await projectIdsWithAncestors(projectId);
   const porTipo = await Promise.all(PACK_SECTIONS.map((s) => entriesByType(sql, ids, s.type, asOf)));
   const sections: PackSection[] = PACK_SECTIONS.map((s, i) => ({ ...s, entries: porTipo[i]! })).filter(
     (s) => s.entries.length > 0,
@@ -144,7 +147,7 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   }
 
   return {
-    project,
+    project: resolved.name,
     generatedAt: new Date(),
     sections,
     sensitiveModules,
@@ -228,17 +231,6 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
 // --- helpers -----------------------------------------------------------------
 
 /** IDs del proyecto + todos sus ancestros (jerarquía padre). Para herencia de contexto. */
-async function projectIdsWithAncestors(sql: Sql, projectId: string): Promise<string[]> {
-  const rows = (await sql`
-    WITH RECURSIVE chain AS (
-      SELECT id, parent_id FROM entities WHERE id = ${projectId}
-      UNION ALL
-      SELECT e.id, e.parent_id FROM entities e JOIN chain c ON e.id = c.parent_id
-    )
-    SELECT id FROM chain
-  `) as unknown as Row[];
-  return rows.map((r) => r.id as string);
-}
 
 async function entriesByType(
   sql: Sql,

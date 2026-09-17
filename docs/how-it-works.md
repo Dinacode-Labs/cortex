@@ -216,7 +216,9 @@ Search gives you loose pieces of text. A **knowledge graph** gives you **how thi
 The idea, simply:
 
 - **Nodes (entities):** the "things" in the project. A client, a module, a technology, a
-  service, a person, an integration. There are **11 entity types**.
+  service, a person, an integration. There are **9 entity types**. One of them, `project`, is
+  the row that represents the project itself: it is created on purpose (`cortex link --create`
+  or the first save into it), never extracted from text.
 - **Edges (relations):** **typed** connections between nodes. "the billing module
   *depends_on* the ERP integration", "incident X was *caused_by* Stripe". There are **10
   relation types**: `depends_on`, `affects`, `caused_by`, `resolved_by`, `supersedes`,

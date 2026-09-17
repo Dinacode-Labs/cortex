@@ -1,4 +1,4 @@
-import { entityType, isUsableEntityName, relationType } from "@cortex/shared";
+import { extractableEntityType, isUsableEntityName, relationType } from "@cortex/shared";
 import type { EntityType, RelationType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
@@ -25,9 +25,10 @@ export interface GraphExtraction {
   relations: ExtractedRelation[];
 }
 
-// Excluimos 'project' de la extracción: el proyecto es el contenedor, no una
-// entidad a extraer (si no, el LLM crea "proyectos" espurios de las cabeceras).
-const ETYPES = entityType.options.filter((t) => t !== "project");
+// Sin 'project': el proyecto es el contenedor, no una entidad a extraer (si no, el LLM crea
+// "proyectos" espurios de las cabeceras). La regla vive en shared para que la compartan todos
+// los extractores (#135).
+const ETYPES = extractableEntityType.options;
 const RTYPES = relationType.options;
 
 function prompt(content: string): string {

@@ -74,3 +74,37 @@ describe("permisos de proyecto (público/privado, admin, miembros, cascada)", ()
     expect(await canAccessProject(c, "admin@example.com")).toBe(true);
   });
 });
+
+describe("herencia en la búsqueda (roadmap: lo que ya estaba doliendo)", () => {
+  /**
+   * El context pack ya subía por la cadena de ancestros y la búsqueda no. Así que lo
+   * transversal de un cliente —contratos, convenciones, con quién se habla— se guardaba en el
+   * proyecto padre y NO se encontraba desde el repo del hijo, que es justo donde hace falta.
+   *
+   * Subir es seguro porque `canAccessProject` restringe el hijo si cualquier ancestro es
+   * privado: tener acceso al hijo implica tenerlo a toda la cadena.
+   */
+  it("buscar dentro de un hijo encuentra lo guardado en el padre", async () => {
+    const RID2 = Math.random().toString(36).slice(2, 8);
+    const padre = await createProject(`Cliente Busq ${RID2}`, { ownerEmail: "ana@example.com" });
+    const hijo = await createProject(`Repo Busq ${RID2}`, { ownerEmail: "ana@example.com", parentSlug: padre.slug! });
+
+    const delPadre = `El cliente exige facturacion trimestral por adelantado ${RID2}.`;
+    await saveContext({ content: delPadre, project: padre.name, createdBy: "ana@example.com" });
+    await saveContext({ content: `El repositorio usa pnpm y Node 22 ${RID2}.`, project: hijo.name, createdBy: "ana@example.com" });
+
+    const hits = await searchContext({ query: `facturacion trimestral ${RID2}`, project: hijo.name, limit: 10 });
+    expect(hits.some((h) => h.entry.content.includes("facturacion trimestral")), "lo del padre no llegó").toBe(true);
+  }, 120_000);
+
+  it("pero no baja: desde el padre no se ve lo del hijo", async () => {
+    const RID3 = Math.random().toString(36).slice(2, 8);
+    const padre = await createProject(`Cliente Solo ${RID3}`, { ownerEmail: "ana@example.com" });
+    const hijo = await createProject(`Repo Solo ${RID3}`, { ownerEmail: "ana@example.com", parentSlug: padre.slug! });
+    const delHijo = `Detalle interno del repositorio hijo ${RID3}.`;
+    await saveContext({ content: delHijo, project: hijo.name, createdBy: "ana@example.com" });
+
+    const hits = await searchContext({ query: `detalle interno repositorio ${RID3}`, project: padre.name, limit: 10 });
+    expect(hits.some((h) => h.entry.content.includes(delHijo)), "un hermano no debe ver lo del otro").toBe(false);
+  }, 120_000);
+});

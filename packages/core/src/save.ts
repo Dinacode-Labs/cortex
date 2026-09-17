@@ -244,6 +244,8 @@ function mergeEntities(
   const byKey = new Map<string, { name: string; type: EntityType }>();
   for (const list of lists) {
     for (const e of list) {
+      // Un proyecto se crea, no se extrae: venga de donde venga, aquí no pasa (#135).
+      if (e.type === "project") continue;
       const key = `${e.type}:${canonicalize(e.name)}`;
       if (!byKey.has(key)) byKey.set(key, e);
     }
