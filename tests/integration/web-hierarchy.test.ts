@@ -124,7 +124,7 @@ describe("jerarquía de proyectos en la UI", () => {
     // La marca va en la entrada heredada, no en todas: la del propio repo no la lleva. Sin
     // esto, marcarlo todo (o no marcar nada) pasaría el test igual.
     const bloques = html.split('class="pack-entry"').slice(1);
-    const marcados = bloques.filter((b) => b.includes('class="inherited"'));
+    const marcados = bloques.filter((b) => b.includes('class="from-project"'));
     expect(bloques.length).toBe(2); // la restricción del cliente + la decisión del repo
     expect(marcados).toHaveLength(1);
     expect(marcados[0]!).toContain(`from ${cliente.name}`);
@@ -132,7 +132,7 @@ describe("jerarquía de proyectos en la UI", () => {
 
   it("en el cliente no hay nada heredado que marcar", async () => {
     const html = await (await get(`/p/${cliente.slug}/agents`)).text();
-    expect(html).not.toContain('class="inherited"');
+    expect(html).not.toContain('class="from-project"');
   }, 60_000);
 
   it("las clases que solo salen con jerarquía también están estiladas", async () => {

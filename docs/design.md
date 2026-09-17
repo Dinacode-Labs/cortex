@@ -83,6 +83,7 @@ cannot be lost.
 /p/<slug>/ask           Ask
 /p/<slug>/agents        What agents see  the pack, with every entry linked
 /p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked
+/p/<slug>/across        Across this client   what its projects share and where they disagree*
 /p/<slug>/map           Map
 /p/<slug>/code          Code
 /p/<slug>/settings      Settings         visibility, owner, members (managers only)
@@ -91,6 +92,8 @@ cannot be lost.
 /search?q=              across everything you can see
 /admin/usage            what the inference costs (admins only)
 ```
+
+`*` only on a project that has children: a tab leading to an empty screen is worse than no tab.
 
 Labels are written for the person reading them, not for the internals: **Health**, not "Lint";
 **What agents see**, not "Context pack". Old URLs redirect permanently — a link someone pasted
@@ -114,11 +117,15 @@ So the hierarchy is drawn where it is felt, without any new screen:
 - the project header carries a **breadcrumb** to the root, every level linked;
 - a parent lists **its children** on its Memory screen, with the same cards as the landing page;
 - the landing page **groups children under their parent** instead of flattening them;
-- **What agents see** marks each inherited entry with the project it comes from.
+- **What agents see** marks each inherited entry with the project it comes from;
+- a parent gets **Across this client**: the shared stack, the contradictions between its
+  projects, and — from its Memory screen — a search that can descend into them
+  ([ADR-0063](decisions.md#adr-0063)).
 
 Two rules hold everywhere here. **Inheritance goes up**: a child reads what its client knows,
-never what a sibling knows. And **anything that crosses downwards is filtered by access**: a
-private child you are not a member of does not appear because you can see its parent.
+never what a sibling knows. And **anything that crosses downwards is a deliberate act, filtered
+by access**: a private child you are not a member of does not appear because you can see its
+parent, and descending is something you ask for, never a default.
 
 **What is not here, and should not be:** creating projects wholesale, running
 maintenance or indexing, editing configuration, administering users or tokens. Those live in
@@ -141,9 +148,9 @@ still true, plus what the rework did not touch.
    indication that there is more.
 4. **No dark mode.** The palette is light-only. The layout is responsive as of the rework, so
    a phone works; a dark room does not.
-5. **A parent cannot see across its children.** The hierarchy is navigable, but nothing yet
-   answers the question a client project exists to answer: what its repositories have in
-   common, and where two of them contradict each other. `lintProject` looks at one project.
+5. **The shared stack shows what the extractor wrote, noise and all.** «Across this client»
+   filters out the entity types that are pure hierarchy noise today, but a ticket id recorded
+   as a module still reaches the list. It gets better when the extractor does, not here.
 6. **Editing has no history.** A correction overwrites, leaving only `updated_at`. For a system
    whose whole argument is traceability, that is a gap worth closing when someone needs it.
 

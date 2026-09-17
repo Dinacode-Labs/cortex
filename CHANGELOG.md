@@ -9,6 +9,20 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **«Across this client»: un proyecto padre ya se puede leer, no solo abrir.** La herencia
+  SUBE —un repo ve lo de su cliente, nunca lo de un hermano— y eso deja sin responder justo la
+  pregunta para la que existe un proyecto padre: qué comparten sus repos y dónde uno decidió lo
+  contrario que otro. Ahora un proyecto con hijos tiene una sección más con tres cosas:
+  **stack compartido** (entidades `technology`/`module`/`service`/`integration`/`vendor`
+  enlazadas desde entradas vigentes de dos o más hijos, y de cuáles; fuera `client`, `project` y
+  `repository`, que hoy son ruido del extractor), **contradicciones entre proyectos** (las
+  relaciones `contradicts` cuyos dos extremos están en proyectos distintos del subárbol — el
+  lint es por proyecto, así que un choque entre hermanos no salía en el informe de ninguno de
+  los dos) y **buscar hacia abajo**: una casilla «include child projects» que solo aparece en el
+  padre, apagada por defecto, y que dice de qué repo es cada resultado. Todo lo que cruza hacia
+  abajo filtra por permisos antes de mirar nada. ADR-0063.
+
+### Added
 - **El CLI avisa cuando se queda atrás, y se niega a escribir cuando se queda demasiado atrás**
   (ADR-0062). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
   son dos relojes distintos y esta semana se vio, con tres despliegues seguidos y gente días
