@@ -9,6 +9,19 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 ## [Unreleased]
 
 ### Added
+- **Skill `cortex-report`: reportar un fallo de Cortex es ahora parte del plugin.** Faltaba el
+  camino de vuelta: cuando el fallo es de Cortex, quien mejor puede describirlo es el agente que
+  acaba de tropezar con él, con el comando, la traza y la versión delante; hoy eso se perdía o
+  acababa en un issue escrito a mano media hora después y sin la evidencia. La skill guía el
+  reporte hasta `Dinacode-Labs/cortex` con `gh`, y lo que aporta no es el `gh issue create` sino
+  las tres cosas que un agente hace mal si nadie se las dice: **el repo es público**, así que
+  antes de enseñar nada hay que producir un *scrub report* —una línea por cada cosa retirada,
+  incluidas las del propio `cortex doctor`, que imprime email, URL del servidor y slug del
+  proyecto real—; **publicar no es iniciativa del agente**, así que título, cuerpo y labels
+  esperan un OK explícito y antes se buscan duplicados; y **la evidencia se pega literal**, con
+  lo verificado separado de lo supuesto. Se dispara por intención del usuario: ante un fallo, el
+  agente ofrece reportar y espera un sí. Cierra el bucle capturando el incidente en el proyecto
+  solo cuando ese proyecto tiene que aplicar un workaround. (#137)
 - **El CLI avisa cuando se queda atrás, y se niega a escribir cuando se queda demasiado atrás**
   (ADR-0062). El CLI lo actualiza cada uno desde npm y el servidor lo actualiza un operador:
   son dos relojes distintos y esta semana se vio, con tres despliegues seguidos y gente días

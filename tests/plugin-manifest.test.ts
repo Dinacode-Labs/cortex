@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
@@ -20,6 +20,11 @@ interface Plugin {
   version: string;
   description: string;
 }
+
+const skillsDir = resolve(root, "plugin/claude-code/skills");
+const carpetasDeSkills = readdirSync(skillsDir, { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .map((d) => d.name);
 
 describe("plugin de Claude Code", () => {
   const market = read<Marketplace>(".claude-plugin/marketplace.json");
@@ -58,8 +63,25 @@ describe("plugin de Claude Code", () => {
     expect(mcp.mcpServers.cortex).toEqual({ command: "cortex", args: ["mcp"] });
   });
 
-  it("la skill y el comando viven dentro del plugin", () => {
-    expect(existsSync(resolve(root, "plugin/claude-code/skills/cortex-capture/SKILL.md"))).toBe(true);
+  it("las skills y el comando viven dentro del plugin", () => {
+    expect(carpetasDeSkills.sort()).toEqual(["cortex-capture", "cortex-report"]);
     expect(existsSync(resolve(root, "plugin/claude-code/commands/cortex-save.md"))).toBe(true);
+  });
+
+  // Lo que rompe `cortex setup` no es que falte el fichero, sino un frontmatter que Claude Code
+  // no sabe leer: sin `---`, con el `name` distinto de la carpeta o sin descripción, la skill se
+  // instala y no se carga nunca.
+  it.each(carpetasDeSkills)("la skill %s trae un frontmatter que Claude Code puede cargar", (carpeta) => {
+    const md = readFileSync(resolve(skillsDir, carpeta, "SKILL.md"), "utf8");
+    expect(md.startsWith("---\n")).toBe(true);
+
+    const frontmatter = /^---\n([\s\S]*?)\n---\n/.exec(md)?.[1];
+    expect(frontmatter, "frontmatter sin cerrar").toBeDefined();
+    expect(/^name:[ \t]*(.+)$/m.exec(frontmatter!)?.[1].trim()).toBe(carpeta);
+    // `description` suele ir como bloque plegado (`>-`), con el texto en las líneas siguientes:
+    // lo que se comprueba es que quede algo después de la clave, esté donde esté.
+    const descripcion = frontmatter!.split(/^description:[ \t]*/m)[1];
+    expect(descripcion, "falta description").toBeDefined();
+    expect(descripcion!.replace(/^>-?/, "").trim()).not.toBe("");
   });
 });
