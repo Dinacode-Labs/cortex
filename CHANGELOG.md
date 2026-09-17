@@ -8,6 +8,12 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Fixed
+- **El mapa de un proyecto vuelve a pintarse.** `/p/<slug>/map` se quedaba en negro en
+  cualquier despliegue: pedía sus datos a `/api/graph`, y ese prefijo se lo lleva entero el
+  servidor de API, que no tiene esa ruta. El endpoint pasa a `/graph.json`. De paso, la casilla
+  «Include entries» no se podía volver a marcar —el formulario manda dos valores y se leía el
+  primero—, y sin entradas el grafo no tiene ni una arista que pintar.
 ### Added
 - **«Across this client»: un proyecto padre ya se puede leer, no solo abrir.** La herencia
   SUBE —un repo ve lo de su cliente, nunca lo de un hermano— y eso deja sin responder justo la
