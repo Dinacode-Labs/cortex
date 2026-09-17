@@ -18,7 +18,7 @@ export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
 // re-exporta aquí porque core lo usa para resolver el proyecto de un repo.
 export { readCortexLink, type CortexLink } from "@cortex/client";
 export { slugify } from "./project-config.js";
-export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, updateProject, deleteProject, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects.js";
+export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, updateProject, deleteProject, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects.js";
 export {
   isNearDuplicate,
   findNearest,

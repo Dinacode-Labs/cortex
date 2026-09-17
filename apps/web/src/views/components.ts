@@ -1,5 +1,7 @@
 import { html, raw } from "hono/html";
+import type { AccessibleProject } from "@cortex/core";
 import type { ContextEntry } from "@cortex/shared";
+import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
 
 /**
@@ -109,6 +111,29 @@ export function hitCard(entry: ContextEntry, score: number): Html {
     <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)}</div>
     <h3>${entry.title}</h3>
     <p>${entry.summary ?? entry.content}</p>
+  </a>`;
+}
+
+// --- Tarjeta de proyecto ------------------------------------------------------------------
+
+/**
+ * La tarjeta con la que se elige un proyecto.
+ *
+ * Vive aquí y no en la portada porque un cliente la enseña también dentro de sí mismo, para
+ * sus repos: si fueran dos tarjetas distintas, elegir «Acme Portal» desde la portada y
+ * elegirlo desde «Acme» parecerían dos cosas distintas, y son la misma.
+ */
+export function projectCard(p: AccessibleProject, salud: Html): Html {
+  return html`<a class="project-card" href="/p/${p.slug}">
+    <div class="card-head">
+      <h2>${p.name}</h2>
+      ${visibilityPill(p.visibility)}
+    </div>
+    <div class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</div>
+    <div class="card-foot">
+      <span>${p.entryCount} ${p.entryCount === 1 ? "entry" : "entries"}</span>
+      ${salud}
+    </div>
   </a>`;
 }
 

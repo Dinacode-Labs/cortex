@@ -27,17 +27,37 @@ export function visibilityPill(v: "public" | "private"): Html {
     : html`<span class="pill vis">public</span>`;
 }
 
+/**
+ * Miga de pan hasta la raíz.
+ *
+ * Un hijo no se entiende solo: «Acme Portal» es un repo de un cliente, y lo que el pack le
+ * cuenta a un agente viene en parte de ese cliente. Se pintan TODOS los niveles, no solo el
+ * padre, porque la jerarquía no tiene por qué ser de dos. Los ancestros son siempre visibles
+ * para quien ve al hijo (`canAccessProject` mira la cadena entera), así que no hay nada que
+ * filtrar aquí.
+ */
+function crumbs(ancestros: ProjectRef[], actual: string): Html {
+  if (ancestros.length === 0) return html``;
+  return html`<nav class="crumbs" aria-label="Breadcrumb">
+    ${ancestros.map(
+      (a) => html`${a.slug ? html`<a href="/p/${a.slug}">${a.name}</a>` : html`<span>${a.name}</span>`}<span class="sep">›</span>`,
+    )}<span class="here">${actual}</span>
+  </nav>`;
+}
+
 /** Cabecera del proyecto + pestañas. `gestor` añade Settings, que el resto no necesita ver. */
 export function projectHeader(
   project: ProjectRef | AccessibleProject,
   activa: Seccion,
   gestor: boolean,
+  ancestros: ProjectRef[] = [],
 ): Html {
   const base = `/p/${project.slug}`;
   const tabs = [...SECCIONES, ...(gestor ? [{ id: "settings" as Seccion, etiqueta: "Settings", sufijo: "/settings" }] : [])];
   const count = "entryCount" in project ? project.entryCount : null;
   return html`
     <div class="project-head">
+      ${crumbs(ancestros, project.name)}
       <div class="project-title">
         <h1>${project.name}</h1>
         ${visibilityPill(project.visibility)}

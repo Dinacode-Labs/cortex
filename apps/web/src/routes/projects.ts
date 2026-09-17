@@ -3,7 +3,6 @@ import { html } from "hono/html";
 import {
   addProjectMember,
   deleteProject,
-  lintProject,
   listAccessibleProjects,
   listProjectMembers,
   NotAManagerError,
@@ -13,7 +12,9 @@ import {
 } from "@cortex/core";
 import { getBrandName } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
-import { projectHeader, visibilityPill } from "../views/project-nav.js";
+import { projectCard } from "../views/components.js";
+import { saludDelProyecto } from "../project-summary.js";
+import { projectHeader } from "../views/project-nav.js";
 import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -27,18 +28,6 @@ import type { WebEnv } from "../middleware/session.js";
  */
 export const projectsRoutes = new Hono<WebEnv>();
 
-/** Estado de salud resumido, para no entrar a un proyecto a ver si hay algo que mirar. */
-async function salud(nombre: string): Promise<Html> {
-  try {
-    const r = await lintProject(nombre);
-    const avisos = r.contradictions.length + r.duplicates.length;
-    if (avisos === 0) return html`<span class="health ok">✓ healthy</span>`;
-    return html`<span class="health warn">${avisos} to review</span>`;
-  } catch {
-    return html``;
-  }
-}
-
 projectsRoutes.get("/", async (c) => {
   const user = c.get("user")!;
   const projects = await listAccessibleProjects(user.email);
@@ -49,22 +38,38 @@ projectsRoutes.get("/", async (c) => {
     const p = projects.find((x) => x.name === viejo);
     if (p?.slug) return c.redirect(`/p/${p.slug}`, 301);
   }
-  const saludes = await Promise.all(projects.map((p) => salud(p.name)));
+  const saludes = await Promise.all(projects.map((p) => saludDelProyecto(p.name)));
+  const saludDe = new Map(projects.map((p, i) => [p.id, saludes[i]!]));
+  const tarjeta = (p: (typeof projects)[number]): Html => projectCard(p, saludDe.get(p.id) ?? html``);
 
-  const cards = projects.map(
-    (p, i) => html`
-      <a class="project-card" href="/p/${p.slug}">
-        <div class="card-head">
-          <h2>${p.name}</h2>
-          ${visibilityPill(p.visibility)}
+  // Los hijos se pintan DENTRO de su padre, no sueltos en la misma lista. Un cliente con tres
+  // repos ocupaba cuatro tarjetas hermanas que no decían que tuvieran nada que ver entre sí,
+  // y la relación —de la que cuelgan la herencia del pack y los permisos— solo se veía
+  // entrando a Settings. Quien no tiene jerarquía no nota nada: sin hijos no hay grupos y la
+  // rejilla es exactamente la de antes.
+  const visibles = new Set(projects.map((p) => p.id));
+  const hijosDe = new Map<string, typeof projects>();
+  for (const p of projects) {
+    // Si el padre no está en la lista no es un huérfano que esconder: es un proyecto de primer
+    // nivel para quien mira. (Hoy no pasa —ver un hijo implica ver a sus padres— pero un
+    // listado que se traga proyectos sería un fallo bastante peor que uno que los aplana.)
+    if (!p.parentId || !visibles.has(p.parentId)) continue;
+    hijosDe.set(p.parentId, [...(hijosDe.get(p.parentId) ?? []), p]);
+  }
+  const raices = projects.filter((p) => !p.parentId || !visibles.has(p.parentId));
+
+  const grupos = raices
+    .filter((p) => hijosDe.has(p.id))
+    .map(
+      (p) => html`<section class="project-group">
+        ${tarjeta(p)}
+        <div class="project-children">
+          <p class="sub">${hijosDe.get(p.id)!.length} project${hijosDe.get(p.id)!.length === 1 ? "" : "s"} in this client</p>
+          <div class="project-grid">${hijosDe.get(p.id)!.map(tarjeta)}</div>
         </div>
-        <div class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</div>
-        <div class="card-foot">
-          <span>${p.entryCount} ${p.entryCount === 1 ? "entry" : "entries"}</span>
-          ${saludes[i]!}
-        </div>
-      </a>`,
-  );
+      </section>`,
+    );
+  const sueltos = raices.filter((p) => !hijosDe.has(p.id)).map(tarjeta);
 
   // Un listado vacío no es un error: casi siempre es alguien que acaba de entrar. Decirle
   // "no tienes proyectos" no le sirve de nada; decirle cómo se crea el primero, sí.
@@ -86,7 +91,9 @@ cortex setup --all</pre>
       <h1>Projects</h1>
       <p class="sub">What ${getBrandName()} remembers, one project at a time.</p>
     </div>
-    ${cards.length ? html`<div class="project-grid">${cards}</div>` : vacio}`;
+    ${projects.length
+      ? html`${grupos}${sueltos.length ? html`<div class="project-grid">${sueltos}</div>` : ""}`
+      : vacio}`;
   return c.html(layout("Projects", body, { user, activo: "projects" }));
 });
 
@@ -96,12 +103,12 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, gestor, ancestros } = res;
 
   // Quien no gestiona ve a quién pedirle las cosas, en vez de un 403 sin salida.
   if (!gestor) {
     const body = html`
-      ${projectHeader(project, "settings", false)}
+      ${projectHeader(project, "settings", false, ancestros)}
       <div class="panel">
         <h2>Access</h2>
         <p class="sub">
@@ -121,7 +128,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const otros = (await listAccessibleProjects(user.email)).filter((o) => o.slug && o.id !== project.id);
 
   const body = html`
-    ${projectHeader(project, "settings", true)}
+    ${projectHeader(project, "settings", true, ancestros)}
     ${aviso ? html`<div class="warn">${aviso}</div>` : ""}
 
     <div class="panel">
