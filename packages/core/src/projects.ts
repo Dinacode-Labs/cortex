@@ -162,6 +162,28 @@ export async function projectIdsWithAncestors(projectId: string): Promise<string
   return rows.map((r) => r.id as string);
 }
 
+/**
+ * Los ancestros de un proyecto, de la RAÍZ al padre directo (el propio proyecto no entra).
+ *
+ * Es lo que necesita una miga de pan —`Acme › Acme Portal`— y lo que permite decir de qué
+ * proyecto viene una entrada heredada. No filtra por permisos a propósito: `canAccessProject`
+ * mira la cadena entera, así que tener acceso al hijo implica tenerlo a todos sus padres.
+ */
+export async function listProjectAncestors(projectId: string): Promise<ProjectRef[]> {
+  const rows = (await getSql()`
+    WITH RECURSIVE chain AS (
+      SELECT id, name, slug, visibility, owner_email, parent_id, 0 AS depth
+        FROM entities WHERE id = ${projectId}
+      UNION ALL
+      SELECT e.id, e.name, e.slug, e.visibility, e.owner_email, e.parent_id, c.depth + 1
+        FROM entities e JOIN chain c ON e.id = c.parent_id
+    )
+    SELECT id, name, slug, visibility, owner_email, parent_id FROM chain WHERE depth > 0
+     ORDER BY depth DESC
+  `) as unknown as Row[];
+  return rows.map(toRef).filter((r): r is ProjectRef => r !== null);
+}
+
 /** Resultado del guard único de acceso a proyecto. */
 export type AccessCheck =
   | { status: "ok"; project: ProjectRef }
@@ -233,6 +255,19 @@ export async function listAccessibleProjects(email: string | null): Promise<Acce
   const out: AccessibleProject[] = [];
   for (const r of refs) if (await canAccessProject(r, email)) out.push(r);
   return out;
+}
+
+/**
+ * Hijos DIRECTOS de un proyecto que `email` puede ver.
+ *
+ * Bajar por la jerarquía no es lo mismo que subir: la herencia sube (un hijo lee lo del
+ * cliente) porque el acceso al hijo ya implica el acceso al padre. Al revés no vale el mismo
+ * razonamiento —un hijo privado del que no eres miembro no se ve por mirar al padre—, así que
+ * cualquier cosa que cruce hacia abajo pasa por aquí y hereda el filtro de
+ * `listAccessibleProjects`.
+ */
+export async function listChildProjects(parentId: string, email: string | null): Promise<AccessibleProject[]> {
+  return (await listAccessibleProjects(email)).filter((p) => p.parentId === parentId);
 }
 
 /**

@@ -31,6 +31,15 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
   no está», no como error. Un campo ausente o un 404 en un endpoint nuevo es un servidor viejo y
   se degrada. Ya pasaba en varios sitios; ahora está dicho en el ADR, en `CONTRIBUTING.md` y en
   la cabecera del cliente HTTP.
+- **La jerarquía de proyectos se ve, no solo existe.** Un cliente con varios repos es un
+  proyecto padre con un hijo por repo (ADR-0037, ADR-0056), y de ahí cuelgan la herencia del
+  context pack y los permisos — pero en la web eso no se notaba en ninguna pantalla. Ahora la
+  cabecera de un proyecto lleva **miga de pan hasta la raíz** (`Acme › Acme Portal`, cada
+  nivel enlazado), un padre lista **sus repos** con las mismas tarjetas de la portada, la
+  **portada agrupa** a los hijos bajo su padre en vez de ponerlos de hermanos, y **What agents
+  see** marca cada entrada heredada con el proyecto del que viene, que antes se mezclaba en
+  silencio. Lo que cruza hacia abajo filtra por permisos: un hijo privado del que no eres
+  miembro no aparece por ver al padre.
 
 ### Fixed
 - **El clasificador ya no fabrica proyectos.** Ofrecía `project` entre los tipos de entidad, así

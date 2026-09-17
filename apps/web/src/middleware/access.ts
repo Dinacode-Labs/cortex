@@ -5,7 +5,9 @@ import {
   checkProjectAccess,
   findProjectBySlug,
   listAccessibleProjects,
+  listProjectAncestors,
   type AccessibleProject,
+  type ProjectRef,
   type AuthUser,
 } from "@cortex/core";
 import { layout, type Html } from "../views/layout.js";
@@ -43,6 +45,8 @@ export interface ProyectoDeLaPagina {
   project: AccessibleProject;
   /** Si quien mira puede cambiar visibilidad, dueño y miembros (ADR-0051). */
   gestor: boolean;
+  /** De la raíz al padre directo, para la miga de pan y para decir de dónde hereda cada cosa. */
+  ancestros: ProjectRef[];
 }
 
 /**
@@ -65,5 +69,9 @@ export async function requireProjectPage(
   // esa lista evita una query extra solo para el número de la cabecera.
   const conCuenta = (await listAccessibleProjects(email)).find((p) => p.slug === slug);
   const base = conCuenta ?? { ...(await findProjectBySlug(slug))!, entryCount: 0 };
-  return { project: base, gestor: await canManageProject(email, slug) };
+  return {
+    project: base,
+    gestor: await canManageProject(email, slug),
+    ancestros: base.parentId ? await listProjectAncestors(base.id) : [],
+  };
 }

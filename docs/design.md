@@ -100,6 +100,26 @@ Two things stay above the project, because they genuinely are: **search**, which
 question that crosses projects, and the **admin** area, which is about the installation rather
 than about any project in it.
 
+### A client and its repositories
+
+A client with several repositories that are not a monorepo is a **parent project with one
+child per repository** ([ADR-0037](decisions.md#adr-0037), [ADR-0056](decisions.md#adr-0056)).
+That relation is load-bearing — the context pack and search inherit from the parent, and so do
+permissions — and for a while it existed only in the database: children sat next to their
+parent on the landing page as if they were unrelated, a child did not say whose it was, and its
+pack silently mixed the client's knowledge with its own.
+
+So the hierarchy is drawn where it is felt, without any new screen:
+
+- the project header carries a **breadcrumb** to the root, every level linked;
+- a parent lists **its children** on its Memory screen, with the same cards as the landing page;
+- the landing page **groups children under their parent** instead of flattening them;
+- **What agents see** marks each inherited entry with the project it comes from.
+
+Two rules hold everywhere here. **Inheritance goes up**: a child reads what its client knows,
+never what a sibling knows. And **anything that crosses downwards is filtered by access**: a
+private child you are not a member of does not appear because you can see its parent.
+
 **What is not here, and should not be:** creating projects wholesale, running
 maintenance or indexing, editing configuration, administering users or tokens. Those live in
 the CLI and in `cortex-admin`, where they belong.
@@ -121,7 +141,10 @@ still true, plus what the rework did not touch.
    indication that there is more.
 4. **No dark mode.** The palette is light-only. The layout is responsive as of the rework, so
    a phone works; a dark room does not.
-5. **Editing has no history.** A correction overwrites, leaving only `updated_at`. For a system
+5. **A parent cannot see across its children.** The hierarchy is navigable, but nothing yet
+   answers the question a client project exists to answer: what its repositories have in
+   common, and where two of them contradict each other. `lintProject` looks at one project.
+6. **Editing has no history.** A correction overwrites, leaving only `updated_at`. For a system
    whose whole argument is traceability, that is a gap worth closing when someone needs it.
 
 **Closed on 2026-09-15:** the empty landing page ([0052](decisions.md#adr-0052)); visibility

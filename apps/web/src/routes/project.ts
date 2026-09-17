@@ -11,13 +11,15 @@ import {
   getContextPack,
   lintProject,
   listAccessibleProjects,
+  listChildProjects,
   listEntries,
   renderContextPack,
   searchProjectCode,
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
-import { badge, empty, entryCard, joinHtml, panel, scoreBadge, searchForm, statusBadge, typeBadge } from "../views/components.js";
+import { badge, empty, entryCard, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge } from "../views/components.js";
+import { saludDelProyecto } from "../project-summary.js";
 import { mdLite } from "../views/md.js";
 import { projectHeader } from "../views/project-nav.js";
 import { requireProjectPage } from "../middleware/access.js";
@@ -42,7 +44,7 @@ projectRoutes.get("/p/:slug", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, gestor, ancestros } = res;
 
   const typeParsed = contextEntryType.safeParse(c.req.query("type"));
   const type: ContextEntryType | undefined = typeParsed.success ? typeParsed.data : undefined;
@@ -51,6 +53,10 @@ projectRoutes.get("/p/:slug", async (c) => {
   const showCapture = c.req.query("capture") === "1";
 
   const entries = await listEntries({ project: project.name, type, status, limit: 60 });
+  // Solo los hijos que quien mira puede ver: un repo privado del que no es miembro no aparece
+  // por mirar al cliente. La herencia sube, el listado no la invierte.
+  const hijos = await listChildProjects(project.id, user.email);
+  const saludes = await Promise.all(hijos.map((h) => saludDelProyecto(h.name)));
   const base = `/p/${project.slug}`;
   const conFiltros = (extra: Record<string, string>) => {
     const qs = new URLSearchParams({ ...(type ? { type } : {}), ...(status ? { status } : {}), ...extra });
@@ -92,8 +98,19 @@ projectRoutes.get("/p/:slug", async (c) => {
       )
     : html``;
 
+  // Un cliente es sobre todo la puerta a sus repos: si al abrirlo solo se ven sus entradas
+  // transversales, la jerarquía existe en la base de datos y en ningún otro sitio.
+  const seccionHijos = hijos.length
+    ? panel(
+        "Projects in this client",
+        html`<div class="project-grid">${hijos.map((h, i) => projectCard(h, saludes[i]!))}</div>`,
+        { ayuda: "Everything remembered here is also part of what their agents are told." },
+      )
+    : html``;
+
   const body = html`
-    ${projectHeader(project, "memory", gestor)}
+    ${projectHeader(project, "memory", gestor, ancestros)}
+    ${seccionHijos}
     <div class="section-bar">
       ${searchForm("/search", "", "Search this project by meaning…", { project: project.name })}
       <a class="button secondary" href="${base}?capture=1">+ Add</a>
@@ -116,7 +133,7 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, gestor, ancestros } = res;
   const q = c.req.query("q") ?? "";
 
   let answerHtml: Html = html``;
@@ -138,7 +155,7 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
   }
 
   const body = html`
-    ${projectHeader(project, "ask", gestor)}
+    ${projectHeader(project, "ask", gestor, ancestros)}
     ${panel(
       null,
       html`<form class="row" method="get" action="/p/${project.slug}/ask">
@@ -157,12 +174,25 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, gestor, ancestros } = res;
 
   const area = c.req.query("area") || undefined;
   const asOfStr = c.req.query("asof");
   const asOf = asOfStr ? new Date(asOfStr) : undefined;
   const pack = await getContextPack(project.name, area, asOf);
+
+  // De dónde viene cada entrada. El pack de un hijo mezcla lo suyo con lo del cliente, y hasta
+  // ahora lo hacía en silencio: quien revisaba «Acme Portal» veía decisiones que no están en
+  // Acme Portal, no podía saber cuáles, y corregirlas significaba tocar la memoria del
+  // cliente entero sin haberlo decidido. La herencia se marca donde se nota.
+  const porId = new Map(ancestros.map((a) => [a.id, a]));
+  const origen = (e: { projectId: string | null }): Html => {
+    const de = e.projectId && e.projectId !== project.id ? porId.get(e.projectId) : undefined;
+    if (!de) return html``;
+    return de.slug
+      ? html`<a class="inherited" href="/p/${de.slug}">from ${de.name}</a>`
+      : html`<span class="inherited">from ${de.name}</span>`;
+  };
 
   const sec = (s: (typeof pack.sections)[number]): Html =>
     s.entries.length
@@ -170,7 +200,7 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
           s.titulo,
           html`${s.entries.map(
             (e) => html`<div class="pack-entry">
-              <div class="card-head">${typeBadge(e.type)} ${statusBadge(e.status)}</div>
+              <div class="card-head">${typeBadge(e.type)} ${statusBadge(e.status)} ${origen(e)}</div>
               <b>${linkEntry(e.id, e.title)}</b>
               <p class="sub">${e.summary ?? e.content}</p>
             </div>`,
@@ -180,12 +210,18 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
       : html``;
 
   const body = html`
-    ${projectHeader(project, "agents", gestor)}
+    ${projectHeader(project, "agents", gestor, ancestros)}
     <p class="sub">
       This is exactly what an agent is told when it opens a session on this project —
       ${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total,
       ${asOf ? html`as they stood on <b>${asOfStr ?? ""}</b>` : "as they stand now"}.
     </p>
+    ${ancestros.length
+      ? html`<p class="sub">
+          Anything marked <span class="inherited">from ${ancestros[ancestros.length - 1]!.name}</span> is inherited:
+          it is recorded on the client project and every project under it is told about it.
+        </p>`
+      : ""}
     <div class="section-bar">
       <form class="row" method="get" action="/p/${project.slug}/agents">
         <input type="text" name="area" placeholder="Narrow to an area or module, e.g. billing" value="${area ?? ""}">
@@ -224,7 +260,7 @@ projectRoutes.get("/p/:slug/health", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, gestor, ancestros } = res;
   const r = await lintProject(project.name);
 
   const buscar = (texto: string) =>
@@ -240,7 +276,7 @@ projectRoutes.get("/p/:slug/health", async (c) => {
     );
 
   const body = html`
-    ${projectHeader(project, "health", gestor)}
+    ${projectHeader(project, "health", gestor, ancestros)}
     <p class="sub">Whether this memory can still be trusted. Every finding links to what it is about.</p>
     ${card(
       "⚠️ Contradictions",
@@ -294,13 +330,13 @@ projectRoutes.get("/p/:slug/map", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, gestor, ancestros } = res;
   // El checkbox manda "1" o nada; leerlo como `!== "0"` hacía IMPOSIBLE desmarcarlo desde la
   // UI. Un campo oculto con el valor por defecto delante del checkbox lo arregla sin JS.
   const incluirEntradas = (c.req.query("entries") ?? "1") !== "0";
 
   const body = html`
-    ${projectHeader(project, "map", gestor)}
+    ${projectHeader(project, "map", gestor, ancestros)}
     <p class="sub">How this project's knowledge connects, and where it does not.</p>
     ${panel(
       null,
@@ -323,7 +359,7 @@ projectRoutes.get("/p/:slug/code", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, gestor, ancestros } = res;
   const q = c.req.query("q") ?? "";
 
   let results: Html = html``;
@@ -342,7 +378,7 @@ projectRoutes.get("/p/:slug/code", async (c) => {
   }
 
   const body = html`
-    ${projectHeader(project, "code", gestor)}
+    ${projectHeader(project, "code", gestor, ancestros)}
     ${panel(null, searchForm(`/p/${project.slug}/code`, q, "e.g. where is the user's phone number verified"), {
       ayuda: "Hybrid search, semantic and lexical, over this project's indexed code.",
     })}
