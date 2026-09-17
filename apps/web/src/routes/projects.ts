@@ -103,12 +103,12 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor, ancestros } = res;
+  const { project, gestor } = res;
 
   // Quien no gestiona ve a quién pedirle las cosas, en vez de un 403 sin salida.
   if (!gestor) {
     const body = html`
-      ${projectHeader(project, "settings", false, ancestros)}
+      ${projectHeader(res, "settings")}
       <div class="panel">
         <h2>Access</h2>
         <p class="sub">
@@ -128,7 +128,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const otros = (await listAccessibleProjects(user.email)).filter((o) => o.slug && o.id !== project.id);
 
   const body = html`
-    ${projectHeader(project, "settings", true, ancestros)}
+    ${projectHeader(res, "settings")}
     ${aviso ? html`<div class="warn">${aviso}</div>` : ""}
 
     <div class="panel">

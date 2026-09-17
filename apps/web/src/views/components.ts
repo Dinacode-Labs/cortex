@@ -105,10 +105,14 @@ export function entryCard(entry: ContextEntry): Html {
   </a>`;
 }
 
-/** Resultado de búsqueda: lo mismo con la puntuación delante, para no tener dos tarjetas. */
-export function hitCard(entry: ContextEntry, score: number): Html {
+/**
+ * Resultado de búsqueda: lo mismo con la puntuación delante, para no tener dos tarjetas.
+ * `origen` lo rellena quien busca en más de un proyecto a la vez — sin él, los resultados de
+ * tres repos distintos se leen como si fueran del mismo.
+ */
+export function hitCard(entry: ContextEntry, score: number, origen?: Html): Html {
   return html`<a class="card" href="/entry/${entry.id}">
-    <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)}</div>
+    <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)} ${origen ?? ""}</div>
     <h3>${entry.title}</h3>
     <p>${entry.summary ?? entry.content}</p>
   </a>`;
@@ -139,11 +143,22 @@ export function projectCard(p: AccessibleProject, salud: Html): Html {
 
 // --- Formularios --------------------------------------------------------------------------
 
-/** Caja de búsqueda con su botón: aparece en cinco sitios y debe ser la misma en los cinco. */
-export function searchForm(action: string, q: string, placeholder: string, ocultos: Record<string, string> = {}): Html {
+/**
+ * Caja de búsqueda con su botón: aparece en cinco sitios y debe ser la misma en los cinco.
+ * `extra` es para lo que solo tiene sentido en uno —hoy, la casilla que baja a los hijos desde
+ * un cliente—, y va entre el campo y el botón para que se lea antes de pulsar.
+ */
+export function searchForm(
+  action: string,
+  q: string,
+  placeholder: string,
+  ocultos: Record<string, string> = {},
+  extra?: Html,
+): Html {
   return html`<form class="row" method="get" action="${action}">
     ${Object.entries(ocultos).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
     <input type="text" name="q" value="${q}" placeholder="${placeholder}" required>
+    ${extra ?? ""}
     <button type="submit">Search</button>
   </form>`;
 }
