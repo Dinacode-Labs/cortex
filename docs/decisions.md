@@ -1068,7 +1068,8 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   There is an integration test demonstrating it.
 - **Intended behaviour change:** captures that used to fail deduplication on spelling now
   reconcile.
-- **Revisit when:** resolving by slug and by name needs to happen in one function.
+- **Revisit when:** resolving by slug and by name needs to happen in one function. **Reached**
+  (2026-09-16): see [0061](#adr-0061).
 
 <a id="adr-0044"></a>
 
@@ -1625,3 +1626,87 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   to one organisation, so its link belongs to each clone.
 - **Revisit when:** Cortex can link a folder without a file in it, or a public repository needs
   to ship a default project for a demo.
+
+---
+
+<a id="adr-0060"></a>
+
+## ADR-0060 · A project is created, never extracted
+
+- **Status:** accepted (2026-09-16). Sibling of [0055](#adr-0055).
+- **Context:** `project` is a legitimate entity type — it is the row that represents the
+  project, the one entries hang from and the one `cortex link` and the web list. The classifier
+  that runs on every save offered the full `entityType` enum to the LLM, `project` included, so
+  any proper noun the model read as a project became an `entities` row with `type='project'`:
+  ticket codes, git branches, file names, microservices. The graph extractor already excluded
+  `project` for exactly this reason, but only for itself.
+
+  Those rows were indistinguishable from real projects to everything that lists "all entities
+  of type project". On a real installation: **26 phantom projects next to 10 real ones**, every
+  phantom with zero entries and no slug or owner, all born from one ingestion session into a
+  single existing project. `isUsableEntityName` ([0055](#adr-0055)) does not help: it judges
+  the shape of a name, not the type.
+- **Decision:** a project is **created**, by `createProject`, with a slug and an owner. It is
+  never a side effect of extraction.
+  1. What the extractors are offered is `extractableEntityType` — the enum minus `project` —
+     and the rule lives in `shared`, so every extractor gets it rather than each one remembering
+     to filter.
+  2. `core` drops any detected entity of type `project` before resolving it, whatever produced
+     it, and `resolveEntity` refuses the type outright: the only way to a project row is
+     `createProject`.
+  3. The database states the invariant: a `project` has a slug, or it is not a project
+     (`CHECK`). This is what tells a real project from a mention, and it is what
+     [0051](#adr-0051) had already made true for every project created on purpose.
+  4. A migration removes the phantoms — only those with no entries, children or members
+     hanging from them — with their links and relations. **No entry is touched.** Anything that
+     did have something hanging from it would be given a slug instead, as
+     [0051](#adr-0051)'s backfill did.
+- **Alternatives:** filter `project` out of the listing only — leaves the rows and the
+  `belongs_to` noise, and the next listing forgets; remove `project` from `entityType` as
+  [0055](#adr-0055) did with `decision` — impossible, the project *is* an entity of that type;
+  keep a separate `projects` table — the right long-term shape, but a large migration for a
+  problem that a filter plus a constraint closes.
+- **Consequences:** `createProject` inserts the row with its slug in one statement, since the
+  constraint forbids "insert the name, fill in the slug later". The seed uses it too.
+- **Revisit when:** projects move to their own table, or a legitimate reason appears to link an
+  entry to a project it merely mentions.
+
+---
+
+<a id="adr-0061"></a>
+
+## ADR-0061 · What you type in `project` resolves by slug first, then by name, everywhere
+
+- **Status:** accepted (2026-09-16). Extends [0043](#adr-0043).
+- **Context:** the slug is the project's identity across the product: it is what `cortex link`
+  prints, what `.cortex.json` stores, what the web puts in `/p/<slug>/…` and what the HTTP API
+  takes ([0036](#adr-0036), [0051](#adr-0051)). The MCP tools, however, take a free-text
+  `project`, and that went through two different resolutions. Writes went through
+  `createProject`, which looks the slug up first, so `save_project_context` with `acme-portal`
+  landed in Acme Portal. Reads went through the canonical-name lookup of [0043](#adr-0043),
+  and canonicalisation does not touch hyphens, so `get_project_context_pack` with the same
+  value answered "Project not found". A third path, the MCP permission guard, compared the
+  **exact** name, and so rejected spellings that the data operations accepted.
+
+  Verified against a real server: the pack for `cortex` failed and the pack for `Cortex`
+  worked. The asymmetry is the worst part: the identifier the user has in front of them works
+  in one direction and fails silently in the other, with nothing explaining why.
+- **Decision:** one function resolves whatever someone types in `project`: **by slug first,
+  then by canonical name**. `findProjectIdByName`, `findProjectByName` and therefore
+  `checkProjectAccess` all go through it; `findProjectBySlug` stays as the strict form for
+  routes and the API, where the slug is already the identifier. The context pack reports the
+  project's **name**, not the string it was asked with. Tool descriptions say "slug or name".
+
+  If a project's *name* happens to equal another project's *slug*, the slug wins: it is the
+  identifier, the name is a label. Such collisions only exist because of the bug this fixes
+  (a project literally named after another's slug, created by a write that missed).
+- **Alternatives:** detect slug-shaped input and return "that is a slug, use the name" — cheaper,
+  and leaves the product contradicting itself; make canonicalisation treat hyphens as spaces —
+  would make `acme-portal` and `Acme Portal` collide in the *entity* dedup too, which is a
+  different question; require the slug everywhere — right in principle, but agents pass names
+  and every existing transcript does.
+- **Consequences:** the [0043](#adr-0043) "revisit when" condition is met and this record is its
+  continuation. The exact-name guard is gone, so a private project is now protected under any
+  spelling of its name, which it was not before.
+- **Revisit when:** the MCP tools take a `slug` field of their own, or projects get their own
+  table with the slug as key.

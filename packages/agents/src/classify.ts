@@ -1,4 +1,4 @@
-import { contextEntryType, entityType, isUsableEntityName } from "@cortex/shared";
+import { contextEntryType, extractableEntityType, isUsableEntityName } from "@cortex/shared";
 import type { ContextEntryType, EntityType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
@@ -18,7 +18,8 @@ export interface ClassificationResult {
 }
 
 const TYPES = contextEntryType.options;
-const ENTITY_TYPES = entityType.options;
+// Sin `project`: el proyecto se crea, no se extrae (ver `extractableEntityType`, #135).
+const ENTITY_TYPES = extractableEntityType.options;
 
 function userPrompt(content: string): string {
   return `Analiza esta pieza de conocimiento de un proyecto y devuelve un objeto JSON con:
@@ -26,7 +27,8 @@ function userPrompt(content: string): string {
 - "title": título corto (máx 100 caracteres)
 - "summary": resumen en 1-2 frases
 - "entities": lista de entidades mencionadas, cada una { "name": string, "type": uno de [${ENTITY_TYPES.join(", ")}] }
-  (extrae tecnologías, módulos, servicios, integraciones, clientes, personas relevantes)
+  (extrae tecnologías, módulos, servicios, integraciones, clientes, personas relevantes;
+  NO extraigas el proyecto o producto contenedor, ni tickets, ramas o nombres de fichero)
 
 Texto:
 """
