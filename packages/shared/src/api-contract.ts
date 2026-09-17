@@ -19,8 +19,9 @@ export const clientConfig = z.object({
   /** URL del MCP por HTTP, para que el CLI no tenga que adivinarla. */
   mcpUrl: z.string(),
   webUrl: z.string(),
+  /** Versión del servidor. Solo informativa: el CLI la compara con la suya para avisar. */
   version: z.string(),
-  /** Versión mínima de CLI que este servidor admite; por debajo, avisa de actualizar. */
+  /** Versión mínima de CLI que este servidor admite; por debajo, el CLI se niega a escribir (ADR-0062). */
   minClientVersion: z.string(),
 });
 export type ClientConfig = z.infer<typeof clientConfig>;
