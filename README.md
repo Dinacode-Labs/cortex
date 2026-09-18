@@ -1,3 +1,5 @@
+<img src="docs/brand/mark.svg" width="64" height="64" alt="" align="left">
+
 # Cortex
 
 [![CI](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml)
@@ -409,16 +411,12 @@ pnpm admin maintain-worker    # scheduled maintenance
   nothing, which is the default, or `brevo` or `smtp`. The configuration is validated at boot.
 - **Branding.** Everything a user sees, the web UI, the emails, the injected context and the
   CLI, takes its name from `CORTEX_BRAND_NAME`, default `Cortex`, and optionally a logo from
-  `CORTEX_BRAND_LOGO_FILE` or `CORTEX_BRAND_LOGO_SVG`. With no logo you get a text wordmark.
-- **Providers**, configured in `.env`, defaulting to `local` and `none` so nothing needs a key.
-  Every endpoint worth supporting speaks the OpenAI dialect, so one generic provider covers a
-  hosted cluster, Ollama, vLLM or LM Studio alike (ADR-0024):
-  ```bash
-  LLM_PROVIDER=openai-compatible
-  LLM_BASE_URL=https://api.example.com/v1
-  LLM_API_KEY=...
-  LLM_MODEL=...
-  CORTEX_VISION_MODEL=...                # the chat model may well be text-only
+  `CORTEX_BRAND_LOGO_FILE` or `CORTEX_BRAND_LOGO_SVG`. With no logo you get the Cortex mark
+  ("Relay": two pieces that change places, a centre that stays), which is one 8×8 drawing shared
+  by the web header, the favicon (`/favicon.svg`) and the CLI splash; with your own logo, the
+  web shows yours and the CLI shows no mark at all. The splash only appears on an interactive
+  terminal (`cortex` with no arguments and `cortex version`), never in CI, with `TERM=dumb` or
+  in the hook and MCP commands, and honours `NO_COLOR`.
 
   EMBEDDINGS_PROVIDER=openai-compatible  # local | openai-compatible | openai | voyage
   EMBEDDINGS_BASE_URL=https://api.example.com/v1

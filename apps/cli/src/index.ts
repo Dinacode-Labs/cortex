@@ -1,5 +1,6 @@
 import { getBrandName } from "@cortex/shared";
 import { CLI_VERSION } from "./version.js";
+import { printSplash, wantsSplash } from "./splash.js";
 
 /**
  * CLI `cortex` — dispatcher único (estilo `gh`). Cada subcomando vive en
@@ -39,8 +40,8 @@ const COMMANDS: Record<string, Cmd> = {
   "hook-capture": { help: "session-end hook: send the session to Cortex to be distilled", managed: false, load: () => import("./commands/hook-capture.js") },
 };
 
-function usage(): void {
-  console.log(`cortex ${CLI_VERSION} — ${getBrandName()}: project memory for software teams\n`);
+function usage(opts: { header?: boolean } = {}): void {
+  if (opts.header !== false) console.log(`cortex ${CLI_VERSION} — ${getBrandName()}: project memory for software teams\n`);
   console.log("Usage: cortex <command> [args]\n");
   console.log("Commands:");
   const w = Math.max(...Object.keys(COMMANDS).map((k) => k.length));
@@ -51,6 +52,12 @@ function usage(): void {
 
 async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
+  if (!sub && wantsSplash()) {
+    // Sin argumentos y en un terminal: el sello, y debajo la ayuda. `--help` sigue siendo texto plano.
+    printSplash(CLI_VERSION);
+    usage({ header: false });
+    return;
+  }
   if (!sub || sub === "help" || sub === "--help" || sub === "-h") {
     usage();
     return;

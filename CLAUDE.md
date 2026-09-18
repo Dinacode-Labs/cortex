@@ -163,6 +163,11 @@ claves** (embeddings `local`, no semánticos); conecta un endpoint real
   pasa por uno de esos dos puntos.
 - Cada unidad de conocimiento conserva **fuente, fecha, autor, confianza, estado y
   vigencia** (principio de trazabilidad, §5.5). No conviertas inferencias en hechos.
+- **La marca es un solo dibujo**: `MARK_GRID` en `packages/shared/src/brand.ts` (rejilla 8×8,
+  «Relay»). De ahí salen la cabecera web (`markSvg`), el favicon (`/favicon.svg`) y el splash
+  del CLI (`apps/cli/src/splash.ts`). Si cambias el sello, cámbialo ahí. El splash solo sale en
+  TTY, fuera de CI y con la marca por defecto; `hook-context` y `mcp` no lo imprimen nunca, que
+  hablan protocolo por stdout. El logo es criterio visual: no lleva ADR.
 
 ## Documentación: mantenerla viva (importante)
 

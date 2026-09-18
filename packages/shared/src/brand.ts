@@ -46,3 +46,93 @@ export function getBrandLogoSvg(): string | null {
 export function resetBrandCache(): void {
   logoCache = undefined;
 }
+
+/**
+ * El sello por defecto: «Relay». Dos piezas en L —la sesión que termina y la que empieza— y un
+ * cuadrado en el centro —lo aprendido— que no se mueve mientras las piezas se sustituyen.
+ *
+ * Está dibujado en una rejilla de 8×8 a propósito: así es el MISMO dibujo en la cabecera de la
+ * web (28 px), en el favicon (16 px = 2 px por celda, sin reescalar) y en el terminal, donde el
+ * CLI lo pinta con caracteres de bloque. Un solo color para las piezas y el acento para el
+ * centro; sin degradados ni texto, para que aguante en monocromo. Criterio visual, no
+ * arquitectura: no lleva ADR.
+ */
+export const MARK_GRID: readonly string[] = [
+  "XXXXX...",
+  "XXXXX...",
+  "XX......",
+  "XX.XX.XX",
+  "XX.XX.XX",
+  "......XX",
+  "...XXXXX",
+  "...XXXXX",
+];
+
+/** `a` y `b` son las dos piezas (sesiones); `core` es el cuadrado central (lo aprendido). */
+export type MarkPart = "a" | "b" | "core";
+export interface MarkCell {
+  x: number;
+  y: number;
+  part: MarkPart;
+}
+
+/** Las 36 celdas del sello, en orden de lectura, cada una con la parte a la que pertenece. */
+export function markCells(): MarkCell[] {
+  const cells: MarkCell[] = [];
+  MARK_GRID.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      if (ch !== "X") return;
+      const core = x >= 3 && x <= 4 && y >= 3 && y <= 4;
+      cells.push({ x, y, part: core ? "core" : x <= 4 && y <= 4 ? "a" : "b" });
+    });
+  });
+  return cells;
+}
+
+export interface MarkSvgOptions {
+  /** Color de las piezas: el relleno si van sólidas, el trazo si van huecas. Vale `var(--ink)`. */
+  ink: string;
+  /** Color del centro. */
+  accent: string;
+  /**
+   * Piezas huecas: relleno de este color y un contorno de `ink` de `strokeWidth` unidades
+   * (la rejilla mide 8). El contorno va por DENTRO del borde, así el dibujo no crece y a 16 px
+   * (2 px por celda) un `strokeWidth` de 0.5 es exactamente 1 px, sin difuminar.
+   */
+  hollow?: { fill: string; strokeWidth: number };
+  /** Clases del `<svg>` (la web engancha ahí la animación). */
+  className?: string;
+  /** CSS embebido en el SVG: lo usa el favicon para cambiar de color en tema oscuro. */
+  style?: string;
+}
+
+/** Contorno de cada pieza en L, como polígono, encogido `d` unidades hacia dentro. */
+function piecePath(part: "a" | "b", d: number): string {
+  const pts: [number, number][] =
+    part === "a"
+      ? [[d, d], [5 - d, d], [5 - d, 2 - d], [2 - d, 2 - d], [2 - d, 5 - d], [d, 5 - d]]
+      : [[8 - d, 8 - d], [3 + d, 8 - d], [3 + d, 6 + d], [6 + d, 6 + d], [6 + d, 3 + d], [8 - d, 3 + d]];
+  return "M" + pts.map(([x, y]) => `${x} ${y}`).join("L") + "Z";
+}
+
+/**
+ * El sello como SVG. Las dos piezas son un `<path>` cada una y el centro un `<rect>`, todos
+ * con `data-g` para que el CSS pueda mover cada parte por separado. `shape-rendering:
+ * crispEdges` mantiene los píxeles limpios a 16 px.
+ */
+export function markSvg(opts: MarkSvgOptions): string {
+  const cls = opts.className ? ` class="${opts.className}"` : "";
+  const style = opts.style ? `<style>${opts.style}</style>` : "";
+  const h = opts.hollow;
+  const piece = (part: "a" | "b"): string =>
+    h
+      ? `<path data-g="${part}" d="${piecePath(part, h.strokeWidth / 2)}" fill="${h.fill}" stroke="${opts.ink}" stroke-width="${h.strokeWidth}" stroke-linejoin="miter"/>`
+      : `<path data-g="${part}" d="${piecePath(part, 0)}" fill="${opts.ink}"/>`;
+  const core = `<rect data-g="core" x="3" y="3" width="2" height="2" fill="${opts.accent}"/>`;
+  return `<svg${cls} viewBox="0 0 8 8" shape-rendering="crispEdges" aria-hidden="true">${style}${piece("a")}${core}${piece("b")}</svg>`;
+}
+
+/** true si el operador no ha puesto ni nombre ni logo propios: entonces el sello es el de Cortex. */
+export function isDefaultBrand(): boolean {
+  return !getEnv("CORTEX_BRAND_NAME", "").trim() && getBrandLogoSvg() === null;
+}

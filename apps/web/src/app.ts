@@ -4,6 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { pingDatabase } from "@cortex/database";
 import { html } from "hono/html";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { getBrandLogoSvg, markSvg } from "@cortex/shared";
 import { sessionGate, type WebEnv } from "./middleware/session.js";
 import { layout } from "./views/layout.js";
 import { authRoutes } from "./routes/auth.js";
@@ -40,6 +41,21 @@ export function createApp(): Hono<WebEnv> {
   app.get("/health", async (c) => {
     const db = await pingDatabase();
     return c.json({ ok: db, service: "cortex-web", db: db ? "ok" : "down" }, db ? 200 : 503);
+  });
+
+  // Favicon: el logo del operador si lo hay; si no, el sello de Cortex. A 16 px cada celda son
+  // 2 px y el contorno de 0.5 es 1 px exacto. En tema oscuro las piezas van sólidas y claras:
+  // huecas sobre una pestaña oscura no se verían.
+  app.get("/favicon.svg", (c) => {
+    const svg =
+      getBrandLogoSvg() ??
+      markSvg({
+        ink: "#5b6673",
+        accent: "#1a6dff",
+        hollow: { fill: "#ffffff", strokeWidth: 0.5 },
+        style: "@media (prefers-color-scheme:dark){path{fill:#f2f5f8;stroke:#f2f5f8}}",
+      });
+    return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" });
   });
 
   // Estáticos (styles.css, graph.js): accesibles SIN sesión — la propia página de

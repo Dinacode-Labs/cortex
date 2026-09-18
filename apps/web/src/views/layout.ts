@@ -1,6 +1,6 @@
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { getBrandLogoSvg, getBrandName } from "@cortex/shared";
+import { getBrandLogoSvg, getBrandName, markSvg } from "@cortex/shared";
 import { ASSET_VERSION } from "../version.js";
 
 /**
@@ -16,26 +16,29 @@ export interface Usuario {
 }
 
 /**
- * El sello por defecto: tres nodos unidos, que es literalmente lo que hay dentro.
- *
- * Antes la marca era la palabra «Cortex» con la primera letra en azul, un truco de CSS que se
- * lee como lo que era: no haber decidido. Un operador puede poner el suyo con
- * `CORTEX_BRAND_LOGO_SVG`; esto es lo que ve quien no pone nada.
+ * El sello por defecto, «Relay»: dos piezas que se sustituyen y un centro que no se mueve. El
+ * dibujo vive en `@cortex/shared` (`MARK_GRID`), que es de donde salen también el favicon y el
+ * splash del CLI. Aquí las piezas van huecas —relleno del papel y un trazo fino gris— y el
+ * centro en el acento; los colores son variables de `styles.css`, y ahí está la animación,
+ * enganchada a `mark-relay`, que un logo de operador no lleva. Un operador puede poner el
+ * suyo con `CORTEX_BRAND_LOGO_SVG`; esto es lo que ve quien no pone nada.
  */
-const MARCA_SVG = `<svg class="mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-  <rect width="28" height="28" rx="7" fill="#1a6dff"/>
-  <path d="M9 9.5 19 14M9 18.5 19 14M9 9.5v9" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
-  <circle cx="9" cy="9.5" r="2.6" fill="#fff"/><circle cx="9" cy="18.5" r="2.6" fill="#fff"/>
-  <circle cx="19" cy="14" r="3" fill="#fff"/>
-</svg>`;
+function marcaSvg(play: boolean): string {
+  return markSvg({
+    ink: "var(--muted)",
+    accent: "var(--accent)",
+    hollow: { fill: "var(--surface)", strokeWidth: 0.3 },
+    className: play ? "mark mark-relay play" : "mark mark-relay",
+  });
+}
 
 /** `raw()` solo sobre SVG de configuración o de este fichero, nunca sobre datos. */
-function brandMark(): Html {
+function brandMark(play: boolean): Html {
   const name = getBrandName();
   const logo = getBrandLogoSvg();
   return logo
     ? html`<span class="logo">${raw(logo)}</span><span class="tag">${name}</span>`
-    : html`${raw(MARCA_SVG)}<span class="wordmark">${name}</span>`;
+    : html`${raw(marcaSvg(play))}<span class="wordmark">${name}</span>`;
 }
 
 export interface OpcionesLayout {
@@ -61,6 +64,8 @@ export function layout(title: string, body: Html, opts: OpcionesLayout | Usuario
   const o: OpcionesLayout = opts && "email" in opts ? { user: opts } : ((opts ?? {}) as OpcionesLayout);
   const user = o.user;
   const brand = getBrandName();
+  // El sello solo se anima al llegar (login) y en la portada: en cada página sería ruido.
+  const play = !user || o.activo === "projects";
   return html`<!doctype html>
 <html lang="en">
 <head>
@@ -70,11 +75,12 @@ export function layout(title: string, body: Html, opts: OpcionesLayout | Usuario
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.svg?v=${ASSET_VERSION}" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css?v=${ASSET_VERSION}">
 </head>
 <body>
   <header>
-    <a class="brand" href="/">${brandMark()}</a>
+    <a class="brand" href="/">${brandMark(play)}</a>
     ${user
       ? html`<form class="global-search" method="get" action="/search">
           <input type="search" name="q" value="${o.q ?? ""}" placeholder="Search everything…" aria-label="Search ${brand}">
