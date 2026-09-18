@@ -1,6 +1,6 @@
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
-import { getBrandLogoSvg, getBrandName } from "@cortex/shared";
+import { getBrandLogoSvg, getBrandName, markSvg } from "@cortex/shared";
 import { ASSET_VERSION } from "../version.js";
 
 /**
@@ -16,26 +16,29 @@ export interface User {
 }
 
 /**
- * The default mark: three connected nodes, which is literally what is inside.
- *
- * The brand used to be the word "Cortex" with the first letter in blue, a CSS trick that read
- * as what it was: not having decided. An operator can set their own with
+ * The default mark, "Relay": two pieces that change places and a centre that stays. The drawing
+ * lives in `@cortex/shared` (`MARK_GRID`), which is also where the favicon and the CLI splash come
+ * from. Here the pieces are hollow — paper fill and a hairline grey stroke — and the centre takes
+ * the accent; the colours are `styles.css` variables, and so is the animation, hooked on
+ * `mark-relay`, which an operator's logo never carries. An operator can set their own with
  * `CORTEX_BRAND_LOGO_SVG`; this is what you get when you set nothing.
  */
-const BRAND_SVG = `<svg class="mark" viewBox="0 0 28 28" fill="none" aria-hidden="true">
-  <rect width="28" height="28" rx="7" fill="#1a6dff"/>
-  <path d="M9 9.5 19 14M9 18.5 19 14M9 9.5v9" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
-  <circle cx="9" cy="9.5" r="2.6" fill="#fff"/><circle cx="9" cy="18.5" r="2.6" fill="#fff"/>
-  <circle cx="19" cy="14" r="3" fill="#fff"/>
-</svg>`;
+function defaultMarkSvg(play: boolean): string {
+  return markSvg({
+    ink: "var(--muted)",
+    accent: "var(--accent)",
+    hollow: { fill: "var(--surface)", strokeWidth: 0.3 },
+    className: play ? "mark mark-relay play" : "mark mark-relay",
+  });
+}
 
 /** `raw()` only over SVG from configuration or from this file, never over data. */
-function brandMark(): Html {
+function brandMark(play: boolean): Html {
   const name = getBrandName();
   const logo = getBrandLogoSvg();
   return logo
     ? html`<span class="logo">${raw(logo)}</span><span class="tag">${name}</span>`
-    : html`${raw(BRAND_SVG)}<span class="wordmark">${name}</span>`;
+    : html`${raw(defaultMarkSvg(play))}<span class="wordmark">${name}</span>`;
 }
 
 export interface LayoutOptions {
@@ -62,6 +65,8 @@ export function layout(title: string, body: Html, opts: LayoutOptions | User | n
   const o: LayoutOptions = opts && "email" in opts ? { user: opts } : ((opts ?? {}) as LayoutOptions);
   const user = o.user;
   const brand = getBrandName();
+  // The mark only animates on arrival (sign-in) and on the home page: on every page it would be noise.
+  const play = !user || o.active === "projects";
   return html`<!doctype html>
 <html lang="en">
 <head>
@@ -71,11 +76,12 @@ export function layout(title: string, body: Html, opts: LayoutOptions | User | n
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.svg?v=${ASSET_VERSION}" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css?v=${ASSET_VERSION}">
 </head>
 <body>
   <header>
-    <a class="brand" href="/">${brandMark()}</a>
+    <a class="brand" href="/">${brandMark(play)}</a>
     ${user
       ? html`<form class="global-search" method="get" action="/search">
           <input type="search" name="q" value="${o.q ?? ""}" placeholder="Search everything…" aria-label="Search ${brand}">

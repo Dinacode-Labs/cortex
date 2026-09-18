@@ -4,6 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { pingDatabase } from "@cortex/database";
 import { html } from "hono/html";
 import { serveStatic } from "@hono/node-server/serve-static";
+import { getBrandLogoSvg, markSvg } from "@cortex/shared";
 import { sessionGate, type WebEnv } from "./middleware/session.js";
 import { layout } from "./views/layout.js";
 import { authRoutes } from "./routes/auth.js";
@@ -40,6 +41,21 @@ export function createApp(): Hono<WebEnv> {
   app.get("/health", async (c) => {
     const db = await pingDatabase();
     return c.json({ ok: db, service: "cortex-web", db: db ? "ok" : "down" }, db ? 200 : 503);
+  });
+
+  // Favicon: the operator's logo if there is one, otherwise the Cortex mark. At 16 px each cell
+  // is 2 px and a 0.5 stroke is exactly 1 px. On a dark tab the pieces go solid and light: hollow
+  // ones would not show.
+  app.get("/favicon.svg", (c) => {
+    const svg =
+      getBrandLogoSvg() ??
+      markSvg({
+        ink: "#5b6673",
+        accent: "#1a6dff",
+        hollow: { fill: "#ffffff", strokeWidth: 0.5 },
+        style: "@media (prefers-color-scheme:dark){path{fill:#f2f5f8;stroke:#f2f5f8}}",
+      });
+    return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" });
   });
 
   // Statics (styles.css, graph.js): reachable WITHOUT a session -- the login page itself links

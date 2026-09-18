@@ -28,6 +28,9 @@ main way anyone uses Cortex.
   somebody pasted in a chat three weeks ago still works.
 - **No screen that shows a problem and offers no way to fix it**: it teaches people to ignore it.
 - **The product name never appears in the markup**: branding is configuration (`getBrandName()`).
+  The default mark comes from `markSvg()` in `@cortex/shared` (one 8×8 drawing shared with the
+  favicon and the CLI); its header animation is scoped to `mark-relay`, so an operator's logo
+  never moves.
 - Access is decided by `checkProjectAccess`, and "you cannot see it" renders as "it does not
   exist".
 - Inheritance goes **up**: a child reads what its client knows, never what a sibling knows.

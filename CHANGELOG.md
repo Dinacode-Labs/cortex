@@ -8,6 +8,14 @@ fixes things.
 
 ## [Unreleased]
 
+### Added
+- **Cortex has a mark.** "Relay": two pieces that change places and a centre that stays —
+  sessions change, knowledge stays. One 8×8 drawing renders the web header (with a one-shot
+  animation on sign-in and home), the favicon (`/favicon.svg`) and a splash in the CLI (`cortex`
+  with no arguments and `cortex version`, on an interactive terminal only; never in CI, in hooks
+  or in `cortex mcp`, and off under `NO_COLOR`). Operators with their own `CORTEX_BRAND_NAME` or
+  logo see theirs and no Cortex mark. What it means and how it is built: `docs/brand/README.md`.
+
 ### Changed
 - **The repository is in English, all of it.** Half of it already was — the README, the CLI, the
   MCP tools, the web UI — and the other half, deliberately, was not: code comments, the ADRs,

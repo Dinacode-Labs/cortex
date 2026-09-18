@@ -1,6 +1,7 @@
 import { getClientConfig, getServerVersion, readCredentials } from "@cortex/client";
 import { classify, noticeLine } from "../compat.js";
 import { CLI_VERSION } from "../version.js";
+import { printSplash, wantsSplash } from "../splash.js";
 
 /**
  * `cortex version` -- which version you have and which version the server has.
@@ -9,7 +10,8 @@ import { CLI_VERSION } from "../version.js";
  * not work for me" the first thing to know is whether they are three versions behind.
  */
 export async function run(): Promise<void> {
-  console.log(`cortex ${CLI_VERSION}`);
+  if (wantsSplash()) printSplash(CLI_VERSION);
+  else console.log(`cortex ${CLI_VERSION}`);
   console.log(`node ${process.versions.node} · ${process.platform}-${process.arch}`);
 
   const creds = readCredentials();

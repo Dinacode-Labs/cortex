@@ -65,7 +65,9 @@ These are settled and not up for renegotiation without an ADR:
   is deliberately no password or email form in the browser.
 - **The brand is configuration.** `getBrandName()` and the optional logo
   ([ADR-0013](decisions.md#adr-0013)). No product name in the markup — and that means *no
-  hardcoded "Cortex"* either, which is where the rule is currently broken.
+  hardcoded "Cortex"* either, which is where the rule is currently broken. The default mark
+  lives in `@cortex/shared` (`markSvg`), and its header animation is scoped to that mark's
+  class, so an operator's logo never moves.
 - **Access is one policy.** `checkProjectAccess` ([ADR-0046](decisions.md#adr-0046)); the UI
   never invents its own rule, and "you cannot see it" renders as "not found".
 

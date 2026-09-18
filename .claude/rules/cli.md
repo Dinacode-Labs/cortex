@@ -38,6 +38,14 @@ They own their own lifecycle (`managed: false`) and **stdout is protocol**: not 
 even the version notice. There is a test. They are also guarded so that a missing CLI or an
 unreachable server never breaks the agent's session.
 
+## The splash
+
+`cortex` with no arguments and `cortex version` print the Cortex mark (`apps/cli/src/splash.ts`,
+drawn from `MARK_GRID` in `@cortex/shared`, the same drawing as the web header and the favicon).
+Only on an interactive terminal, never in CI or with `TERM=dumb`, and only with the default brand:
+an operator who set `CORTEX_BRAND_NAME` does not get the Cortex mark. `NO_COLOR` disables every
+escape. Piped output does not change. The mark is visual judgement: no ADR for it.
+
 ## Connectors
 
 `connect-<x>.ts` exporting `run(args)`, reusing core's `extract` layer and writing through the
