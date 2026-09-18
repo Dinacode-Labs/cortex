@@ -129,7 +129,7 @@ jobs:
         with: { node-version: 22 }
       - name: Release notes from the CHANGELOG
         run: node scripts/changelog-notes.mjs "${GITHUB_REF_NAME#v}" > /tmp/notes.md
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           body_path: /tmp/notes.md
           name: ${{ github.ref_name }}
