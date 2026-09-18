@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { contextEntryType } from "@cortex/shared";
 import { canonicalize } from "@cortex/core";
-import type { GoldWindow } from "../apps/admin/src/commands/eval-distill-match.js";
+import type { GoldWindow } from "../apps/admin/src/eval/distill-match.js";
 
 /**
  * The distillation fixture, checked without spending a single call on a model.

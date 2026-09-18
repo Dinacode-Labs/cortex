@@ -4,7 +4,7 @@ import {
   summarizeDistillMatches,
   type DistillItem,
   type GoldWindow,
-} from "../apps/admin/src/commands/eval-distill-match.js";
+} from "../apps/admin/src/eval/distill-match.js";
 
 /**
  * The rule that decides whether a distilled window passed, exercised with no model.

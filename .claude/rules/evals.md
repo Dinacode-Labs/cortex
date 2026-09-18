@@ -27,8 +27,10 @@ Four pieces, and the names in `tests/fixtures/eval/` are the reference:
 - **The marking key** (`gold.json`): one entry per input, saying what has to come out and what
   must not. Not the expected text: the **keywords** that have to be in it, plus the type.
 - **The examiner**: a command in `apps/admin` that runs the model and prints a table.
-- **The marker**: a **pure function**, in a file of its own, that compares what came out against
-  the key. It takes no model, no database and no filesystem.
+- **The marker**: a **pure function** that compares what came out against the key, taking no
+  model, no database and no filesystem. It goes in a file of its own **outside `commands/`**
+  (`apps/admin/src/eval/`): that directory holds commands, each exporting `run(args)` and each
+  registered in the dispatcher, and there is a test for it.
 
 ## Marking
 

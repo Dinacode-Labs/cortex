@@ -29,6 +29,10 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **`commands/` holds commands and nothing else**, in both CLIs: what a command needs and is not
+  one itself lives in a sibling directory. A module parked in there reads as a subcommand that
+  cannot be invoked, and a command that never reaches the dispatcher exists without being
+  reachable; `tests/cli-commands.test.ts` now checks both.
 - **How to build an eval is written down**, in `.claude/rules/evals.md`: when a mark on a model
   replaces an assertion, how the marking key is written, why half the exam has to expect nothing,
   and why a set with no first run is worth nothing. The rules of thumb that are easy to get wrong
