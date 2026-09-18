@@ -9,8 +9,8 @@
     "prepublishOnly": "pnpm build && node dist/cortex.js version"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "yaml": "^2.9.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "yaml": "^2.9.1",
     "zod": "^3.25.76"
   },
   "devDependencies": {
