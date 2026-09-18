@@ -1,0 +1,21 @@
+USER: Ayer una cuenta se quedó con cuatrocientos documentos en estado "procesando" y no nos enteramos hasta que llamaron por teléfono.
+
+ASSISTANT: He mirado los registros de esa ventana. Todos los trabajos parados venían del mismo lote, y el worker que los cogió murió sin dejar traza de error: el último mensaje suyo es el de arranque del documento.
+
+USER: Lo he encontrado. El extractor carga el PDF entero en memoria antes de trocearlo, y ese lote traía un documento de novecientas páginas. El worker se pasó del límite de memoria del contenedor y lo mató el kernel, por eso no hay excepción en el registro.
+
+ASSISTANT: Y como el trabajo no volvía a la cola, el documento se quedaba en "procesando" para siempre. Son dos fallos encadenados: el consumo de memoria y que un trabajo cogido por un worker muerto no se recupera.
+
+USER: Exacto. El arreglo son las dos cosas: la extracción pasa a ir página a página en streaming, sin cargar el documento completo, y la cola devuelve a pendiente cualquier trabajo cogido hace más de quince minutos sin confirmación. Y una alerta si un documento lleva más de treinta minutos en "procesando".
+
+ASSISTANT: Hecho. He puesto el límite de recuperación en quince minutos, por debajo del máximo de diez minutos de proceso más el margen de arranque.
+
+USER: Bien. Deja la alerta avisando al canal de guardia, no al correo, que el correo no lo lee nadie un domingo.
+
+ASSISTANT: Por cierto, el servidor MCP de la herramienta de tickets no me conecta en este entorno, así que no he podido abrir la incidencia desde aquí.
+
+USER: Da igual, la abro yo a mano.
+
+ASSISTANT: Otra cosa: el test de integración de la cola ha fallado una vez y ha pasado al reintentar, sin tocar nada. Parece que es flaky cuando el puerto de Postgres tarda en levantar.
+
+USER: Apúntalo para otro día, ahora no.

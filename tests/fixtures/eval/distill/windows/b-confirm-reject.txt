@@ -1,0 +1,17 @@
+USER: Necesito que el cliente se entere de que su documento ya está procesado sin tener que mirar la pantalla.
+
+ASSISTANT: Te planteo dos opciones. Opción A, sondeo desde el cliente: publicamos un endpoint de estado y quien integra pregunta cada 30 segundos por cada documento en vuelo. Es lo más simple de implementar y no exige nada del otro lado. Opción B, webhook firmado: la cuenta registra una URL, y cuando el documento termina hacemos un POST con la firma HMAC en una cabecera, con reintentos si la URL falla.
+
+USER: Vale, la B. El sondeo no lo quiero: multiplica las peticiones de estado por cada documento en vuelo, y además la mitad de nuestros clientes no son un navegador abierto, son procesos suyos que no pueden estar preguntando todo el día.
+
+ASSISTANT: ¿La firma la hacemos con una clave por cuenta o con una global nuestra?
+
+USER: Por cuenta, y que se pueda rotar sin cortar el servicio: durante la rotación se admiten dos claves válidas a la vez y el cliente decide cuándo deja de usar la vieja.
+
+ASSISTANT: Ya que tocamos esto, podríamos meter Kafka entre el proceso y el envío, y de paso nos vale para el resto de eventos del sistema.
+
+USER: ¿Qué tal si terminamos el webhook primero?
+
+ASSISTANT: Entendido. Los reintentos, ¿con el mismo backoff que la cola de proceso?
+
+USER: El mismo, no inventes otro. Y el cuerpo del webhook no lleva el documento, solo el identificador, el estado y la cuenta. Si quieren el contenido, que lo pidan por la API con su token.

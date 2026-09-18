@@ -1,0 +1,27 @@
+USER: Retomo lo de las miniaturas de los documentos. Ahora se generan cuando alguien abre el listado y nos está costando picos de CPU en recepción a media mañana.
+
+ASSISTANT: Hay dos caminos. Generarlas en la subida y guardarlas junto al fichero, o seguir bajo demanda con una caché en disco. Bajo demanda ocupa menos almacenamiento, pero el primer acceso sigue pagando la conversión.
+
+USER: Se generan en la subida, decidido. El pico coincide con la hora a la que el equipo del cliente entra a revisar, y si se cae recepción se cae también la puerta de entrada. Prefiero pagar 200 ms más en un proceso asíncrono, donde no los nota nadie, que arriesgar la subida.
+
+ASSISTANT: Entonces la miniatura pasa a formar parte del trabajo de recepción. ¿Qué hacemos con los documentos que ya están subidos?
+
+USER: Esos se generan la primera vez que alguien los pida y listo. No voy a lanzar un reproceso de dos millones de ficheros por una miniatura.
+
+USER: Segunda cosa. El identificador que aparece en la URL de un documento es el autoincremental de la tabla. Quiero que deje de serlo.
+
+ASSISTANT: ¿Por privacidad o por el reparto de escrituras en la base?
+
+USER: Sobre todo por privacidad. Con un autoincremental, cualquier cliente sabe cuántos documentos procesamos al día restando dos identificadores suyos, y eso es información de negocio que no tiene por qué tener. Pasamos a ULID: sigue siendo ordenable por tiempo, así que el índice se comporta igual que ahora, y no filtra el volumen. El autoincremental se queda como clave interna.
+
+ASSISTANT: Vale: columna pública nueva con el ULID, clave primaria interna igual que hasta ahora, y la API deja de aceptar el numérico.
+
+USER: La API lo acepta seis meses más y avisa en la respuesta, que hay integraciones que lo tienen escrito a mano.
+
+USER: Y tercera. La facturación cerrada se archiva. La tabla de líneas de factura va por cuarenta millones de filas y el cierre del día 1 tarda más cada mes.
+
+ASSISTANT: ¿Archivamos a fichero o movemos a otra tabla?
+
+USER: A otra tabla, particionada por mes. A fichero no, porque soporte consulta facturas de hace un año casi todas las semanas y no pienso montar un proceso de rescate para eso. Con particiones por mes el cierre solo toca la del mes en curso y lo antiguo se sigue consultando con SQL normal.
+
+ASSISTANT: He abierto el módulo de recepción para ver dónde encaja la miniatura. Los tests pasan.

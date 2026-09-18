@@ -1,0 +1,46 @@
+[
+  {
+    "window": "a-decisions.txt",
+    "expected": [
+      { "type": "decision", "must_mention": ["miniatura", "subida"] },
+      { "type": "decision", "must_mention": ["ulid"] },
+      { "type": "decision", "must_mention": ["factura", "partición"] }
+    ],
+    "forbidden": [{ "must_mention": ["tests", "pasan"] }]
+  },
+  {
+    "window": "b-confirm-reject.txt",
+    "expected": [{ "type": "decision", "must_mention": ["webhook", "firma"] }],
+    "forbidden": [{ "must_mention": ["kafka"] }]
+  },
+  {
+    "window": "c-open-discussion.txt",
+    "expected": [],
+    "forbidden": [{ "must_mention": ["gpu"] }, { "must_mention": ["sla"] }]
+  },
+  {
+    "window": "d-incident-vs-hiccup.txt",
+    "expected": [{ "type": "incident", "must_mention": ["memoria"] }],
+    "forbidden": [{ "must_mention": ["mcp"] }, { "must_mention": ["flaky"] }]
+  },
+  {
+    "window": "e-narration.txt",
+    "expected": [],
+    "forbidden": [{ "must_mention": ["tests", "pasan"] }, { "must_mention": ["ocr.ts"] }]
+  },
+  {
+    "window": "f-convention.txt",
+    "expected": [{ "type": "convention", "must_mention": ["idempotencia"] }],
+    "forbidden": [{ "must_mention": ["retroactiva"] }]
+  },
+  {
+    "window": "g-exploration.txt",
+    "expected": [],
+    "forbidden": [{ "must_mention": ["logo"] }]
+  },
+  {
+    "window": "h-trivial.txt",
+    "expected": [],
+    "forbidden": []
+  }
+]
