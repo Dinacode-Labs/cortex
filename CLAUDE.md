@@ -142,7 +142,7 @@ OpenAI/Voyage) when you want genuine quality.
 
 ## Conventions
 
-- Language: **the repository is in English — all of it**. That includes CLI messages, MCP tool
+- Language (ADR-0064): **the repository is in English — all of it**. That includes CLI messages, MCP tool
   descriptions, the skill and the plugin's commands, API errors, the web UI, `README.md`,
   `docs/how-it-works.md`, `CONTRIBUTING.md` and `SECURITY.md`, and equally the code comments,
   the ADRs (`docs/decisions.md`), the roadmap, the research notes and the LLM agents' prompts.

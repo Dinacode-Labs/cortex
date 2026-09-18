@@ -89,7 +89,8 @@ are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
 
 ## Conventions
 
-- **Language.** The repository is in **English** — all of it: the README, this guide, the
+- **Language** ([ADR-0064](./docs/decisions.md#adr-0064))**.** The repository is in
+  **English** — all of it: the README, this guide, the
   security policy, CLI output, MCP tool descriptions, the web UI, the code and its comments,
   the decision records, the roadmap, the research notes and the agents' prompts. A public
   repository that switches language halfway is a repository half of which nobody outside can

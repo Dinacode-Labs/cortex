@@ -33,7 +33,7 @@ pnpm test:integration         # tests de integración (requiere pnpm db:up)
 gracias a una condición `development` en los `exports` de cada paquete. **Producción sí
 compila**: `pnpm build` lanza `tsc -b` y deja un `dist/` en cada paquete y app.
 
-## El idioma del repositorio
+## El idioma del repositorio ([ADR-0064](./docs/decisions.md#adr-0064))
 
 **El repositorio está en inglés, entero**: el README, esta guía, la política de seguridad, los
 mensajes del CLI, las descripciones de las tools MCP, la UI web, el código, sus comentarios, los

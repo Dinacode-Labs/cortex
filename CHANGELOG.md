@@ -29,6 +29,7 @@ fixes things.
 
   Being Spanish speakers, the two entry points are also kept in Spanish, `README.es.md` and
   `CONTRIBUTING.es.md`, with English as the version that must be current when they disagree.
+  ADR-0064.
 
 ### Fixed
 - **`/context-pack` answered 500 instead of 404 for a project that does not exist.** The route
