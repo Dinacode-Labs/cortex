@@ -506,7 +506,10 @@ where it should improve. When you try it, look at these things above all:
 5. **Does the time dimension hold up?** Mark something as superseded and check that `asOf`
    returns the right snapshot and that the current view excludes the old one.
 6. **Does auto-capture distil well?** Close a session and look at what it stored. Useful
-   typed knowledge, or noise? Did any secret slip through? It should not have.
+   typed knowledge, or noise? Did any secret slip through? It should not have. To measure it
+   rather than judge it by eye, `pnpm admin eval-distill` runs the distiller over a fixed set
+   of session windows with an annotated expectation each and reports what it kept, what it
+   dropped and what it mistyped.
 7. **Cost and latency:** look at `/admin/usage`. How many tokens does it cost to classify, rerank
    and distil? Does the LLM earn its keep against the heuristics for your case?
 

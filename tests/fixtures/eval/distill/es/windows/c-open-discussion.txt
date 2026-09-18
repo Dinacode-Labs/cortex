@@ -1,0 +1,15 @@
+USER: Estoy dándole vueltas a lo de depender de un solo proveedor de OCR. ¿Qué alternativas tenemos?
+
+ASSISTANT: Veo tres. Una, montar un modelo abierto en GPU propia: nos quita la dependencia pero añade operación, y el coste fijo entra aunque el mes venga flojo. Dos, un segundo proveedor como respaldo, con el mismo contrato de entrada y conmutación manual: es lo más barato de hacer, pero hay que mantener dos integraciones vivas. Tres, renegociar el SLA con el actual y pedir compensación por caída, que no resuelve nada técnicamente pero pone un precio a su indisponibilidad.
+
+USER: La GPU me da respeto por el coste fijo. ¿Qué volumen haría falta para que salga a cuenta?
+
+ASSISTANT: Con lo que factura el proveedor ahora, el punto de equilibrio está en torno al triple del volumen actual, y eso sin contar el tiempo de quien lo mantenga.
+
+USER: ¿Y el segundo proveedor? ¿Cuánto es "mantener dos integraciones vivas"?
+
+ASSISTANT: La parte de enviar y recibir es pequeña, lo caro es la calidad: los campos no salen igual y habría que ajustar el umbral de confianza por proveedor para no cambiar el comportamiento de la revisión humana.
+
+USER: Ya. Pues no lo tengo claro. Déjalo aquí, lo hablo con el resto la semana que viene y decidimos entonces. No des nada por decidido de esta conversación.
+
+ASSISTANT: De acuerdo, lo dejamos abierto.

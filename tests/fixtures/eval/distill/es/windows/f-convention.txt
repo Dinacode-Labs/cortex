@@ -1,0 +1,17 @@
+USER: A partir de ahora, todo trabajo que entre en la cola lleva clave de idempotencia. Siempre, sin excepciones y en todos los servicios.
+
+ASSISTANT: ¿Quién genera la clave, quien encola o la propia cola al recibir?
+
+USER: Quien encola, a partir del identificador del documento y del tipo de trabajo. Si la genera la cola no sirve de nada, porque el duplicado ya ha entrado.
+
+ASSISTANT: ¿Y qué hacemos con un mensaje que llegue sin clave?
+
+USER: Se rechaza en la entrada, no se procesa "por si acaso". Llevamos dos incidentes de trabajos duplicados por reintentos, uno de ellos cobrando dos veces las mismas páginas, y no quiero un tercero.
+
+ASSISTANT: Entonces lo dejo como una comprobación en el punto de encolado, con error explícito.
+
+USER: Y que el mismo trabajo con la misma clave se pueda reenviar sin miedo: si ya está hecho, responde que está hecho y no vuelve a ejecutarse.
+
+ASSISTANT: ¿Lo aplicamos también de forma retroactiva a lo que ya está encolado?
+
+USER: Eso ya lo veremos, no lo des por hecho.

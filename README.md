@@ -443,6 +443,15 @@ pnpm admin maintain-worker    # scheduled maintenance
   `pnpm admin maintain ["<Project>"]` chains reclassify, enrich, resolve, temporal, curate,
   reconcile and lint. Syncing sources is **manual**, triggered by a developer. This is
   maintenance only.
+- **Measuring quality.** Two evaluation sets ship with the repo, both run as operator commands.
+  `pnpm admin eval` measures **retrieval**: recall@5 and MRR over a fixed corpus with annotated
+  evidence. `pnpm admin eval-distill` measures the **distiller** over a set of session windows
+  with an annotated expectation each -- what it keeps, what it drops and what it files under the
+  wrong type -- in English, or in the corpus's own language with `--lang es`, each set with its
+  own mark; `--verbose` prints every item it emitted. Both need a real provider, and
+  `eval-distill` refuses to run without an LLM, because the distiller *is* the model and with no
+  model every window comes back empty. What each set contains and what the numbers mean:
+  [`tests/fixtures/eval/README.md`](./tests/fixtures/eval/README.md).
 
 ### Deployment
 

@@ -27,7 +27,7 @@ content** (ADR-0065):
 
 - Always: `architecture.md`, `language.md`, `tests.md`, `documentation.md`.
 - Only when you touch what they cover (a `paths:` header): `typescript-style.md`, `api-http.md`,
-  `cli.md`, `web.md`, `llm-agents.md`.
+  `cli.md`, `web.md`, `llm-agents.md`, `evals.md`.
 
 If you work with another agent that does not read `.claude/rules/`, those files are still the
 reference: they are written for anyone.
