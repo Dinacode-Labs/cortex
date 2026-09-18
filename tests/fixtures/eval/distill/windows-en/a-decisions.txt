@@ -1,0 +1,23 @@
+USER: Let's settle the public document identifier. Right now the URL carries the table's autoincrement and I want that gone.
+
+ASSISTANT: Is that about privacy or about write distribution in the database?
+
+USER: Privacy, mostly. With an autoincrement any customer can work out how many documents we process a day by subtracting two of their own identifiers, and that is business information they have no reason to have. We move to ULID: still time-ordered, so the index behaves exactly as it does now, and it leaks nothing about volume. The autoincrement stays as the internal key.
+
+ASSISTANT: So: new public column with the ULID, internal primary key untouched, and the API stops accepting the numeric one.
+
+USER: The API keeps accepting it for six more months with a warning in the response. There are integrations out there with that number hardcoded.
+
+USER: Second thing. Every billing timestamp goes in UTC. No exceptions, no local time anywhere near the billing tables.
+
+ASSISTANT: Including what we show in the UI?
+
+USER: The UI converts on display, that is a rendering concern. What is stored is UTC. We already lost an afternoon to a billing period that closed an hour early in March, and that was daylight saving doing its thing while half the rows carried local time.
+
+USER: And third: the queue state moves out of Redis into Postgres.
+
+ASSISTANT: That costs you throughput. Redis was chosen precisely because the queue is hot.
+
+USER: It costs throughput we are not using. We are nowhere near the load that justified it, and right now a job's state lives in Redis while the document it belongs to lives in Postgres, so the two go out of sync whenever Redis restarts and somebody has to reconcile them by hand. One store, one transaction, and the day the throughput actually matters we will have the numbers to argue about it.
+
+ASSISTANT: I have opened billing/dates.ts to see where the UTC change lands. The tests pass.

@@ -1,0 +1,19 @@
+USER: Ok.
+
+ASSISTANT: Anything else?
+
+USER: Nothing for now. Thanks.
+
+ASSISTANT: Any time.
+
+USER: Right, I will look at it properly later.
+
+ASSISTANT: Sounds good. I am here when you need me.
+
+USER: Thanks again.
+
+ASSISTANT: A pleasure.
+
+USER: See you later.
+
+ASSISTANT: See you later.

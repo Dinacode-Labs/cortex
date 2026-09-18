@@ -1,0 +1,15 @@
+USER: I need ideas for the Nébula logo. The one we have I drew myself in ten minutes and it shows.
+
+ASSISTANT: A few, then. A cloud of dots that resolves into a sheet of paper as you step back. An inbound-mail stamp, slightly rotated. Three lines that come in from the left and leave as one on the right, for reception, processing and billing. Or just the letter N treated as a piece of cut paper.
+
+USER: The three lines one is not bad. How would it hold up small, in a browser tab?
+
+ASSISTANT: At sixteen pixels the three lines will merge. If we go that way we would need a reduced version with two lines, or keep only the crossing point.
+
+USER: And the stamp?
+
+ASSISTANT: It survives better at small sizes because it is a closed silhouette, but it is everywhere in anything that smells of paperwork.
+
+USER: Right. Anyway, that was curiosity while the deploy finished. Back to what we were doing, we are not changing the logo today.
+
+ASSISTANT: Agreed.
