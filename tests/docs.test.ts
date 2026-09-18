@@ -18,6 +18,7 @@ const DOCS = [
   "deploy/README.md",
   "config/README.md",
   ...globSync("docs/**/*.md", { cwd: ROOT }),
+  ...globSync(".claude/rules/*.md", { cwd: ROOT }),
 ];
 
 const read = (p: string): string => readFileSync(resolve(ROOT, p), "utf8");
@@ -98,5 +99,30 @@ describe("documentación", () => {
 
   it("el CHANGELOG mantiene una sección [Unreleased] para el próximo PR", () => {
     expect(read("CHANGELOG.md")).toContain("## [Unreleased]");
+  });
+
+  /**
+   * Las reglas de `.claude/rules/` las carga el agente por sí solo (ADR-0064), y ahí está la
+   * trampa: nada falla cuando una deja de cargarse. Si alguien la importa desde CLAUDE.md, el
+   * mismo texto entra dos veces en contexto; si el `paths:` apunta a un directorio que se
+   * renombró, la regla existe, se lee bien y no se aplica nunca.
+   */
+  it("las reglas se cargan como reglas: ni importadas dos veces, ni apuntando a la nada", () => {
+    const reglas = globSync(".claude/rules/*.md", { cwd: ROOT }).map((f) => f.replaceAll("\\", "/"));
+    expect(reglas.length, "no hay reglas que cargar").toBeGreaterThan(0);
+
+    const importadas = [...read("CLAUDE.md").matchAll(/^@(\S*\.claude\/rules\/\S+\.md)$/gm)].map((m) => m[1]!);
+    expect(importadas, "CLAUDE.md las importa y el agente ya las carga: entrarían dos veces").toEqual([]);
+
+    // De cada glob se comprueba la parte literal: "apps/web/**/*.ts" → "apps/web".
+    const huerfanos: string[] = [];
+    for (const regla of reglas) {
+      const frontmatter = /^---\n([\s\S]*?)\n---/.exec(read(regla))?.[1];
+      for (const m of frontmatter?.matchAll(/^\s*-\s*"([^"]+)"/gm) ?? []) {
+        const base = m[1]!.split("*")[0]!.replace(/\/[^/]*$/, "");
+        if (base && !existsSync(resolve(ROOT, base))) huerfanos.push(`${regla} → ${m[1]}`);
+      }
+    }
+    expect(huerfanos, "un paths: que no existe es una regla que no se aplica jamás").toEqual([]);
   });
 });

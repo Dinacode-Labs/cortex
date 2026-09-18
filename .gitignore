@@ -47,3 +47,15 @@ config/skills/*/*.zip
 # (ADR-0059): quien clone esto y quiera su propia memoria no debería tener que pelearse con un
 # fichero versionado. Se crea solo con `cortex link`.
 .cortex.json
+# Lo que Cortex instala en Claude Code para ESTE repo (reglas, comando y skill) sí se versiona:
+# es parte de cómo se trabaja aquí (ADR-0064). Hace falta decirlo porque el .gitignore global de
+# casi cualquier máquina ignora `.claude/`, y una reinclusión no vale si el directorio que la
+# contiene sigue excluido: hay que desexcluir el directorio primero. Lo personal
+# (settings.local.json) se queda fuera por no estar en la lista.
+!.claude/
+!.claude/rules/
+!.claude/rules/*.md
+!.claude/commands/
+!.claude/commands/*.md
+!.claude/skills/
+!.claude/skills/**

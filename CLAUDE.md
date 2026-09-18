@@ -19,6 +19,19 @@ portátil necesita base de datos ni claves de modelo.
 > responsables, ni skills de herramientas internas, ni marca. Eso vive en el repo privado
 > `Dinacode-Labs/ai-toolbelt`.
 
+## Reglas
+
+Lo que hay que respetar al escribir código aquí vive en `.claude/rules/`, un fichero por tema.
+Claude Code las carga solo, así que **no las importes desde aquí ni dupliques su contenido**
+(ADR-0064):
+
+- Siempre: `arquitectura.md`, `tests.md`, `documentacion.md`.
+- Al tocar la parte que les toca (`paths:` en su cabecera): `estilo-typescript.md`, `api-http.md`,
+  `cli.md`, `web.md`, `agentes-llm.md`.
+
+Si trabajas con otro agente que no lee `.claude/rules/`, esos ficheros siguen siendo la
+referencia: están escritos para cualquiera.
+
 ## Stack (ver `docs/decisions.md` para el porqué)
 
 - **Monorepo** pnpm (`packages/*` librerías, `apps/*` ejecutables).
@@ -75,49 +88,8 @@ docs/
   toolbelt-registry.md
 ```
 
-> **Qué NO va en este repo** (ADR-0031): decisiones operativas (qué proveedor, con qué clave,
-> a qué coste), auditorías de seguridad y planes de refactor con hallazgos por fichero,
-> prioridades de negocio y responsables, y datos de clientes (ADR-0026). Todo eso vive en el
-> repo privado `Dinacode-Labs/ai-toolbelt`. Regla rápida: si ayuda a alguien de fuera a usar,
-> entender o mejorar Cortex, es público; si describe cómo lo operamos nosotros, es privado.
-
-`@cortex/core` es determinista (sin LLM). La capa de inteligencia (`@cortex/agents`,
-Mastra sobre un endpoint OpenAI-compatible) se inyecta desde cada entrypoint llamando a
-`wireLlm()` tras `loadEnv()` (cablea `setClassifier`/`setReranker`/`setReconciler` y
-el sink de uso de embeddings; sin `LLM_PROVIDER`, core cae a heurísticas). MCP, API,
-UI y CLI consumen `core`. Nota: `agents` usa zod v4 (lo exige Mastra), aislado del
-zod v3 del resto del repo; no cruzar schemas entre ambos.
-
-## Reglas de dependencia (qué puede importar qué)
-
-```
-shared      → (ninguna dependencia interna)   # tipos, contratos de la API, utilidades puras
-client      → shared                          # lado cliente: HTTP, credenciales, transcripts
-database    → shared
-embeddings  → shared
-core        → client, database, embeddings, shared   # sin LLM; de client solo .cortex.json
-agents      → client, core, database, shared         # implementa los hooks LLM de core
-apps/*      → cualquier package
-```
-
-- Los packages **jamás** importan de `apps/*` ni ficheros de otro paquete por ruta.
-- Side effects (`loadEnv`, wiring de hooks, `serve`, `process.exit`) **solo** en
-  entrypoints, nunca al importar un módulo de librería.
-- Estas reglas **se cumplen** hoy: la capa multimodal con LLM se inyecta con
-  `setMediaExtractor`, igual que classifier, reranker y reconciler. No añadas excepciones.
-- **`apps/cli` solo puede depender de `client` y `shared`.** Si un comando necesita la base
-  de datos, el modelo o levantar un servicio, va en `apps/admin`. Hay un test que lo
-  comprueba (`tests/client-package.test.ts`).
-- **`client` se mantiene ligero a propósito**: nada de Postgres, Mastra ni embeddings. Es lo
-  que permite empaquetar el CLI y distribuirlo con `npm i -g` sin arrastrar ~95 MB de
-  dependencias al portátil de cada dev (ADR-0025). Hay un test que lo comprueba
-  (`tests/client-package.test.ts`), porque es una regla fácil de romper sin darse cuenta.
-
-## Disciplina
-
-Un PR por cambio, `typecheck` y tests en verde, docs actualizadas en el mismo PR, y sin
-arreglos «ya que estoy» fuera de alcance. Si te encuentras algo roto que no toca, anótalo en
-el PR y sigue.
+`@cortex/core` es determinista (sin LLM): la capa de inteligencia se **inyecta** desde cada
+entrypoint con `wireLlm()`. Cómo y por qué, en `.claude/rules/arquitectura.md`.
 
 ## Comandos
 
@@ -140,46 +112,8 @@ Copia `.env.example` a `.env` antes de empezar. Por defecto todo funciona **sin
 claves** (embeddings `local`, no semánticos); conecta un endpoint real
 (`openai-compatible` con NaN, o OpenAI/Voyage) cuando quieras calidad de verdad.
 
-## Convenciones
+## Mantener esto vivo
 
-- Idioma: **lo que ve alguien de fuera va en inglés**. Eso incluye los mensajes del CLI, las
-  descripciones de las tools MCP, la skill y los comandos del plugin, los errores de la API,
-  la UI web, el `README.md`, `docs/how-it-works.md`, `CONTRIBUTING.md` y `SECURITY.md` — el
-  repositorio es público, y quien encuentra un fallo de seguridad o quiere contribuir tiene
-  que poder leer cómo se hace. También los ADR
-  (`docs/decisions.md`): explican **cómo está construido** el producto y son parte de lo que
-  hace creíble abrirlo, así que los lee gente de fuera. **Lo que es registro de trabajo del
-  equipo va en español**: comentarios del código, roadmap e investigación. También los prompts de los agentes
-  LLM, porque el corpus que procesan es español.
-- Nada de secretos en el repo. `.env` está ignorado; usa `.env.example` como plantilla.
-- **Un cliente puede hablar con varios servidores** (ADR-0033). El servidor sale del
-  `.cortex.json` del repo, no de una variable global: quien vaya a llamar a la API desde una
-  carpeta debe pasar antes por `useProjectServer(cwd)`. El token se busca **por servidor**;
-  no asumas que `readCredentials()` sin argumento es el correcto.
-- **CLI y servidor no van en lockstep** (ADR-0062). El contrato es la API HTTP. Si añades un
-  endpoint o un campo, el lado que lo lee tolera su ausencia: campo opcional, 404 = servidor
-  viejo, y se degrada en vez de fallar. `minClientVersion` es lo único que bloquea (solo
-  escrituras) y lo sube el operador cuando algo rompe de verdad. La comparación de versiones
-  está en `apps/cli/src/version.ts` y el aviso/bloqueo en `apps/cli/src/compat.ts`; los
-  hooks y `cortex mcp` no lo llaman nunca (stdout es protocolo; hay test).
-- **Borrado de secretos**: `scrub()` vive en `@cortex/shared` (función pura, sin I/O).
-  `agents` lo aplica antes de mandar nada al LLM y `core` al persistir (`saveContext`,
-  `captureBatch`): el servidor no confía en que el cliente haya limpiado. Es idempotente,
-  así que aplicarlo en varias capas es seguro. Si añades una vía de entrada de texto,
-  pasa por uno de esos dos puntos.
-- Cada unidad de conocimiento conserva **fuente, fecha, autor, confianza, estado y
-  vigencia** (principio de trazabilidad, §5.5). No conviertas inferencias en hechos.
-
-## Documentación: mantenerla viva (importante)
-
-La documentación es parte del trabajo, no un extra. Al cambiar comportamiento, **actualiza
-en el mismo PR** lo afectado: `README.md` (capacidades/arquitectura/comandos/estructura),
-`docs/decisions.md` (ADR: decisión = hipótesis a revisar, añade entrada en decisiones de
-calado), `docs/roadmap.md`, `CONTRIBUTING.md` y este `CLAUDE.md`.
-
-- **Mantén este `CLAUDE.md` actualizado** cuando cambie el stack, la estructura o las
-  convenciones, para que el siguiente agente no opere con información obsoleta.
-- **Pódalo de vez en cuando**: relee y **limpia** lo que haya quedado desfasado, duplicado
-  o irrelevante. Un CLAUDE.md corto y veraz vale más que uno largo y desactualizado.
-- Antes de afirmar que algo "funciona así", verifica que el fichero/función/flag citado
-  sigue existiendo (el código manda sobre la doc).
+Actualiza este documento y `.claude/rules/` cuando cambie el stack, la estructura o una
+convención, para que el siguiente agente no opere con información obsoleta. Y **pódalos**: un
+CLAUDE.md corto y veraz vale más que uno largo y desfasado.

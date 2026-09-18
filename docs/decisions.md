@@ -61,6 +61,12 @@ repository went public and the CLI went to npm, and both brought the same lesson
 right for one team is not right for every clone. The link file belongs to each clone, and the
 CLI and the server are two clocks that are compared, not tied.
 
+**Writing down what had only been imitated — 17 September 2026** ([0064](#adr-0064)). The rules
+an agent works by moved out of one long document and into a file per subject, and two conventions
+that the tree had followed without ever stating them — formatting, and where `any` is allowed —
+were finally given an answer. A third, which language the code itself is written in, was left open
+on purpose.
+
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
 > to by title alone. They were numbered on 2026-09-12, taking the next free identifiers. The
@@ -1835,3 +1841,62 @@ CLI and the server are two clocks that are compared, not tied.
   instead of listing project names; or the extractor stops producing `client`/`repository`
   noise ([0060](#adr-0060) is the first half of that), at which point the type filter can be
   relaxed and argued for on its merits rather than as a workaround.
+
+<a id="adr-0064"></a>
+
+## ADR-0064 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
+
+- **Status:** accepted (2026-09-17).
+- **Context:** `CLAUDE.md` was the only written guidance for an agent working in this repository,
+  and it had grown to 11.6 KB while still leaving out most of what an agent actually needs to get
+  right: how a route, a command or a screen is written here, when to throw and when to return,
+  what a comment is for. Two conventions that the tree follows consistently were also written down
+  nowhere at all, so anyone — human or model — had to infer them from whichever files they
+  happened to open:
+
+  1. **Formatting.** There is no ESLint and no Prettier, yet the tree is uniform: double quotes
+     in all 613 imports, two spaces, lines up to about 120 columns. Uniform by imitation, with
+     nothing to imitate from when a file is new.
+  2. **`any`.** Eighteen uses, every one of them at a boundary with a foreign format, and no rule
+     saying that is the limit.
+
+  A third question came up while this was being written and is **deliberately left open**: which
+  language identifiers and process logs should be in. `CONTRIBUTING.md` says "the code itself" is
+  English; `CLAUDE.md` only ever mentioned comments; roughly 29 declarations carry Spanish names,
+  and server and admin logs are Spanish while CLI output is English. Whatever is decided creates
+  debt across the tree, so it is worth arguing out on its own rather than settling as a side
+  effect of writing rules down. Until then the rules stay silent on it, and the per-area rules
+  only restate what `CONTRIBUTING.md` already said about text a user reads.
+- **Decision:**
+  1. Rules live in **`.claude/rules/*.md`**, one file per subject, picked up by the agent's own
+     rule mechanism rather than imported from `CLAUDE.md` — an import would put the same text in
+     context twice. Three of them load in every session, because they hold for every change:
+     architecture, tests, documentation. Five carry a `paths:` header and load only when a file
+     they cover is opened: TypeScript style, HTTP and MCP, CLI, web, the LLM layer. `CLAUDE.md`
+     keeps what only it can say: what the product is, the stack, the tree, the commands. The files
+     are plain markdown, so an agent that does not know the convention can still be pointed at
+     them.
+  2. **No formatter and no linter.** Style is written instead: double quotes, two spaces, ~120
+     columns, no reformatting of code you are not touching.
+  3. **`any` only at a boundary with a foreign format that has no schema** — transcripts from
+     other agents, untyped APIs, SQL rows through `Row` — and it never crosses into the domain:
+     it is validated with zod or mapped first. `@ts-ignore` stays banned; there are zero today.
+- **Alternatives:** leave the conventions unwritten — they are decided in practice already, just
+  not anywhere a newcomer can read them, which is how drift starts; put everything in `CLAUDE.md`
+  — it doubles a file that already asks to be pruned, and makes every rule harder to cite; import
+  the rule files from `CLAUDE.md` instead — the same text would then load twice, once through the
+  import and once through the rule mechanism; skills loaded on demand — cheaper still, but they
+  may not fire when they are needed, and the three unconditional rules apply to every change;
+  adopt Prettier — a tree-wide reformat, and a noisy history, for a problem nobody has yet.
+- **Consequences:** a rule is now a thing you can point at, and `CLAUDE.md` came down from 11.6 KB
+  to 6.5 KB. What covers one corner of the tree costs nothing until that corner is opened, so the
+  detail can go where it was previously too expensive to write: how a route is written, how a
+  command is registered, why the web talks to `core` and not to the API. The trade is that the
+  three unconditional files load every session, so they have to stay short — and anything
+  checkable should become a test rather than a paragraph, which is what this repository already
+  does with the CLI weight, the configuration template and the documentation itself. There is now
+  one for the rules as well.
+- **Revisit when:** the language question above is settled, which adds a rule and a stretch of
+  bounded debt; or contributors from outside start arriving and style diverges in pull requests,
+  at which point a formatter finally earns its cost; or the rules grow past what is worth loading
+  in every session, at which point the rarely-needed ones move to skills.

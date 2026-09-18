@@ -135,6 +135,11 @@ Documentation is part of the work, not an extra:
 - **`docs/research/`** — the investigation behind decisions.
 - **`CLAUDE.md`** — the guide for AI agents working on this repository. Keep it current, and
   prune it now and then so it does not drift into noise.
+- **`.claude/rules/`** — one file per subject: architecture, style, tests, documentation, and one
+  per area of the tree (HTTP and MCP, CLI, web, the LLM layer). They are
+  written for a coding agent, which loads them automatically, but they hold for anyone
+  ([ADR-0064](./docs/decisions.md#adr-0064)). A convention that changes is changed there — and a
+  rule that can be checked belongs in a test instead.
 
 ## Publishing a release
 

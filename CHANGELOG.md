@@ -8,6 +8,24 @@ Mientras estemos en `0.x`, una versión **menor** puede traer cambios incompatib
 
 ## [Unreleased]
 
+### Changed
+- **Las reglas con las que se trabaja aquí ya se pueden leer, y citar** (ADR-0064). `CLAUDE.md`
+  era lo único escrito para un agente, había llegado a 11,6 KB y aun así dejaba fuera casi todo lo
+  que hace falta acertar: cómo se escribe una ruta, un comando o una pantalla, cuándo se lanza y
+  cuándo se devuelve, para qué sirve un comentario. Ahora eso vive en `.claude/rules/`, un fichero
+  por tema. Tres se cargan siempre, porque valen para cualquier cambio —arquitectura, tests y
+  documentación—, y cinco llevan `paths:` y solo aparecen cuando tocas lo suyo: estilo TypeScript,
+  API HTTP y MCP, CLI, web y capa LLM. `CLAUDE.md` baja a 6,5 KB y se queda con lo que solo él
+  puede decir. Lo que cubre un rincón del árbol ya no cuesta contexto hasta que abres ese rincón,
+  así que el detalle puede estar escrito donde antes salía demasiado caro.
+
+  De paso se deciden dos convenciones que el repo seguía sin decirlas donde las lee quien escribe
+  el código: no hay formatter ni linter y el estilo se escribe en su lugar, y `any` solo vale en la
+  frontera con un formato ajeno sin esquema, sin cruzar nunca al dominio. En qué idioma van los
+  identificadores y los logs se queda **sin decidir a propósito**: cualquier respuesta deja deuda
+  por todo el árbol y merece discutirse aparte. Y hay un test que vigila las reglas, como con el
+  peso del CLI o la plantilla de configuración.
+
 ### Added
 - **«Across this client»: un proyecto padre ya se puede leer, no solo abrir.** La herencia
   SUBE —un repo ve lo de su cliente, nunca lo de un hermano— y eso deja sin responder justo la
