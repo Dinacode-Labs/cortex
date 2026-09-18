@@ -4,16 +4,17 @@ import { loadRegistry } from "../toolbelt/registry.js";
 import { getClientConfig, readCredentials } from "@cortex/client";
 
 /**
- * `cortex toolbelt` — instala el toolbelt de TU organización (MCPs, skills y comandos de las
- * herramientas que use tu equipo) en los agentes de este equipo.
+ * `cortex toolbelt` -- installs YOUR organisation's toolbelt (the MCPs, skills and commands for
+ * the tools your team uses) into this machine's agents.
  *
- * No es lo mismo que `cortex setup`: eso instala Cortex. Esto instala lo demás, y por eso el
- * registry vive fuera de este repo, normalmente en uno privado (ADR-0014 revisado, ADR-0026).
+ * It is not the same as `cortex setup`: that installs Cortex. This installs everything else,
+ * which is why the registry lives outside this repo, usually in a private one (ADR-0014
+ * revised, ADR-0026).
  *
- *   cortex toolbelt sync --registry <ruta|url> [--repo <dir>] [--agents a,b] [--apply]
- *   cortex toolbelt doctor --registry <ruta|url>
+ *   cortex toolbelt sync --registry <path|url> [--repo <dir>] [--agents a,b] [--apply]
+ *   cortex toolbelt doctor --registry <path|url>
  *
- * DRY-RUN por defecto: sin `--apply` solo cuenta lo que haría.
+ * DRY-RUN by default: without `--apply` it only reports what it would do.
  */
 
 function usage(): void {
@@ -32,7 +33,7 @@ function flag(args: string[], name: string): string | undefined {
   return args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
 }
 
-/** Sin `--registry`, se le pregunta al servidor: es quien sabe cuál usa el equipo. */
+/** Without `--registry`, the server is asked: it is what knows which one the team uses. */
 async function defaultRegistry(): Promise<string | null> {
   const creds = readCredentials();
   if (!creds) return null;

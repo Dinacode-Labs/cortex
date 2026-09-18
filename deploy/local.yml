@@ -1,20 +1,20 @@
-# Cortex en tu máquina, para probarlo. NO es un despliegue de producción: eso es
-# deploy/docker-compose.yml, que añade TLS, copias de seguridad y healthchecks.
+# Cortex on your machine, to try it out. This is NOT a production deployment: that is
+# deploy/docker-compose.yml, which adds TLS, backups and healthchecks.
 #
 #   docker compose -f local.yml up -d
 #   cortex auth login --server http://localhost:8787
 #
-# Todo escucha SOLO en 127.0.0.1 y no hay nada expuesto a la red. Por eso aquí se puede
-# dejar el alta abierta y una contraseña fija: nadie más puede llegar. En cuanto publiques
-# esto en una red, usa el otro compose.
+# Everything listens on 127.0.0.1 ONLY and nothing is exposed to the network. That is why
+# sign-up can be left open here, with a fixed password: nobody else can reach it. The moment
+# you put this on a network, use the other compose file.
 #
-# Los datos sobreviven a un reinicio (volumen `cortex-local-pgdata`), que es lo suyo: una
-# memoria de proyecto solo demuestra su valor cuando lleva semanas acumulando.
+# Data survives a restart (the `cortex-local-pgdata` volume), as it should: a project memory
+# only shows its worth once it has been accumulating for weeks.
 name: cortex-local
 
 x-app: &app
   image: ${CORTEX_IMAGE:-ghcr.io/dinacode-labs/cortex}:${CORTEX_VERSION:-latest}
-  # Si has clonado el repo y prefieres construirla tú, añade --build.
+  # If you cloned the repo and would rather build it yourself, add --build.
   build:
     context: ..
     dockerfile: Dockerfile
@@ -24,11 +24,11 @@ x-app: &app
     CORTEX_BIND_HOST: 0.0.0.0
     DATABASE_URL: postgres://cortex:cortex-local@postgres:5432/cortex
 
-    # El código de acceso se imprime en el log del servidor en vez de enviarse por correo:
+    # The access code is printed to the server log instead of being emailed:
     #   docker compose -f local.yml logs server | grep -oE '[0-9]{6}' | tail -1
     CORTEX_EMAIL_PROVIDER: log
-    # Vacío = cualquier email puede darse de alta. Aceptable SOLO porque esto no sale de
-    # tu máquina.
+    # Empty = any email can sign up. Acceptable ONLY because this never leaves your
+    # machine.
     CORTEX_AUTH_DOMAIN: ""
 
     CORTEX_PUBLIC_URL: http://localhost:8787
@@ -36,24 +36,25 @@ x-app: &app
     CORTEX_WEB_URL: http://localhost:8080
     CORTEX_MCP_PUBLIC_URL: http://localhost:8788/mcp
 
-    # Embeddings sin claves. NO son semánticos: sirven para arrancar y para los tests, no
-    # para juzgar la calidad de la búsqueda. Para eso, apunta EMBEDDINGS_* a un endpoint real.
+    # Embeddings with no keys. They are NOT semantic: they are good for getting started and
+    # for the tests, not for judging search quality. For that, point EMBEDDINGS_* at a real
+    # endpoint.
     EMBEDDINGS_PROVIDER: ${EMBEDDINGS_PROVIDER:-local}
     EMBEDDINGS_BASE_URL: ${EMBEDDINGS_BASE_URL:-}
     EMBEDDINGS_API_KEY: ${EMBEDDINGS_API_KEY:-}
     EMBEDDINGS_MODEL: ${EMBEDDINGS_MODEL:-}
     EMBEDDINGS_DIM: ${EMBEDDINGS_DIM:-}
 
-    # Sin modelo, las 8 tools funcionan y puedes guardar y buscar a mano, pero la captura
-    # automática de sesiones no produce nada: destilar una conversación es lo que hace el
-    # modelo. Dos formas de dárselo, las dos sin tocar este fichero:
+    # With no model the 8 tools work and you can save and search by hand, but automatic
+    # session capture produces nothing: distilling a conversation is what the model does.
+    # Two ways to give it one, both without touching this file:
     #
-    #   Ollama en tu máquina:
+    #   Ollama on your machine:
     #     LLM_PROVIDER=openai-compatible LLM_ALLOW_NO_KEY=1 \
     #     LLM_BASE_URL=http://host.docker.internal:11434/v1 LLM_MODEL=llama3.1 \
     #     docker compose -f local.yml up -d
     #
-    #   Cualquier endpoint OpenAI-compatible:
+    #   Any OpenAI-compatible endpoint:
     #     LLM_PROVIDER=openai-compatible LLM_BASE_URL=https://… LLM_API_KEY=… LLM_MODEL=… \
     #     docker compose -f local.yml up -d
     LLM_PROVIDER: ${LLM_PROVIDER:-none}
@@ -114,8 +115,8 @@ services:
       HEALTH_PORT: "8788"
     ports: ["127.0.0.1:8788:8788"]
 
-# Sin `worker`: el mantenimiento corre de madrugada y no aporta nada a una prueba. Sin
-# `backup`: para eso está el compose de producción.
+# No `worker`: maintenance runs overnight and adds nothing to a trial. No `backup`: that is
+# what the production compose file is for.
 networks:
   internal:
 

@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { getBrandLogoSvg, getBrandName, resetBrandCache } from "@cortex/shared";
 
 /**
- * La marca es configuración del operador, no una constante del código (ADR-0013 revisado):
- * quien despliegue Cortex no debería heredar la marca de quien lo escribió. El logo se
- * inserta con `raw()` en la web, así que aquí se fija también qué se rechaza.
+ * Branding is operator configuration, not a code constant (ADR-0013, revised): whoever
+ * deploys Cortex should not inherit the branding of whoever wrote it. The logo is inserted
+ * with `raw()` in the web, so what gets rejected is pinned down here too.
  */
 let dir: string;
 
@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe("getBrandName", () => {
-  it("por defecto es Cortex", () => {
+  it("defaults to Cortex", () => {
     expect(getBrandName()).toBe("Cortex");
   });
 
@@ -36,7 +36,7 @@ describe("getBrandName", () => {
 });
 
 describe("getBrandLogoSvg", () => {
-  it("sin configurar no hay logo (la web cae al wordmark de texto)", () => {
+  it("with nothing configured there is no logo (the web falls back to the text wordmark)", () => {
     expect(getBrandLogoSvg()).toBeNull();
   });
 
@@ -45,25 +45,25 @@ describe("getBrandLogoSvg", () => {
     expect(getBrandLogoSvg()).toContain("<svg");
   });
 
-  it("lee el SVG de un fichero", () => {
+  it("reads the SVG from a file", () => {
     const file = join(dir, "logo.svg");
     writeFileSync(file, '<svg width="10"><rect/></svg>');
     vi.stubEnv("CORTEX_BRAND_LOGO_FILE", file);
     expect(getBrandLogoSvg()).toContain("<rect/>");
   });
 
-  it("rechaza contenido con <script> (se inserta con raw en la web)", () => {
+  it("rejects content with <script> (it is inserted with raw in the web)", () => {
     vi.stubEnv("CORTEX_BRAND_LOGO_SVG", '<svg><script>alert(1)</script></svg>');
     expect(getBrandLogoSvg()).toBeNull();
   });
 
-  it("rechaza lo que no sea un SVG", () => {
+  it("rejects anything that is not an SVG", () => {
     vi.stubEnv("CORTEX_BRAND_LOGO_SVG", "<img src=x onerror=alert(1)>");
     expect(getBrandLogoSvg()).toBeNull();
   });
 
-  it("un fichero inexistente no rompe: degrada a wordmark", () => {
-    vi.stubEnv("CORTEX_BRAND_LOGO_FILE", join(dir, "no-existe.svg"));
+  it("a missing file does not break anything: it degrades to the wordmark", () => {
+    vi.stubEnv("CORTEX_BRAND_LOGO_FILE", join(dir, "does-not-exist.svg"));
     expect(getBrandLogoSvg()).toBeNull();
   });
 });

@@ -1,12 +1,11 @@
 import { getSql, type Sql } from "@cortex/database";
-import { resolveEntity } from "./entities.js";
 import { isAdmin } from "./auth.js";
 import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
 import { canonicalize } from "./text.js";
 import type { Row } from "./map.js";
 
-/** Referencia a un proyecto (entidad type='project') con visibilidad y dueño. */
+/** A reference to a project (an entity with type='project') with visibility and owner. */
 export interface ProjectRef {
   id: string;
   name: string;
@@ -29,25 +28,43 @@ function toRef(r: Row | undefined): ProjectRef | null {
 }
 
 /**
- * Id de un proyecto por nombre con la semántica CANÓNICA del repo (`canonical_name`:
- * minúsculas, sin acentos) — la ÚNICA resolución por nombre para operaciones de datos;
- * mayúsculas o acentos distintos no deben crear proyectos nuevos ni saltarse el dedup.
+ * The ONE resolution of a project from whatever somebody types into `project` (ADR-0043,
+ * ADR-0061): by **slug** first -- the project's identity across the whole product:
+ * `cortex link`, `.cortex.json`, `/p/<slug>`, the API -- and, failing that, by name with
+ * CANONICAL semantics (lowercase, accents stripped). Writes used to resolve by slug
+ * (`createProject`) and reads only by canonical name, and since `canonicalize` leaves hyphens
+ * alone the same value worked on save and said "not found" on read (#136). When one project's
+ * name matches another's slug, the slug wins: it is the identifier, the name is not.
  */
-export async function findProjectIdByName(sql: Sql, project: string): Promise<string | null> {
+async function findProjectRow(sql: Sql, ref: string): Promise<Row | undefined> {
   const rows = (await sql`
-    SELECT id FROM entities WHERE type = 'project' AND canonical_name = ${canonicalize(project)} LIMIT 1
+    SELECT id, name, slug, visibility, owner_email, parent_id
+      FROM entities
+     WHERE type = 'project' AND (slug = ${ref} OR canonical_name = ${canonicalize(ref)})
+     ORDER BY (slug = ${ref}) DESC
+     LIMIT 1
   `) as unknown as Row[];
-  return rows[0] ? (rows[0].id as string) : null;
+  return rows[0];
 }
 
+/** A project's id by slug or canonical name (see `findProjectRow`). For data operations:
+ * different casing or accents must not create new projects nor skip the dedup. */
+export async function findProjectIdByName(sql: Sql, project: string): Promise<string | null> {
+  const row = await findProjectRow(sql, project);
+  return row ? (row.id as string) : null;
+}
+
+/** By slug only: used by the routes and the API, where the slug already is the identifier. */
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {
   const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND slug = ${slug} LIMIT 1`) as unknown as Row[];
   return toRef(rows[0]);
 }
 
+/** By slug or canonical name (see `findProjectRow`): what an agent or a person types into
+ * `project`. It used to compare the EXACT name, so the MCP guard rejected what the data
+ * operations did find (different casing, the slug). */
 export async function findProjectByName(name: string): Promise<ProjectRef | null> {
-  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND name = ${name} LIMIT 1`) as unknown as Row[];
-  return toRef(rows[0]);
+  return toRef(await findProjectRow(getSql(), name));
 }
 
 export async function getEntryProject(entryId: string): Promise<ProjectRef | null> {
@@ -59,8 +76,8 @@ export async function getEntryProject(entryId: string): Promise<ProjectRef | nul
   return toRef(rows[0]);
 }
 
-/** Crea (o recupera) un proyecto. Público por defecto; `private` lo restringe; `parentSlug`
- * lo cuelga de un padre (cliente) → hereda contexto y permisos. */
+/** Creates (or retrieves) a project. Public by default; `private` restricts it; `parentSlug`
+ * hangs it under a parent (a client) -> it inherits context and permissions. */
 export async function createProject(
   name: string,
   opts?: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
@@ -69,20 +86,30 @@ export async function createProject(
   let parentId: string | null = null;
   if (opts?.parentSlug) {
     const parent = await findProjectBySlug(opts.parentSlug);
-    if (!parent) throw new Error(`Proyecto padre "${opts.parentSlug}" no encontrado.`);
+    if (!parent) throw new Error(`Parent project "${opts.parentSlug}" not found.`);
     parentId = parent.id;
   }
   const slug = slugify(name);
-  // El slug es la IDENTIDAD: si ya existe, NO inventamos un slug-2 — devolvemos el
-  // existente para que el caller decida (acceso/solicitar permiso). Ver link.ts.
+  // The slug is the IDENTITY: when it already exists we do NOT invent a slug-2 -- the existing
+  // one is returned so the caller decides (access / request permission). See link.ts.
   const bySlug = await findProjectBySlug(slug);
   if (bySlug) return bySlug;
-  const ent = await resolveEntity(sql, name, "project");
-  const cur = (await sql`SELECT slug, visibility, owner_email, parent_id FROM entities WHERE id = ${ent.id}`) as unknown as Row[];
-  if (cur[0]?.slug) return toRef({ ...cur[0], id: ent.id, name: ent.name })!; // ya existía (por nombre)
+  // The project is born whole, with its slug: the database does not accept a `project`
+  // without one (#135), so inserting the name and filling in later is not an option. When the
+  // canonical name already exists with a different slug, that one is returned as is, as before.
   const visibility = opts?.visibility ?? "public";
-  await sql`UPDATE entities SET slug = ${slug}, visibility = ${visibility}, owner_email = ${opts?.ownerEmail ?? null}, parent_id = ${parentId} WHERE id = ${ent.id}`;
-  return { id: ent.id, name: ent.name, slug, visibility, ownerEmail: opts?.ownerEmail ?? null, parentId };
+  const inserted = (await sql`
+    INSERT INTO entities (name, canonical_name, type, slug, visibility, owner_email, parent_id)
+    VALUES (${name}, ${canonicalize(name)}, 'project', ${slug}, ${visibility}, ${opts?.ownerEmail ?? null}, ${parentId})
+    ON CONFLICT (type, canonical_name) DO NOTHING
+    RETURNING id, name, slug, visibility, owner_email, parent_id
+  `) as unknown as Row[];
+  if (inserted[0]) return toRef(inserted[0])!;
+  const byName = (await sql`
+    SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
+    WHERE type = 'project' AND canonical_name = ${canonicalize(name)} LIMIT 1
+  `) as unknown as Row[];
+  return toRef(byName[0])!; // it already existed (by name)
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
@@ -91,9 +118,9 @@ export async function isProjectMember(projectId: string, email: string): Promise
 }
 
 /**
- * ¿Puede `email` acceder al proyecto? Cascada por la jerarquía: si el proyecto O algún
- * ANCESTRO es privado → restringido; concede acceso ser admin, o dueño/miembro del
- * proyecto o de cualquier ancestro (membresía del padre "Acme" abre los subproyectos).
+ * Can `email` access the project? It cascades through the hierarchy: if the project OR any
+ * ANCESTOR is private -> restricted; access is granted by being an admin, or owner/member of
+ * the project or of any ancestor (membership of the parent "Acme" opens its sub-projects).
  */
 export async function canAccessProject(project: ProjectRef, email: string | null): Promise<boolean> {
   const chain = (await getSql()`
@@ -104,7 +131,7 @@ export async function canAccessProject(project: ProjectRef, email: string | null
     )
     SELECT id, visibility, owner_email FROM c
   `) as unknown as Row[];
-  if (!chain.some((r) => (r.visibility as string) === "private")) return true; // todo público
+  if (!chain.some((r) => (r.visibility as string) === "private")) return true; // all public
   if (!email) return false;
   if (isAdmin(email)) return true;
   const e = email.toLowerCase();
@@ -115,26 +142,69 @@ export async function canAccessProject(project: ProjectRef, email: string | null
   return false;
 }
 
-/** Resultado del guard único de acceso a proyecto. */
+/**
+ * The project and its whole ancestor chain, from child to root.
+ *
+ * The context pack and search use it: a child project inherits what its client knows. Going up
+ * is safe because `canAccessProject` looks at the entire chain -- if an ancestor is private the
+ * child is restricted -- so having access to the child implies having it to all its parents.
+ * Nothing can be seen through inheritance that could not be seen directly.
+ */
+export async function projectIdsWithAncestors(projectId: string): Promise<string[]> {
+  const rows = (await getSql()`
+    WITH RECURSIVE chain AS (
+      SELECT id, parent_id FROM entities WHERE id = ${projectId}
+      UNION ALL
+      SELECT e.id, e.parent_id FROM entities e JOIN chain c ON e.id = c.parent_id
+    )
+    SELECT id FROM chain
+  `) as unknown as Row[];
+  return rows.map((r) => r.id as string);
+}
+
+/**
+ * A project's ancestors, from the ROOT to the direct parent (the project itself is excluded).
+ *
+ * It is what a breadcrumb needs -- `Acme › Acme Portal` -- and what allows saying which project
+ * an inherited entry came from. It deliberately does not filter by permissions:
+ * `canAccessProject` looks at the entire chain, so access to the child implies access to all
+ * its parents.
+ */
+export async function listProjectAncestors(projectId: string): Promise<ProjectRef[]> {
+  const rows = (await getSql()`
+    WITH RECURSIVE chain AS (
+      SELECT id, name, slug, visibility, owner_email, parent_id, 0 AS depth
+        FROM entities WHERE id = ${projectId}
+      UNION ALL
+      SELECT e.id, e.name, e.slug, e.visibility, e.owner_email, e.parent_id, c.depth + 1
+        FROM entities e JOIN chain c ON e.id = c.parent_id
+    )
+    SELECT id, name, slug, visibility, owner_email, parent_id FROM chain WHERE depth > 0
+     ORDER BY depth DESC
+  `) as unknown as Row[];
+  return rows.map(toRef).filter((r): r is ProjectRef => r !== null);
+}
+
+/** The result of the single project-access guard. */
 export type AccessCheck =
   | { status: "ok"; project: ProjectRef }
   | { status: "not_found" }
   | { status: "forbidden" };
 
 /**
- * Política ÚNICA de acceso a proyecto para las apps (MCP, API, web). Resuelve el
- * proyecto por `slug` (si viene) o por `name` y aplica `canAccessProject`:
- * - proyecto inexistente → `not_found` (los callers de ESCRITURA por nombre pueden
- *   tratarlo como «se creará», porque el save auto-crea el proyecto; ver ADR),
- * - existente sin permiso → `forbidden`,
- * - existente con permiso → `ok` + el ProjectRef resuelto.
- * Sin `name` ni `slug` es un bug del caller → Error.
+ * The ONE project-access policy for the apps (MCP, API, web). It resolves the project by
+ * `slug` (when given) or by `name` and applies `canAccessProject`:
+ * - project does not exist -> `not_found` (WRITE callers working by name may read this as
+ *   "it will be created", because save auto-creates the project; see the ADR),
+ * - exists, no permission -> `forbidden`,
+ * - exists, with permission -> `ok` plus the resolved ProjectRef.
+ * Neither `name` nor `slug` is a caller bug -> Error.
  */
 export async function checkProjectAccess(
   email: string | null,
   ref: { name?: string; slug?: string },
 ): Promise<AccessCheck> {
-  if (!ref.slug && !ref.name) throw new Error("checkProjectAccess: se necesita 'name' o 'slug' (bug del caller).");
+  if (!ref.slug && !ref.name) throw new Error("checkProjectAccess: 'name' or 'slug' is required (caller bug).");
   const project = ref.slug ? await findProjectBySlug(ref.slug) : await findProjectByName(ref.name!);
   if (!project) return { status: "not_found" };
   if (!(await canAccessProject(project, email))) return { status: "forbidden" };
@@ -142,11 +212,11 @@ export async function checkProjectAccess(
 }
 
 /**
- * Acceso vía ID de entrada (validar, relacionar…): el permiso lo manda el proyecto de
- * la entrada.
- * - entrada inexistente → `not_found`,
- * - entrada sin proyecto → `ok` con `project: null` (no hay permisos que aplicar),
- * - proyecto de la entrada sin permiso → `forbidden`.
+ * Access through an entry id (validate, relate...): the permission comes from the entry's
+ * project.
+ * - entry does not exist -> `not_found`,
+ * - entry with no project -> `ok` with `project: null` (there are no permissions to apply),
+ * - the entry's project without permission -> `forbidden`.
  */
 export async function checkEntryAccess(
   email: string | null,
@@ -163,15 +233,15 @@ export async function checkEntryAccess(
   return { status: "ok", project };
 }
 
-/** Proyecto accesible con su nº de entradas (para los listados/selectores de la UI). */
+/** An accessible project with its entry count (for the UI's lists and selectors). */
 export interface AccessibleProject extends ProjectRef {
   entryCount: number;
 }
 
 /**
- * Proyectos visibles para `email`: admin → todos; resto → públicos + privados
- * propios/compartidos. Incluye `entryCount` con UNA sola query agregada
- * (GROUP BY project_id) fusionada por id — no una query por proyecto.
+ * Projects visible to `email`: an admin sees them all; everyone else sees the public ones plus
+ * the private ones they own or were given. It includes `entryCount` from ONE aggregate query
+ * (GROUP BY project_id) merged by id -- not one query per project.
  */
 export async function listAccessibleProjects(email: string | null): Promise<AccessibleProject[]> {
   const sql = getSql();
@@ -189,15 +259,28 @@ export async function listAccessibleProjects(email: string | null): Promise<Acce
 }
 
 /**
- * Quién puede **gestionar** un proyecto: su dueño o un admin global (ADR-0051).
+ * The DIRECT children of a project that `email` can see.
  *
- * Antes solo mandaba el admin, y el guard vivía en la web —el dominio se fiaba de que el
- * llamante hubiera mirado—. Eso convertía al admin en cuello de botella de cualquier equipo y
- * dejaba al dueño de un proyecto privado sin poder añadir a nadie al suyo. Ahora la pregunta
- * se responde una sola vez y aquí, que es donde no se puede olvidar.
+ * Going down the hierarchy is not the same as going up: inheritance goes up (a child reads the
+ * client's knowledge) because access to the child already implies access to the parent. The
+ * same reasoning does not hold in reverse -- a private child you are not a member of does not
+ * become visible by looking at the parent -- so anything crossing downwards goes through here
+ * and inherits `listAccessibleProjects`'s filter.
+ */
+export async function listChildProjects(parentId: string, email: string | null): Promise<AccessibleProject[]> {
+  return (await listAccessibleProjects(email)).filter((p) => p.parentId === parentId);
+}
+
+/**
+ * Who may **manage** a project: its owner or a global admin (ADR-0051).
  *
- * Gestionar es cambiar la visibilidad, traspasar la propiedad y tocar la lista de miembros.
- * No es leer: eso lo decide `canAccessProject`, que es otra pregunta.
+ * Only the admin used to rule, and the guard lived in the web -- the domain trusted that the
+ * caller had checked. That made the admin a bottleneck for any team and left the owner of a
+ * private project unable to add anyone to their own. The question is now answered once, and
+ * here, which is where it cannot be forgotten.
+ *
+ * Managing means changing visibility, transferring ownership and touching the member list. It
+ * is not reading: that is decided by `canAccessProject`, which is a different question.
  */
 export async function canManageProject(email: string | null, slug: string): Promise<boolean> {
   if (!email) return false;
@@ -206,7 +289,7 @@ export async function canManageProject(email: string | null, slug: string): Prom
   return !!p && p.ownerEmail?.toLowerCase() === email.toLowerCase();
 }
 
-/** Lo que `canManageProject` deja hacer, para no repetir el mensaje en cada llamante. */
+/** What `canManageProject` allows, so the message is not repeated in every caller. */
 export class NotAManagerError extends Error {
   constructor(slug: string) {
     super(`Only the owner of "${slug}" or an administrator can change this.`);
@@ -214,52 +297,53 @@ export class NotAManagerError extends Error {
   }
 }
 
-async function exigeGestion(slug: string, byEmail: string | null): Promise<ProjectRef> {
+async function requireManager(slug: string, byEmail: string | null): Promise<ProjectRef> {
   const p = await findProjectBySlug(slug);
-  if (!p) throw new Error(`Proyecto "${slug}" no encontrado.`);
+  if (!p) throw new Error(`Project "${slug}" not found.`);
   if (!(await canManageProject(byEmail, slug))) throw new NotAManagerError(slug);
   return p;
 }
 
 /**
- * Cambia lo que un proyecto puede cambiar después de nacer: su visibilidad y su dueño.
+ * Changes what a project can change after birth: its visibility and its owner.
  *
- * Que esto no existiera era el agujero grande de ADR-0036: un proyecto creado público lo era
- * para siempre, en cualquier interfaz, porque el único `UPDATE ... visibility` del repositorio
- * corría al crearlo. Volver privado es inmediato y afecta a todo —búsqueda, packs, listados—
- * porque la política los consulta en vivo; no toca ninguna entrada.
+ * The absence of this was ADR-0036's big hole: a project created public stayed public forever,
+ * in every interface, because the repository's only `UPDATE ... visibility` ran at creation
+ * time. Turning it private takes effect immediately and affects everything -- search, packs,
+ * listings -- because the policy consults them live; it touches no entry.
  */
 export async function updateProject(
   slug: string,
-  cambios: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
+  changes: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
   byEmail: string | null,
 ): Promise<ProjectRef> {
-  const p = await exigeGestion(slug, byEmail);
-  const visibility = cambios.visibility ?? p.visibility;
+  const p = await requireManager(slug, byEmail);
+  const visibility = changes.visibility ?? p.visibility;
   const ownerEmail =
-    cambios.ownerEmail === undefined ? p.ownerEmail : cambios.ownerEmail ? cambios.ownerEmail.toLowerCase() : null;
+    changes.ownerEmail === undefined ? p.ownerEmail : changes.ownerEmail ? changes.ownerEmail.toLowerCase() : null;
 
-  // Colgar de un padre después de crearlo (ADR-0056). El caso que lo pide es el de siempre:
-  // un cliente con varios repos que no son un monorepo, y alguien del equipo que crea uno de
-  // los hijos sin `--parent` porque iba con prisa. Sin esto no había arreglo — ni reengancharlo
-  // ni recrearlo, porque el slug ya estaba cogido — y la memoria del cliente quedaba partida.
+  // Hanging a project under a parent after creating it (ADR-0056). The case that asks for it is
+  // the usual one: a client with several repos that are not a monorepo, and someone on the team
+  // creating one of the children without `--parent` because they were in a hurry. Without this
+  // there was no fix -- neither re-attaching nor recreating, because the slug was already taken
+  // -- and the client's memory stayed split in two.
   let parentId = p.parentId;
-  if (cambios.parentSlug !== undefined) {
-    if (cambios.parentSlug === null) parentId = null;
+  if (changes.parentSlug !== undefined) {
+    if (changes.parentSlug === null) parentId = null;
     else {
-      const padre = await findProjectBySlug(cambios.parentSlug);
-      if (!padre) throw new Error(`Proyecto padre "${cambios.parentSlug}" no encontrado.`);
-      if (padre.id === p.id) throw new Error("Un proyecto no puede ser su propio padre.");
-      // Los permisos y el pack suben por la cadena de ancestros: un ciclo los dejaría dando
-      // vueltas para siempre, así que se comprueba antes de escribir y no después.
+      const parent = await findProjectBySlug(changes.parentSlug);
+      if (!parent) throw new Error(`Parent project "${changes.parentSlug}" not found.`);
+      if (parent.id === p.id) throw new Error("A project cannot be its own parent.");
+      // Permissions and the pack climb the ancestor chain: a cycle would leave them going round
+      // forever, so it is checked before writing rather than after.
       const sql = getSql();
-      let cursor: string | null = padre.parentId;
+      let cursor: string | null = parent.parentId;
       while (cursor) {
-        if (cursor === p.id) throw new Error(`"${cambios.parentSlug}" ya cuelga de "${slug}": sería un ciclo.`);
-        const filas = (await sql`SELECT parent_id FROM entities WHERE id = ${cursor}`) as unknown as Row[];
-        cursor = (filas[0]?.parent_id as string | null) ?? null;
+        if (cursor === p.id) throw new Error(`"${changes.parentSlug}" already hangs under "${slug}": that would be a cycle.`);
+        const rows = (await sql`SELECT parent_id FROM entities WHERE id = ${cursor}`) as unknown as Row[];
+        cursor = (rows[0]?.parent_id as string | null) ?? null;
       }
-      parentId = padre.id;
+      parentId = parent.id;
     }
   }
 
@@ -270,32 +354,31 @@ export async function updateProject(
 }
 
 /**
- * Borra un proyecto VACÍO.
+ * Deletes an EMPTY project.
  *
- * Se puede deshacer un `cortex link --create` equivocado, y nada más (ADR-0057). Si el
- * proyecto tiene una sola entrada o un solo hijo, esto se niega: borrarlo sería destruir
- * memoria, y en un producto cuyo principio es que invalidar no es borrar, eso no puede estar
- * a un clic. Para ese caso hay una base de datos, una copia de seguridad y una decisión
- * tomada despacio.
+ * It undoes a mistaken `cortex link --create`, and nothing else (ADR-0057). If the project has
+ * so much as one entry or one child, this refuses: deleting it would destroy memory, and in a
+ * product whose principle is that invalidating is not deleting, that cannot be one click away.
+ * For that case there is a database, a backup and a decision taken slowly.
  *
- * Lo puede hacer el dueño, no solo un admin: quien se equivoca escribiendo un nombre debería
- * poder arreglarlo sin escribirle a nadie, y aquí no hay nada que destruir.
+ * The owner can do it, not only an admin: someone who mistypes a name should be able to fix it
+ * without writing to anybody, and there is nothing here to destroy.
  */
 export async function deleteProject(slug: string, byEmail: string | null): Promise<void> {
-  const p = await exigeGestion(slug, byEmail);
+  const p = await requireManager(slug, byEmail);
   const sql = getSql();
-  const [entradas] = (await sql`SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${p.id}`) as unknown as Row[];
-  if (Number(entradas?.n ?? 0) > 0) {
-    throw new ProjectNotEmptyError(`"${slug}" has ${entradas!.n} entries. Only an empty project can be deleted.`);
+  const [entries] = (await sql`SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${p.id}`) as unknown as Row[];
+  if (Number(entries?.n ?? 0) > 0) {
+    throw new ProjectNotEmptyError(`"${slug}" has ${entries!.n} entries. Only an empty project can be deleted.`);
   }
-  const [hijos] = (await sql`SELECT count(*)::int AS n FROM entities WHERE parent_id = ${p.id}`) as unknown as Row[];
-  if (Number(hijos?.n ?? 0) > 0) {
-    throw new ProjectNotEmptyError(`"${slug}" still has ${hijos!.n} child project(s). Move them out first.`);
+  const [children] = (await sql`SELECT count(*)::int AS n FROM entities WHERE parent_id = ${p.id}`) as unknown as Row[];
+  if (Number(children?.n ?? 0) > 0) {
+    throw new ProjectNotEmptyError(`"${slug}" still has ${children!.n} child project(s). Move them out first.`);
   }
   await sql`DELETE FROM entities WHERE id = ${p.id}`;
 }
 
-/** Se niega a borrar algo que contiene memoria. Es un 409, no un error del servidor. */
+/** Refuses to delete something that holds memory. It is a 409, not a server error. */
 export class ProjectNotEmptyError extends Error {
   constructor(message: string) {
     super(message);
@@ -303,19 +386,19 @@ export class ProjectNotEmptyError extends Error {
   }
 }
 
-/** Añade un miembro. Solo el dueño o un admin (ADR-0051). */
+/** Adds a member. Owner or admin only (ADR-0051). */
 export async function addProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
-  const p = await exigeGestion(slug, byEmail);
+  const p = await requireManager(slug, byEmail);
   await getSql()`INSERT INTO project_members (project_id, email) VALUES (${p.id}, ${email.toLowerCase()}) ON CONFLICT DO NOTHING`;
 }
 
-/** Quita un miembro. Solo el dueño o un admin (ADR-0051). */
+/** Removes a member. Owner or admin only (ADR-0051). */
 export async function removeProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
-  const p = await exigeGestion(slug, byEmail);
+  const p = await requireManager(slug, byEmail);
   await getSql()`DELETE FROM project_members WHERE project_id = ${p.id} AND email = ${email.toLowerCase()}`;
 }
 
-/** Miembros (emails) de un proyecto. */
+/** A project's members (email addresses). */
 export async function listProjectMembers(slug: string): Promise<string[]> {
   const p = await findProjectBySlug(slug);
   if (!p) return [];
@@ -324,8 +407,9 @@ export async function listProjectMembers(slug: string): Promise<string[]> {
 }
 
 /**
- * Resuelve el proyecto VINCULADO a un directorio (lee `.cortex.json`). NO crea: si el
- * slug no existe en Cortex (o hay opt-out / no hay `.cortex.json`), devuelve null.
+ * Resolves the project LINKED to a directory (it reads `.cortex.json`). It does NOT create:
+ * when the slug does not exist in Cortex (or there is an opt-out, or no `.cortex.json`), it
+ * returns null.
  */
 export async function resolveLinkedProject(cwd: string): Promise<ProjectRef | null> {
   const link = readCortexLink(cwd);

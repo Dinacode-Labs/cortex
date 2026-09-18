@@ -1,43 +1,43 @@
 /* ============================================================================
    Cortex UI
 
-   Una sola hoja, sin build y sin framework de CSS. La decisión está razonada en
-   ADR-0053: lo que le faltaba a esta interfaz no era una herramienta, era una escala
-   coherente y una capa de componentes — y eso se arregla escribiendo CSS, no añadiendo
-   una cadena de construcción a un producto que se despliega con `docker compose up`.
+   One sheet, no build and no CSS framework. The reasoning is in ADR-0053: what this
+   interface lacked was not a tool, it was a coherent scale and a component layer -- and that
+   is fixed by writing CSS, not by adding a build chain to a product that is deployed with
+   `docker compose up`.
 
-   Orden: tokens · base · layout · header · componentes · pantallas · responsive.
-   Si añades algo, añádelo a su sección y usa los tokens. Un valor suelto es una
-   inconsistencia dentro de seis meses.
+   Order: tokens · base · layout · header · components · screens · responsive.
+   If you add something, add it to its section and use the tokens. A loose value is an
+   inconsistency six months from now.
    ============================================================================ */
 
 :root {
-  /* Color. Un solo acento; el resto es tinta sobre papel. El color lo aportan los
-     badges, que son los que llevan significado (tipo, estado, confianza). */
+  /* Colour. A single accent; the rest is ink on paper. The colour comes from the badges,
+     which are what carry meaning (type, status, confidence). */
   --accent:#1a6dff;
   --accent-hover:#0f52cc;
   --accent-soft:#eef4ff;
   --accent-ring:rgba(26,109,255,.28);
 
-  --ink:#0f1419;          /* títulos */
-  --text:#2b3440;         /* cuerpo */
-  --muted:#5b6673;        /* secundario */
-  --faint:#8a95a3;        /* terciario: metadatos, marcas de agua */
+  --ink:#0f1419;          /* headings */
+  --text:#2b3440;         /* body */
+  --muted:#5b6673;        /* secondary */
+  --faint:#8a95a3;        /* tertiary: metadata, watermarks */
 
-  --bg:#fbfcfd;           /* fondo de página */
-  --surface:#ffffff;      /* tarjetas y paneles */
-  --surface-2:#f4f6f9;    /* inputs, bloques de código, zonas hundidas */
-  --line:#e3e8ef;         /* bordes */
+  --bg:#fbfcfd;           /* page background */
+  --surface:#ffffff;      /* cards and panels */
+  --surface-2:#f4f6f9;    /* inputs, code blocks, sunken areas */
+  --line:#e3e8ef;         /* borders */
   --line-strong:#cbd3dd;
 
   --ok:#0f7b3d; --ok-soft:#e8f6ed;
   --warn:#9a5b00; --warn-soft:#fff5e5;
   --danger:#b3261e; --danger-soft:#fdeceb;
 
-  /* Escala tipográfica: cuatro tamaños y basta. */
+  /* Type scale: four sizes and no more. */
   --t-xs:11.5px; --t-sm:13px; --t-base:14px; --t-lg:16px; --t-xl:20px; --t-2xl:28px;
 
-  /* Espaciado en múltiplos de 4: si un hueco no está en la escala, está mal. */
+  /* Spacing in multiples of 4: a gap that is not on the scale is wrong. */
   --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:24px; --s-6:32px; --s-7:48px;
 
   --r-sm:6px; --r-md:8px; --r-lg:10px; --r-xl:14px; --r-full:9999px;
@@ -74,8 +74,8 @@ hr { border:none; border-top:1px solid var(--line); margin:var(--s-5) 0; }
 ::selection { background:var(--accent-soft); }
 :focus-visible { outline:2px solid var(--accent); outline-offset:2px; border-radius:var(--r-sm); }
 
-/* Escalón de texto secundario. Es la clase más usada de la hoja, así que merece
-   comportarse igual en todas partes: mismo color, mismo tamaño, sin margen propio. */
+/* The secondary text step. It is the most used class in the sheet, so it deserves to behave
+   the same everywhere: same colour, same size, no margin of its own. */
 .sub { color:var(--muted); font-size:var(--t-sm); margin:0; }
 .stack > * + * { margin-top:var(--s-4); }
 .stack-sm > * + * { margin-top:var(--s-2); }
@@ -102,9 +102,9 @@ header {
 header .brand { display:flex; align-items:center; gap:var(--s-2); flex:none; }
 header .brand:hover { text-decoration:none; }
 header .brand .mark { display:block; width:26px; height:26px; flex:none; }
-/* El sello «Relay» (dibujo en @cortex/shared): las piezas se van por su esquina y vuelven; el
-   centro no se mueve. Solo se anima cuando la vista añade `play` (login y portada), y solo el
-   sello por defecto —`mark-relay`—, nunca el logo de un operador. */
+/* The "Relay" mark (drawing in @cortex/shared): each piece leaves by its corner and comes back;
+   the centre never moves. It only animates when the view adds `play` (sign-in and home), and only
+   the default mark — `mark-relay` — never an operator's logo. */
 header .brand .mark-relay path, header .brand .mark-relay rect { transform-box:fill-box; transform-origin:center; }
 header .brand .mark-relay.play path[data-g="a"] { animation:relay-a 1100ms cubic-bezier(.4,0,.2,1) 250ms both; }
 header .brand .mark-relay.play path[data-g="b"] { animation:relay-b 1100ms cubic-bezier(.4,0,.2,1) 650ms both; }
@@ -115,8 +115,8 @@ header .brand .logo svg { height:100%; width:auto; }
 header .brand .wordmark,
 header .brand .tag { color:var(--ink); font-size:15px; font-weight:680; letter-spacing:-.02em; }
 
-/* La búsqueda es lo único global que hay, y se comporta como tal: ocupa el centro,
-   no compite con la navegación y se ensancha al escribir en ella. */
+/* Search is the only global thing there is, and it behaves like it: it takes the centre, it
+   does not compete with the navigation, and it widens as you type into it. */
 header .global-search { flex:1; max-width:440px; margin:0; position:relative; }
 header .global-search input {
   width:100%; height:34px; padding:0 var(--s-3) 0 34px;
@@ -151,7 +151,7 @@ header nav .whoami {
   color:var(--muted); font-size:var(--t-sm); white-space:nowrap;
 }
 
-/* --- Botones ------------------------------------------------------------- */
+/* --- Buttons ------------------------------------------------------------- */
 
 button, .button {
   display:inline-flex; align-items:center; justify-content:center; gap:6px;
@@ -172,7 +172,7 @@ button.quiet:hover, .button.quiet:hover { color:var(--ink); background:var(--sur
 button.danger { color:var(--danger); background:var(--surface); border-color:var(--line-strong); }
 button.danger:hover { color:#fff; background:var(--danger); border-color:var(--danger); }
 
-/* --- Campos -------------------------------------------------------------- */
+/* --- Fields -------------------------------------------------------------- */
 
 input[type=text], input[type=search], input[type=email], input[type=date], select, textarea {
   font:var(--t-base)/1.4 var(--font); color:var(--text);
@@ -194,7 +194,7 @@ label.check input { height:auto; }
 form { margin:0; }
 form.row input[type=text], form.row input[type=search], form.row input[type=email] { flex:1; min-width:200px; }
 
-/* --- Superficies --------------------------------------------------------- */
+/* --- Surfaces ------------------------------------------------------------ */
 
 .panel {
   background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl);
@@ -225,7 +225,7 @@ form.row input[type=text], form.row input[type=search], form.row input[type=emai
   background:var(--surface); border:1px dashed var(--line-strong); border-radius:var(--r-xl);
 }
 
-/* --- Badges y pills ------------------------------------------------------ */
+/* --- Badges and pills ---------------------------------------------------- */
 
 .badge {
   display:inline-flex; align-items:center; height:20px; padding:0 var(--s-2);
@@ -256,7 +256,7 @@ a.pill.active { color:#fff; background:var(--accent); border-color:var(--accent)
   color:var(--faint); background:transparent; border:none; border-radius:var(--r-full); }
 .chip button:hover { color:var(--danger); background:var(--danger-soft); }
 
-/* --- Contenido ----------------------------------------------------------- */
+/* --- Content ------------------------------------------------------------- */
 
 .content-block {
   white-space:pre-wrap; overflow-wrap:anywhere;
@@ -291,9 +291,14 @@ a.pill.active { color:#fff; background:var(--accent); border-color:var(--accent)
 a.back { display:inline-block; margin-bottom:var(--s-4); color:var(--muted); font-size:var(--t-sm); }
 a.back:hover { color:var(--ink); text-decoration:none; }
 
-/* --- Cabecera de proyecto y pestañas ------------------------------------- */
+/* --- Project header and tabs --------------------------------------------- */
 
 .project-head { margin-bottom:var(--s-5); border-bottom:1px solid var(--line); }
+/* Breadcrumbs: the path up to the root, above the title and not competing with it. */
+.crumbs { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-1);
+  margin-bottom:var(--s-2); font-size:var(--t-sm); color:var(--muted); }
+.crumbs .sep { color:var(--faint); }
+.crumbs .here { color:var(--muted); font-weight:500; }
 .project-title { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
 .project-title .sub { margin-left:auto; }
 .tabs { display:flex; gap:var(--s-1); margin-top:var(--s-4); overflow-x:auto; scrollbar-width:none; }
@@ -310,7 +315,7 @@ a.back:hover { color:var(--ink); text-decoration:none; }
 .section-bar { display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap; margin-bottom:var(--s-4); }
 .section-bar > form { flex:1; min-width:260px; }
 
-/* --- Portada de proyectos ------------------------------------------------ */
+/* --- Projects home page -------------------------------------------------- */
 
 .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--s-3); }
 .project-card {
@@ -335,6 +340,13 @@ a.back:hover { color:var(--ink); text-decoration:none; }
 .health.warn { color:var(--warn); }
 .onboarding .content-block { margin:var(--s-4) 0; }
 
+/* A client and its repos: the parent full width and the children inside, indented, so it
+   reads as them hanging off it rather than as them being its siblings. */
+.project-group { margin-bottom:var(--s-5); }
+.project-children { margin:var(--s-3) 0 0 var(--s-5); padding-left:var(--s-4);
+  border-left:2px solid var(--line); }
+.project-children .sub { margin-bottom:var(--s-2); }
+
 /* --- Health -------------------------------------------------------------- */
 
 .findings { margin:0; padding:0; list-style:none; }
@@ -344,14 +356,21 @@ a.back:hover { color:var(--ink); text-decoration:none; }
 .pack-entry:first-of-type { border-top:none; padding-top:0; }
 .pack-entry .card-head { margin-bottom:var(--s-2); }
 .pack-entry b { display:block; margin-bottom:2px; }
+/* Which project something looked at from another comes from: an entry inherited from the
+   client in a child's pack, a clash between siblings, or a child's result when searching from
+   the parent. It is always the same question -- "whose is this?" -- so it is the same mark. */
+.from-project { display:inline-flex; align-items:center; height:20px; padding:0 var(--s-2);
+  font-size:var(--t-xs); font-weight:600; color:var(--muted);
+  background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-sm); }
+a.from-project:hover { color:var(--ink); border-color:var(--line-strong); text-decoration:none; }
 
-/* --- Mapa ---------------------------------------------------------------- */
+/* --- Map ----------------------------------------------------------------- */
 
 #net { height:70vh; margin-top:var(--s-3); background:#0d1117;
   border:1px solid var(--line); border-radius:var(--r-xl); }
 #legend { font-size:var(--t-sm); color:var(--muted); }
 
-/* --- Tablas (admin) ------------------------------------------------------ */
+/* --- Tables (admin) ------------------------------------------------------ */
 
 table { width:100%; border-collapse:collapse; font-size:var(--t-sm); }
 th { text-align:left; padding:var(--s-2) var(--s-3); font-size:var(--t-xs); font-weight:600;
@@ -359,7 +378,7 @@ th { text-align:left; padding:var(--s-2) var(--s-3); font-size:var(--t-xs); font
 td { padding:var(--s-2) var(--s-3); border-bottom:1px solid var(--line); }
 tr:last-child td { border-bottom:none; }
 
-/* --- Pantalla de acceso -------------------------------------------------- */
+/* --- Sign-in screen ------------------------------------------------------ */
 
 .signin { max-width:440px; margin:12vh auto; padding:var(--s-6);
   background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl); box-shadow:var(--shadow-2); }
@@ -377,6 +396,7 @@ tr:last-child td { border-bottom:none; }
   main { padding:var(--s-5) var(--s-4) var(--s-6); }
   h1 { font-size:22px; }
   .grid, .project-grid { grid-template-columns:1fr; }
+  .project-children { margin-left:0; padding-left:var(--s-3); }
   .project-title .sub { margin-left:0; flex-basis:100%; }
   .meta { grid-template-columns:1fr; gap:0; }
   .meta dt { margin-top:var(--s-3); }

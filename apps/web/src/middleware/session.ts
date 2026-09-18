@@ -5,14 +5,14 @@ import { validateToken, type AuthUser } from "@cortex/core";
 import { getBrandName } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 
-/** Entorno de la app web: el usuario de la sesión (o null) en `c.var.user`. */
+/** The web app's environment: the session's user (or null) in `c.var.user`. */
 export type WebEnv = { Variables: { user: AuthUser | null } };
 
-/** Página de login: la respuesta del gate sin sesión (y de /auth/cli y /logout). */
+/** The login page: the gate's response when there is no session (and /auth/cli's and /logout's). */
 export function loginPage(msg = ""): Html {
-  // No hay formulario a propósito: se entra desde la terminal, y el token de larga vida del
-  // CLI nunca viaja por una URL (ADR-0025). Así que esta pantalla solo tiene un trabajo,
-  // que es decir exactamente qué teclear.
+  // There is no form on purpose: you sign in from the terminal, and the CLI's long-lived token
+  // never travels through a URL (ADR-0025). So this screen has exactly one job, which is to
+  // say precisely what to type.
   return layout(
     "Sign in",
     html`<div class="signin stack">
@@ -27,10 +27,9 @@ cortex ui           # opens this UI, already signed in</pre>
 }
 
 /**
- * Gate de sesión: resuelve el usuario desde la cookie → `c.var.user`; sin sesión
- * válida → 401 con la página de login. Las rutas EXENTAS (/auth/cli, /logout) y los
- * estáticos se montan ANTES de este middleware en app.ts — el orden de registro es
- * la exención.
+ * The session gate: it resolves the user from the cookie into `c.var.user`; with no valid
+ * session it answers 401 with the login page. The EXEMPT routes (/auth/cli, /logout) and the
+ * statics are mounted BEFORE this middleware in app.ts -- registration order is the exemption.
  */
 export const sessionGate: MiddlewareHandler<WebEnv> = async (c, next) => {
   const token = getCookie(c, "cortex_session");

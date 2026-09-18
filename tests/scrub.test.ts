@@ -2,34 +2,34 @@ import { describe, it, expect } from "vitest";
 import { scrub } from "@cortex/shared";
 
 /**
- * `scrub()` es código de SEGURIDAD y ahora vive en @cortex/shared: lo usan agents (antes
- * del LLM), core (antes de persistir) y los conectores. `tests/transcript-utils.test.ts`
- * cubre los patrones históricos a través del re-export; aquí se fijan los AÑADIDOS al
- * centralizarlo (backlog #6) y la propiedad de idempotencia, de la que depende aplicarlo
- * en varias capas sin corromper el texto. Secretos SINTÉTICOS, ninguno real.
+ * `scrub()` is SECURITY code and now lives in @cortex/shared: agents use it (before the LLM),
+ * core does (before persisting) and so do the connectors. `tests/transcript-utils.test.ts`
+ * covers the historical patterns through the re-export; what is pinned here are the ones ADDED
+ * when centralising it (backlog #6) and the idempotence property, which applying it across
+ * several layers without corrupting the text depends on. SYNTHETIC secrets, none real.
  */
-describe("scrub — patrones añadidos al centralizar en shared", () => {
-  it("redacta la contraseña de una connection string y conserva host y usuario", () => {
+describe("scrub — patterns added when centralising in shared", () => {
+  it("redacts a connection string's password and keeps host and user", () => {
     const s = scrub("DATABASE_URL=postgres://cortex:s3cr3tP4ss@db.internal:5432/cortex");
     expect(s).not.toContain("s3cr3tP4ss");
     expect(s).toContain("postgres://cortex:[REDACTED]@db.internal:5432/cortex");
   });
 
-  it("cubre otros esquemas con credenciales embebidas (mongodb+srv, redis, amqp)", () => {
+  it("covers other schemes with embedded credentials (mongodb+srv, redis, amqp)", () => {
     const s = scrub("mongodb+srv://app:mongoPass123@cluster0.example.net/db redis://user:redisPass99@cache:6379");
     expect(s).not.toContain("mongoPass123");
     expect(s).not.toContain("redisPass99");
   });
 
-  it("redacta cabeceras Cookie / Set-Cookie de un volcado de request", () => {
+  it("redacts Cookie / Set-Cookie headers from a request dump", () => {
     const s = scrub(["GET /admin HTTP/1.1", "Cookie: session=abc123def456ghi789jkl", "Accept: */*"].join("\n"));
     expect(s).not.toContain("abc123def456ghi789jkl");
     expect(s).toContain("Cookie: [REDACTED]");
-    expect(s).toContain("Accept: */*"); // el resto de la petición se conserva
+    expect(s).toContain("Accept: */*"); // the rest of the request is preserved
   });
 
-  it("no toca prosa que solo mencione cookies", () => {
-    const text = "Decisión: la política de cookies se acepta en el primer render del portal.";
+  it("leaves alone prose that merely mentions cookies", () => {
+    const text = "Decision: the cookie policy is accepted on the portal's first render.";
     expect(scrub(text)).toBe(text);
   });
 
@@ -39,7 +39,7 @@ describe("scrub — patrones añadidos al centralizar en shared", () => {
     expect(s).toContain("Basic [REDACTED]");
   });
 
-  it("redacta claves de Anthropic, npm y Stripe", () => {
+  it("redacts Anthropic, npm and Stripe keys", () => {
     const s = scrub(
       "sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWXYZ012345 npm_ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 sk_live_ABCDEFGHIJKLMNOP1234",
     );
@@ -48,14 +48,14 @@ describe("scrub — patrones añadidos al centralizar en shared", () => {
     expect(s).not.toContain("sk_live_ABCDEFGHIJKLMNOP1234");
   });
 
-  it("es idempotente: aplicarlo dos veces da el mismo resultado", () => {
-    const raw = "key sk-abcDEF123456ghiJKL789 y postgres://u:p4ssw0rdLargo@h/d y Bearer abcdefghijklmnopqrstu";
+  it("is idempotent: applying it twice gives the same result", () => {
+    const raw = "key sk-abcDEF123456ghiJKL789 and postgres://u:aL0ngP4ssword@h/d and Bearer abcdefghijklmnopqrstu";
     const once = scrub(raw);
     expect(scrub(once)).toBe(once);
   });
 
-  it("deja intacto el texto de conocimiento normal", () => {
-    const text = "Restricción del cliente: el despliegue se hace los martes y requiere ventana de 30 minutos.";
+  it("leaves ordinary knowledge text untouched", () => {
+    const text = "Client constraint: deployment happens on Tuesdays and needs a 30-minute window.";
     expect(scrub(text)).toBe(text);
   });
 });

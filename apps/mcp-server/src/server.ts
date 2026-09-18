@@ -23,15 +23,12 @@ import { z } from "zod";
 import { createRequire } from "node:module";
 
 /**
- * Construcción del MCP de Cortex (las 8 tools), reutilizable por cualquier transporte
- * (stdio en `index.ts`, HTTP en `http.ts`). Si se pasa `user` (transporte HTTP
- * autenticado), las tools **atribuyen** las escrituras (`created_by`=email) y **aplican
- * permisos** (acceso al proyecto); sin `user` (stdio local) se comportan como antes.
- *
- * Los textos que ve el agente van en INGLÉS: son parte del producto y los lee un modelo que
- * puede estar trabajando en cualquier idioma. Los comentarios del código siguen en español.
+ * Construction of Cortex's MCP (the 8 tools), reusable by any transport (stdio in `index.ts`,
+ * HTTP in `http.ts`). When `user` is passed (the authenticated HTTP transport), the tools
+ * **attribute** writes (`created_by`=email) and **apply permissions** (project access);
+ * without `user` (local stdio) they behave as before.
  */
-/** La versión que anuncia el MCP sale del package.json propio: mentirla confunde al cliente. */
+/** The version the MCP announces comes from its own package.json: lying about it confuses the client. */
 const VERSION: string = (() => {
   try {
     return (createRequire(import.meta.url)("../package.json") as { version?: string }).version ?? "0.0.0";
@@ -46,10 +43,10 @@ const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }
 export function buildMcpServer(user?: AuthUser): McpServer {
   const server = new McpServer({ name: "cortex", version: VERSION });
 
-  // Permiso de acceso al proyecto (solo si hay usuario autenticado; sin `user` — stdio
-  // local — no se aplican guards). Devuelve el mensaje de denegación, o null si puede
-  // continuar. En LECTURAS un proyecto inexistente se rechaza (`not_found`); las
-  // ESCRITURAS por nombre pasan `allowMissing` porque el save auto-crea el proyecto (ADR).
+  // Project access permission (only when there is an authenticated user; without `user` --
+  // local stdio -- no guards apply). It returns the denial message, or null when the call may
+  // proceed. On READS a non-existent project is rejected (`not_found`); WRITES by name pass
+  // `allowMissing` because save auto-creates the project (see the ADR).
   const guard = async (project?: string, opts?: { allowMissing?: boolean }): Promise<string | null> => {
     if (!user || !project) return null;
     const access = await checkProjectAccess(user.email, { name: project });
@@ -93,9 +90,9 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       try {
         const denied = await guard(args.project);
         if (denied) return errorText(denied);
-        // Con usuario (HTTP autenticado) y sin proyecto concreto, restringimos la
-        // búsqueda a los proyectos accesibles (no filtrar privados ajenos). Sin `user`
-        // (stdio local, confiable) se busca en todo, como antes.
+        // With a user (authenticated HTTP) and no concrete project, the search is restricted
+        // to accessible projects (so other people's private ones do not leak). Without `user`
+        // (trusted local stdio) it searches everything, as before.
         const hits = user ? await searchContext(args, { restrictToAccessibleOf: user.email }) : await searchContext(args);
         return text(renderSearchHits(hits));
       } catch (e) {
@@ -113,7 +110,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "technical debt, conventions and sensitive modules, plus whatever is most relevant to " +
         "an area if you name one. Read this before touching a module.",
       inputSchema: {
-        project: z.string().describe("Project name, e.g. 'Acme Portal'"),
+        project: z.string().describe("Project slug (what `cortex link` shows) or name, e.g. 'acme-portal' or 'Acme Portal'"),
         area: z.string().optional().describe("Optional area or module, e.g. 'billing'"),
         asOf: z.string().optional().describe("ISO date (YYYY-MM-DD) to see the project as it was known then; defaults to now"),
       },
@@ -135,7 +132,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       title: "List project decisions",
       description: "List the technical decisions recorded for a project, most recent first.",
       inputSchema: {
-        project: z.string().describe("Project name"),
+        project: z.string().describe("Project slug or name"),
         limit: z.number().int().positive().max(50).optional(),
       },
     },
@@ -162,8 +159,8 @@ export function buildMcpServer(user?: AuthUser): McpServer {
     },
     async ({ id, status }) => {
       try {
-        // Esta tool opera por ID de entrada, no por nombre de proyecto → el `guard` por
-        // proyecto no la cubre: el acceso se comprueba vía la entrada (checkEntryAccess).
+        // This tool works by entry id, not by project name -> the per-project `guard` does not
+        // cover it: access is checked through the entry (checkEntryAccess).
         if (user) {
           const access = await checkEntryAccess(user.email, id);
           if (access.status === "not_found") return errorText(`No entry with id ${id}.`);
@@ -188,16 +185,16 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "without one it falls back to search results.",
       inputSchema: {
         question: z.string().describe("The question, in plain language"),
-        project: z.string().optional().describe("Project name"),
+        project: z.string().optional().describe("Project slug or name"),
       },
     },
     async ({ question, project }) => {
       try {
         const denied = await guard(project);
         if (denied) return errorText(denied);
-        // Orquestación compartida con la web (/ask): recuperar + sintetizar (@cortex/agents).
-        // Con usuario y sin proyecto concreto, restringimos a proyectos accesibles (P0);
-        // `undefined` como limit conserva el default (6). Sin `user` (stdio) sin cambio.
+        // Orchestration shared with the web (/ask): retrieve plus synthesise (@cortex/agents).
+        // With a user and no concrete project it restricts to accessible projects (P0);
+        // `undefined` as the limit keeps the default (6). Without `user` (stdio), unchanged.
         const { answer, hits } = await askProjectContext(
           question,
           project,
@@ -220,7 +217,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "and line range. Use it to find where something is implemented before you change it.",
       inputSchema: {
         query: z.string().describe("What to look for: plain language or an identifier"),
-        project: z.string().describe("Project name"),
+        project: z.string().describe("Project slug or name"),
         limit: z.number().int().positive().max(20).optional(),
       },
     },
@@ -243,7 +240,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         "Report on the health of a project's memory: contradictions, likely duplicates, orphan " +
         "entities, low-confidence entries, superseded history, and gaps (areas with incidents " +
         "but no documented decisions).",
-      inputSchema: { project: z.string().describe("Project name") },
+      inputSchema: { project: z.string().describe("Project slug or name") },
     },
     async ({ project }) => {
       try {

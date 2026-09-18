@@ -4,18 +4,18 @@ import cron from "node-cron";
 import { runMaintenance, wireLlm } from "@cortex/agents";
 
 /**
- * Worker de mantenimiento: ejecuta el pipeline `runMaintenance` periódicamente
- * (loops §12 — enrich/resolve/temporal/lint). Pensado para correr en el server como
- * proceso/servicio (docker-compose) o vía cron del sistema llamando a `maintain`.
+ * The maintenance worker: it runs the `runMaintenance` pipeline periodically (the loops of
+ * section 12 -- enrich/resolve/temporal/lint). Meant to run on the server as a
+ * process/service (docker-compose) or through the system's cron calling `maintain`.
  *
- * Uso: cortex-admin maintain-worker
- * Env: CORTEX_MAINTAIN_CRON (cron expr; def "0 3 * * *" = 3:00 cada día),
- *      CORTEX_MAINTAIN_ON_START=1 para ejecutar una vez al arrancar,
- *      CORTEX_WORKER_HEARTBEAT_FILE (fichero de latido; def /tmp/cortex-worker.heartbeat).
+ * Usage: cortex-admin maintain-worker
+ * Env: CORTEX_MAINTAIN_CRON (a cron expression; default "0 3 * * *" = 03:00 daily),
+ *      CORTEX_MAINTAIN_ON_START=1 to run once at startup,
+ *      CORTEX_WORKER_HEARTBEAT_FILE (the heartbeat file; default /tmp/cortex-worker.heartbeat).
  *
- * El latido existe porque este proceso no escucha en ningún puerto: sin él, un worker
- * colgado (cron que no dispara, promesa que nunca resuelve) parece perfectamente sano desde
- * fuera y nadie se entera hasta que alguien echa en falta el mantenimiento de una semana.
+ * The heartbeat exists because this process listens on no port: without it, a hung worker (a
+ * cron that never fires, a promise that never resolves) looks perfectly healthy from outside
+ * and nobody finds out until someone misses a week's maintenance.
  */
 export async function run(): Promise<void> {
   wireLlm();
@@ -24,11 +24,11 @@ export async function run(): Promise<void> {
     try {
       writeFileSync(heartbeatFile, new Date().toISOString());
     } catch {
-      /* si no se puede escribir, el healthcheck lo dirá; no es motivo para no trabajar */
+      /* if it cannot be written, the healthcheck will say so; that is no reason not to work */
     }
-    // Y también a la base: el fichero solo lo ve el healthcheck de ESTE contenedor. Desde
-    // fuera nadie sabría que el worker ha muerto, y es quien mantiene la memoria viva.
-    // Fallar aquí tampoco puede parar el trabajo.
+    // And to the database too: the file is only seen by THIS container's healthcheck. From
+    // outside nobody would know the worker had died, and it is what keeps the memory alive.
+    // Failing here must not stop the work either.
     void getSql()`
       INSERT INTO worker_heartbeats (name, beat_at) VALUES ('maintain', now())
       ON CONFLICT (name) DO UPDATE SET beat_at = now()
@@ -36,23 +36,23 @@ export async function run(): Promise<void> {
   };
   const expr = process.env.CORTEX_MAINTAIN_CRON ?? "0 3 * * *";
   if (!cron.validate(expr)) {
-    console.error(`CORTEX_MAINTAIN_CRON inválido: "${expr}"`);
+    console.error(`Invalid CORTEX_MAINTAIN_CRON: "${expr}"`);
     process.exit(1);
   }
   let running = false;
   async function tick(): Promise<void> {
-    if (running) { console.log("[worker] tick saltado (ejecución previa en curso)."); return; }
+    if (running) { console.log("[worker] tick skipped (a previous run is still in progress)."); return; }
     running = true;
     try {
       await runMaintenance();
     } catch (e) {
-      console.error("[worker] error en mantenimiento:", (e as Error).message);
+      console.error("[worker] maintenance error:", (e as Error).message);
     } finally {
       running = false;
       beat();
     }
   }
-  console.log(`[worker] mantenimiento programado: "${expr}". Esperando…`);
+  console.log(`[worker] maintenance scheduled: "${expr}". Waiting...`);
   beat();
   setInterval(beat, 30_000).unref();
   cron.schedule(expr, tick);

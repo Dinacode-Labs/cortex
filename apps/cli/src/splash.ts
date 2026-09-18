@@ -1,21 +1,21 @@
 import { getBrandName, isDefaultBrand, markCells, MARK_GRID } from "@cortex/shared";
 
 /**
- * Splash de `cortex` (sin argumentos) y de `cortex version`: el sello de Cortex pintado con
- * caracteres de bloque, y al lado el nombre, la versión y una línea de qué es esto.
+ * Splash for `cortex` (no arguments) and `cortex version`: the Cortex mark painted with block
+ * characters, and next to it the name, the version and one line on what this is.
  *
- * Reglas, porque este binario también lo invocan hooks y agentes:
- * - Solo en un terminal interactivo (`isTTY`), nunca en `hook-context` ni `mcp`, que hablan
- *   protocolo por stdout. En CI o con `TERM=dumb` tampoco: un log con cursores no se lee.
- * - Solo con la marca por defecto. Si el operador ha puesto `CORTEX_BRAND_NAME` o su logo, el
- *   CLI no le enseña el sello de Cortex como si fuera suyo.
- * - Color: el centro en el azul de Cortex; las piezas, en el color del terminal. `NO_COLOR`
- *   lo apaga todo (https://no-color.org).
+ * Rules, because hooks and agents invoke this binary too:
+ * - Only on an interactive terminal (`isTTY`), never in `hook-context` or `mcp`, whose stdout is
+ *   protocol. Not in CI or with `TERM=dumb` either: a log full of escapes cannot be read.
+ * - Only with the default brand. If the operator has set `CORTEX_BRAND_NAME` or their own logo,
+ *   the CLI does not show them the Cortex mark as if it were theirs.
+ * - Colour: the centre in Cortex blue; the pieces in the terminal's own foreground. `NO_COLOR`
+ *   turns everything off (https://no-color.org).
  *
- * El dibujo sale de `MARK_GRID` (@cortex/shared), el mismo que la web y el favicon. Cada
- * celda es «▀» seguido de un espacio: medio carácter de alto y uno de ancho, casi cuadrado,
- * con hueco a la derecha y abajo. Así se ve la rejilla —el centro son cuatro cuadraditos— y
- * las piezas huecas de la web quedan aquí sólidas en el color de primer plano.
+ * The drawing is `MARK_GRID` (@cortex/shared), the same one the web and the favicon use. Each
+ * cell is "▀" followed by a space: half a character tall and one wide, close to square, with a
+ * gap to the right and below. That is what makes the grid visible — the centre is four little
+ * squares — and the web's hollow pieces come out solid here, in the foreground colour.
  */
 export interface SplashEnv {
   env?: NodeJS.ProcessEnv;
@@ -30,7 +30,7 @@ export function wantsSplash(opts: SplashEnv = {}): boolean {
 
 type Paint = { accent: string; dim: string; bold: string; reset: string };
 
-/** Escapes ANSI según lo que soporte el terminal; todo vacío con `NO_COLOR`. */
+/** ANSI escapes for what the terminal supports; all empty under `NO_COLOR`. */
 export function paint(env: NodeJS.ProcessEnv = process.env): Paint {
   if (env.NO_COLOR !== undefined) return { accent: "", dim: "", bold: "", reset: "" };
   const truecolor = /truecolor|24bit/i.test(env.COLORTERM ?? "");
@@ -43,8 +43,8 @@ export function paint(env: NodeJS.ProcessEnv = process.env): Paint {
 }
 
 /**
- * Las ocho líneas del sello, de 16 columnas VISIBLES cada una (8 celdas × «▀ »). El relleno se
- * calcula sin los escapes de color: si no, las filas con azul quedan una columna más cortas.
+ * The mark's eight lines, 16 VISIBLE columns each (8 cells × "▀ "). Padding is computed without
+ * the colour escapes: otherwise the rows with blue come out one column short.
  */
 export function renderMark(p: Paint): string[] {
   const parts = new Map(markCells().map((c) => [`${c.x},${c.y}`, c.part]));
@@ -61,12 +61,12 @@ export function renderMark(p: Paint): string[] {
       out += core ? `${p.accent}▀${p.reset} ` : "▀ ";
       visible += 2;
     });
-    // los huecos del final se dejan (son parte de las 16 columnas), pero sin escapes sueltos
+    // trailing gaps stay (they are part of the 16 columns), with no dangling escapes
     return out + " ".repeat(Math.max(0, 16 - visible));
   });
 }
 
-/** Sello + columna de texto, como líneas listas para imprimir. */
+/** Mark plus the text column, as lines ready to print. */
 export function splashLines(version: string, env: NodeJS.ProcessEnv = process.env): string[] {
   const p = paint(env);
   const right: string[] = [

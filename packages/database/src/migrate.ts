@@ -3,18 +3,17 @@ import { resolve } from "node:path";
 import { getSql } from "./client.js";
 
 /**
- * Runner de migraciones mínimo: aplica en orden los ficheros .sql de `migrations/` que aún
- * no estén registrados en `schema_migrations`. Cada migración corre en su propia
- * transacción.
+ * Minimal migration runner: applies, in order, the .sql files in `migrations/` that are not
+ * yet recorded in `schema_migrations`. Each migration runs in its own transaction.
  *
- * Es una LIBRERÍA (no se auto-ejecuta al importarse): el entrypoint es `migrate-cli.ts`.
- * Así el servidor o los tests pueden migrar sin arrastrar un `process.exit`.
+ * This is a LIBRARY (it does not run itself on import): the entrypoint is `migrate-cli.ts`.
+ * That way the server or the tests can migrate without dragging in a `process.exit`.
  */
 
 export interface MigrateOptions {
-  /** Directorio de las migraciones. Por defecto, el hermano `migrations/` del compilado.
-   *  Funciona igual desde `src/` y desde `dist/` porque ambos cuelgan de la raíz del
-   *  paquete y `migrations/` está al mismo nivel. */
+  /** Migrations directory. Defaults to the `migrations/` sibling of the compiled output.
+   *  It works the same from `src/` and from `dist/` because both hang off the package root
+   *  and `migrations/` sits at the same level. */
   migrationsDir?: string;
   log?: (line: string) => void;
 }
@@ -47,7 +46,7 @@ export async function runMigrations(opts: MigrateOptions = {}): Promise<MigrateR
   for (const file of files) {
     if (already.has(file)) continue;
     const contents = readFileSync(resolve(migrationsDir, file), "utf8");
-    log(`→ aplicando ${file} ...`);
+    log(`-> applying ${file} ...`);
     await sql.begin(async (tx) => {
       await tx.unsafe(contents);
       await tx`INSERT INTO schema_migrations (name) VALUES (${file})`;
@@ -55,6 +54,6 @@ export async function runMigrations(opts: MigrateOptions = {}): Promise<MigrateR
     applied.push(file);
   }
 
-  log(applied.length === 0 ? "Sin migraciones pendientes. Esquema al día." : `Aplicadas ${applied.length} migración(es).`);
+  log(applied.length === 0 ? "No pending migrations. Schema is up to date." : `Applied ${applied.length} migration(s).`);
   return { applied };
 }

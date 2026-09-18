@@ -3,27 +3,28 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * `cortex ui` se autenticaba contra el servidor correcto y luego abría el navegador en
- * `http://localhost:8080`, porque la dirección de la web era una variable con un default de
- * desarrollo en vez de salir del propio servidor.
+ * `cortex ui` authenticated against the right server and then opened the browser at
+ * `http://localhost:8080`, because the web's address was a variable with a development default
+ * instead of coming from the server itself.
  *
- * Es de los fallos más desconcertantes que hay: todo el flujo dice que va bien —sesión,
- * ticket, "Opening the Cortex UI, already signed in"— y la ventana que se abre no existe.
+ * It is one of the most baffling failures there is: the whole flow says it is going fine --
+ * session, ticket, "Opening the Cortex UI, already signed in" -- and the window that opens does
+ * not exist.
  *
- * El servidor ya publica su `webUrl` en `/client-config`, que está justo para esto.
+ * The server already publishes its `webUrl` in `/client-config`, which exists for exactly this.
  */
 const src = readFileSync(resolve(import.meta.dirname, "../apps/cli/src/commands/ui.ts"), "utf8");
 
 describe("cortex ui", () => {
-  it("saca la dirección de la web de lo que publica el servidor", () => {
+  it("takes the web's address from what the server publishes", () => {
     expect(src).toContain("getClientConfig");
     expect(src).toMatch(/cfg\?\.webUrl/);
   });
 
-  it("el default de desarrollo es el ÚLTIMO recurso, no el primero", () => {
-    // Orden: lo que pide el entorno > lo que dice el servidor > localhost.
-    const linea = src.split("\n").find((l) => l.includes("localhost:8080"));
-    expect(linea, "el default debe estar en la misma expresión, al final").toBeDefined();
-    expect(linea).toMatch(/CORTEX_WEB_URL.*cfg\?\.webUrl.*localhost:8080/);
+  it("the development default is the LAST resort, not the first", () => {
+    // Order: what the environment asks for > what the server says > localhost.
+    const line = src.split("\n").find((l) => l.includes("localhost:8080"));
+    expect(line, "the default must be in the same expression, at the end").toBeDefined();
+    expect(line).toMatch(/CORTEX_WEB_URL.*cfg\?\.webUrl.*localhost:8080/);
   });
 });

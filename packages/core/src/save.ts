@@ -23,7 +23,7 @@ import {
 } from "./text.js";
 import { storeEmbedding, vectorSearch } from "./vectors.js";
 
-// --- Hook de clasificación opcional (capa LLM) -------------------------------
+// --- Optional classification hook (the LLM layer) ----------------------------
 
 export interface ClassifierResult {
   type?: ContextEntryType;
@@ -32,15 +32,15 @@ export interface ClassifierResult {
   entities?: { name: string; type: EntityType }[];
 }
 
-/** Función de enriquecimiento por LLM. Devuelve null si no puede clasificar. */
+/** LLM enrichment function. It returns null when it cannot classify. */
 export type Classifier = (content: string) => Promise<ClassifierResult | null>;
 
 let classifier: Classifier | null = null;
 
 /**
- * Registra (o desregistra con null) un clasificador LLM. Lo cablean los
- * entrypoints (mcp-server, web) cuando hay LLM disponible, manteniendo @cortex/core
- * desacoplado de Mastra/@cortex/agents. Sin clasificador, se usan heurísticas.
+ * Registers (or, with null, unregisters) an LLM classifier. The entrypoints (mcp-server, web)
+ * wire it when an LLM is available, which keeps @cortex/core decoupled from
+ * Mastra/@cortex/agents. With no classifier, the heuristics are used.
  */
 export function setClassifier(fn: Classifier | null): void {
   classifier = fn;
@@ -58,22 +58,22 @@ export interface ContextWarning {
 
 export interface SaveContextResult {
   entry: ContextEntry;
-  /** Señales del loop de mejora (duplicados/contradicciones). §12.1, §12.5. */
+  /** Signals from the improvement loop (duplicates/contradictions). Sections 12.1 and 12.5. */
   warnings: ContextWarning[];
 }
 
 /**
- * Guarda una pieza de contexto con baja fricción: clasifica, resume, extrae
- * entidades, genera embedding y ejecuta los loops de detección. §11, §15.2.
+ * Stores a piece of context with low friction: it classifies, summarises, extracts entities,
+ * generates the embedding and runs the detection loops. Sections 11 and 15.2.
  */
 export interface SaveContextOptions {
-  /** Si false, no invoca el clasificador LLM (lo usa el workflow, que clasifica
-   *  en un paso previo y pasa type/title/summary explícitos). Por defecto true. */
+  /** When false, the LLM classifier is not invoked (the workflow uses this: it classifies in
+   *  an earlier step and passes explicit type/title/summary). Defaults to true. */
   useClassifier?: boolean;
-  /** Si false, omite los loops de duplicados/contradicciones (ingesta masiva).
-   *  Por defecto true. */
+  /** When false, the duplicate/contradiction loops are skipped (bulk ingestion).
+   *  Defaults to true. */
   detectImprovements?: boolean;
-  /** Si true, no genera el embedding aquí (la ingesta los hace por lotes después). */
+  /** When true, the embedding is not generated here (ingestion does them in batches later). */
   skipEmbedding?: boolean;
 }
 
@@ -82,10 +82,10 @@ export async function saveContext(
   opts: SaveContextOptions = {},
 ): Promise<SaveContextResult> {
   const raw = saveContextInput.parse(input);
-  // Última línea de defensa: el servidor NO confía en que el cliente haya escrubado
-  // (los hooks y conectores lo hacen, pero la API es pública para cualquier cliente
-  // autenticado). Se limpia ANTES de clasificar con el LLM, generar el embedding y
-  // persistir, así que ninguna de las tres rutas ve el secreto.
+  // Last line of defence: the server does NOT trust that the client scrubbed (the hooks and
+  // connectors do, but the API is open to any authenticated client). It is cleaned BEFORE
+  // classifying with the LLM, generating the embedding and persisting, so none of those three
+  // paths ever sees the secret.
   const parsed = {
     ...raw,
     content: scrub(raw.content),
@@ -94,33 +94,33 @@ export async function saveContext(
   const sql = getSql();
   const provider = getEmbeddingProvider();
 
-  // Capa LLM opcional: precedencia input explícito > LLM > heurística.
+  // Optional LLM layer: precedence is explicit input > LLM > heuristic.
   const useClassifier = opts.useClassifier ?? true;
   const llm = useClassifier && classifier ? await classifier(parsed.content).catch(() => null) : null;
   const type = parsed.type ?? llm?.type ?? classifyType(parsed.content);
   const title = parsed.title ?? llm?.title ?? deriveTitle(parsed.content);
-  // El resumen va justo debajo del título en el pack y en las tarjetas, así que empezar por
-  // el título es gastar presupuesto en decir dos veces lo mismo (ADR-0054).
+  // The summary sits right below the title in the pack and in the cards, so starting with the
+  // title spends budget on saying the same thing twice (ADR-0054).
   const summary = stripLeadingTitle(parsed.summary ?? llm?.summary ?? summarize(parsed.content), title);
   const sourceType = parsed.sourceType ?? "manual";
   const embedText = `${title}\n\n${parsed.content}`;
-  // metadata es JSON validado por zod; lo casteamos al tipo que espera sql.json.
+  // metadata is zod-validated JSON; it is cast to the type sql.json expects.
   const enrichedBy = llm ? "llm" : ((parsed.metadata?.enrichedBy as string | undefined) ?? "heuristic");
   const meta = {
     ...(parsed.metadata ?? {}),
     enrichedBy,
   } as Parameters<typeof sql.json>[0];
 
-  // Entidades: heurísticas + las que detecte el LLM, deduplicadas.
+  // Entities: the heuristic ones plus whatever the LLM detects, deduplicated.
   const detectedEntities = mergeEntities(extractEntities(parsed.content), llm?.entities ?? []);
 
   let projectId: string | null = null;
   if (parsed.project) {
-    // Un proyecto nacido de un `save` pasa por el mismo sitio que `cortex link --create`: con
-    // slug y con dueño (ADR-0051). Antes se creaba con `resolveEntity`, que solo pone el
-    // nombre, y quedaba sin slug, sin dueño y público: imposible de vincular, de adoptar y de
-    // cerrar. `createProject` devuelve el que ya exista sin tocarlo, así que esto no cambia
-    // nada de los que ya están.
+    // A project born from a `save` goes through the same place as `cortex link --create`: with
+    // a slug and an owner (ADR-0051). It used to be created with `resolveEntity`, which only
+    // sets the name, and ended up with no slug, no owner and public: impossible to link, to
+    // adopt or to close. `createProject` returns an existing one untouched, so this changes
+    // nothing about the projects already there.
     projectId = (await createProject(parsed.project, { ownerEmail: parsed.createdBy ?? null })).id;
   }
 
@@ -144,7 +144,7 @@ export async function saveContext(
 
   if (!opts.skipEmbedding) await storeEmbedding(sql, provider, entry.id, embedText);
 
-  // Enlace de entidades (grafo relacional)
+  // Entity linking (the relational graph)
   const entityIds: string[] = [];
   for (const e of detectedEntities) {
     const ent = await resolveEntity(sql, e.name, e.type);
@@ -170,11 +170,11 @@ export async function saveContext(
 }
 
 /**
- * Loops de mejora (§12.1, §12.5):
- *  - Duplicado: similitud vectorial muy alta con una entrada existente.
- *  - Contradicción: polaridad opuesta (p.ej. "mantener" vs "eliminar") sobre el
- *    mismo sujeto, detectado por entidades compartidas. No depende de una alta
- *    similitud vectorial, que con embeddings léxicos locales sería poco fiable.
+ * Improvement loops (sections 12.1 and 12.5):
+ *  - Duplicate: very high vector similarity with an existing entry.
+ *  - Contradiction: opposite polarity (e.g. "keep" vs "remove") about the same subject,
+ *    detected through shared entities. It does not rely on high vector similarity, which with
+ *    local lexical embeddings would be unreliable.
  */
 async function detectImprovements(
   sql: Sql,
@@ -188,7 +188,7 @@ async function detectImprovements(
   const seen = new Set<string>();
   const newPolarity = polarityTags(entry.content);
 
-  // Duplicados por similitud vectorial.
+  // Duplicates by vector similarity.
   const hits = await vectorSearch(sql, provider, {
     queryText: embedText,
     projectId,
@@ -201,7 +201,7 @@ async function detectImprovements(
       seen.add(hit.entry.id);
       warnings.push({
         kind: "possible_duplicate",
-        message: `Posible duplicado de "${hit.entry.title}" (similitud ${hit.score.toFixed(2)}). Considera consolidar.`,
+        message: `Possible duplicate of "${hit.entry.title}" (similarity ${hit.score.toFixed(2)}). Consider consolidating.`,
         relatedEntryId: hit.entry.id,
         relatedTitle: hit.entry.title,
         score: hit.score,
@@ -209,7 +209,7 @@ async function detectImprovements(
     }
   }
 
-  // Contradicciones por polaridad opuesta sobre entidades compartidas.
+  // Contradictions by opposite polarity over shared entities.
   if (newPolarity.size > 0 && entityIds.length > 0) {
     const candidates = (await sql`
       SELECT DISTINCT ce.*
@@ -226,7 +226,7 @@ async function detectImprovements(
         seen.add(cand.id);
         warnings.push({
           kind: "possible_contradiction",
-          message: `Posible contradicción con "${cand.title}". Requiere revisión humana.`,
+          message: `Possible contradiction with "${cand.title}". A human needs to look at this.`,
           relatedEntryId: cand.id,
           relatedTitle: cand.title,
           score: scoreById.get(cand.id) ?? 0,
@@ -237,13 +237,15 @@ async function detectImprovements(
   return warnings;
 }
 
-/** Une entidades heurísticas y de LLM, deduplicando por (tipo + nombre canónico). */
+/** Merges heuristic and LLM entities, deduplicating by (type + canonical name). */
 function mergeEntities(
   ...lists: { name: string; type: EntityType }[][]
 ): { name: string; type: EntityType }[] {
   const byKey = new Map<string, { name: string; type: EntityType }>();
   for (const list of lists) {
     for (const e of list) {
+      // A project is created, not extracted: wherever it comes from, it does not get in (#135).
+      if (e.type === "project") continue;
       const key = `${e.type}:${canonicalize(e.name)}`;
       if (!byKey.has(key)) byKey.set(key, e);
     }
@@ -251,23 +253,23 @@ function mergeEntities(
   return [...byKey.values()];
 }
 
-// --- reclasificación diferida (maintain) -------------------------------------
+// --- deferred reclassification (maintain) ------------------------------------
 
 /**
- * Reclasifica con el LLM el `type` de las entradas VIGENTES de un proyecto que se
- * tiparon por HEURÍSTICA (los conectores ingieren barato: `enrichedBy != 'llm'`). Es la
- * pieza que hace real la filosofía «ingesta barata → maintain añade inteligencia»: arregla
- * los tipos de lo ya ingerido SIN re-ingerir, y complementa a `CORTEX_CAPTURE_LLM` (que
- * tipa en la propia ingesta). Solo toca el `type` (no el embedding). Idempotente: marca
- * `enrichedBy='llm'`, así que la siguiente pasada salta lo ya reclasificado. Sin
- * clasificador cableado (sin LLM), es un no-op. Precedencia intacta: no pisa lo que ya
- * clasificó el LLM ni lo curado por humanos (solo entradas heurísticas).
+ * Uses the LLM to reclassify the `type` of a project's CURRENT entries that were typed
+ * HEURISTICALLY (connectors ingest cheaply: `enrichedBy != 'llm'`). It is the piece that makes
+ * the "cheap ingestion -> maintain adds intelligence" philosophy real: it fixes the types of
+ * what was already ingested WITHOUT re-ingesting, and complements `CORTEX_CAPTURE_LLM` (which
+ * types during ingestion itself). It touches only the `type` (not the embedding). Idempotent:
+ * it marks `enrichedBy='llm'`, so the next pass skips whatever was already reclassified. With
+ * no classifier wired (no LLM) it is a no-op. Precedence is intact: it overwrites neither what
+ * the LLM already classified nor what humans curated (heuristic entries only).
  */
 export async function reclassifyProject(project: string): Promise<{ scanned: number; reclassified: number }> {
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, project);
-  if (!projectId) throw new Error(`Proyecto no encontrado: "${project}".`);
-  if (!classifier) return { scanned: 0, reclassified: 0 }; // sin LLM → no-op
+  if (!projectId) throw new Error(`Project not found: "${project}".`);
+  if (!classifier) return { scanned: 0, reclassified: 0 }; // no LLM -> no-op
 
   const rows = (await sql`
     SELECT id, content, type, metadata
@@ -279,7 +281,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   let reclassified = 0;
   for (const r of rows) {
     const res = await classifier(r.content as string).catch(() => null);
-    if (!res?.type) continue; // el LLM no clasificó: se reintentará en la próxima pasada
+    if (!res?.type) continue; // the LLM did not classify: it will be retried next pass
     if (res.type !== r.type) reclassified++;
     const meta = { ...((r.metadata as Record<string, unknown>) ?? {}), enrichedBy: "llm" } as Parameters<typeof sql.json>[0];
     await sql`UPDATE context_entries SET type = ${res.type}, metadata = ${sql.json(meta)} WHERE id = ${r.id}`;

@@ -65,12 +65,12 @@ What separates Cortex from a drawer full of notes is that **every fact carries i
 provenance**. An example entry:
 
 ```
-title:            "El cliente Acme Corp no permite servicios cloud públicos"
-content:          "La solución debe desplegarse en infraestructura propia (on-prem)."
+title:            "Acme Corp does not allow public cloud services"
+content:          "The solution has to be deployed on their own infrastructure (on-prem)."
 type:             constraint
 ─── provenance ───────────────────────────────────────────────────────
 source_type:      meeting_transcript          ← where it came from
-source_reference: "Reunión kickoff 2026-01"   ← pointer to the original
+source_reference: "Kickoff meeting 2026-01"   ← pointer to the original
 created_by:       "ana@example.com"           ← WHO recorded it (attribution)
 created_at:       2026-01-10                  ← WHEN we learned it
 confidence:       verified                    ← how much we trust it
@@ -216,14 +216,16 @@ Search gives you loose pieces of text. A **knowledge graph** gives you **how thi
 The idea, simply:
 
 - **Nodes (entities):** the "things" in the project. A client, a module, a technology, a
-  service, a person, an integration. There are **11 entity types**.
+  service, a person, an integration. There are **9 entity types**. One of them, `project`, is
+  the row that represents the project itself: it is created on purpose (`cortex link --create`
+  or the first save into it), never extracted from text.
 - **Edges (relations):** **typed** connections between nodes. "the billing module
   *depends_on* the ERP integration", "incident X was *caused_by* Stripe". There are **10
   relation types**: `depends_on`, `affects`, `caused_by`, `resolved_by`, `supersedes`,
   `contradicts`, `belongs_to`, `implemented_by`, `discussed_in`, `related_to`.
 
 One neat detail: **the entry itself can be a node**. When the graph extractor finds a
-relation whose source is the entry, it uses the keyword `"ENTRADA"`. That lets an incident
+relation whose source is the entry, it uses the keyword `"ENTRY"`. That lets an incident
 connect straight to what it affects:
 
 ```
@@ -335,7 +337,7 @@ OUT: { type: "decision",
 IN : "La pasarela Stripe devolvió 500 en producción; lo causó un cambio de
       versión de la API de Stripe. Se resolvió fijando la versión."
 OUT: { entities:  [ { name: "Stripe", type: "integration" } ],
-       relations: [ { source: "ENTRADA", target: "Stripe", type: "caused_by" } ] }
+       relations: [ { source: "ENTRY", target: "Stripe", type: "caused_by" } ] }
 ```
 
 **`reconciler` plus `merger`**, new information that refines the old:

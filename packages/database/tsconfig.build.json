@@ -1,5 +1,5 @@
 {
-  "$comment": "Build real (tsc -b). El tsconfig.json de al lado sigue siendo solo typecheck (--noEmit): separarlos evita el TS6305 de las project references.",
+  "$comment": "The real build (tsc -b). The tsconfig.json next to it stays typecheck-only (--noEmit): keeping them apart avoids TS6305 from the project references.",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "composite": true,

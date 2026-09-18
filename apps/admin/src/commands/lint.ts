@@ -1,10 +1,10 @@
 import { lintProject, renderLintReport } from "@cortex/core";
 
-/** Lint del conocimiento de un proyecto (salud de la memoria). */
+/** A project's knowledge lint (the memory's health). */
 export async function run(args: string[]): Promise<void> {
   const project = args[0];
   if (!project) {
-    console.error('Uso: cortex lint "<Proyecto>"');
+    console.error('Usage: cortex-admin lint "<Project>"');
     process.exitCode = 1;
     return;
   }

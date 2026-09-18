@@ -1,12 +1,13 @@
 import { getClientConfig, getServerVersion, readCredentials } from "@cortex/client";
+import { classify, noticeLine } from "../compat.js";
 import { CLI_VERSION } from "../version.js";
 import { printSplash, wantsSplash } from "../splash.js";
 
 /**
- * `cortex version` — qué versión tienes tú y qué versión tiene el servidor.
+ * `cortex version` -- which version you have and which version the server has.
  *
- * Las dos importan: el servidor declara una versión mínima de cliente, y cuando alguien dice
- * «a mí no me funciona» lo primero es saber si está tres versiones por detrás.
+ * Both matter: the server declares a minimum client version, and when somebody says "it does
+ * not work for me" the first thing to know is whether they are three versions behind.
  */
 export async function run(): Promise<void> {
   if (wantsSplash()) printSplash(CLI_VERSION);
@@ -22,4 +23,6 @@ export async function run(): Promise<void> {
   }
   console.log(`server ${creds.server} · ${version ?? cfg?.version ?? "?"}`);
   if (cfg?.minClientVersion) console.log(`minimum client version: ${cfg.minClientVersion}`);
+  const line = noticeLine(classify(creds.server, CLI_VERSION, cfg ?? (version ? { version } : null)));
+  if (line) console.log(line);
 }

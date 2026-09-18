@@ -6,69 +6,69 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
 /**
- * `@cortex/client` existe para poder empaquetar el CLI y distribuirlo con `npm i -g`
- * (ADR-0025). Eso solo se sostiene si el paquete NO arrastra Postgres, Mastra ni la capa
- * de embeddings: son ~95 MB que no pintan nada en el portátil de un dev.
+ * `@cortex/client` exists so the CLI can be bundled and shipped with `npm i -g` (ADR-0025).
+ * That only holds if the package does NOT drag in Postgres, Mastra or the embeddings layer:
+ * that is ~95 MB with no business being on a dev's laptop.
  *
- * Es una regla fácil de romper sin darse cuenta (un import "que ya está ahí"), así que se
- * comprueba en el test en vez de confiar en la revisión.
+ * It is an easy rule to break without noticing (an import "that is already there"), so it is
+ * checked in a test rather than trusted to review.
  */
-const PROHIBIDAS = ["@cortex/database", "@cortex/core", "@cortex/agents", "@cortex/embeddings"];
+const FORBIDDEN = ["@cortex/database", "@cortex/core", "@cortex/agents", "@cortex/embeddings"];
 
-function ficherosTs(dir: string): string[] {
+function tsFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
-    e.isDirectory() ? ficherosTs(join(dir, e.name)) : e.name.endsWith(".ts") ? [join(dir, e.name)] : [],
+    e.isDirectory() ? tsFiles(join(dir, e.name)) : e.name.endsWith(".ts") ? [join(dir, e.name)] : [],
   );
 }
 
-describe("@cortex/client se mantiene ligero", () => {
-  it("solo declara @cortex/shared como dependencia interna", () => {
+describe("@cortex/client stays lightweight", () => {
+  it("declares @cortex/shared as its only internal dependency", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "packages/client/package.json"), "utf8")) as {
       dependencies?: Record<string, string>;
     };
-    const internas = Object.keys(pkg.dependencies ?? {}).filter((d) => d.startsWith("@cortex/"));
-    expect(internas).toEqual(["@cortex/shared"]);
+    const internal = Object.keys(pkg.dependencies ?? {}).filter((d) => d.startsWith("@cortex/"));
+    expect(internal).toEqual(["@cortex/shared"]);
   });
 
-  it("ningún fichero importa los paquetes pesados", () => {
-    const ofensores: string[] = [];
-    for (const f of ficherosTs(join(ROOT, "packages/client/src"))) {
+  it("no file imports the heavy packages", () => {
+    const offenders: string[] = [];
+    for (const f of tsFiles(join(ROOT, "packages/client/src"))) {
       const src = readFileSync(f, "utf8");
-      for (const dep of PROHIBIDAS) {
-        if (src.includes(`from "${dep}"`)) ofensores.push(`${f.replace(ROOT, "")} → ${dep}`);
+      for (const dep of FORBIDDEN) {
+        if (src.includes(`from "${dep}"`)) offenders.push(`${f.replace(ROOT, "")} → ${dep}`);
       }
     }
-    expect(ofensores).toEqual([]);
+    expect(offenders).toEqual([]);
   });
 });
 
-describe("el CLI `cortex` se mantiene instalable", () => {
-  it("no depende de los paquetes pesados: van en cortex-admin", () => {
+describe("the `cortex` CLI stays installable", () => {
+  it("does not depend on the heavy packages: those live in cortex-admin", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "apps/cli/package.json"), "utf8")) as {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
-    // Los dos paquetes internos se bundlean, así que están declarados como devDependencies:
-    // si estuvieran en `dependencies`, npm intentaría descargarlos al instalar el CLI.
+    // The two internal packages are bundled, so they are declared as devDependencies: were
+    // they in `dependencies`, npm would try to download them when installing the CLI.
     const todas = { ...pkg.dependencies, ...pkg.devDependencies };
-    const internas = Object.keys(todas).filter((d) => d.startsWith("@cortex/"));
-    expect(internas.sort()).toEqual(["@cortex/client", "@cortex/shared"]);
+    const internal = Object.keys(todas).filter((d) => d.startsWith("@cortex/"));
+    expect(internal.sort()).toEqual(["@cortex/client", "@cortex/shared"]);
     expect(Object.keys(pkg.dependencies ?? {}).filter((d) => d.startsWith("@cortex/"))).toEqual([]);
   });
 
-  it("ningún comando del CLI importa Postgres, core, agents ni embeddings", () => {
-    const ofensores: string[] = [];
-    for (const f of ficherosTs(join(ROOT, "apps/cli/src"))) {
+  it("no CLI command imports Postgres, core, agents or embeddings", () => {
+    const offenders: string[] = [];
+    for (const f of tsFiles(join(ROOT, "apps/cli/src"))) {
       const src = readFileSync(f, "utf8");
-      for (const dep of PROHIBIDAS) {
-        if (src.includes(`from "${dep}"`)) ofensores.push(`${f.replace(ROOT, "")} → ${dep}`);
+      for (const dep of FORBIDDEN) {
+        if (src.includes(`from "${dep}"`)) offenders.push(`${f.replace(ROOT, "")} → ${dep}`);
       }
     }
-    expect(ofensores).toEqual([]);
+    expect(offenders).toEqual([]);
   });
 });
 
-describe("cliente tipado de la API", () => {
+describe("the API's typed client", () => {
   beforeEach(() => {
     vi.stubEnv("CORTEX_SERVER_URL", "https://cortex.example.com");
   });
@@ -77,20 +77,20 @@ describe("cliente tipado de la API", () => {
     vi.restoreAllMocks();
   });
 
-  it("getClientConfig no lanza si el servidor no responde: devuelve null", async () => {
+  it("getClientConfig does not throw when the server does not answer: it returns null", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("ECONNREFUSED")));
     const { getClientConfig } = await import("@cortex/client");
     await expect(getClientConfig()).resolves.toBeNull();
   });
 
-  it("getClientConfig devuelve null en un servidor antiguo (404), sin romper", async () => {
+  it("getClientConfig returns null on an old server (404), without breaking", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 404 })));
     const { getClientConfig } = await import("@cortex/client");
     await expect(getClientConfig()).resolves.toBeNull();
   });
 
-  it("un endpoint autenticado sin credenciales devuelve 401 en vez de lanzar", async () => {
-    // Sin `~/.cortex/credentials` (HOME apuntando a un sitio sin nada) no hay token.
+  it("an authenticated endpoint with no credentials returns 401 instead of throwing", async () => {
+    // With no `~/.cortex/credentials` (HOME pointing somewhere empty) there is no token.
     vi.stubEnv("HOME", "/tmp/cortex-sin-credenciales-" + Date.now());
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
@@ -98,6 +98,6 @@ describe("cliente tipado de la API", () => {
     const res = await listProjects();
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
-    expect(fetchSpy).not.toHaveBeenCalled(); // ni se molesta en salir a la red
+    expect(fetchSpy).not.toHaveBeenCalled(); // it does not even bother hitting the network
   });
 });

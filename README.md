@@ -4,6 +4,8 @@
 
 [![CI](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml)
 
+*En español: [`README.es.md`](./README.es.md).*
+
 **Project memory for software teams.** Cortex captures the knowledge that gets scattered
 across a project, the decisions, constraints, incidents, conventions, pull requests,
 conversations, docs and code, structures it in a hybrid layer that is at once documental,
@@ -177,6 +179,13 @@ at any point in between.
   membership of the private ones.
 - All you need is a **Cortex server running somewhere**. Whoever handles your infrastructure
   runs it.
+- **Two clocks, compared rather than tied.** You update the CLI from npm; an operator updates
+  the server. They do not have to match ([ADR-0062](./docs/decisions.md#adr-0062)). When the
+  server is newer, commands end with one line on stderr, once a day: `Cortex 0.1.9 → 0.1.12 ·
+  cortex upgrade`. When your CLI is newer, they tell you the server is behind so you can tell
+  whoever runs it. Only if your CLI is older than the server's `minClientVersion` do the
+  commands that **write** refuse; reading keeps working. `CORTEX_NO_VERSION_CHECK=1` turns it
+  off. Hooks and `cortex mcp` never print any of this.
 
 ### Or let your agent do it
 
@@ -413,7 +422,8 @@ pnpm admin maintain-worker    # scheduled maintenance
   CLI, takes its name from `CORTEX_BRAND_NAME`, default `Cortex`, and optionally a logo from
   `CORTEX_BRAND_LOGO_FILE` or `CORTEX_BRAND_LOGO_SVG`. With no logo you get the Cortex mark
   ("Relay": two pieces that change places, a centre that stays), which is one 8×8 drawing shared
-  by the web header, the favicon (`/favicon.svg`) and the CLI splash; with your own logo, the
+  by the web header, the favicon (`/favicon.svg`) and the CLI splash (what it means and how it
+  is built: [`docs/brand/README.md`](docs/brand/README.md)); with your own logo, the
   web shows yours and the CLI shows no mark at all. The splash only appears on an interactive
   terminal (`cortex` with no arguments and `cortex version`), never in CI, with `TERM=dumb` or
   in the hook and MCP commands, and honours `NO_COLOR`.

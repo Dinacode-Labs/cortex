@@ -1,6 +1,6 @@
--- Tickets de un solo uso para el handshake `cortex ui` → navegador. El CLI (autenticado)
--- pide un ticket corto; la web lo canjea por una sesión propia. Así el token de larga
--- vida del CLI nunca viaja en la URL. Ver docs/decisions.md.
+-- Single-use tickets for the `cortex ui` -> browser handshake. The (authenticated) CLI
+-- asks for a short ticket; the web exchanges it for a session of its own. That way the
+-- CLI's long-lived token never travels in the URL. See docs/decisions.md.
 CREATE TABLE IF NOT EXISTS ui_tickets (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ticket_hash text UNIQUE NOT NULL,

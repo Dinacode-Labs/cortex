@@ -1,13 +1,13 @@
-import { contextEntryType, entityType, isUsableEntityName } from "@cortex/shared";
+import { contextEntryType, extractableEntityType, isUsableEntityName } from "@cortex/shared";
 import type { ContextEntryType, EntityType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
 
 /**
- * Agente de clasificación / ingesta (§7). Dado un texto libre de conocimiento,
- * propone tipo, título, resumen y entidades mencionadas. Mejora las heurísticas
- * locales de @cortex/core cuando hay LLM disponible. Implementado como Agent de
- * Mastra (rol "classifier", ver mastra.ts).
+ * Classification / ingestion agent (section 7). Given free-form knowledge text, it proposes a
+ * type, a title, a summary and the entities mentioned. It improves on @cortex/core's local
+ * heuristics when an LLM is available. Implemented as a Mastra Agent (role "classifier", see
+ * mastra.ts).
  */
 
 export interface ClassificationResult {
@@ -18,38 +18,39 @@ export interface ClassificationResult {
 }
 
 const TYPES = contextEntryType.options;
-const ENTITY_TYPES = entityType.options;
+// No `project`: a project is created, not extracted (see `extractableEntityType`, #135).
+const ENTITY_TYPES = extractableEntityType.options;
 
 function userPrompt(content: string): string {
-  return `Analiza esta pieza de conocimiento de un proyecto y devuelve un objeto JSON con:
-- "type": uno de [${TYPES.join(", ")}]
-- "title": título corto (máx 100 caracteres)
-- "summary": resumen en 1-2 frases
-- "entities": lista de entidades mencionadas, cada una { "name": string, "type": uno de [${ENTITY_TYPES.join(", ")}] }
-  (extrae tecnologías, módulos, servicios, integraciones, clientes, personas relevantes)
+  return `Analyse this piece of knowledge from a project and return a JSON object with:
+- "type": one of [${TYPES.join(", ")}]
+- "title": a short title (100 characters max)
+- "summary": a 1-2 sentence summary
+- "entities": the entities mentioned, each one { "name": string, "type": one of [${ENTITY_TYPES.join(", ")}] }
+  (extract technologies, modules, services, integrations, clients, relevant people;
+  do NOT extract the containing project or product, nor tickets, branches or file names)
 
-Texto:
+Text:
 """
 ${content}
 """
 
-Responde solo con el JSON.`;
+Answer with the JSON only.`;
 }
 
 /**
- * Clasifica una entrada con el LLM. Devuelve null si falla (el llamador debe caer
- * a heurísticas). Valida los enums a mano para tolerar variaciones del modelo.
+ * Classifies an entry with the LLM. Returns null on failure (the caller must fall back to the
+ * heuristics). The enums are validated by hand so model variations are tolerated.
  */
 export async function classifyEntry(content: string): Promise<ClassificationResult | null> {
-  // DeepSeek es un modelo de razonamiento: dejamos presupuesto amplio para que
-  // tras el razonamiento quede espacio para el JSON, y reintentamos una vez si la
-  // respuesta llega vacía/truncada.
+  // Reasoning models need room: the budget is generous so that JSON still fits after the
+  // reasoning, and we retry once when the answer arrives empty or truncated.
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const raw = await runAgent("classifier", userPrompt(content), { maxOutputTokens: 2000 });
       const text = extractJson(raw).trim();
-      if (!text) throw new Error("respuesta vacía del modelo");
+      if (!text) throw new Error("empty response from the model");
       const parsed = JSON.parse(text) as {
         type?: string;
         title?: string;
@@ -77,6 +78,6 @@ export async function classifyEntry(content: string): Promise<ClassificationResu
       lastErr = e;
     }
   }
-  console.error("[agents] classifyEntry falló, se usarán heurísticas:", (lastErr as Error)?.message);
+  console.error("[agents] classifyEntry failed, falling back to heuristics:", (lastErr as Error)?.message);
   return null;
 }

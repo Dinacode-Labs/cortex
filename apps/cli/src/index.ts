@@ -1,25 +1,32 @@
 import { getBrandName } from "@cortex/shared";
+import { printVersionNotice } from "./compat.js";
 import { CLI_VERSION } from "./version.js";
 import { printSplash, wantsSplash } from "./splash.js";
 
 /**
- * CLI `cortex` — dispatcher único (estilo `gh`). Cada subcomando vive en
- * ./commands/<nombre>.ts y exporta `run(args)`, y la carga es perezosa con rutas LITERALES
- * (arrancar `--help` no debe pagar el coste de cargar nada).
+ * The `cortex` CLI -- a single dispatcher (in the style of `gh`). Each subcommand lives in
+ * ./commands/<name>.ts and exports `run(args)`, and loading is lazy with LITERAL paths
+ * (running `--help` must not pay the cost of loading anything).
  *
- * Aquí SOLO viven los comandos de developer: los que necesitan la base de datos, el modelo
- * o levantar un servicio están en `cortex-admin` (ADR-0025). Es lo que permite que este
- * binario se instale con `npm i -g` sin arrastrar Postgres ni Mastra: si añades un comando
- * que importa `@cortex/database`, `core`, `agents` o `embeddings`, va en admin, no aquí
- * (hay un test que lo comprueba).
+ * ONLY developer commands live here: the ones that need the database, the model or standing up
+ * a service are in `cortex-admin` (ADR-0025). That is what lets this binary be installed with
+ * `npm i -g` without dragging in Postgres or Mastra: if you add a command that imports
+ * `@cortex/database`, `core`, `agents` or `embeddings`, it goes in admin, not here (there is a
+ * test that checks this).
  */
 type CommandModule = { run: (args: string[]) => Promise<void> };
 
 interface Cmd {
   help: string;
   load: () => Promise<CommandModule>;
-  /** false = el comando gestiona su propio ciclo de vida (hooks, procesos largos). */
+  /**
+   * false = the command manages its own lifecycle (hooks, long-running processes). It also does
+   * NOT get the version notice at the end: in the hooks and in `cortex mcp`, stdout is protocol
+   * and one extra byte breaks the agent's session.
+   */
   managed?: boolean;
+  /** false = the command already talks about versions itself; the closing notice would be redundant. */
+  versionNotice?: boolean;
 }
 
 const COMMANDS: Record<string, Cmd> = {
@@ -30,9 +37,9 @@ const COMMANDS: Record<string, Cmd> = {
   mem: { help: "project memory from the terminal: save, search, read and fix entries", load: () => import("./commands/mem.js") },
   mcp: { help: "MCP server over stdio for your agent (proxies to the Cortex server)", managed: false, load: () => import("./commands/mcp.js") },
   toolbelt: { help: "install your organisation's toolbelt (third-party MCPs and skills)", load: () => import("./commands/toolbelt.js") },
-  version: { help: "this CLI's version and the server's", load: () => import("./commands/version.js") },
-  upgrade: { help: "install the latest published version of this CLI", load: () => import("./commands/upgrade.js") },
-  doctor: { help: "check every piece is in place, and say what to do if not", load: () => import("./commands/doctor.js") },
+  version: { help: "this CLI's version and the server's", versionNotice: false, load: () => import("./commands/version.js") },
+  upgrade: { help: "install the latest published version of this CLI", versionNotice: false, load: () => import("./commands/upgrade.js") },
+  doctor: { help: "check every piece is in place, and say what to do if not", versionNotice: false, load: () => import("./commands/doctor.js") },
   "connect-docs": { help: "ingest a folder of documentation into a project", load: () => import("./commands/connect-docs.js") },
   "connect-github": { help: "ingest pull requests and issues from a GitHub repo", load: () => import("./commands/connect-github.js") },
   "connect-sessions": { help: "backfill past agent sessions into a project", load: () => import("./commands/connect-sessions.js") },
@@ -53,7 +60,7 @@ function usage(opts: { header?: boolean } = {}): void {
 async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
   if (!sub && wantsSplash()) {
-    // Sin argumentos y en un terminal: el sello, y debajo la ayuda. `--help` sigue siendo texto plano.
+    // No arguments, on a terminal: the mark, and the help below it. `--help` stays plain text.
     printSplash(CLI_VERSION);
     usage({ header: false });
     return;
@@ -67,7 +74,7 @@ async function main(): Promise<void> {
     return;
   }
   if (sub === "sync") {
-    // `cortex sync` hacía dos cosas distintas a la vez; ahora son dos comandos (ADR-0032).
+    // `cortex sync` did two different things at once; now they are two commands (ADR-0032).
     console.error("`cortex sync` is gone. It did two different things, and now they are two commands:\n");
     console.error("  cortex setup --all        wire Cortex into your agents (hooks, MCP, skill)");
     console.error("  cortex toolbelt sync      install your organisation's MCPs and skills");
@@ -90,6 +97,10 @@ async function main(): Promise<void> {
     console.error(`cortex ${sub} failed:`, e instanceof Error ? e.message : e);
     process.exitCode = 1;
   }
+  // Passive version notice (ADR-0062): one line to stderr, only with a terminal in front and at
+  // most once a day. Only an interactive command reaches here; the `managed: false` ones left
+  // above.
+  if (cmd.versionNotice !== false) await printVersionNotice();
   process.exit(process.exitCode ?? 0);
 }
 

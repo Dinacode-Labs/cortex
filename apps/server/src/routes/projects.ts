@@ -21,9 +21,9 @@ import { currentUser } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
 /**
- * Proyectos por HTTP. Existe para que `cortex link` deje de hablar directamente con
- * Postgres: es el último comando del CLI que necesitaba la base de datos, y mientras la
- * necesite no se puede distribuir un cliente ligero (ADR-0025).
+ * Projects over HTTP. It exists so `cortex link` stops talking directly to Postgres: it was
+ * the last CLI command that needed the database, and while it needed it no lightweight client
+ * could be shipped (ADR-0025).
  */
 export const projectRoutes = new Hono();
 
@@ -33,7 +33,7 @@ const toSummary = (p: ProjectRef): ProjectSummary => ({
   visibility: p.visibility ?? "public",
 });
 
-/** Proyectos visibles para el usuario (admin → todos). */
+/** Projects visible to the user (an admin sees them all). */
 projectRoutes.get("/projects", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
@@ -42,9 +42,9 @@ projectRoutes.get("/projects", async (c) => {
 });
 
 /**
- * Un proyecto por slug. Distingue 404 de 403 a propósito: saber que un proyecto existe
- * pero es privado es justo lo que necesita el CLI para decirte a quién pedir acceso, y no
- * es información sensible (el slug ya lo escribiste tú).
+ * One project by slug. It distinguishes 404 from 403 on purpose: knowing that a project exists
+ * but is private is exactly what the CLI needs in order to tell you whom to ask for access,
+ * and it is not sensitive (you typed the slug yourself).
  */
 projectRoutes.get("/projects/:slug", async (c) => {
   const user = await currentUser(c);
@@ -58,11 +58,11 @@ projectRoutes.get("/projects/:slug", async (c) => {
 });
 
 /**
- * Crea un proyecto, o devuelve el que ya existe con ese slug.
+ * Creates a project, or returns the one that already holds that slug.
  *
- * El slug es la IDENTIDAD: si ya está cogido no se inventa un `-2`, porque eso acaba
- * partiendo en dos la memoria del mismo proyecto. Se responde `created: false` si el
- * usuario tiene acceso, o 403 con la lista de admins si es privado y ajeno.
+ * The slug is the IDENTITY: when it is taken, no `-2` is invented, because that ends up
+ * splitting the same project's memory in two. The answer is `created: false` when the user has
+ * access, or a 403 with the admin list when it is private and somebody else's.
  */
 projectRoutes.post("/projects", async (c) => {
   const user = await currentUser(c);
@@ -74,7 +74,7 @@ projectRoutes.post("/projects", async (c) => {
   if (existing) {
     if (!(await canAccessProject(existing, user.email))) {
       return c.json(
-        { error: `Ya existe un proyecto "${existing.name}" y es privado: pide acceso.`, admins: listAdmins() },
+        { error: `A project "${existing.name}" already exists and is private: ask for access.`, admins: listAdmins() },
         403,
       );
     }
@@ -89,18 +89,18 @@ projectRoutes.post("/projects", async (c) => {
     });
     return c.json({ project: toSummary(project), created: true }, 201);
   } catch (e) {
-    // El caso realista es un `parentSlug` que no existe: es culpa del cliente, no del
-    // servidor, así que 400 con el motivo en vez de un 500 opaco.
+    // The realistic case is a `parentSlug` that does not exist: that is the client's fault,
+    // not the server's, so a 400 with the reason rather than an opaque 500.
     return c.json({ error: (e as Error).message }, 400);
   }
 });
 
 /**
- * Cambia la visibilidad o el dueño de un proyecto (ADR-0051).
+ * Changes a project's visibility or owner (ADR-0051).
  *
- * El agujero que tapa: hasta ahora la visibilidad se fijaba al crear y no había forma de
- * cambiarla en ninguna interfaz, así que un proyecto nacido público lo era para siempre.
- * Quien puede hacerlo lo decide el dominio (`canManageProject`): el dueño o un admin.
+ * The hole it closes: visibility used to be fixed at creation with no way to change it in any
+ * interface, so a project born public stayed public forever. Who may do it is decided by the
+ * domain (`canManageProject`): the owner or an admin.
  */
 projectRoutes.patch("/projects/:slug", async (c) => {
   const user = await currentUser(c);
@@ -108,7 +108,7 @@ projectRoutes.patch("/projects/:slug", async (c) => {
   const body = await parseBody(c, updateProjectRequest);
   if (body instanceof Response) return body;
   const slug = c.req.param("slug");
-  // Un proyecto que no puedes ni ver responde 404, no 403: lo contrario diría que existe.
+  // A project you cannot even see answers 404, not 403: the opposite would reveal it exists.
   const project = await findProjectBySlug(slug);
   if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
   try {
@@ -119,7 +119,7 @@ projectRoutes.patch("/projects/:slug", async (c) => {
   }
 });
 
-/** Miembros de un proyecto. Ver la lista exige poder gestionarlo: es quién tiene acceso. */
+/** A project's members. Seeing the list requires being able to manage it: it is who has access. */
 projectRoutes.get("/projects/:slug/members", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
@@ -165,10 +165,11 @@ projectRoutes.delete("/projects/:slug/members", async (c) => {
 });
 
 /**
- * Borra un proyecto vacío: deshace un `cortex link --create` equivocado y nada más.
+ * Deletes an empty project: it undoes a mistaken `cortex link --create` and nothing else.
  *
- * Con memoria dentro responde 409 y no lo toca. Un producto cuyo principio es que invalidar
- * no es borrar no puede tener «borrar toda la memoria de un cliente» a un clic (ADR-0057).
+ * With memory inside it answers 409 and touches nothing. A product whose principle is that
+ * invalidating is not deleting cannot have "delete a client's whole memory" one click away
+ * (ADR-0057).
  */
 projectRoutes.delete("/projects/:slug", async (c) => {
   const user = await currentUser(c);

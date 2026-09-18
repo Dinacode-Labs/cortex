@@ -7,8 +7,8 @@ import type { ContextPack } from "../packages/core/src/context-pack.js";
 import type { ContextEntry } from "@cortex/shared";
 
 /**
- * ADR-0054: el pack cubre todo el conocimiento que describe el ESTADO del proyecto, no los
- * cinco tipos que alguien escribió a mano en una interfaz.
+ * ADR-0054: the pack covers all the knowledge that describes the project's STATE, not the five
+ * types somebody once hand-wrote into an interface.
  */
 const entrada = (tipo: string, i: number): ContextEntry =>
   ({
@@ -35,56 +35,56 @@ const pack = (): ContextPack =>
     conflicts: [],
   }) as unknown as ContextPack;
 
-describe("qué tipos llegan al agente", () => {
-  it("los tipos que describen el estado del proyecto están en el pack", () => {
-    const enPack = new Set(PACK_SECTIONS.map((s) => s.type));
+describe("which types reach the agent", () => {
+  it("the types that describe the project's state are in the pack", () => {
+    const inPack = new Set(PACK_SECTIONS.map((s) => s.type));
     for (const t of ["decision", "constraint", "risk", "technical_debt", "convention",
                      "architecture", "business_rule", "incident", "integration_note",
                      "module_note", "how_to"]) {
-      expect(enPack.has(t as never), `"${t}" no llega a ningún agente`).toBe(true);
+      expect(inPack.has(t as never), `"${t}" reaches no agent at all`).toBe(true);
     }
   });
 
-  it("solo quedan fuera los que son registro de un suceso, y a propósito", () => {
+  it("only the ones that record an event are left out, and deliberately so", () => {
     const fuera = contextEntryType.options.filter((t) => !PACK_SECTIONS.some((s) => s.type === t));
     expect(fuera.sort()).toEqual(["meeting_summary", "pr_summary", "ticket_resolution"]);
   });
 
-  it("con presupuesto llega algo de cada sección, y las que gobiernan el trabajo llevan más", () => {
+  it("with a budget something from every section arrives, and those governing the work carry more", () => {
     const txt = renderContextPack(pack(), { maxChars: 6000 });
     for (const s of PACK_SECTIONS) {
-      expect(txt, `falta "${s.titulo}"`).toContain(`## ${s.titulo}`);
-      expect(txt, `"${s.titulo}" llegó sin contenido`).toContain(`${s.type} 0`);
+      expect(txt, `falta "${s.title}"`).toContain(`## ${s.title}`);
+      expect(txt, `"${s.title}" arrived with no content`).toContain(`${s.type} 0`);
     }
     const cuenta = (tipo: string) => (txt.match(new RegExp(`\\*\\*${tipo} \\d+\\*\\*`, "g")) ?? []).length;
     expect(cuenta("decision")).toBeGreaterThan(cuenta("how_to"));
   });
 
-  it("nunca se pasa del tope", () => {
+  it("never goes over the cap", () => {
     for (const tope of [1500, 3000, 6000, 12000, 30000]) {
       expect(renderContextPack(pack(), { maxChars: tope }).length, `tope ${tope}`).toBeLessThanOrEqual(tope);
     }
   });
 });
 
-describe("el resumen no repite el título", () => {
-  it("lo quita cuando el resumen empieza por él", () => {
-    const t = "Exportar PDF nativo desde Figma evita el rate-limit";
-    const s = `${t} Clic derecho sobre la página en la app de Figma y exportar todos los frames.`;
-    expect(stripLeadingTitle(s, t)).toBe("Clic derecho sobre la página en la app de Figma y exportar todos los frames.");
+describe("the summary does not repeat the title", () => {
+  it("strips it when the summary starts with it", () => {
+    const t = "Exporting native PDF from Figma avoids the rate limit";
+    const s = `${t} Right-click the page in the Figma app and export every frame.`;
+    expect(stripLeadingTitle(s, t)).toBe("Right-click the page in the Figma app and export every frame.");
   });
 
-  it("tolera puntuación y mayúsculas, que es como viene de verdad", () => {
-    expect(stripLeadingTitle("Cola con 3 reintentos: la cola pasa a tener un tope de tres y una DLQ configurada.", "cola con 3 reintentos"))
-      .toBe("la cola pasa a tener un tope de tres y una DLQ configurada.");
+  it("tolerates punctuation and casing, which is how it really arrives", () => {
+    expect(stripLeadingTitle("Queue with 3 retries: the queue now has a cap of three and a configured DLQ.", "queue with 3 retries"))
+      .toBe("the queue now has a cap of three and a configured DLQ.");
   });
 
-  it("si al quitarlo no queda resumen, se deja como estaba", () => {
-    const t = "Una decisión sobre la cola";
-    expect(stripLeadingTitle(`${t} y poco más.`, t)).toBe(`${t} y poco más.`);
+  it("when stripping leaves no summary, it is left as it was", () => {
+    const t = "A decision about the queue";
+    expect(stripLeadingTitle(`${t} and little else.`, t)).toBe(`${t} and little else.`);
   });
 
-  it("no toca un resumen que no empieza por el título", () => {
-    expect(stripLeadingTitle("La cola pasa a tener tope.", "Reintentos")).toBe("La cola pasa a tener tope.");
+  it("does not touch a summary that does not start with the title", () => {
+    expect(stripLeadingTitle("The queue now has a cap.", "Retries")).toBe("The queue now has a cap.");
   });
 });

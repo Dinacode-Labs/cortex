@@ -31,8 +31,8 @@ pnpm-debug.log*
 # Mastra
 .mastra/
 
-# Material corporativo / interno: vive en Dinacode-Labs/ai-toolbelt (privado), nunca aquí.
-# Ver ADR-0026. Estas reglas existen para que no vuelva por accidente.
+# Corporate / internal material: it lives in Dinacode-Labs/ai-toolbelt (private), never here.
+# See ADR-0026. These rules exist so it does not come back by accident.
 .od-skills/
 docs/assets/
 docs/internal/
@@ -43,7 +43,19 @@ config/skills/*/*.zip
 # Local Pi runtime state
 .atl/
 
-# El vínculo de ESTA carpeta con un proyecto de Cortex. Es de cada clon, no del repositorio
-# (ADR-0059): quien clone esto y quiera su propia memoria no debería tener que pelearse con un
-# fichero versionado. Se crea solo con `cortex link`.
+# The link between THIS folder and a Cortex project. It belongs to each clone, not to the
+# repository (ADR-0059): whoever clones this and wants their own memory should not have to
+# fight a versioned file. `cortex link` creates it on its own.
 .cortex.json
+# What Cortex installs into Claude Code for THIS repo (rules, command and skill) IS versioned:
+# it is part of how the work is done here (ADR-0065). It has to be spelled out because the global
+# .gitignore on almost any machine ignores `.claude/`, and re-including a file does not work while
+# the directory holding it is still excluded: the directory has to be un-excluded first. Anything
+# personal (settings.local.json) stays out by not being on the list.
+!.claude/
+!.claude/rules/
+!.claude/rules/*.md
+!.claude/commands/
+!.claude/commands/*.md
+!.claude/skills/
+!.claude/skills/**

@@ -3,9 +3,9 @@ import type { ContextEntry, ContextEntryType, ContextEntryStatus, Entity, Source
 import { findProjectIdByName } from "./projects.js";
 import { rowToContextEntry, rowToEntity, rowToSource, type Row } from "./map.js";
 
-/** Consultas de lectura para la UI / inspección (no semánticas). */
+/** Read queries for the UI / inspection (non-semantic). */
 
-/** Lista los proyectos (entidades de tipo project) con su nº de entradas. */
+/** Lists the projects (entities of type project) with their entry count. */
 export async function listProjects(): Promise<{ entity: Entity; entryCount: number }[]> {
   const sql = getSql();
   const rows = (await sql`
@@ -25,21 +25,21 @@ export interface ListEntriesFilter {
   status?: ContextEntryStatus;
   limit?: number;
   /**
-   * A qué proyectos puede llegar quien mira. **El filtro va dentro de la consulta**, antes de
-   * ordenar y limitar (ADR-0052).
+   * Which projects the viewer can reach. **The filter goes inside the query**, before ordering
+   * and limiting (ADR-0052).
    *
-   * Filtrarlo después no filtra: recorta. La portada pedía las 60 entradas más recientes de
-   * todos los proyectos y descartaba en memoria las inaccesibles, así que bastaba con que esas
-   * 60 fueran de proyectos ajenos —o de ninguno— para que la pantalla saliera vacía teniendo
-   * cientos de entradas que sí se podían ver. Medido: 452 accesibles, 0 mostradas.
+   * Filtering afterwards does not filter: it truncates. The home page asked for the 60 most
+   * recent entries across all projects and discarded the inaccessible ones in memory, so it was
+   * enough for those 60 to belong to other people's projects -- or to none -- for the screen to
+   * come out empty while hundreds of visible entries existed. Measured: 452 accessible, 0 shown.
    *
-   * Sin este campo se listan todas: es para quien ya sabe que puede verlas (un admin, un
-   * proceso interno). Quien sirva a una persona, pásalo.
+   * Without this field everything is listed: that is for callers who already know they may see
+   * it (an admin, an internal process). Anyone serving a person should pass it.
    */
   accessibleProjectIds?: string[];
 }
 
-/** Lista entradas de contexto con filtros opcionales, más recientes primero. */
+/** Lists context entries with optional filters, newest first. */
 export async function listEntries(filter: ListEntriesFilter = {}): Promise<ContextEntry[]> {
   const sql = getSql();
   let where = sql`WHERE true`;
@@ -48,8 +48,8 @@ export async function listEntries(filter: ListEntriesFilter = {}): Promise<Conte
     if (!projectId) return [];
     where = sql`${where} AND ce.project_id = ${projectId}`;
   } else if (filter.accessibleProjectIds) {
-    // Una entrada sin proyecto la ve cualquiera con sesión: no hay proyecto que la restrinja
-    // (misma regla que `checkEntryAccess`, que devuelve `ok` con `project: null`).
+    // An entry with no project is visible to anyone with a session: there is no project to
+    // restrict it (the same rule as `checkEntryAccess`, which returns `ok` with `project: null`).
     where = sql`${where} AND (ce.project_id IS NULL OR ce.project_id = ANY(${filter.accessibleProjectIds}))`;
   }
   if (filter.type) where = sql`${where} AND ce.type = ${filter.type}`;
@@ -71,7 +71,7 @@ export interface EntryDetail {
   projectName: string | null;
 }
 
-/** Devuelve una entrada con su fuente, entidades enlazadas y proyecto. */
+/** Returns an entry with its source, linked entities and project. */
 export async function getEntryDetail(id: string): Promise<EntryDetail | null> {
   const sql = getSql();
   const entryRows = (await sql`SELECT * FROM context_entries WHERE id = ${id} LIMIT 1`) as unknown as Row[];
@@ -122,8 +122,8 @@ export interface ProjectGraph {
 }
 
 /**
- * Grafo de conocimiento de un proyecto para visualización: entidades + (opcional)
- * entradas como nodos; relaciones y menciones (entrada→entidad) como aristas.
+ * A project's knowledge graph, for visualisation: entities plus (optionally) entries as nodes;
+ * relations and mentions (entry -> entity) as edges.
  */
 export async function getProjectGraph(
   project: string,
@@ -135,7 +135,7 @@ export async function getProjectGraph(
   const includeEntries = opts.includeEntries ?? true;
   const maxEntries = opts.maxEntries ?? 500;
 
-  // Entidades del proyecto (enlazadas a sus entradas), excluyendo el propio proyecto.
+  // The project's entities (linked to its entries), excluding the project itself.
   const entityRows = (await sql`
     SELECT DISTINCT en.id, en.name, en.type
     FROM entities en
@@ -167,7 +167,7 @@ export async function getProjectGraph(
   }
 
   const edges: GraphEdge[] = [];
-  // Relaciones (entidad↔entidad, entrada→entidad) con ambos extremos en el grafo.
+  // Relations (entity <-> entity, entry -> entity) with both ends inside the graph.
   const relRows = (await sql`
     SELECT source_id, target_id, relation_type
     FROM relations
@@ -178,7 +178,7 @@ export async function getProjectGraph(
       edges.push({ from: r.source_id, to: r.target_id, label: r.relation_type, kind: "relation" });
     }
   }
-  // Menciones entrada→entidad (si se incluyen entradas).
+  // Entry -> entity mentions (when entries are included).
   if (includeEntries) {
     const linkRows = (await sql`
       SELECT cee.context_entry_id, cee.entity_id

@@ -5,9 +5,9 @@ import { sendOtpEmail } from "./email.js";
 import type { Row } from "./map.js";
 
 /**
- * Autenticación email + OTP (sin passwords). `requestOtp` genera un código y lo envía;
- * `verifyOtp` lo valida y emite un token de sesión (Bearer); `validateToken` resuelve el
- * usuario de un token. Códigos y tokens se guardan HASHEADOS. El usuario ES su correo.
+ * Email + OTP authentication (no passwords). `requestOtp` generates a code and sends it;
+ * `verifyOtp` validates it and issues a session token (Bearer); `validateToken` resolves the
+ * user behind a token. Codes and tokens are stored HASHED. A user IS their email address.
  */
 const MAX_ATTEMPTS = 5;
 
@@ -15,16 +15,16 @@ const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
 const normEmail = (e: string): string => e.trim().toLowerCase();
 const csv = (v: string | undefined): string[] => (v ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
-// Config leída LAZY (no al cargar el módulo): robusta ante el orden de loadEnv/imports.
+// Config read LAZILY (not on module load): robust against the order of loadEnv/imports.
 const otpTtlMin = (): number => getEnvNum("CORTEX_OTP_TTL_MIN", 10);
 const tokenTtlDays = (): number => getEnvNum("CORTEX_TOKEN_TTL_DAYS", 30);
 const otpRateMax = (): number => getEnvNum("CORTEX_OTP_RATE_MAX", 5);
 const otpRateWindowMin = (): number => getEnvNum("CORTEX_OTP_RATE_WINDOW_MIN", 15);
-/** Dominios permitidos (whitelist, coma-separado). Vacío = cualquiera. Sin registro: el primer login válido crea el usuario. */
-// Sin default: el dominio permitido depende de quién despliegue. Vacío = cualquiera puede
-// registrarse (el servidor avisa al arrancar); heredar un dominio ajeno sería peor.
+/** Allowed domains (comma-separated whitelist). Empty = anyone. There is no sign-up step: the first valid login creates the user. */
+// No default: the allowed domain depends on whoever deploys. Empty = anyone can register
+// (the server warns on startup); inheriting somebody else's domain would be worse.
 const authDomains = (): string[] => csv(process.env.CORTEX_AUTH_DOMAIN ?? "");
-/** Emails admin (coma-separado; puede haber varios). Gestionan permisos y ven todos los proyectos. */
+/** Admin emails (comma-separated; there can be several). They manage permissions and see every project. */
 const adminEmails = (): string[] => csv(process.env.CORTEX_ADMIN_EMAIL);
 
 export function isAllowedEmail(emailRaw: string): boolean {
@@ -33,12 +33,12 @@ export function isAllowedEmail(emailRaw: string): boolean {
   return domains.length === 0 || domains.some((d) => email.endsWith(`@${d}`));
 }
 
-/** ¿Es admin? (config por env CORTEX_ADMIN_EMAIL, uno o varios). */
+/** Is this an admin? (configured through CORTEX_ADMIN_EMAIL, one or several). */
 export function isAdmin(email: string | null | undefined): boolean {
   return !!email && adminEmails().includes(normEmail(email));
 }
 
-/** Lista de admins configurados (para "pide acceso a…"). */
+/** The configured admins (for "ask X for access"). */
 export function listAdmins(): string[] {
   return adminEmails();
 }
@@ -49,7 +49,7 @@ export interface AuthUser {
   admin: boolean;
 }
 
-/** Genera un OTP para el email y lo envía (Brevo o dev-log). Invalida los previos. */
+/** Generates an OTP for the email and sends it (Brevo or dev-log). Invalidates earlier ones. */
 export async function requestOtp(emailRaw: string): Promise<void> {
   const email = normEmail(emailRaw);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("That does not look like an email address.");
@@ -71,7 +71,7 @@ export async function requestOtp(emailRaw: string): Promise<void> {
   await sendOtpEmail(email, code);
 }
 
-/** Verifica el OTP y, si es correcto, crea/actualiza el usuario y devuelve un token. */
+/** Verifies the OTP and, when correct, creates/updates the user and returns a token. */
 export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ token: string; user: AuthUser }> {
   const email = normEmail(emailRaw);
   const code = codeRaw.trim();
@@ -84,14 +84,14 @@ export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ to
       FOR UPDATE
     `) as unknown as Row[];
     const otp = rows[0];
-    if (!otp) return { ok: false as const, error: "Código expirado o inexistente. Pide uno nuevo." };
+    if (!otp) return { ok: false as const, error: "That code has expired or never existed. Ask for a new one." };
     if ((otp.attempts as number) >= MAX_ATTEMPTS) {
       await tx`UPDATE otp_codes SET consumed_at = now() WHERE id = ${otp.id}`;
-      return { ok: false as const, error: "Demasiados intentos. Pide un código nuevo." };
+      return { ok: false as const, error: "Too many attempts. Ask for a new code." };
     }
     if (sha(code) !== otp.code_hash) {
       await tx`UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ${otp.id}`;
-      return { ok: false as const, error: "Código incorrecto." };
+      return { ok: false as const, error: "Wrong code." };
     }
     await tx`UPDATE otp_codes SET consumed_at = now() WHERE id = ${otp.id}`;
 
@@ -113,7 +113,7 @@ export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ to
   return { token: result.token, user: result.user };
 }
 
-/** Resuelve el usuario de un token (o null). Actualiza last_used_at. */
+/** Resolves the user behind a token (or null). Updates last_used_at. */
 export async function validateToken(token: string): Promise<AuthUser | null> {
   if (!token) return null;
   const sql = getSql();
@@ -126,15 +126,15 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
   return { id: rows[0].id as string, email: rows[0].email as string, admin: isAdmin(rows[0].email as string) };
 }
 
-/** Revoca un token (logout). */
+/** Revokes a token (logout). */
 export async function revokeToken(token: string): Promise<void> {
   await getSql()`DELETE FROM auth_tokens WHERE token_hash = ${sha(token)}`;
 }
 
 const TICKET_TTL_SEC = getEnvNum("CORTEX_UI_TICKET_TTL_SEC", 90);
 
-/** Emite un ticket de un solo uso (corto) para el handshake `cortex ui`. Requiere un
- * token de CLI válido. El ticket NO es el token: la web lo canjea por una sesión propia. */
+/** Issues a short, single-use ticket for the `cortex ui` handshake. It needs a valid CLI
+ * token. The ticket is NOT the token: the web exchanges it for a session of its own. */
 export async function createUiTicket(cliToken: string): Promise<string | null> {
   const user = await validateToken(cliToken);
   if (!user) return null;
@@ -146,7 +146,7 @@ export async function createUiTicket(cliToken: string): Promise<string | null> {
   return ticket;
 }
 
-/** Canjea un ticket (atómico → un solo uso) por una NUEVA sesión web. null si inválido. */
+/** Exchanges a ticket (atomic -> single use) for a NEW web session. null when invalid. */
 export async function redeemUiTicket(ticket: string): Promise<{ token: string; user: AuthUser } | null> {
   if (!ticket) return null;
   const sql = getSql();
@@ -160,7 +160,7 @@ export async function redeemUiTicket(ticket: string): Promise<{ token: string; u
   const urows = (await sql`SELECT email FROM users WHERE id = ${userId} LIMIT 1`) as unknown as Row[];
   if (!urows[0]) return null;
   const email = urows[0].email as string;
-  const token = randomBytes(32).toString("base64url"); // sesión web nueva (≠ token CLI)
+  const token = randomBytes(32).toString("base64url"); // a fresh web session (not the CLI token)
   await sql`
     INSERT INTO auth_tokens (token_hash, user_id, expires_at)
     VALUES (${sha(token)}, ${userId}, now() + make_interval(days => ${tokenTtlDays()}))

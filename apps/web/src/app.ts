@@ -17,35 +17,35 @@ import { graphRoutes } from "./routes/graph.js";
 import { redirectRoutes } from "./routes/redirects.js";
 
 /**
- * UI mínima de demo (§16). Renderizado en servidor (Hono), sin build de
- * frontend. Es un segundo consumidor de @cortex/core, demostrando que humanos y
- * agentes comparten la misma capa de contexto (§5.4).
+ * A minimal demo UI (section 16). Server-rendered (Hono), with no frontend build. It is a
+ * second consumer of @cortex/core, showing that humans and agents share the same context layer
+ * (section 5.4).
  *
- * Este módulo NO tiene efectos al importar (ni loadEnv ni serve): `createApp()`
- * solo COMPONE la app — estáticos + rutas exentas + gate de sesión + rutas
- * (`routes/`, una por recurso) — y el entrypoint fino (`index.ts`) la arranca.
- * Así los tests ejercitan las rutas con `app.request()` sin levantar un servidor.
+ * This module has NO import-time effects (neither loadEnv nor serve): `createApp()` only
+ * COMPOSES the app -- statics + exempt routes + the session gate + the routes (`routes/`, one
+ * per resource) -- and the thin entrypoint (`index.ts`) starts it. That way the tests exercise
+ * the routes with `app.request()` without standing up a server.
  */
 export type { WebEnv } from "./middleware/session.js";
 
-// Root ABSOLUTO de los estáticos: funciona arrancando desde la raíz del monorepo
-// o desde apps/web (no depende del cwd del proceso).
+// ABSOLUTE root for the statics: it works whether started from the monorepo root or from
+// apps/web (it does not depend on the process's cwd).
 const PUBLIC_DIR = resolve(import.meta.dirname, "../public");
 
-/** Construye la app web completa (estáticos + middleware de sesión + rutas). Sin side effects. */
+/** Builds the whole web app (statics + session middleware + routes). No side effects. */
 export function createApp(): Hono<WebEnv> {
   const app = new Hono<WebEnv>();
   app.use("*", secureHeaders());
 
-  // Antes del gate de sesión, o el healthcheck del contenedor recibiría un redirect a login.
+  // Before the session gate, or the container's healthcheck would get a redirect to login.
   app.get("/health", async (c) => {
     const db = await pingDatabase();
     return c.json({ ok: db, service: "cortex-web", db: db ? "ok" : "down" }, db ? 200 : 503);
   });
 
-  // Favicon: el logo del operador si lo hay; si no, el sello de Cortex. A 16 px cada celda son
-  // 2 px y el contorno de 0.5 es 1 px exacto. En tema oscuro las piezas van sólidas y claras:
-  // huecas sobre una pestaña oscura no se verían.
+  // Favicon: the operator's logo if there is one, otherwise the Cortex mark. At 16 px each cell
+  // is 2 px and a 0.5 stroke is exactly 1 px. On a dark tab the pieces go solid and light: hollow
+  // ones would not show.
   app.get("/favicon.svg", (c) => {
     const svg =
       getBrandLogoSvg() ??
@@ -58,18 +58,18 @@ export function createApp(): Hono<WebEnv> {
     return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" });
   });
 
-  // Estáticos (styles.css, graph.js): accesibles SIN sesión — la propia página de
-  // login enlaza /styles.css. Si el fichero no existe, serveStatic hace next().
+  // Statics (styles.css, graph.js): reachable WITHOUT a session -- the login page itself links
+  // /styles.css. When the file does not exist, serveStatic calls next().
   app.use("*", serveStatic({ root: PUBLIC_DIR }));
 
-  // Rutas exentas del gate (handshake CLI y logout): montadas ANTES del gate,
-  // el orden de registro es la exención.
+  // Routes exempt from the gate (the CLI handshake and logout): mounted BEFORE the gate --
+  // registration order is the exemption.
   app.route("/", authRoutes);
 
-  // Gate: el resto de rutas requieren sesión (resuelve c.var.user desde la cookie).
+  // The gate: every other route requires a session (it resolves c.var.user from the cookie).
   app.use("*", sessionGate);
 
-  // Las redirecciones van PRIMERO: una ruta vieja no debe caer en el 404 de una nueva.
+  // Redirects go FIRST: an old path must not fall into a new one's 404.
   app.route("/", redirectRoutes);
   app.route("/", projectsRoutes);
   app.route("/", projectRoutes);
@@ -78,10 +78,10 @@ export function createApp(): Hono<WebEnv> {
   app.route("/", usageRoutes);
   app.route("/", graphRoutes);
 
-  // Errores no controlados: log completo en servidor + página genérica (500),
-  // sin filtrar detalles internos al navegador.
+  // Unhandled errors: a full log on the server plus a generic page (500), leaking no internal
+  // detail to the browser.
   app.onError((err, c) => {
-    console.error("[cortex-web] error no controlado:", err);
+    console.error("[cortex-web] unhandled error:", err);
     return c.html(
       layout("Error", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Something went wrong. Try again.</div>`, c.get("user") ?? null),
       500,

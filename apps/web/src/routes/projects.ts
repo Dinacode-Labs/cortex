@@ -3,7 +3,6 @@ import { html } from "hono/html";
 import {
   addProjectMember,
   deleteProject,
-  lintProject,
   listAccessibleProjects,
   listProjectMembers,
   NotAManagerError,
@@ -13,62 +12,69 @@ import {
 } from "@cortex/core";
 import { getBrandName } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
-import { projectHeader, visibilityPill } from "../views/project-nav.js";
+import { projectCard } from "../views/components.js";
+import { projectHealth } from "../project-summary.js";
+import { projectHeader } from "../views/project-nav.js";
 import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
 /**
- * La portada (lista de proyectos) y los ajustes de cada uno.
+ * The home page (the project list) and each project's settings.
  *
- * La portada era antes un listado de entradas de todos los proyectos mezclados, que es la
- * pregunta que nadie se hace: quien abre la web viene pensando en un proyecto. Ahora lo primero
- * es elegirlo, y cada tarjeta dice lo que hace falta para elegir — cuánto sabe, si está
- * abierto o cerrado, y si tiene algo que revisar (ADR-0050).
+ * The home page used to be a list of entries from every project mixed together, which is the
+ * question nobody asks: whoever opens the web arrives thinking about one project. Now the first
+ * thing is to pick it, and each card says what is needed to pick -- how much it knows, whether
+ * it is open or closed, and whether there is anything to review (ADR-0050).
  */
 export const projectsRoutes = new Hono<WebEnv>();
-
-/** Estado de salud resumido, para no entrar a un proyecto a ver si hay algo que mirar. */
-async function salud(nombre: string): Promise<Html> {
-  try {
-    const r = await lintProject(nombre);
-    const avisos = r.contradictions.length + r.duplicates.length;
-    if (avisos === 0) return html`<span class="health ok">✓ healthy</span>`;
-    return html`<span class="health warn">${avisos} to review</span>`;
-  } catch {
-    return html``;
-  }
-}
 
 projectsRoutes.get("/", async (c) => {
   const user = c.get("user")!;
   const projects = await listAccessibleProjects(user.email);
 
-  // `/?project=<nombre>` era la portada de un proyecto; ahora lo es `/p/<slug>` (ADR-0050).
-  const viejo = c.req.query("project");
-  if (viejo) {
-    const p = projects.find((x) => x.name === viejo);
+  // `/?project=<name>` used to be a project's home page; now `/p/<slug>` is (ADR-0050).
+  const old = c.req.query("project");
+  if (old) {
+    const p = projects.find((x) => x.name === old);
     if (p?.slug) return c.redirect(`/p/${p.slug}`, 301);
   }
-  const saludes = await Promise.all(projects.map((p) => salud(p.name)));
+  const healths = await Promise.all(projects.map((p) => projectHealth(p.name)));
+  const healthOf = new Map(projects.map((p, i) => [p.id, healths[i]!]));
+  const card = (p: (typeof projects)[number]): Html => projectCard(p, healthOf.get(p.id) ?? html``);
 
-  const cards = projects.map(
-    (p, i) => html`
-      <a class="project-card" href="/p/${p.slug}">
-        <div class="card-head">
-          <h2>${p.name}</h2>
-          ${visibilityPill(p.visibility)}
-        </div>
-        <div class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</div>
-        <div class="card-foot">
-          <span>${p.entryCount} ${p.entryCount === 1 ? "entry" : "entries"}</span>
-          ${saludes[i]!}
-        </div>
-      </a>`,
-  );
+  // Children are painted INSIDE their parent, not loose in the same list. A client with three
+  // repos took up four sibling cards that gave no hint of having anything to do with each
+  // other, and the relationship -- which pack inheritance and permissions hang off -- could
+  // only be seen by going into Settings. Anyone without a hierarchy notices nothing: with no
+  // children there are no groups and the grid is exactly what it was.
+  const visible = new Set(projects.map((p) => p.id));
+  const childrenOf = new Map<string, typeof projects>();
+  for (const p of projects) {
+    // A parent that is not in the list is not an orphan to hide: it is a top-level project for
+    // whoever is looking. (It does not happen today -- seeing a child implies seeing its
+    // parents -- but a listing that swallows projects would be a far worse bug than one that
+    // flattens them.)
+    if (!p.parentId || !visible.has(p.parentId)) continue;
+    childrenOf.set(p.parentId, [...(childrenOf.get(p.parentId) ?? []), p]);
+  }
+  const roots = projects.filter((p) => !p.parentId || !visible.has(p.parentId));
 
-  // Un listado vacío no es un error: casi siempre es alguien que acaba de entrar. Decirle
-  // "no tienes proyectos" no le sirve de nada; decirle cómo se crea el primero, sí.
-  const vacio = html`<section class="panel onboarding">
+  const groups = roots
+    .filter((p) => childrenOf.has(p.id))
+    .map(
+      (p) => html`<section class="project-group">
+        ${card(p)}
+        <div class="project-children">
+          <p class="sub">${childrenOf.get(p.id)!.length} project${childrenOf.get(p.id)!.length === 1 ? "" : "s"} in this client</p>
+          <div class="project-grid">${childrenOf.get(p.id)!.map(card)}</div>
+        </div>
+      </section>`,
+    );
+  const standalone = roots.filter((p) => !childrenOf.has(p.id)).map(card);
+
+  // An empty list is not an error: almost always it is somebody who has just arrived. Telling
+  // them "you have no projects" helps nobody; telling them how to create the first one does.
+  const emptyState = html`<section class="panel onboarding">
     <h2>Nothing here yet</h2>
     <p class="sub">
       ${getBrandName()} fills itself from your coding sessions. Link a repository from its folder and your agents
@@ -86,22 +92,24 @@ cortex setup --all</pre>
       <h1>Projects</h1>
       <p class="sub">What ${getBrandName()} remembers, one project at a time.</p>
     </div>
-    ${cards.length ? html`<div class="project-grid">${cards}</div>` : vacio}`;
-  return c.html(layout("Projects", body, { user, activo: "projects" }));
+    ${projects.length
+      ? html`${groups}${standalone.length ? html`<div class="project-grid">${standalone}</div>` : ""}`
+      : emptyState}`;
+  return c.html(layout("Projects", body, { user, active: "projects" }));
 });
 
-// --- Ajustes del proyecto: visibilidad, dueño y miembros (ADR-0051) ---------------------
+// --- Project settings: visibility, owner and members (ADR-0051) ------------------------
 
 projectsRoutes.get("/p/:slug/settings", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, gestor } = res;
+  const { project, manager } = res;
 
-  // Quien no gestiona ve a quién pedirle las cosas, en vez de un 403 sin salida.
-  if (!gestor) {
+  // Whoever cannot manage sees who to ask, rather than a dead-end 403.
+  if (!manager) {
     const body = html`
-      ${projectHeader(project, "settings", false)}
+      ${projectHeader(res, "settings")}
       <div class="panel">
         <h2>Access</h2>
         <p class="sub">
@@ -115,14 +123,14 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   }
 
   const members = await listProjectMembers(project.slug!);
-  const aviso = c.req.query("error");
-  // Candidatos a padre: cualquier otro accesible con slug. La comprobación de ciclos la hace
-  // el dominio, que es quien conoce toda la cadena de ancestros.
-  const otros = (await listAccessibleProjects(user.email)).filter((o) => o.slug && o.id !== project.id);
+  const notice = c.req.query("error");
+  // Parent candidates: any other accessible project with a slug. The cycle check is done by
+  // the domain, which is what knows the whole ancestor chain.
+  const others = (await listAccessibleProjects(user.email)).filter((o) => o.slug && o.id !== project.id);
 
   const body = html`
-    ${projectHeader(project, "settings", true)}
-    ${aviso ? html`<div class="warn">${aviso}</div>` : ""}
+    ${projectHeader(res, "settings")}
+    ${notice ? html`<div class="warn">${notice}</div>` : ""}
 
     <div class="panel">
       <h2>Visibility</h2>
@@ -159,7 +167,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
       <form class="row" method="post" action="/p/${project.slug}/settings/parent">
         <select name="parentSlug">
           <option value="">(none — top level)</option>
-          ${otros.map((o) => html`<option value="${o.slug}" ${project.parentId === o.id ? "selected" : ""}>${o.name}</option>`)}
+          ${others.map((o) => html`<option value="${o.slug}" ${project.parentId === o.id ? "selected" : ""}>${o.name}</option>`)}
         </select>
         <button type="submit">Save</button>
       </form>
@@ -205,8 +213,8 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   return c.html(layout(`${project.name} · Settings`, body, { user }));
 });
 
-/** Traduce el corte del dominio en una vuelta a la página con el motivo, no en un 500. */
-function vuelveConError(slug: string, e: unknown): string {
+/** Turns the domain's refusal into a return to the page with the reason, not into a 500. */
+function backWithError(slug: string, e: unknown): string {
   if (e instanceof NotAManagerError) return `/p/${slug}/settings?error=${encodeURIComponent(e.message)}`;
   throw e;
 }
@@ -219,7 +227,7 @@ projectsRoutes.post("/p/:slug/settings/visibility", async (c) => {
   try {
     await updateProject(slug, { visibility: v }, user.email);
   } catch (e) {
-    return c.redirect(vuelveConError(slug, e));
+    return c.redirect(backWithError(slug, e));
   }
   return c.redirect(`/p/${slug}/settings`);
 });
@@ -245,8 +253,8 @@ projectsRoutes.post("/p/:slug/settings/parent", async (c) => {
   try {
     await updateProject(slug, { parentSlug }, user.email);
   } catch (e) {
-    if (e instanceof NotAManagerError) return c.redirect(vuelveConError(slug, e));
-    // Padre inexistente o ciclo: el motivo se lee, no se traga.
+    if (e instanceof NotAManagerError) return c.redirect(backWithError(slug, e));
+    // A non-existent parent or a cycle: the reason is shown, not swallowed.
     return c.redirect(`/p/${slug}/settings?error=${encodeURIComponent((e as Error).message)}`);
   }
   return c.redirect(`/p/${slug}/settings`);
@@ -259,7 +267,7 @@ projectsRoutes.post("/p/:slug/settings/owner", async (c) => {
   try {
     await updateProject(slug, { ownerEmail: email || null }, user.email);
   } catch (e) {
-    return c.redirect(vuelveConError(slug, e));
+    return c.redirect(backWithError(slug, e));
   }
   return c.redirect(`/p/${slug}/settings`);
 });
@@ -271,7 +279,7 @@ projectsRoutes.post("/p/:slug/members", async (c) => {
   try {
     if (email) await addProjectMember(slug, email, user.email);
   } catch (e) {
-    return c.redirect(vuelveConError(slug, e));
+    return c.redirect(backWithError(slug, e));
   }
   return c.redirect(`/p/${slug}/settings`);
 });
@@ -283,7 +291,7 @@ projectsRoutes.post("/p/:slug/members/remove", async (c) => {
   try {
     if (email) await removeProjectMember(slug, email, user.email);
   } catch (e) {
-    return c.redirect(vuelveConError(slug, e));
+    return c.redirect(backWithError(slug, e));
   }
   return c.redirect(`/p/${slug}/settings`);
 });

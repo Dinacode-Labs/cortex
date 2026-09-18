@@ -1,27 +1,29 @@
 import { html, raw } from "hono/html";
+import type { AccessibleProject } from "@cortex/core";
 import type { ContextEntry } from "@cortex/shared";
+import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
 
 /**
- * Los ladrillos de la interfaz.
+ * The interface's building blocks.
  *
- * Todo lo que se repite en más de una pantalla vive aquí, y las rutas COMPONEN en vez de
- * escribir HTML suelto. Cuando cada página se dibujaba a sí misma, la misma idea —una tarjeta,
- * un panel, un aviso— salía distinta en cada sitio y el conjunto parecía hecho por cuatro
- * personas que no hablaban entre ellas. Un componente es también dónde arreglar algo una vez
- * (ADR-0053).
+ * Everything that repeats across more than one screen lives here, and the routes COMPOSE
+ * instead of writing loose HTML. When every page drew itself, the same idea -- a card, a panel,
+ * a warning -- came out differently in each place and the whole looked like the work of four
+ * people who never spoke to each other. A component is also the one place to fix something
+ * once (ADR-0053).
  */
 
-/** Une fragmentos ya escapados sin volver a escaparlos. */
+/** Joins already-escaped fragments without escaping them again. */
 export function joinHtml(parts: Html[], sep = ""): Html {
   return html`${parts.flatMap((p, i) => (i === 0 ? [p] : [raw(sep), p]))}`;
 }
 
-// --- Semántica de color -------------------------------------------------------------------
+// --- Colour semantics ---------------------------------------------------------------------
 //
-// El color de la interfaz es casi todo tinta sobre papel; el que hay lleva significado. Estos
-// tres mapas son ese significado, y por eso viven juntos: si un estado cambia de color, cambia
-// aquí y en todas partes a la vez.
+// The interface's colour is almost all ink on paper; what colour there is carries meaning.
+// These maps are that meaning, which is why they live together: when a state changes colour it
+// changes here and everywhere at once.
 
 const STATUS_COLORS: Record<string, string> = {
   pending_validation: "#9a5b00",
@@ -44,7 +46,7 @@ const TYPE_COLORS: Record<string, string> = {
   architecture: "#6b3fa0",
 };
 
-/** Etiqueta de color suave: fondo al 10 % del color y el color como tinta. */
+/** A soft colour badge: the background at 10% of the colour, and the colour as ink. */
 export function badge(text: string, color: string): Html {
   return html`<span class="badge" style="color:${color};background:${color}14">${text}</span>`;
 }
@@ -54,45 +56,45 @@ export const typeBadge = (t: string): Html => badge(t, TYPE_COLORS[t] ?? "#5b667
 export const confidenceBadge = (c: string): Html => badge(`conf: ${c}`, "#5b6673");
 export const scoreBadge = (n: number): Html => badge(n.toFixed(2), "#1a6dff");
 
-// --- Superficies --------------------------------------------------------------------------
+// --- Surfaces -----------------------------------------------------------------------------
 
 export interface PanelOptions {
-  /** Una línea explicando de qué va la sección. Casi siempre hace falta. */
-  ayuda?: Html | string;
-  /** Acciones a la derecha del título (un enlace, un botón). */
-  acciones?: Html;
+  /** One line explaining what the section is about. Almost always needed. */
+  help?: Html | string;
+  /** Actions to the right of the title (a link, a button). */
+  actions?: Html;
 }
 
-export function panel(titulo: string | null, cuerpo: Html, opts: PanelOptions = {}): Html {
+export function panel(title: string | null, body: Html, opts: PanelOptions = {}): Html {
   return html`<section class="panel">
-    ${titulo
+    ${title
       ? html`<div class="row-between" style="margin-bottom:8px">
-          <h2>${titulo}</h2>${opts.acciones ?? ""}
+          <h2>${title}</h2>${opts.actions ?? ""}
         </div>`
       : ""}
-    ${opts.ayuda ? html`<p class="sub" style="margin-bottom:16px">${opts.ayuda}</p>` : ""}
-    ${cuerpo}
+    ${opts.help ? html`<p class="sub" style="margin-bottom:16px">${opts.help}</p>` : ""}
+    ${body}
   </section>`;
 }
 
 /**
- * Un estado vacío que dice qué hacer.
+ * An empty state that says what to do.
  *
- * "No hay nada" es información inútil: quien lo lee ya lo ve. Lo que necesita saber es si eso
- * está bien, y qué le toca hacer si no.
+ * "There is nothing here" is useless information: whoever reads it can already see that. What
+ * they need to know is whether that is fine, and what to do if it is not.
  */
-export function empty(mensaje: Html | string, acciones?: Html): Html {
+export function empty(message: Html | string, actions?: Html): Html {
   return html`<div class="empty">
-    <p>${mensaje}</p>
-    ${acciones ? html`<div class="row" style="justify-content:center;margin-top:16px">${acciones}</div>` : ""}
+    <p>${message}</p>
+    ${actions ? html`<div class="row" style="justify-content:center;margin-top:16px">${actions}</div>` : ""}
   </div>`;
 }
 
-export function warn(mensaje: Html | string, tipo: "aviso" | "contradiccion" = "aviso"): Html {
-  return html`<div class="warn ${tipo === "contradiccion" ? "contradiction" : ""}">${mensaje}</div>`;
+export function warn(message: Html | string, kind: "notice" | "contradiction" = "notice"): Html {
+  return html`<div class="warn ${kind === "contradiction" ? "contradiction" : ""}">${message}</div>`;
 }
 
-// --- Tarjeta de entrada -------------------------------------------------------------------
+// --- Entry card ---------------------------------------------------------------------------
 
 export function entryCard(entry: ContextEntry): Html {
   return html`<a class="card" href="/entry/${entry.id}">
@@ -103,22 +105,61 @@ export function entryCard(entry: ContextEntry): Html {
   </a>`;
 }
 
-/** Resultado de búsqueda: lo mismo con la puntuación delante, para no tener dos tarjetas. */
-export function hitCard(entry: ContextEntry, score: number): Html {
+/**
+ * A search result: the same card with the score in front, so there are not two cards.
+ * `origin` is filled in by whoever searches across more than one project at a time -- without
+ * it, results from three different repos read as if they came from the same one.
+ */
+export function hitCard(entry: ContextEntry, score: number, origin?: Html): Html {
   return html`<a class="card" href="/entry/${entry.id}">
-    <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)}</div>
+    <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)} ${origin ?? ""}</div>
     <h3>${entry.title}</h3>
     <p>${entry.summary ?? entry.content}</p>
   </a>`;
 }
 
-// --- Formularios --------------------------------------------------------------------------
+// --- Project card -------------------------------------------------------------------------
 
-/** Caja de búsqueda con su botón: aparece en cinco sitios y debe ser la misma en los cinco. */
-export function searchForm(action: string, q: string, placeholder: string, ocultos: Record<string, string> = {}): Html {
+/**
+ * The card a project is chosen from.
+ *
+ * It lives here rather than on the home page because a client shows it inside itself too, for
+ * its repos: were they two different cards, picking "Acme Portal" from the home page and
+ * picking it from "Acme" would look like two different things, and they are the same.
+ */
+export function projectCard(p: AccessibleProject, health: Html): Html {
+  return html`<a class="project-card" href="/p/${p.slug}">
+    <div class="card-head">
+      <h2>${p.name}</h2>
+      ${visibilityPill(p.visibility)}
+    </div>
+    <div class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</div>
+    <div class="card-foot">
+      <span>${p.entryCount} ${p.entryCount === 1 ? "entry" : "entries"}</span>
+      ${health}
+    </div>
+  </a>`;
+}
+
+// --- Forms --------------------------------------------------------------------------------
+
+/**
+ * A search box with its button: it appears in five places and must be the same in all five.
+ * `extra` is for whatever only makes sense in one of them -- today, the checkbox that reaches
+ * down into the children from a client -- and it sits between the field and the button so it
+ * gets read before anyone presses.
+ */
+export function searchForm(
+  action: string,
+  q: string,
+  placeholder: string,
+  hidden: Record<string, string> = {},
+  extra?: Html,
+): Html {
   return html`<form class="row" method="get" action="${action}">
-    ${Object.entries(ocultos).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
+    ${Object.entries(hidden).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
     <input type="text" name="q" value="${q}" placeholder="${placeholder}" required>
+    ${extra ?? ""}
     <button type="submit">Search</button>
   </form>`;
 }

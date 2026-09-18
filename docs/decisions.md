@@ -56,6 +56,18 @@ members can change; nothing is born without a slug), the rule that made the land
 (scope in the query, never after a limit), and how it is styled — one stylesheet as a design
 system, a component layer, and no framework ([0053](#adr-0053)).
 
+**Living with several clocks — 16 September 2026** ([0059](#adr-0059), [0062](#adr-0062)). The
+repository went public and the CLI went to npm, and both brought the same lesson: what is
+right for one team is not right for every clone. The link file belongs to each clone, and the
+CLI and the server are two clocks that are compared, not tied. The same lesson closes the
+phase ([0064](#adr-0064)): a repository that switches language halfway is one whose
+explanations only its authors can read.
+
+**Writing down what had only been imitated — 18 September 2026** ([0065](#adr-0065)). The rules
+an agent works by moved out of one long document and into a file per subject, some of which load
+only when the part of the tree they cover is opened, and two conventions that had been followed
+without ever being stated — formatting, and where `any` is allowed — were finally given an answer.
+
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
 > to by title alone. They were numbered on 2026-09-12, taking the next free identifiers. The
@@ -1068,7 +1080,8 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   There is an integration test demonstrating it.
 - **Intended behaviour change:** captures that used to fail deduplication on spelling now
   reconcile.
-- **Revisit when:** resolving by slug and by name needs to happen in one function.
+- **Revisit when:** resolving by slug and by name needs to happen in one function. **Reached**
+  (2026-09-16): see [0061](#adr-0061).
 
 <a id="adr-0044"></a>
 
@@ -1625,3 +1638,327 @@ system, a component layer, and no framework ([0053](#adr-0053)).
   to one organisation, so its link belongs to each clone.
 - **Revisit when:** Cortex can link a folder without a file in it, or a public repository needs
   to ship a default project for a demo.
+
+---
+
+<a id="adr-0060"></a>
+
+## ADR-0060 · A project is created, never extracted
+
+- **Status:** accepted (2026-09-16). Sibling of [0055](#adr-0055).
+- **Context:** `project` is a legitimate entity type — it is the row that represents the
+  project, the one entries hang from and the one `cortex link` and the web list. The classifier
+  that runs on every save offered the full `entityType` enum to the LLM, `project` included, so
+  any proper noun the model read as a project became an `entities` row with `type='project'`:
+  ticket codes, git branches, file names, microservices. The graph extractor already excluded
+  `project` for exactly this reason, but only for itself.
+
+  Those rows were indistinguishable from real projects to everything that lists "all entities
+  of type project". On a real installation: **26 phantom projects next to 10 real ones**, every
+  phantom with zero entries and no slug or owner, all born from one ingestion session into a
+  single existing project. `isUsableEntityName` ([0055](#adr-0055)) does not help: it judges
+  the shape of a name, not the type.
+- **Decision:** a project is **created**, by `createProject`, with a slug and an owner. It is
+  never a side effect of extraction.
+  1. What the extractors are offered is `extractableEntityType` — the enum minus `project` —
+     and the rule lives in `shared`, so every extractor gets it rather than each one remembering
+     to filter.
+  2. `core` drops any detected entity of type `project` before resolving it, whatever produced
+     it, and `resolveEntity` refuses the type outright: the only way to a project row is
+     `createProject`.
+  3. The database states the invariant: a `project` has a slug, or it is not a project
+     (`CHECK`). This is what tells a real project from a mention, and it is what
+     [0051](#adr-0051) had already made true for every project created on purpose.
+  4. A migration removes the phantoms — only those with no entries, children or members
+     hanging from them — with their links and relations. **No entry is touched.** Anything that
+     did have something hanging from it would be given a slug instead, as
+     [0051](#adr-0051)'s backfill did.
+- **Alternatives:** filter `project` out of the listing only — leaves the rows and the
+  `belongs_to` noise, and the next listing forgets; remove `project` from `entityType` as
+  [0055](#adr-0055) did with `decision` — impossible, the project *is* an entity of that type;
+  keep a separate `projects` table — the right long-term shape, but a large migration for a
+  problem that a filter plus a constraint closes.
+- **Consequences:** `createProject` inserts the row with its slug in one statement, since the
+  constraint forbids "insert the name, fill in the slug later". The seed uses it too.
+- **Revisit when:** projects move to their own table, or a legitimate reason appears to link an
+  entry to a project it merely mentions.
+
+---
+
+<a id="adr-0061"></a>
+
+## ADR-0061 · What you type in `project` resolves by slug first, then by name, everywhere
+
+- **Status:** accepted (2026-09-16). Extends [0043](#adr-0043).
+- **Context:** the slug is the project's identity across the product: it is what `cortex link`
+  prints, what `.cortex.json` stores, what the web puts in `/p/<slug>/…` and what the HTTP API
+  takes ([0036](#adr-0036), [0051](#adr-0051)). The MCP tools, however, take a free-text
+  `project`, and that went through two different resolutions. Writes went through
+  `createProject`, which looks the slug up first, so `save_project_context` with `acme-portal`
+  landed in Acme Portal. Reads went through the canonical-name lookup of [0043](#adr-0043),
+  and canonicalisation does not touch hyphens, so `get_project_context_pack` with the same
+  value answered "Project not found". A third path, the MCP permission guard, compared the
+  **exact** name, and so rejected spellings that the data operations accepted.
+
+  Verified against a real server: the pack for `cortex` failed and the pack for `Cortex`
+  worked. The asymmetry is the worst part: the identifier the user has in front of them works
+  in one direction and fails silently in the other, with nothing explaining why.
+- **Decision:** one function resolves whatever someone types in `project`: **by slug first,
+  then by canonical name**. `findProjectIdByName`, `findProjectByName` and therefore
+  `checkProjectAccess` all go through it; `findProjectBySlug` stays as the strict form for
+  routes and the API, where the slug is already the identifier. The context pack reports the
+  project's **name**, not the string it was asked with. Tool descriptions say "slug or name".
+
+  If a project's *name* happens to equal another project's *slug*, the slug wins: it is the
+  identifier, the name is a label. Such collisions only exist because of the bug this fixes
+  (a project literally named after another's slug, created by a write that missed).
+- **Alternatives:** detect slug-shaped input and return "that is a slug, use the name" — cheaper,
+  and leaves the product contradicting itself; make canonicalisation treat hyphens as spaces —
+  would make `acme-portal` and `Acme Portal` collide in the *entity* dedup too, which is a
+  different question; require the slug everywhere — right in principle, but agents pass names
+  and every existing transcript does.
+- **Consequences:** the [0043](#adr-0043) "revisit when" condition is met and this record is its
+  continuation. The exact-name guard is gone, so a private project is now protected under any
+  spelling of its name, which it was not before.
+- **Revisit when:** the MCP tools take a `slug` field of their own, or projects get their own
+  table with the slug as key.
+
+<a id="adr-0062"></a>
+
+## ADR-0062 · The CLI and the server are not versioned in lockstep
+
+- **Status:** accepted (2026-09-16).
+- **Context:** the CLI is installed from npm and updated by each person, when they get round
+  to it. The server is updated by an operator, on their own schedule, and anyone can run their
+  own. Those are two clocks, and this week they drifted visibly: three deployments in a row and
+  people kept working for days on a CLI that did not know about any of them. The server already
+  published `version` and `minClientVersion` on `/client-config`, and `cortex doctor` already
+  compared them, but nothing a person runs day to day ever said a word, and `minClientVersion`
+  had never been raised from its default. The warning existed where nobody looked.
+- **Decision:** the versions are **not tied together**. The contract between the CLI and the
+  server is the HTTP API, not the version number. Tying them would force every developer to
+  update the day the operator does, and the other way round, which does not hold with several
+  independent deployments. Instead the two numbers the server already publishes each get one
+  meaning:
+  1. **`minClientVersion`** is the oldest CLI *this* server supports. It is the **only number
+     that can block**: below it, the commands that **write** (`mem save`, `mem update`, `link
+     --create`, the connectors) refuse with a clear message rather than saving something
+     half-way. Reading keeps working. The operator raises it when a change really breaks old
+     clients, not on every release, which is why the default is so low.
+  2. **`version`** of the server is **informative only**. The CLI compares it with its own and
+     says which side is behind: if the server is newer, there is a newer CLI on npm (`Cortex
+     0.1.9 → 0.1.12 · cortex upgrade`); if the CLI is newer, the server has fallen behind and
+     the person is told to tell whoever operates it, because they are the only one who can act
+     on it. That second case was invisible before, and it is the one that will happen to us
+     most often: npm moves faster than a deployment.
+
+  The notice is **passive**: one request per server every 24 hours, cached under `~/.cortex/`,
+  and **one line on stderr** at the end of an interactive command, only when stdout is a
+  terminal, at most once a day. Hooks and `cortex mcp` **never** print it: there stdout is the
+  agent's protocol and one extra byte breaks the session. A test guarantees it.
+
+  And one rule of writing, which was already practised in places but written down nowhere:
+  **the CLI treats what it does not know as "that feature is not there", not as an error.** A
+  missing field in `/client-config`, or a 404 on an endpoint that did not exist last month, is
+  an older server, and the caller degrades: skips the feature, uses the previous value, or says
+  so plainly. Not knowing never blocks; when the server cannot be reached, the real request will
+  say what happened.
+- **Alternatives:** the same version on both sides, rejected above; asking npm directly whether
+  there is a newer CLI, which is a network call to a third party from every developer's machine,
+  wrong for forks, and unnecessary because the server's own version already answers it;
+  enforcing `minClientVersion` on the server by rejecting old clients, which would be the only
+  guard that cannot be skipped, but needs the client to send its version on every request and
+  is a change to the API rather than to the CLI; and a prompt to update on every command, which
+  is how warnings get ignored.
+- **Consequences:** every write command in the CLI makes one short, unauthenticated request
+  before writing. Whoever adds an endpoint or a field must make the reading side tolerate its
+  absence, and whoever raises `minClientVersion` is choosing to stop old CLIs from writing, so
+  it goes with a release note. `cortex doctor` and `cortex version` say the same thing as the
+  passive notice, using the same comparison.
+- **Revisit when:** the server enforces the minimum itself, which would make the client-side
+  check a courtesy rather than the guard; or a deployment needs to pin an exact CLI, which is
+  lockstep and should then be argued for as such.
+
+---
+
+<a id="adr-0063"></a>
+
+## ADR-0063 · Inheritance goes up; crossing down is a deliberate act, from the parent only
+
+- **Status:** accepted (2026-09-17). Builds on [0037](#adr-0037), [0046](#adr-0046) and
+  [0056](#adr-0056).
+- **Context:** a client with several repositories that are not a monorepo is modelled as a
+  parent project with one child per repository. Children inherit **upwards**: the context pack
+  ([0037](#adr-0037)) and, since PR #134, search and ask include the parent's knowledge. That
+  direction is safe by construction, because access cascades the same way — if any ancestor is
+  private the child is restricted, so reaching a child implies reaching all of its parents.
+
+  Inheritance never goes sideways, and that is on purpose: a repository should not carry its
+  sibling's context into every session. But it leaves a real question unanswered, and it is
+  exactly the question a parent project exists to answer: **what do these repositories have in
+  common, and where has one of them decided the opposite of another?** `lintProject` looks at
+  one project at a time, so a decision in the frontend that contradicts one in the backend
+  appears in neither report. Nobody is looking.
+
+  The data for this already exists. Entities are global — one row per (type, canonical name)
+  across the installation, linked to entries of any project — so the crossing has been there
+  all along. On a real server, 152 entities span more than one project. What was missing was a
+  place to look at it.
+- **Decision:** a project that has children gets one more section, **Across this client**, and
+  it holds two things plus an explicit affordance:
+
+  1. **Shared stack** — entities of type `technology`, `module`, `service`, `integration` or
+     `vendor` linked from current entries of **two or more** children, with which ones. The
+     three types that name the hierarchy itself — `client`, `project`, `repository` — are
+     excluded: today's extractor produces the client's own name as a `client` entity in each of
+     its repositories, so including them would answer "these repositories share… the client
+     they belong to", which is noise dressed as insight (see [0060](#adr-0060)). `person` is
+     out too: who worked on something is not stack.
+  2. **Contradictions between projects** — `contradicts` relations whose two current entries
+     live in *different* projects of the subtree. The pair query is the one the context pack
+     already uses, extracted so both read the same thing; only the cross-project ones are kept,
+     because within a project Health already reports them.
+  3. **Searching downwards** — an explicit "include child projects" checkbox, offered **only**
+     on a parent. It is not inheritance and does not behave like it: it is off by default, it
+     changes what you are looking at, and every result says which project it came from.
+
+  Everything that crosses downwards filters by access first: the children come from
+  `listChildProjects`, which goes through `listAccessibleProjects`, so a private child you are
+  not a member of contributes nothing — not to the shared stack, not to the contradictions, not
+  to the search. Being able to see a parent has never implied being able to see all of it, and
+  this does not change that.
+- **Alternatives:** make search and the pack descend into children by default — it would turn
+  every client session into every repository's session, which is the monorepo we deliberately
+  did not model; a cross-project graph — unreadable with the entity noise the extractor
+  produces today; entity pages, so each shared name has a home — the right general primitive
+  and the better long-term answer, but it is a different piece of work and this view does not
+  depend on it.
+- **Consequences:** a parent project stops being a container and becomes something you read.
+  The shared stack is honest about what it is: what the memory has linked from more than one
+  repository, noise included, ordered by how many of them and cut off at a length a person
+  actually reads. And the contradictions list is expected to be **empty** on a healthy client —
+  it is a watchpost, not a report.
+- **Revisit when:** entity pages exist, at which point the shared stack should link to them
+  instead of listing project names; or the extractor stops producing `client`/`repository`
+  noise ([0060](#adr-0060) is the first half of that), at which point the type filter can be
+  relaxed and argued for on its merits rather than as a workaround.
+
+<a id="adr-0064"></a>
+
+## ADR-0064 · The whole repository is in English; what stays in Spanish is data, not prose
+
+- **Status:** accepted (2026-09-18). Supersedes the language convention set out in
+  [0031](#adr-0031)'s wake and stated until now in `CONTRIBUTING.md` and `CLAUDE.md`.
+- **Context:** the repository was deliberately bilingual. Everything an outsider *opened* was in
+  English — the README, `SECURITY.md`, the CLI, the MCP tool descriptions, the web UI, the API
+  errors — and everything that was the team's **working record** stayed in Spanish: code
+  comments, the ADRs, the roadmap, the research notes, test names and the LLM agents' prompts.
+  The reasoning was that the working record blocks nobody, and writing it in the language the
+  team thinks in is faster and more precise.
+
+  It does block somebody. Once the repository went public ([0029](#adr-0029),
+  [0059](#adr-0059)), the half a reader cannot parse turned out to be the half that explains
+  **why** things are the way they are. This log is the clearest case: it is cited from 67 files
+  and was already written in English precisely because outsiders read it — but the comment above
+  the function an outsider is actually reading, the one that says which bug a workaround exists
+  for, was not. A comment that saves an hour is worth nothing to somebody who cannot read it,
+  and a test name is the first description of a behaviour anyone meets.
+
+  Measured before the change: ~2,800 lines of comment, ~460 test names, 14 documents under
+  `docs/`, the CHANGELOG, the deployment files and the CI workflows.
+- **Decision:** the repository is in English, all of it. **Two** things stay in Spanish, and the
+  rule that separates them is that they are **data rather than prose we wrote**:
+
+  1. **Patterns that match the corpus**, which is Spanish: `CLASSIFY_RULES`, `MODULE_KEYWORDS`
+     and `polarityTags` in `packages/core/src/text.ts`, the deictics regex in
+     `packages/shared/src/domain.ts`, and the eval fixtures in `tests/fixtures/eval/` — the
+     recall@5 0.987 / MRR 0.928 baseline was measured against them, so translating them would
+     silently invalidate every comparison the eval exists to make. They match what users write,
+     not the language of the file they live in.
+  2. The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in
+     `packages/agents/src/mastra.ts`). The prompts themselves are now English; what the agents
+     *produce* is knowledge entries stored next to a corpus that is already Spanish. Translating
+     a prompt is a translation; changing the output language is a product decision, and it would
+     split every existing memory in two.
+
+  Values an external system owns keep their own spelling for the same reason — Plane's
+  `'Histórico'`, Notion's property names, the migration filenames, which are primary keys in
+  `schema_migrations` and would re-run every migration on every installation if renamed.
+
+  Each exception carries an English comment saying why, and `tests/docs.test.ts` holds the list:
+  it scans `packages/*/src`, `apps/*/src`, `tests/` and the docs, checks every exempted path
+  still exists, and checks each one explains itself. **An exception that is not written down is
+  indistinguishable from an oversight**, which is how the previous convention decayed.
+
+  Because the team is Spanish-speaking, two entry points are kept in Spanish as well —
+  `README.es.md` and `CONTRIBUTING.es.md` — deliberately *not* as line-by-line translations,
+  which drift and then lie. They cover the essentials and point at the English version, which is
+  the one that must be current when the two disagree; a test checks the links both ways.
+- **Alternatives:** keep the split — it is cheaper right up to the moment somebody outside tries
+  to change something, which is the moment that matters for a public repository; translate the
+  agents' output too, for one language across the board — it would strand every entry already
+  stored and is a product decision, not a housekeeping one; full bilingual documentation — two
+  copies of 14 documents, where the second copy is wrong within a month and nobody notices.
+- **Consequences:** contributing no longer requires reading Spanish. The cost is real and paid
+  up front: a translation pass over ~290 files, and from now on the team writes its working
+  record in its second language, which is slower and slightly less precise. Two things were
+  found by reading every line: a latent bug where `apps/server/src/routes/context.ts` matched an
+  error by the text of a message defined in `packages/core` and the two had drifted apart
+  (`/context-pack` answered 500 instead of 404), and a real client name left in a migration
+  fixture, against [0026](#adr-0026).
+- **Revisit when:** the corpus stops being predominantly Spanish. That single premise holds up
+  both exceptions — the patterns and the output language — and nothing else about this decision
+  depends on anything that is likely to change.
+
+<a id="adr-0065"></a>
+
+## ADR-0065 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
+
+- **Status:** accepted (2026-09-18).
+- **Context:** `CLAUDE.md` was the only written guidance for an agent working in this repository,
+  and it had grown to 11.6 KB while still leaving out most of what an agent actually needs to get
+  right: how a route, a command or a screen is written here, when to throw and when to return,
+  what a comment is for. Two conventions the tree follows consistently were written down nowhere at
+  all, so anyone — human or model — had to infer them from whichever files they happened to open:
+
+  1. **Formatting.** There is no ESLint and no Prettier, yet the tree is uniform: double quotes in
+     all 613 imports, two spaces, lines up to about 120 columns. Uniform by imitation, with nothing
+     to imitate from when a file is new.
+  2. **`any`.** Eighteen uses, every one of them at a boundary with a foreign format, and no rule
+     saying that is the limit.
+
+  A third question — which language all of this is written in — was open while this was being
+  drafted, and is settled on its own terms by [0064](#adr-0064).
+- **Decision:**
+  1. Rules live in **`.claude/rules/*.md`**, one file per subject, picked up by the agent's own
+     rule mechanism rather than imported from `CLAUDE.md` — an import would put the same text in
+     context twice. Four load in every session, because they hold for every change: architecture,
+     language, tests, documentation. Five carry a `paths:` header and load only when a file they
+     cover is opened: TypeScript style, HTTP and MCP, CLI, web, the LLM layer. `CLAUDE.md` keeps
+     what only it can say: what the product is, the stack, the tree, the commands. They are plain
+     markdown, so an agent that does not know the convention can still be pointed at them.
+  2. **No formatter and no linter.** Style is written down instead: double quotes, two spaces, ~120
+     columns, and no reformatting of code you are not touching.
+  3. **`any` only at a boundary with a foreign format that has no schema** — transcripts from other
+     agents, untyped APIs, SQL rows through `Row` — and it never crosses into the domain: it is
+     validated with zod or mapped first. `@ts-ignore` stays banned; there are zero today.
+- **Alternatives:** leave the conventions unwritten — they are decided in practice already, just
+  not anywhere a newcomer can read them, which is how drift starts; put everything in `CLAUDE.md` —
+  it doubles a file that already asks to be pruned, and makes every rule harder to cite; import the
+  rule files from `CLAUDE.md` instead — the same text would then load twice, once through the
+  import and once through the rule mechanism; skills loaded on demand — cheaper still, but they may
+  not fire when they are needed, and the four unconditional rules apply to every change; adopt
+  Prettier — a tree-wide reformat, and a noisy history, for a problem nobody has yet.
+- **Consequences:** a rule is now a thing you can point at, and `CLAUDE.md` came down from 11.6 KB
+  to under 7 KB. What covers one corner of the tree costs nothing until that corner is opened, so
+  the detail can go where it was previously too expensive to write: how a route is written, how a
+  command is registered, why the web talks to `core` and not to the API. The trade is that the four
+  unconditional files load every session, so they have to stay short — and anything checkable
+  should become a test rather than a paragraph, which is what this repository already does with the
+  CLI weight, the configuration template and the documentation itself. There is now one for the
+  rules as well: it fails if a rule is imported twice, or if a `paths:` header points at a
+  directory that no longer exists, which is the failure this mechanism has no other way of
+  reporting.
+- **Revisit when:** contributors from outside start arriving and style diverges in pull requests,
+  at which point a formatter finally earns its cost; or the rules grow past what is worth loading
+  in every session, at which point the rarely-needed ones move to skills.

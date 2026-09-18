@@ -3,15 +3,15 @@ import { getEnvNum } from "@cortex/shared";
 import type { Row } from "./map.js";
 
 /**
- * Auto-curación SIN humano (sustituye al "review" para no añadir fricción; ver
- * research/memory-capture-policy.md). Sobre el conocimiento AUTO-capturado
- * (`source_type = 'agent_session'`, confianza baja — el filtro va por origen, no por
- * autor: la captura autenticada firma con el email del usuario):
- *  - PROMUEVE a confianza media lo CORROBORADO: entradas que se reforzaron/fusionaron
- *    DESPUÉS de crearse (updated_at avanzó → recurrió en otra sesión).
- *  - DECAE lo viejo nunca corroborado: auto-capturado, sin fusiones, más antiguo que
- *    CORTEX_DECAY_DAYS → status `obsolete` (sale de la búsqueda; reversible).
- * No toca conocimiento curado/validado ni de otras fuentes.
+ * Auto-curation with NO human in the loop (it replaces "review" so as not to add friction;
+ * see research/memory-capture-policy.md). Over AUTO-captured knowledge
+ * (`source_type = 'agent_session'`, low confidence -- the filter goes by origin, not by
+ * author: authenticated capture signs with the user's email):
+ *  - PROMOTES to medium confidence whatever was CORROBORATED: entries reinforced/merged
+ *    AFTER being created (updated_at moved on -> it recurred in another session).
+ *  - DECAYS the old and never corroborated: auto-captured, never merged, older than
+ *    CORTEX_DECAY_DAYS -> status `obsolete` (it leaves search; reversible).
+ * It never touches curated/validated knowledge, nor knowledge from other sources.
  */
 export interface CurationResult {
   promoted: number;

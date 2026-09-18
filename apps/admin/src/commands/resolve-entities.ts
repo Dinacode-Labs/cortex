@@ -1,7 +1,7 @@
 import { resolveEntities } from "@cortex/core";
 
-/** Fusiona variantes de una misma entidad en una canónica (solo BD, sin LLM). */
+/** Merges variants of the same entity into a canonical one (database only, no LLM). */
 export async function run(): Promise<void> {
   const r = await resolveEntities();
-  console.log(`Resolución de entidades: ${r.groups} grupos, ${r.merged} variantes fusionadas.`);
+  console.log(`Entity resolution: ${r.groups} groups, ${r.merged} variants merged.`);
 }

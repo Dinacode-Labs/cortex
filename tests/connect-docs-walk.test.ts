@@ -5,16 +5,16 @@ import { basename, join } from "node:path";
 import { walk } from "../apps/admin/src/commands/connect-docs";
 
 /**
- * connect-docs recorre una carpeta e ingiere los ficheros soportados. Debe SALTAR los
- * directorios de dependencias/artefactos (node_modules, vendor, dist…) y los dotfiles:
- * sin eso, apuntar el conector a la raíz de un repo mete basura de `vendor/` (fixtures de
- * php_codesniffer, etc.) en la memoria. Este test fija ese contrato.
+ * connect-docs walks a folder and ingests the supported files. It must SKIP the
+ * dependency/artefact directories (node_modules, vendor, dist...) and the dotfiles: without
+ * that, pointing the connector at a repo root puts junk from `vendor/` (php_codesniffer
+ * fixtures and the like) into the memory. This test pins that contract.
  */
 describe("connect-docs walk — ignora dependencias y dotfiles", () => {
   const root = mkdtempSync(join(tmpdir(), "cortex-walk-"));
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
-  const file = (rel: string, body = "contenido de prueba suficientemente largo") => {
+  const file = (rel: string, body = "test content long enough to count") => {
     const p = join(root, rel);
     mkdirSync(join(p, ".."), { recursive: true });
     writeFileSync(p, body);
@@ -30,15 +30,15 @@ describe("connect-docs walk — ignora dependencias y dotfiles", () => {
   file("wt-back-end/vendor/squizlabs/php_codesniffer/fixture.xml");
   file("dist/bundle.md");
   file(".hidden/secreto.md");
-  file("logo.svg"); // extensión no soportada
+  file("logo.svg"); // unsupported extension
 
   const found = walk(root).map((p) => basename(p)).sort();
 
-  it("incluye solo los ficheros soportados fuera de dirs ignorados", () => {
+  it("includes only the supported files outside ignored directories", () => {
     expect(found).toEqual(["guia.md", "informe.pdf", "notas.txt"]);
   });
 
-  it("no incluye nada bajo node_modules/vendor/dist ni dotdirs", () => {
+  it("includes nothing under node_modules/vendor/dist nor dotdirs", () => {
     expect(found).not.toContain("readme.md");
     expect(found).not.toContain("fixture.xml");
     expect(found).not.toContain("bundle.md");

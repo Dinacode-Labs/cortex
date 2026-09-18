@@ -1,23 +1,23 @@
 name: Bug
-description: Algo no funciona como debería
+description: Something does not work the way it should
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        ¿Es un problema de **seguridad**? No lo reportes aquí: sigue [SECURITY.md](../blob/main/SECURITY.md).
+        Is this a **security** problem? Do not report it here: follow [SECURITY.md](../blob/main/SECURITY.md).
   - type: textarea
     id: what
     attributes:
-      label: Qué pasa
-      description: Qué esperabas y qué ocurre en su lugar.
+      label: What happens
+      description: What you expected, and what happens instead.
     validations:
       required: true
   - type: textarea
     id: repro
     attributes:
-      label: Cómo reproducirlo
-      description: Los pasos mínimos. Si hay un error, pégalo entero.
+      label: How to reproduce it
+      description: The minimum steps. If there is an error, paste the whole thing.
       placeholder: |
         1. `cortex link --create "..."`
         2. ...
@@ -26,14 +26,14 @@ body:
   - type: input
     id: version
     attributes:
-      label: Versión
-      description: Salida de `cortex --version`, o el commit si vas desde el repo.
+      label: Version
+      description: The output of `cortex --version`, or the commit if you run from the repo.
     validations:
       required: true
   - type: textarea
     id: env
     attributes:
-      label: Entorno
+      label: Environment
       description: |
-        SO, versión de Node, agente (Claude Code, Codex, OpenCode, Hermes) y, si viene al caso,
-        el proveedor de LLM/embeddings configurado. **No pegues claves.**
+        OS, Node version, agent (Claude Code, Codex, OpenCode, Hermes) and, where it matters,
+        the LLM/embeddings provider you have configured. **Do not paste keys.**

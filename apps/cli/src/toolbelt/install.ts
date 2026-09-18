@@ -6,17 +6,16 @@ import { emptyReport, type AgentId, type SetupCtx, type SetupReport } from "../s
 import { missingEnv, resolveArgs, type Manifest, type McpDef } from "./registry.js";
 
 /**
- * Instala el registry de una organización en los agentes del dev.
+ * Installs an organisation's registry into the dev's agents.
  *
- * Cada agente registra sus MCPs a su manera: Claude y Codex tienen comando propio, y
- * OpenCode, Hermes y Pi lo declaran en un fichero de config. Aquí solo se registran MCPs de
- * terceros y se enlazan skills y comandos; los hooks y el MCP de Cortex son cosa de
- * `cortex setup` (ADR-0032), que es lo que separa «el producto» de «las herramientas de tu
- * empresa».
+ * Each agent registers its MCPs its own way: Claude and Codex have their own command, and
+ * OpenCode, Hermes and Pi declare it in a config file. Only third-party MCPs are registered
+ * here, and skills and commands linked; the hooks and Cortex's own MCP are `cortex setup`'s job
+ * (ADR-0032), which is what separates "the product" from "your company's tools".
  *
- * Regla que no se rompe: se reparte configuración, nunca credenciales. Una entrada cuyas
- * variables no estén exportadas se omite con un aviso; no se inventa un valor ni se deja el
- * MCP registrado y roto.
+ * The rule that does not bend: configuration is distributed, credentials never are. An entry
+ * whose variables are not exported is skipped with a warning; no value is invented and no MCP
+ * is left registered and broken.
  */
 
 const envPairs = (d: McpDef): string[][] => (d.env ?? []).filter((k) => process.env[k]).map((k) => [k, process.env[k]!]);
@@ -27,7 +26,7 @@ interface JsonMcpFile {
   [k: string]: unknown;
 }
 
-/** Escribe una entrada en un fichero JSON de config, respetando lo que ya hubiera. */
+/** Writes an entry into a config JSON file, respecting whatever was already there. */
 function upsertJsonMcp(ctx: SetupCtx, file: string, key: "mcpServers" | "mcp", name: string, value: unknown, report: SetupReport): void {
   const cfg = readJson<JsonMcpFile>(file);
   if (cfg === null) {
@@ -66,7 +65,7 @@ function upsertYamlMcp(ctx: SetupCtx, file: string, name: string, value: unknown
   report.changed.push(`${name} → ${tilde(ctx, file)}`);
 }
 
-/** Registra un MCP con el CLI del agente (Claude y Codex tienen uno). */
+/** Registers an MCP through the agent's CLI (Claude and Codex have one). */
 function registerViaCli(ctx: SetupCtx, bin: string, name: string, d: McpDef, args: string[], report: SetupReport): void {
   const exists = (): boolean => {
     try {
@@ -104,15 +103,15 @@ function link(ctx: SetupCtx, src: string, dest: string, report: SetupReport): vo
   try {
     rmSync(dest, { recursive: true, force: true });
   } catch {
-    /* no había nada */
+    /* there was nothing */
   }
   symlinkSync(src, dest);
 }
 
 /**
- * Instala el registry en un agente. `repo` es el checkout local del registry: sin él se
- * instalan solo los MCPs que no dependan de una ruta, y las skills y comandos se omiten
- * (son ficheros, y sin repo no hay de dónde sacarlos).
+ * Installs the registry into one agent. `repo` is the registry's local checkout: without it,
+ * only the MCPs that do not depend on a path are installed, and skills and commands are skipped
+ * (they are files, and with no repo there is nowhere to take them from).
  */
 export function installToolbelt(ctx: SetupCtx, agent: AgentId, manifest: Manifest, repo: string | null): SetupReport {
   const report = emptyReport();
@@ -170,7 +169,7 @@ export function installToolbelt(ctx: SetupCtx, agent: AgentId, manifest: Manifes
     return report;
   }
 
-  // Solo Claude Code tiene skills nativas; el resto usa las tools por MCP.
+  // Only Claude Code has native skills; the rest use the tools over MCP.
   if (agent === "claude-code") {
     for (const s of manifest.skills) link(ctx, resolve(repo, "skills", s.name), homeFile(ctx, ".claude/skills", s.name), report);
   }
@@ -185,7 +184,7 @@ export function installToolbelt(ctx: SetupCtx, agent: AgentId, manifest: Manifes
   return report;
 }
 
-/** Qué auth necesita cada entrada y qué falta. No instala nada. */
+/** Which auth each entry needs and what is missing. It installs nothing. */
 export function auditToolbelt(manifest: Manifest): { line: string; ok: boolean }[] {
   const out: { line: string; ok: boolean }[] = [];
   for (const [name, d] of Object.entries(manifest.mcpServers)) {

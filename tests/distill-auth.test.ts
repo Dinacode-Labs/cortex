@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /**
- * Una clave mal puesta no puede parecerse a «esta sesión no tenía nada que guardar».
+ * A wrong key must not look like "this session had nothing worth storing".
  *
- * Pasó al desplegar el servidor: con la clave equivocada, la captura devolvía
- * `saved: 0, failed: 0` y el estado `done`. Todo verde, cero conocimiento, y así para
- * siempre hasta que alguien se preguntara por qué la memoria seguía vacía.
+ * It happened while deploying the server: with the wrong key, capture returned
+ * `saved: 0, failed: 0` and the status `done`. All green, zero knowledge, and it would have
+ * stayed that way until somebody wondered why the memory was still empty.
  */
 const runAgent = vi.fn();
 vi.mock("../packages/agents/src/mastra.js", () => ({ runAgent: (...a: unknown[]) => runAgent(...a) }));
@@ -19,30 +19,30 @@ async function distill() {
   return (await import("../packages/agents/src/distill.js")).distill;
 }
 
-describe("distill ante un fallo del proveedor", () => {
-  it("lanza si rechaza la clave, para que el fallo llegue arriba", async () => {
+describe("distill facing a provider failure", () => {
+  it("throws when the key is rejected, so the failure reaches the top", async () => {
     runAgent.mockRejectedValue(Object.assign(new Error("Invalid API key."), { statusCode: 401 }));
-    await expect((await distill())("P", "x".repeat(300))).rejects.toThrow(/rechaza la clave/);
+    await expect((await distill())("P", "x".repeat(300))).rejects.toThrow(/rejecting the key/);
   });
 
-  it("también lo detecta cuando solo viene en el texto", async () => {
+  it("detects it when it only comes through in the text too", async () => {
     runAgent.mockRejectedValue(new Error("AI_APICallError: Unauthorized"));
-    await expect((await distill())("P", "x".repeat(300))).rejects.toThrow(/rechaza la clave/);
+    await expect((await distill())("P", "x".repeat(300))).rejects.toThrow(/rejecting the key/);
   });
 
-  it("sin LLM configurado NO es un fallo: es un estado deliberado", async () => {
-    // core cae a heurísticas y Cortex sigue siendo útil sin ninguna clave.
-    runAgent.mockRejectedValue(new Error("LLM no habilitado (LLM_PROVIDER / API key)."));
+  it("with no LLM configured it is NOT a failure: it is a deliberate state", async () => {
+    // core falls back to heuristics and Cortex stays useful with no key at all.
+    runAgent.mockRejectedValue(new Error("LLM not enabled (LLM_PROVIDER / API key)."));
     await expect((await distill())("P", "x".repeat(300))).resolves.toEqual([]);
   });
 
-  it("una ventana que devuelve basura se salta, sin tumbar la sesión", async () => {
-    // Un modelo que se inventa el formato es recuperable: las demás ventanas pueden ir bien.
-    runAgent.mockResolvedValue("esto no es JSON ni de lejos");
+  it("a window returning garbage is skipped, without bringing the session down", async () => {
+    // A model that invents the format is recoverable: the other windows may be fine.
+    runAgent.mockResolvedValue("this is nowhere near JSON");
     await expect((await distill())("P", "x".repeat(300))).resolves.toEqual([]);
   });
 
-  it("lo normal sigue funcionando", async () => {
+  it("the ordinary path still works", async () => {
     runAgent.mockResolvedValue('{"items":[{"type":"decision","title":"T","content":"C"}]}');
     const items = await (await distill())("P", "x".repeat(300));
     expect(items).toEqual([{ type: "decision", title: "T", content: "C" }]);

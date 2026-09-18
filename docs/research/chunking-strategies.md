@@ -1,133 +1,131 @@
-# Estrategias de chunking para RAG — investigación (jul 2026)
+# Chunking strategies for RAG — research (Jul 2026)
 
-- **Estado:** investigación completada (2026-07-13). Responde al follow-up del roadmap
-  («investigar estrategias de chunking antes de invertir más», PR #32) y a la duda de
-  fondo: *¿el tamaño fijo nos va a funcionar? ¿importa tanto el chunking con RAG híbrido?*
-- **Método:** deep-research con verificación adversarial — 22 fuentes primarias (papers,
-  docs oficiales, benchmarks reproducibles), 109 afirmaciones extraídas, 25 verificadas
-  con 3 votos independientes cada una: **23 confirmadas, 2 refutadas**. Se citan solo las
-  confirmadas; las refutadas y los sesgos, al final.
-- **Conclusión en una frase:** nuestro chunker estructural v1 es exactamente el patrón
-  que la evidencia respalda; lo que toca ahora no es sofisticar el chunker sino
-  **construir el eval set** y añadir una mejora barata (contexto estructural al embeber)
-  que en gran parte ya tenemos.
+- **Status:** research complete (2026-07-13). It answers the roadmap's follow-up ("research
+  chunking strategies before investing more", PR #32) and the underlying doubt: *is a fixed size
+  going to work for us? does chunking matter that much with hybrid RAG?*
+- **Method:** deep research with adversarial verification -- 22 primary sources (papers,
+  official docs, reproducible benchmarks), 109 claims extracted, 25 verified with 3 independent
+  votes each: **23 confirmed, 2 refuted**. Only the confirmed ones are cited; the refuted ones
+  and the biases are at the end.
+- **The conclusion in one sentence:** our structural chunker v1 is exactly the pattern the
+  evidence supports; what to do now is not to sophisticate the chunker but to **build the eval
+  set** and add one cheap improvement (structural context at embedding time) that we largely
+  already have.
 
-## 1. Cómo trocean los frameworks de referencia (verificado contra código/docs)
+## 1. How the reference frameworks chunk (verified against code/docs)
 
-| Framework | Estrategia | Lo relevante para nosotros |
+| Framework | Strategy | What matters for us |
 |---|---|---|
-| **Docling** (IBM) | `HierarchicalChunker` (1 chunk por elemento estructural) + `HybridChunker` (2 pasadas token-aware: divide solo lo que excede el límite, fusiona vecinos pequeños con mismos headings) + `contextualize()` (prepende headings/captions al embeber — **sin LLM**) | Es el patrón "estructural → tokens" idéntico en espíritu a nuestro v1. Su contextualización es concatenación determinista de metadata, no una llamada LLM. |
-| **RAGFlow** | ~12 plantillas **por tipo de documento** (General, Laws, Paper, Manual, One…). Default 'General': tope de 512 tokens con límites delimiter-aware. **'One'** = documento entero como 1 chunk, opción de primera clase | Los productos serios no usan un splitter único: adaptan por tipo de doc. Y validan nuestro comportamiento de "doc corto = 1 chunk". |
-| **LlamaIndex** | Semantic chunking **solo como opción explícita** (`SemanticSplitterNodeParser`), con advertencia oficial: su segmentador de frases **está diseñado para inglés** y el umbral necesita tuning | Aviso directo contra aplicar semantic chunking out-of-the-box a nuestro corpus en español. (Ojo: los supuestos defaults "1024/20" de LlamaIndex fueron **refutados** en verificación — no citarlos.) |
-| **Anthropic** | Contextual Retrieval: LLM prepende 50–100 tokens de contexto por chunk antes de embeber y de indexar en BM25 | La técnica con mayores ganancias medidas (§3), pero eval interno de vendor. |
-| **Jina** | Late chunking: embeber el doc entero y trocear antes del pooling | Mecánicamente **inviable para nosotros**: requiere embeddings por token, que `text-embedding-3-large` vía API no expone. |
+| **Docling** (IBM) | `HierarchicalChunker` (1 chunk per structural element) + `HybridChunker` (2 token-aware passes: it splits only what exceeds the limit, and merges small neighbours sharing headings) + `contextualize()` (prepends headings/captions at embedding time -- **no LLM**) | It is the "structural → tokens" pattern, identical in spirit to our v1. Its contextualisation is a deterministic concatenation of metadata, not an LLM call. |
+| **RAGFlow** | ~12 templates **per document type** (General, Laws, Paper, Manual, One…). The 'General' default: a 512-token cap with delimiter-aware boundaries. **'One'** = the whole document as 1 chunk, a first-class option | Serious products do not use a single splitter: they adapt per document type. And they validate our "a short doc = 1 chunk" behaviour. |
+| **LlamaIndex** | Semantic chunking **only as an explicit option** (`SemanticSplitterNodeParser`), with an official warning: its sentence segmenter **is designed for English** and the threshold needs tuning | A direct warning against applying semantic chunking out of the box to our Spanish corpus. (Note: LlamaIndex's supposed "1024/20" defaults were **refuted** in verification -- do not cite them.) |
+| **Anthropic** | Contextual Retrieval: an LLM prepends 50-100 tokens of context per chunk before embedding and before indexing into BM25 | The technique with the largest measured gains (section 3), but a vendor's internal eval. |
+| **Jina** | Late chunking: embed the whole doc and split before pooling | Mechanically **unviable for us**: it needs per-token embeddings, which `text-embedding-3-large` does not expose through the API. |
 
-## 2. La evidencia empírica sobre tamaño y estrategia
+## 2. The empirical evidence on size and strategy
 
-- **El chunking importa, pero de forma acotada** (benchmark de Chroma, reproducible,
-  con `text-embedding-3-large`): la elección de estrategia movió el recall **hasta ~9
-  puntos** entre la mejor y la peor. Y la peor fue precisamente un default popular:
-  RecursiveCharacterTextSplitter a **800 tokens con 400 de solape** (el default estilo
-  OpenAI Assistants) — peor precisión/IoU con recall solo mediocre.
-- **El estructural bien parametrizado empata con el semántico** (Chroma + paper
-  peer-reviewed NAACL 2025): recursive ~200 tokens 88.1% de recall vs 87.3% del
-  ClusterSemanticChunker; en el ejemplo insignia del propio benchmark, hasta el chunker
-  más tosco (cortes fijos de 1200 chars) da 0.809 de recall. El paper NAACL concluye
-  textualmente que **el coste extra del semantic chunking no está justificado por
-  ganancias consistentes**: solo gana en documentos artificialmente "cosidos" con
-  diversidad temática irreal; en docs reales, fixed-size ganó en los 4 datasets
-  originales y la generación end-to-end fue prácticamente idéntica.
-- **Por qué tantos benchmarks no detectan nada** ("evidence sparsity", confianza media,
-  voto 2-1 y conflicto de interés del autor): cuando solo ~2 frases del doc son
-  relevantes por query, todos los chunkers rinden casi igual; las diferencias afloran en
-  queries **evidence-dense** (~20 frases relevantes: "¿qué se decidió sobre X y por
-  qué?") — que son justo las típicas de una memoria de proyecto. Nuestro eval set debe
-  incluirlas.
-- **Contextual Retrieval (Anthropic)** es la única técnica con ganancias grandes
-  medidas: −49% de fallos de retrieval con híbrido y **−67% añadiendo reranker**
-  (1−recall@20, evals internos; corroboración independiente de Unstructured: −47% en
-  10-Ks de la SEC). Coste one-time ~$1–5/M tokens de documento. **Los beneficios de
-  contexto, híbrido y rerank se apilan** — no se sustituyen.
-- **Late chunking**: ganancia real pero modesta (+2.7–3.6% relativo de nDCG@10) y
-  dependiente de corpus; en un head-to-head pequeño empata con Contextual Retrieval sin
-  coste LLM. Irrelevante para nosotros por la limitación de API (§1).
+- **Chunking matters, but within bounds** (Chroma's benchmark, reproducible, with
+  `text-embedding-3-large`): the choice of strategy moved recall **by up to ~9 points** between
+  the best and the worst. And the worst was precisely a popular default:
+  RecursiveCharacterTextSplitter at **800 tokens with 400 of overlap** (the OpenAI
+  Assistants-style default) -- worse precision/IoU with only mediocre recall.
+- **A well-parameterised structural chunker ties with the semantic one** (Chroma plus a
+  peer-reviewed NAACL 2025 paper): recursive at ~200 tokens gives 88.1% recall against the
+  ClusterSemanticChunker's 87.3%; in the benchmark's own flagship example, even the crudest
+  chunker (fixed 1200-character cuts) reaches 0.809 recall. The NAACL paper concludes in so many
+  words that **semantic chunking's extra cost is not justified by consistent gains**: it only
+  wins on documents artificially "stitched" with unrealistic topical diversity; on real
+  documents, fixed-size won across all 4 original datasets and end-to-end generation was
+  practically identical.
+- **Why so many benchmarks detect nothing** ("evidence sparsity", medium confidence, a 2-1 vote
+  and the author's conflict of interest): when only ~2 sentences of the document are relevant
+  per query, every chunker performs almost the same; the differences surface on
+  **evidence-dense** queries (~20 relevant sentences: "what was decided about X and why?") --
+  which are exactly the typical ones for a project memory. Our eval set has to include them.
+- **Contextual Retrieval (Anthropic)** is the only technique with large measured gains: −49% of
+  retrieval failures with hybrid search and **−67% adding a reranker** (1−recall@20, internal
+  evals; independent corroboration from Unstructured: −47% on SEC 10-Ks). A one-time cost of
+  ~$1-5 per million document tokens. **The benefits of context, hybrid and rerank stack** --
+  they do not replace each other.
+- **Late chunking**: a real but modest gain (+2.7-3.6% relative nDCG@10) and corpus-dependent;
+  in a small head-to-head it ties with Contextual Retrieval without the LLM cost. Irrelevant for
+  us because of the API limitation (section 1).
 
-## 3. La pregunta clave: ¿importa el chunking con híbrido + RRF + rerank?
+## 3. The key question: does chunking matter with hybrid + RRF + rerank?
 
-**No existe la ablación directa** (nadie ha publicado chunking × rerank de forma
-controlada — es el hueco de evidencia central). La evidencia indirecta acota la
-respuesta por los dos lados:
+**The direct ablation does not exist** (nobody has published chunking × rerank in a controlled
+way -- that is the central evidence gap). The indirect evidence bounds the answer from both
+sides:
 
-1. **Las capas se suman, no se compensan**: el reranker de Anthropic aportó ganancia
-   *adicional* (2.9%→1.9% de fallos) incluso sobre retrieval híbrido ya contextualizado.
-2. **A granularidad comparable, las diferencias entre chunkers en corpus reales ya son
-   pequeñas incluso sin rerank** (NAACL 2025 usó denso puro).
-3. **Lo que el rerank no puede arreglar**: evidencia partida entre chunks o contexto de
-   documento perdido dentro del chunk. Eso lo arreglan el solape, el tamaño y la
-   contextualización — el reranker solo reordena lo que ya se recuperó.
+1. **The layers add up, they do not compensate for each other**: Anthropic's reranker brought an
+   *additional* gain (2.9% → 1.9% failures) even on top of already-contextualised hybrid
+   retrieval.
+2. **At comparable granularity, the differences between chunkers on real corpora are already
+   small even without a rerank** (NAACL 2025 used pure dense retrieval).
+3. **What the rerank cannot fix**: evidence split across chunks, or document context lost inside
+   a chunk. Those are fixed by overlap, size and contextualisation -- the reranker only reorders
+   what was already retrieved.
 
-Conclusión operativa: con nuestro pipeline (híbrido RRF + rerank LLM), el retorno
-marginal de sofisticar el chunker más allá de "estructural con parámetros sensatos" es
-**bajo**. La intuición inicial del equipo era correcta.
+The operational conclusion: with our pipeline (hybrid RRF plus an LLM rerank), the marginal
+return of sophisticating the chunker beyond "structural with sensible parameters" is **low**.
+The team's initial intuition was right.
 
-> ⚠️ **Pista sin verificar** (extraída pero fuera del top-25 verificado): un paper
-> (arXiv 2604.01733) afirmaría que incluso con híbrido + reranker, el chunking movió
-> 8–10 pp de Retrieval Completeness. Contradiría parcialmente el punto 2 — **leerlo
-> antes de dar este capítulo por cerrado**, pero no citarlo como hecho.
+> ⚠️ **An unverified lead** (extracted but outside the verified top 25): a paper
+> (arXiv 2604.01733) reportedly claims that even with hybrid plus a reranker, chunking moved
+> Retrieval Completeness by 8-10 pp. It would partially contradict point 2 -- **read it before
+> calling this chapter closed**, but do not cite it as fact.
 
-## 4. Qué significa para Cortex (plan)
+## 4. What this means for Cortex (the plan)
 
-1. **Mantener el chunker v1** (estructural: headings→párrafos→frases, ~1000 tokens,
-   solape 400 chars). Es el patrón Docling/RAGFlow y la evidencia lo respalda como
-   competitivo. No migrar a semantic chunking (sin ganancias peer-reviewed, tooling
-   English-only) ni a late chunking (inviable vía API). Si los evals lo sugieren,
-   probar bajar el tamaño objetivo (los mejores resultados de Chroma están en 200–400
-   tokens — con el caveat de que sus métricas penalizan chunks grandes y no usó rerank).
-2. **Contextualización barata sin LLM — en gran parte YA la tenemos**: `connect-docs`
-   embebe `título-doc (k/N · sección)\n\ncontenido`, que es el patrón `contextualize()`
-   de Docling. Mejora incremental posible: añadir proyecto/tipo/fecha al texto embebido.
-   Coste cero; medirla en el eval, no asumirla.
-3. **Eval set propio ANTES que cualquier cambio más de chunker** (30–100 queries en
-   español sobre corpus real, con evidencia anotada; incluir queries evidence-dense
-   tipo "¿qué se decidió sobre X, cuándo y por qué?"). El benchmark de Chroma es
-   open-source (MIT, chunkers enchufables) y sirve de plantilla directa.
-4. **Plantillas por tipo de documento** (a lo RAGFlow) como evolución natural:
-   contrato ≠ acta ≠ ticket ≠ código. El "doc corto = 1 chunk" ya lo hacemos ("One").
-5. **Contextual Retrieval con LLM: aplazado** — es el único upgrade con ganancias
-   grandes medidas, pero es benchmark de vendor y cuesta ~$1–5/M tokens. Adoptarlo solo
-   si el eval muestra fallos por pérdida de contexto de documento. (Esto **rebaja** lo
-   que decía el plan de ADR-0023 §5.2, que lo daba por hacer en Fase 4: ahora queda
-   condicionado al eval.)
+1. **Keep chunker v1** (structural: headings → paragraphs → sentences, ~1000 tokens, 400
+   characters of overlap). It is the Docling/RAGFlow pattern and the evidence backs it as
+   competitive. Do not migrate to semantic chunking (no peer-reviewed gains, English-only
+   tooling) nor to late chunking (unviable through the API). If the evals suggest it, try
+   lowering the target size (Chroma's best results sit at 200-400 tokens -- with the caveat that
+   its metrics penalise large chunks and it used no rerank).
+2. **Cheap contextualisation with no LLM -- we largely have it ALREADY**: `connect-docs` embeds
+   `doc-title (k/N · section)\n\ncontent`, which is Docling's `contextualize()` pattern. A
+   possible incremental improvement: adding project/type/date to the embedded text. Zero cost;
+   measure it in the eval rather than assuming it.
+3. **Our own eval set BEFORE any further chunker change** (30-100 Spanish queries over a real
+   corpus, with annotated evidence; include evidence-dense queries of the "what was decided
+   about X, when and why?" kind). Chroma's benchmark is open source (MIT, pluggable chunkers)
+   and serves as a direct template.
+4. **Per-document-type templates** (RAGFlow style) as the natural evolution: a contract is not a
+   set of minutes is not a ticket is not code. The "short doc = 1 chunk" part we already do
+   ("One").
+5. **Contextual Retrieval with an LLM: deferred** -- it is the only upgrade with large measured
+   gains, but it is a vendor benchmark and it costs ~$1-5 per million tokens. Adopt it only if
+   the eval shows failures caused by lost document context. (This **downgrades** what ADR-0023
+   section 5.2's plan said, which assumed it for phase 4: it is now conditional on the eval.)
 
-## 5. Caveats y salud de la evidencia
+## 5. Caveats and the health of the evidence
 
-- **Sesgo de vendor** en las dos técnicas estrella: los números de Contextual Retrieval
-  son evals internos de Anthropic (datasets sin publicar); el paper de late chunking es
-  de Jina (código público, limitaciones autodeclaradas, y evaluaciones independientes
-  muestran que no generaliza a todos los setups).
-- **Prácticamente toda la evidencia es en inglés.** No existe ningún eval de chunking
-  en español; la única mención explícita de idioma es la advertencia English-only de
-  LlamaIndex. La transferencia a contratos/actas en español es una extrapolación —
-  razón de más para el eval propio.
-- **Nada sobre código fuente**: ningún claim verificado cubrió chunking de código
-  (AST vs líneas vs fichero). Sigue abierto para nuestra indexación de repos.
-- **Claims refutados en verificación (0-3)**: los defaults "chunk_size=1024 /
-  overlap=20" de LlamaIndex que circulan por ahí — no citarlos.
-- Benchmark de Chroma: corpus pequeño (~330k tokens), queries sintéticas, métricas
-  token-level que penalizan mecánicamente el solape grande; no mide calidad de
-  respuesta final.
-- Los defaults de frameworks cambian rápido; lo aquí citado es a **2026-07**.
+- **Vendor bias** in both headline techniques: Contextual Retrieval's numbers are Anthropic's
+  internal evals (unpublished datasets); the late chunking paper is Jina's (public code,
+  self-declared limitations, and independent evaluations show it does not generalise to every
+  setup).
+- **Practically all the evidence is in English.** There is no chunking eval in Spanish at all;
+  the only explicit mention of language is LlamaIndex's English-only warning. Transferring it to
+  Spanish contracts and minutes is an extrapolation -- all the more reason for our own eval.
+- **Nothing about source code**: no verified claim covered code chunking (AST vs lines vs file).
+  It stays open for our repo indexing.
+- **Claims refuted in verification (0-3)**: LlamaIndex's "chunk_size=1024 / overlap=20" defaults
+  that circulate around -- do not cite them.
+- Chroma's benchmark: a small corpus (~330k tokens), synthetic queries, token-level metrics that
+  mechanically penalise large overlap; it does not measure final answer quality.
+- Framework defaults change fast; what is cited here is as of **2026-07**.
 
-## Fuentes principales
+## Main sources
 
-- Chroma, *Evaluating Chunking Strategies for Retrieval* (jul 2024) + repo
-  [`chunking_evaluation`](https://github.com/brandonstarxel/chunking_evaluation) (MIT).
+- Chroma, *Evaluating Chunking Strategies for Retrieval* (Jul 2024) plus the
+  [`chunking_evaluation`](https://github.com/brandonstarxel/chunking_evaluation) repo (MIT).
 - Qu et al., *Is Semantic Chunking Worth the Computational Cost?* — NAACL 2025 Findings
   ([arXiv 2410.13070](https://arxiv.org/abs/2410.13070)).
-- Anthropic, [*Contextual Retrieval*](https://www.anthropic.com/engineering/contextual-retrieval) (sep 2024).
+- Anthropic, [*Contextual Retrieval*](https://www.anthropic.com/engineering/contextual-retrieval) (Sep 2024).
 - Günther et al. (Jina), *Late Chunking* ([arXiv 2409.04701](https://arxiv.org/pdf/2409.04701)).
-- Tencent YouTu, *HiChunk / evidence sparsity* ([arXiv 2509.11552](https://arxiv.org/abs/2509.11552)) — con conflicto de interés declarado.
-- [Docling — chunking](https://docling-project.github.io/docling/concepts/chunking/) y
-  [RAGFlow — knowledge base](https://ragflow.io/docs/configure_knowledge_base) (docs + código).
+- Tencent YouTu, *HiChunk / evidence sparsity* ([arXiv 2509.11552](https://arxiv.org/abs/2509.11552)) — with a declared conflict of interest.
+- [Docling — chunking](https://docling-project.github.io/docling/concepts/chunking/) and
+  [RAGFlow — knowledge base](https://ragflow.io/docs/configure_knowledge_base) (docs plus code).
 - LlamaIndex — [node parsers](https://developers.llamaindex.ai/python/framework/module_guides/loading/node_parsers/modules/).
-- Pendiente de leer (sin verificar): arXiv 2604.01733 (¿ablación chunking×rerank?).
+- Still to read (unverified): arXiv 2604.01733 (a chunking × rerank ablation?).

@@ -1,29 +1,30 @@
 import { defaultServer, getClientConfig, listCredentials, normalizeServer, readCortexLink, useProjectServer } from "@cortex/client";
 import { defaultCtx, detectAgents, getAdapter } from "../setup/index.js";
 import type { SetupCtx } from "../setup/types.js";
-import { CLI_VERSION, isOlderThan } from "../version.js";
+import { classify } from "../compat.js";
+import { CLI_VERSION } from "../version.js";
 
 /**
- * `cortex doctor` — por qué no funciona.
+ * `cortex doctor` -- why it does not work.
  *
- * Cortex tiene bastantes piezas (CLI, servidor, MCP, credenciales, vínculo del repo,
- * integración de cada agente) y cuando algo no va, lo caro es averiguar cuál. Esto las
- * comprueba todas de una vez y dice qué hacer con cada fallo.
+ * Cortex has a fair number of pieces (CLI, server, MCP, credentials, the repo's link, each
+ * agent's integration) and when something is wrong, the expensive part is finding out which.
+ * This checks them all at once and says what to do about each failure.
  *
- * Sale con código 1 si algo crítico está roto, para poder usarlo en un script.
+ * It exits with code 1 when something critical is broken, so it can be used in a script.
  */
 
-type Nivel = "ok" | "aviso" | "error";
+type Level = "ok" | "warn" | "error";
 
 export interface Check {
-  nombre: string;
-  nivel: Nivel;
-  detalle: string;
-  /** Qué hacer. Solo cuando hay algo que hacer. */
-  arreglo?: string;
+  name: string;
+  level: Level;
+  detail: string;
+  /** What to do. Only when there is something to do. */
+  fix?: string;
 }
 
-const ICONO: Record<Nivel, string> = { ok: "✔", aviso: "!", error: "✗" };
+const ICON: Record<Level, string> = { ok: "✔", warn: "!", error: "✗" };
 
 async function ping(url: string, opts: { token?: string } = {}): Promise<{ ok: boolean; status?: number; error?: string }> {
   try {
@@ -39,9 +40,9 @@ async function ping(url: string, opts: { token?: string } = {}): Promise<{ ok: b
 
 
 /**
- * Las comprobaciones, separadas de cómo se pintan. El contexto entra por parámetro porque
- * preguntarle a cada agente por su estado significa ejecutar SU binario, y en un test eso ni
- * se puede ni se quiere.
+ * The checks, separated from how they are painted. The context enters as a parameter because
+ * asking each agent for its status means running ITS binary, and in a test that neither can
+ * nor should happen.
  */
 export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]> {
   const checks: Check[] = [];
@@ -50,52 +51,52 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
   const major = Number(process.versions.node.split(".")[0]);
   const minor = Number(process.versions.node.split(".")[1]);
   checks.push({
-    nombre: "Node",
-    nivel: major >= 20 ? "ok" : "error",
-    detalle: `v${process.versions.node}`,
-    ...(major < 20 ? { arreglo: "Cortex needs Node 20 or newer." } : {}),
+    name: "Node",
+    level: major >= 20 ? "ok" : "error",
+    detail: `v${process.versions.node}`,
+    ...(major < 20 ? { fix: "Cortex needs Node 20 or newer." } : {}),
   });
   if (major < 22 || (major === 22 && minor < 5)) {
     checks.push({
-      nombre: "Node (Hermes)",
-      nivel: "aviso",
-      detalle: "capturing Hermes sessions needs node:sqlite",
-      arreglo: "Upgrade to Node 22.5 or newer if you use Hermes. Everything else works as is.",
+      name: "Node (Hermes)",
+      level: "warn",
+      detail: "capturing Hermes sessions needs node:sqlite",
+      fix: "Upgrade to Node 22.5 or newer if you use Hermes. Everything else works as is.",
     });
   }
 
-  // --- Sesión y servidor ----------------------------------------------------
-  // Se comprueban TODOS los servidores en los que hay sesión (ADR-0033): con varios, saber
-  // que uno va no dice nada del otro, y el repo en el que estés puede apuntar a cualquiera.
-  const sesiones = listCredentials();
-  if (sesiones.length === 0) {
-    checks.push({ nombre: "Session", nivel: "error", detalle: "not signed in", arreglo: "cortex auth login" });
+  // --- Session and server ---------------------------------------------------
+  // EVERY server there is a session for is checked (ADR-0033): with several of them, knowing
+  // one works says nothing about the other, and the repo you are in may point at any of them.
+  const sessions = listCredentials();
+  if (sessions.length === 0) {
+    checks.push({ name: "Session", level: "error", detail: "not signed in", fix: "cortex auth login" });
   }
 
-  // Con varios servidores (ADR-0033), que uno esté caído no significa que Cortex no funcione:
-  // significa que ESE no va. Solo bloquea el que esta carpeta usa de verdad — el del
-  // `.cortex.json` o, si no lo dice, el de por defecto. Antes cualquiera de ellos daba «1
-  // problem stopping Cortex from working» con todo lo demás sano, que es una falsa alarma y
-  // de las caras: la primera vez que alguien ve eso, deja de fiarse del diagnóstico.
-  const elQueImporta = normalizeServer(readCortexLink(cwd)?.server ?? defaultServer() ?? "");
-  const bloquea = (servidor: string): Nivel =>
-    sesiones.length === 1 || normalizeServer(servidor) === elQueImporta ? "error" : "aviso";
+  // With several servers (ADR-0033), one being down does not mean Cortex does not work: it
+  // means THAT one does not. Only the one this folder actually uses blocks -- the
+  // `.cortex.json`'s or, when it says nothing, the default. Any of them used to produce "1
+  // problem stopping Cortex from working" with everything else healthy, which is a false alarm
+  // and an expensive one: the first time somebody sees that, they stop trusting the diagnosis.
+  const theOneThatMatters = normalizeServer(readCortexLink(cwd)?.server ?? defaultServer() ?? "");
+  const blocks = (server: string): Level =>
+    sessions.length === 1 || normalizeServer(server) === theOneThatMatters ? "error" : "warn";
 
-  for (const creds of sesiones) {
-    const varios = sesiones.length > 1;
-    const esElDeEstaCarpeta = bloquea(creds.server) === "error";
-    const et = (n: string): string => (varios ? `${n} · ${creds.server.replace(/^https?:\/\//, "")}` : n);
-    checks.push({ nombre: et("Session"), nivel: "ok", detalle: `${creds.email} on ${creds.server}` });
+  for (const creds of sessions) {
+    const several = sessions.length > 1;
+    const isThisFolders = blocks(creds.server) === "error";
+    const label = (n: string): string => (several ? `${n} · ${creds.server.replace(/^https?:\/\//, "")}` : n);
+    checks.push({ name: label("Session"), level: "ok", detail: `${creds.email} on ${creds.server}` });
 
     const health = await ping(`${creds.server.replace(/\/$/, "")}/health`);
     checks.push({
-      nombre: et("Server"),
-      nivel: health.ok ? "ok" : bloquea(creds.server),
-      detalle: health.ok ? creds.server : `not responding (${health.error ?? `HTTP ${health.status}`})`,
+      name: label("Server"),
+      level: health.ok ? "ok" : blocks(creds.server),
+      detail: health.ok ? creds.server : `not responding (${health.error ?? `HTTP ${health.status}`})`,
       ...(health.ok
         ? {}
         : {
-            arreglo: esElDeEstaCarpeta
+            fix: isThisFolders
               ? "Check the URL, or ask whoever runs the server."
               : `This folder does not use this server, so nothing here is blocked. Sign out of it with: cortex auth logout --server ${creds.server}`,
           }),
@@ -104,66 +105,71 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
 
     const me = await ping(`${creds.server.replace(/\/$/, "")}/auth/me`, { token: creds.token });
     checks.push({
-      nombre: et("Token"),
-      nivel: me.ok ? "ok" : bloquea(creds.server),
-      detalle: me.ok ? "valid" : `rejected (HTTP ${me.status})`,
-      ...(me.ok ? {} : { arreglo: `cortex auth login --server ${creds.server}` }),
+      name: label("Token"),
+      level: me.ok ? "ok" : blocks(creds.server),
+      detail: me.ok ? "valid" : `rejected (HTTP ${me.status})`,
+      ...(me.ok ? {} : { fix: `cortex auth login --server ${creds.server}` }),
     });
 
     const cfg = await getClientConfig(creds.server);
     if (cfg?.mcpUrl) {
-      // El MCP sin token responde 401: eso YA demuestra que está vivo y pidiendo auth.
+      // The MCP without a token answers 401: that ALREADY proves it is alive and asking for auth.
       const mcp = await ping(cfg.mcpUrl);
-      const vivo = mcp.ok || mcp.status === 401 || mcp.status === 405 || mcp.status === 406;
+      const alive = mcp.ok || mcp.status === 401 || mcp.status === 405 || mcp.status === 406;
       checks.push({
-        nombre: et("MCP"),
-        nivel: vivo ? "ok" : bloquea(creds.server),
-        detalle: vivo ? cfg.mcpUrl : `not responding (${mcp.error ?? `HTTP ${mcp.status}`})`,
-        ...(vivo ? {} : { arreglo: "The MCP server is not running; tell whoever runs it." }),
+        name: label("MCP"),
+        level: alive ? "ok" : blocks(creds.server),
+        detail: alive ? cfg.mcpUrl : `not responding (${mcp.error ?? `HTTP ${mcp.status}`})`,
+        ...(alive ? {} : { fix: "The MCP server is not running; tell whoever runs it." }),
       });
     } else {
-      checks.push({ nombre: et("MCP"), nivel: "aviso", detalle: "the server does not publish its URL", arreglo: "Older server: the URL will be guessed from the port." });
+      checks.push({ name: label("MCP"), level: "warn", detail: "the server does not publish its URL", fix: "Older server: the URL will be guessed from the port." });
     }
 
-    const min = cfg?.minClientVersion;
-    if (min && isOlderThan(CLI_VERSION, min)) {
-      checks.push({ nombre: et("CLI version"), nivel: "aviso", detalle: `you have ${CLI_VERSION}, the server asks for ${min}`, arreglo: "cortex upgrade" });
+    // The two versions are compared in one place (ADR-0062): here they are only rendered.
+    const compat = classify(creds.server, CLI_VERSION, cfg);
+    if (compat.kind === "blocked") {
+      checks.push({ name: label("CLI version"), level: "warn", detail: `you have ${CLI_VERSION}, the server accepts ${compat.minClientVersion} or newer: writing is disabled`, fix: "cortex upgrade" });
+    } else if (compat.kind === "cli-behind") {
+      checks.push({ name: label("CLI version"), level: "warn", detail: `you have ${CLI_VERSION}, the server runs ${compat.serverVersion}`, fix: "cortex upgrade" });
+    } else if (compat.kind === "server-behind") {
+      checks.push({ name: label("Server version"), level: "warn", detail: `${compat.serverVersion}, older than this CLI (${CLI_VERSION})`, fix: "Newer features stay off until whoever operates the server updates it." });
     }
   }
 
-  // --- Este repo ------------------------------------------------------------
+  // --- This repo ------------------------------------------------------------
   const link = useProjectServer(cwd);
   if (!link) {
     checks.push({
-      nombre: "This folder",
-      nivel: "aviso",
-      detalle: "not linked to any project",
-      arreglo: 'cortex link <slug>  ·  or  cortex link --create "<Name>"',
+      name: "This folder",
+      level: "warn",
+      detail: "not linked to any project",
+      fix: 'cortex link <slug>  ·  or  cortex link --create "<Name>"',
     });
   } else if (link.ignore) {
-    checks.push({ nombre: "This folder", nivel: "ok", detalle: "marked as ignored (a deliberate opt-out)" });
+    checks.push({ name: "This folder", level: "ok", detail: "marked as ignored (a deliberate opt-out)" });
   } else {
-    const dondeVa = sesiones.length > 1 ? ` · on ${link.server ?? "the default server"}` : "";
-    checks.push({ nombre: "This folder", nivel: "ok", detalle: `linked to "${link.slug ?? link.project}"${dondeVa}` });
+    const whereItGoes = sessions.length > 1 ? ` · on ${link.server ?? "the default server"}` : "";
+    checks.push({ name: "This folder", level: "ok", detail: `linked to "${link.slug ?? link.project}"${whereItGoes}` });
   }
 
   // --- Agentes --------------------------------------------------------------
   const detectados = detectAgents(ctx);
   if (detectados.length === 0) {
-    checks.push({ nombre: "Agents", nivel: "aviso", detalle: "none found on this machine" });
+    checks.push({ name: "Agents", level: "warn", detail: "none found on this machine" });
   }
   for (const id of detectados) {
     const adapter = getAdapter(id);
     if (!adapter) continue;
     const st = await adapter.status(ctx);
-    // Estar instalado no basta: un MCP que apunta al repo clonado «existe» y no funciona.
+    // Being installed is not enough: an MCP pointing at the cloned repo "exists" and does not work.
     const pendiente = st.details.some((d) => d.includes("ANTIGUO") || d.startsWith("⚠️"));
-    const sano = st.installed && !pendiente;
+    const healthy = st.installed && !pendiente;
     checks.push({
-      nombre: `Agent ${id}`,
-      nivel: sano ? "ok" : "aviso",
-      detalle: st.details.join(" · ") || (st.installed ? "configured" : "not configured"),
-      ...(sano ? {} : { arreglo: `cortex setup ${id}` }),
+      name: `Agent ${id}`,
+      level: healthy ? "ok" : "warn",
+      detail: st.details.join(" · ") || (st.installed ? "configured" : "not configured"),
+      ...(healthy ? {} : { fix: `cortex setup ${id}` }),
     });
   }
 
@@ -175,22 +181,22 @@ export async function run(args: string[] = []): Promise<void> {
   const checks = await collectChecks(defaultCtx(), cwd);
 
   // --- Informe --------------------------------------------------------------
-  const ancho = Math.max(...checks.map((c) => c.nombre.length));
+  const width = Math.max(...checks.map((c) => c.name.length));
   console.log("cortex doctor\n");
   for (const c of checks) {
-    console.log(`  ${ICONO[c.nivel]} ${c.nombre.padEnd(ancho)}  ${c.detalle}`);
-    if (c.arreglo) console.log(`    ${" ".repeat(ancho)}→ ${c.arreglo}`);
+    console.log(`  ${ICON[c.level]} ${c.name.padEnd(width)}  ${c.detail}`);
+    if (c.fix) console.log(`    ${" ".repeat(width)}→ ${c.fix}`);
   }
 
-  const errores = checks.filter((c) => c.nivel === "error").length;
-  const avisos = checks.filter((c) => c.nivel === "aviso").length;
+  const errors = checks.filter((c) => c.level === "error").length;
+  const warnings = checks.filter((c) => c.level === "warn").length;
   console.log(
-    errores
-      ? `\n${errores} problem${errores > 1 ? "s" : ""} stopping Cortex from working${avisos ? `, and ${avisos} warning${avisos > 1 ? "s" : ""}` : ""}.`
-      : avisos
-        ? `\nEverything essential works (${avisos} warning${avisos > 1 ? "s" : ""}).`
+    errors
+      ? `\n${errors} problem${errors > 1 ? "s" : ""} stopping Cortex from working${warnings ? `, and ${warnings} warning${warnings > 1 ? "s" : ""}` : ""}.`
+      : warnings
+        ? `\nEverything essential works (${warnings} warning${warnings > 1 ? "s" : ""}).`
         : "\nAll good.",
   );
-  if (errores) process.exitCode = 1;
+  if (errors) process.exitCode = 1;
   if (args.includes("--verbose")) console.log(`\ncwd: ${cwd}`);
 }

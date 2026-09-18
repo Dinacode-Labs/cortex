@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 import { apiPost, useProjectServer } from "@cortex/client";
+import { requireCompatibleServer } from "../compat.js";
 import {
   chunkDocument,
   extractionKind,
@@ -10,43 +11,44 @@ import {
 } from "@cortex/shared";
 
 /**
- * `cortex connect-docs` — mete la documentación de una carpeta en la memoria del proyecto.
+ * `cortex connect-docs` -- pulls a folder's documentation into the project's memory.
  *
- * Esto vivía solo en `cortex-admin`, que no se publica en npm, así que para ingerir un
- * directorio de documentación había que clonar el monorepo entero. Ingerir documentación es de
- * las primeras cosas que alguien quiere hacer al conocer Cortex, y pedirle un clon del
- * monorepo para eso convertía la primera buena idea en un rato de instalación (ADR-0058).
+ * This used to live only in `cortex-admin`, which is not published to npm, so ingesting a
+ * documentation directory meant cloning the whole monorepo. Ingesting documentation is one of
+ * the first things somebody wants to do when they meet Cortex, and asking them for a monorepo
+ * clone turned that first good idea into an installation session (ADR-0058).
  *
- * El CLI lee lo que puede leer sin dependencias: Markdown y texto plano, que es la mayor parte
- * de la documentación de cualquier equipo y todo lo que exporta Notion. Los formatos que
- * necesitan mammoth/unpdf/xlsx o un modelo —docx, pdf, xlsx, imágenes, audio, vídeo— **no se
- * ignoran en silencio**: se cuentan y se dice qué hacer con ellos. Un conector que se calla lo
- * que no ha subido es peor que uno que no lo sube.
+ * The CLI reads what it can read with no dependencies: Markdown and plain text, which is most
+ * of any team's documentation and everything Notion exports. The formats that need
+ * mammoth/unpdf/xlsx or a model -- docx, pdf, xlsx, images, audio, video -- are **not silently
+ * ignored**: they are counted and it says what to do with them. A connector that keeps quiet
+ * about what it did not upload is worse than one that does not upload it.
  *
- * Trocea igual que el conector de operador (`chunkDocument`) y escribe por la API autenticada,
- * así que respeta permisos y atribución. No toca la base de datos ni necesita claves.
+ * It chunks exactly like the operator connector (`chunkDocument`) and writes through the
+ * authenticated API, so it respects permissions and attribution. It touches neither the
+ * database nor any keys.
  *
- * Uso: cortex connect-docs "<slug>" <carpeta>
+ * Usage: cortex connect-docs "<slug>" <folder>
  */
 
 const MIN_CHARS = Number(process.env.CORTEX_DOCS_MIN_CHARS ?? "40");
-const LOTE = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
-/** Los exports de Notion cuelgan un hash de 32 hex del nombre del fichero. */
+const BATCH = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
+/** Notion exports append a 32-hex hash to the filename. */
 const HEX32 = /\s+[0-9a-f]{32}$/i;
 
-interface Hallazgo {
-  texto: string[];
-  pesados: string[];
+interface Found {
+  text: string[];
+  heavy: string[];
 }
 
-/** Recorre la carpeta separando lo que este CLI puede leer de lo que no. */
-export function recorre(dir: string, out: Hallazgo = { texto: [], pesados: [] }): Hallazgo {
+/** Walks the folder, separating what this CLI can read from what it cannot. */
+export function walk(dir: string, out: Found = { text: [], heavy: [] }): Found {
   for (const name of readdirSync(dir)) {
     if (name.startsWith(".") || name.startsWith("~$") || IGNORE_DIRS.has(name)) continue;
     const p = join(dir, name);
-    if (statSync(p).isDirectory()) recorre(p, out);
-    else if (extractionKind(name) === "texto") out.texto.push(p);
-    else if (extractionKind(name) === "pesado") out.pesados.push(p);
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (extractionKind(name) === "text") out.text.push(p);
+    else if (extractionKind(name) === "heavy") out.heavy.push(p);
   }
   return out;
 }
@@ -62,20 +64,21 @@ export async function run(args: string[]): Promise<void> {
   }
 
   const root = resolve(dir);
-  let hallazgo: Hallazgo;
+  let found: Found;
   try {
-    hallazgo = recorre(root);
+    found = walk(root);
   } catch (e) {
     console.error(`Could not read ${root}: ${(e as Error).message}`);
     process.exitCode = 1;
     return;
   }
 
-  // El servidor sale del `.cortex.json` de la carpeta desde la que se lanza (ADR-0033), no de
-  // la carpeta de documentos, que puede estar en cualquier sitio.
+  // The server comes from the `.cortex.json` of the folder the command is launched from
+  // (ADR-0033), not from the documents folder, which may live anywhere.
   useProjectServer(process.cwd());
+  await requireCompatibleServer();
 
-  if (hallazgo.texto.length === 0 && hallazgo.pesados.length === 0) {
+  if (found.text.length === 0 && found.heavy.length === 0) {
     console.error(`Nothing readable in ${root}.`);
     process.exitCode = 1;
     return;
@@ -83,37 +86,37 @@ export async function run(args: string[]): Promise<void> {
 
   const items: BatchItem[] = [];
   let docs = 0;
-  let vacios = 0;
-  for (const file of hallazgo.texto) {
+  let empty = 0;
+  for (const file of found.text) {
     let text: string;
     try {
       text = readFileSync(file, "utf8");
     } catch {
-      vacios++;
+      empty++;
       continue;
     }
     if (text.trim().length < MIN_CHARS) {
-      vacios++;
+      empty++;
       continue;
     }
     docs++;
     const title = basename(file, extname(file)).replace(HEX32, "").trim().slice(0, 200);
     const ref = relative(root, file).slice(0, 200);
     for (const ch of chunkDocument(text)) {
-      const varios = ch.total > 1;
-      const parteTitulo = varios
+      const many = ch.total > 1;
+      const partTitle = many
         ? `${title} (${ch.index + 1}/${ch.total}${ch.section ? ` · ${ch.section}` : ""})`
         : title;
       items.push({
         content: ch.content,
-        title: parteTitulo.slice(0, 200),
+        title: partTitle.slice(0, 200),
         sourceType: "document",
-        // Ref única por fragmento → volver a lanzarlo es incremental, no duplica.
-        sourceReference: varios ? `${ref}#${ch.index}` : ref,
+        // A unique ref per fragment -> re-running is incremental, it does not duplicate.
+        sourceReference: many ? `${ref}#${ch.index}` : ref,
         metadata: {
           format: extname(file).slice(1).toLowerCase(),
           file: ref,
-          ...(varios ? { chunk: ch.index, chunks: ch.total } : {}),
+          ...(many ? { chunk: ch.index, chunks: ch.total } : {}),
           ...(ch.section ? { section: ch.section } : {}),
         },
       });
@@ -122,15 +125,15 @@ export async function run(args: string[]): Promise<void> {
 
   console.log(
     `${docs} document${docs === 1 ? "" : "s"} → ${items.length} chunk${items.length === 1 ? "" : "s"}` +
-      `${vacios ? ` (${vacios} too short)` : ""}. Sending to "${slug}"…`,
+      `${empty ? ` (${empty} too short)` : ""}. Sending to "${slug}"…`,
   );
 
-  let nuevos = 0;
-  let existentes = 0;
-  for (let i = 0; i < items.length; i += LOTE) {
+  let added = 0;
+  let known = 0;
+  for (let i = 0; i < items.length; i += BATCH) {
     const r = await apiPost<{ results?: { action: string }[]; error?: string }>("/capture/batch", {
       slug,
-      items: items.slice(i, i + LOTE),
+      items: items.slice(i, i + BATCH),
     });
     if (!r.ok) {
       console.error(
@@ -139,21 +142,21 @@ export async function run(args: string[]): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    for (const x of r.data.results ?? []) x.action === "added" ? nuevos++ : existentes++;
-    process.stdout.write(`  ${Math.min(i + LOTE, items.length)}/${items.length}\r`);
+    for (const x of r.data.results ?? []) x.action === "added" ? added++ : known++;
+    process.stdout.write(`  ${Math.min(i + BATCH, items.length)}/${items.length}\r`);
   }
-  if (items.length) console.log(`\n${nuevos} new, ${existentes} already known.`);
+  if (items.length) console.log(`\n${added} new, ${known} already known.`);
 
-  // Lo que este CLI no sabe leer se dice, con su número y con la salida.
-  if (hallazgo.pesados.length > 0) {
-    const porTipo = new Map<string, number>();
-    for (const f of hallazgo.pesados) {
+  // What this CLI cannot read is stated, with its count and with a way out.
+  if (found.heavy.length > 0) {
+    const byType = new Map<string, number>();
+    for (const f of found.heavy) {
       const ext = extname(f).slice(1).toLowerCase();
-      porTipo.set(ext, (porTipo.get(ext) ?? 0) + 1);
+      byType.set(ext, (byType.get(ext) ?? 0) + 1);
     }
-    const resumen = [...porTipo.entries()].sort((a, b) => b[1] - a[1]).map(([e, n]) => `${n} .${e}`).join(", ");
+    const summary = [...byType.entries()].sort((a, b) => b[1] - a[1]).map(([e, n]) => `${n} .${e}`).join(", ");
     console.log(
-      `\n${hallazgo.pesados.length} file${hallazgo.pesados.length === 1 ? "" : "s"} left out (${resumen}).\n` +
+      `\n${found.heavy.length} file${found.heavy.length === 1 ? "" : "s"} left out (${summary}).\n` +
         `Reading those needs document and media extraction, which ${getBrandName()} keeps on the server side\n` +
         `rather than in the CLI. An operator can ingest them with:  cortex-admin connect-docs "${slug}" ${dir}`,
     );

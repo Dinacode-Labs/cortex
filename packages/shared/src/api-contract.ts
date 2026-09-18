@@ -2,30 +2,32 @@ import { z } from "zod";
 import { confidenceLevel, contextEntryType, sourceType } from "./domain.js";
 
 /**
- * Contrato de la API HTTP: los schemas que comparten servidor y cliente.
+ * The HTTP API contract: the schemas server and client share.
  *
- * Viven en `shared` y no en el servidor ni en el cliente porque los necesitan los dos, y
- * tenerlos en un solo sitio es lo que evita que se desincronicen en silencio: el servidor
- * valida el body con el mismo schema con el que el cliente lo construye.
+ * They live in `shared` rather than in the server or the client because both need them, and
+ * keeping them in one place is what stops them drifting apart silently: the server validates
+ * the body with the very schema the client used to build it.
  *
- * zod v3 (el del resto del repo; `agents` usa v4 porque lo exige Mastra, aislado — ADR-0008).
+ * zod v3 (the one the rest of the repo uses; `agents` uses v4 because Mastra requires it,
+ * isolated -- ADR-0008).
  */
 
-// --- Configuración que el servidor anuncia a sus clientes -----------------------------
+// --- Configuration the server announces to its clients --------------------------------
 
 export const clientConfig = z.object({
-  /** Base de la API (puede llevar prefijo de ruta si hay un proxy delante). */
+  /** API base (it may carry a path prefix when there is a proxy in front). */
   apiUrl: z.string(),
-  /** URL del MCP por HTTP, para que el CLI no tenga que adivinarla. */
+  /** The MCP-over-HTTP URL, so the CLI does not have to guess it. */
   mcpUrl: z.string(),
   webUrl: z.string(),
+  /** Server version. Informational only: the CLI compares it with its own to warn. */
   version: z.string(),
-  /** Versión mínima de CLI que este servidor admite; por debajo, avisa de actualizar. */
+  /** Minimum CLI version this server accepts; below it, the CLI refuses to write (ADR-0062). */
   minClientVersion: z.string(),
 });
 export type ClientConfig = z.infer<typeof clientConfig>;
 
-// --- Proyectos ------------------------------------------------------------------------
+// --- Projects -------------------------------------------------------------------------
 
 export const projectSummary = z.object({
   slug: z.string(),
@@ -35,14 +37,14 @@ export const projectSummary = z.object({
 export type ProjectSummary = z.infer<typeof projectSummary>;
 
 /**
- * Lo que un proyecto puede cambiar después de nacer (ADR-0051). Los dos campos son
- * opcionales y se aplican solo si vienen: mandar `{}` no borra el dueño. Para quitarlo
- * hay que decirlo con `ownerEmail: null`, que es una decisión distinta de no mencionarlo.
+ * What a project can change after birth (ADR-0051). Both fields are optional and only
+ * applied when present: sending `{}` does not clear the owner. Removing it has to be said
+ * with `ownerEmail: null`, which is a different decision from not mentioning it.
  */
 export const updateProjectRequest = z.object({
   visibility: z.enum(["public", "private"]).optional(),
   ownerEmail: z.string().email().nullable().optional(),
-  /** Colgar de otro proyecto, o `null` para dejarlo suelto. */
+  /** Hang it under another project, or `null` to leave it standalone. */
   parentSlug: z.string().nullable().optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequest>;
@@ -53,26 +55,26 @@ export type ProjectMemberRequest = z.infer<typeof projectMemberRequest>;
 export const createProjectRequest = z.object({
   name: z.string().min(1).max(120),
   visibility: z.enum(["public", "private"]).optional(),
-  /** Cuelga el proyecto de otro (hereda contexto y permisos). */
+  /** Hangs the project under another one (it inherits context and permissions). */
   parentSlug: z.string().optional(),
 });
 export type CreateProjectRequest = z.infer<typeof createProjectRequest>;
 
 export const createProjectResponse = z.object({
   project: projectSummary,
-  /** false = ya existía y tienes acceso; no se crea un duplicado. */
+  /** false = it already existed and you have access; no duplicate is created. */
   created: z.boolean(),
 });
 export type CreateProjectResponse = z.infer<typeof createProjectResponse>;
 
-// --- Captura de una sesión de agente --------------------------------------------------
+// --- Capture of an agent session ------------------------------------------------------
 
 export const capturePlatform = z.enum(["claude", "codex", "opencode", "hermes", "pi", "meeting", "other"]);
 export type CapturePlatform = z.infer<typeof capturePlatform>;
 
 /**
- * El cliente manda el transcript ya **condensado y escrubado**; destilar es cosa del
- * servidor, que es quien tiene las credenciales del modelo (ADR-0025).
+ * The client sends the transcript already **condensed and scrubbed**; distilling is the
+ * server's job, since it is the one holding the model credentials (ADR-0025).
  */
 export const captureSessionRequest = z.object({
   slug: z.string().min(1),
@@ -92,8 +94,8 @@ export const captureSessionCounters = z.object({
   failed: z.number(),
   windows: z.number(),
   /**
-   * Caracteres de la sesión que no se han destilado, cuando no cabía entera. Opcional porque
-   * las capturas anteriores a esto no lo tienen: su ausencia significa «no se sabe», no «cero».
+   * Characters of the session left undistilled, when it did not fit whole. Optional because
+   * captures predating this do not have it: its absence means "unknown", not "zero".
    */
   droppedChars: z.number().optional(),
 });
@@ -101,14 +103,14 @@ export type CaptureSessionCounters = z.infer<typeof captureSessionCounters>;
 
 export const captureSessionResponse = z.object({
   id: z.string(),
-  /** `duplicate` = esta sesión ya se destiló con el mismo contenido; no se repite el gasto. */
+  /** `duplicate` = this session was already distilled with the same content; no repeat spend. */
   status: z.enum(["queued", "running", "done", "failed", "duplicate"]),
   counters: captureSessionCounters.optional(),
   error: z.string().optional(),
 });
 export type CaptureSessionResponse = z.infer<typeof captureSessionResponse>;
 
-// --- Captura suelta (una pieza de conocimiento) ---------------------------------------
+// --- One-off capture (a single piece of knowledge) ------------------------------------
 
 export const captureRequest = z.object({
   slug: z.string().min(1),
@@ -122,12 +124,12 @@ export const captureRequest = z.object({
 });
 export type CaptureRequest = z.infer<typeof captureRequest>;
 
-// --- Captura por lotes (conectores) ---------------------------------------------------
+// --- Batch capture (connectors) -------------------------------------------------------
 
 /**
- * Un item de `POST /capture/batch`. Los campos de enumeración van como `string` a
- * propósito: los conectores construyen items a partir de fuentes externas y el servidor es
- * quien valida contra los enums del dominio. Así un conector no necesita importar `core`.
+ * One item of `POST /capture/batch`. The enum-ish fields are typed as `string` on purpose:
+ * connectors build items from external sources and the server is what validates against the
+ * domain enums. That way a connector never needs to import `core`.
  */
 export interface BatchItem {
   title?: string;
@@ -139,15 +141,15 @@ export interface BatchItem {
   metadata?: Record<string, unknown>;
 }
 
-// --- Búsqueda y acceso por id ---------------------------------------------------------
+// --- Search and access by id ----------------------------------------------------------
 //
-// La API sabía escribir (`/capture`) pero no leer: buscar solo existía por MCP, contra la
-// base de datos. Eso dejaba fuera al CLI y a cualquier integración que no sea un agente con
-// MCP, como las tools de memoria que Cortex registra en Pi (ADR-0034).
+// The API could write (`/capture`) but not read: search only existed over MCP, against the
+// database. That left out the CLI and any integration that is not an MCP-speaking agent,
+// such as the memory tools Cortex registers in Pi (ADR-0034).
 
 export const searchRequest = z.object({
   q: z.string().min(1),
-  /** Sin slug se busca en todo lo accesible; con slug, solo en ese proyecto. */
+  /** Without a slug it searches everything accessible; with one, only that project. */
   slug: z.string().optional(),
   type: contextEntryType.optional(),
   limit: z.number().int().min(1).max(50).optional(),
@@ -170,9 +172,9 @@ export const searchResponse = z.object({ hits: z.array(searchHitSummary) });
 export type SearchResponse = z.infer<typeof searchResponse>;
 
 /**
- * Actualización de una entrada por id. Solo `title` y `content`: el resto (tipo, confianza,
- * vigencia) lo decide la reconciliación o el lint, no quien llama por la API. Cambiar el
- * contenido vuelve a calcular el embedding, así que la entrada sigue siendo encontrable.
+ * Updating an entry by id. Only `title` and `content`: the rest (type, confidence, validity)
+ * is decided by reconciliation or by the lint, not by whoever calls the API. Changing the
+ * content recomputes the embedding, so the entry stays findable.
  */
 export const updateEntryRequest = z
   .object({ title: z.string().min(1).optional(), content: z.string().min(1).optional() })
@@ -182,9 +184,9 @@ export const updateEntryRequest = z
 export type UpdateEntryRequest = z.infer<typeof updateEntryRequest>;
 
 /**
- * `GET /entries/:id` devuelve el `EntryDetail` de core tal cual. El cliente no necesita
- * conocer su forma entera —la usa para mostrarla—, así que aquí solo se fija lo que sí se
- * lee por código; el resto viaja igualmente.
+ * `GET /entries/:id` returns core's `EntryDetail` as is. The client does not need to know
+ * its whole shape -- it uses it for display -- so only what is actually read by code is
+ * pinned here; the rest travels along anyway.
  */
 export interface EntryDetailResponse {
   entry: { id: string; title?: string | null; content: string; type: string; status?: string | null; confidence?: string | null };

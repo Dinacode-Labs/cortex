@@ -4,9 +4,9 @@ import { linkEntryToEntity, listEntries, relate, resolveEntity } from "@cortex/c
 import { extractGraph } from "./enrich.js";
 
 /**
- * Pase de enriquecimiento de grafo (§7/§12.4) de un proyecto: extrae entidades +
- * relaciones con el LLM y construye el grafo. Idempotente (find-or-create + relate
- * dedup). Reutilizable desde el CLI (`enrich-run`) y el mantenimiento (`maintain`).
+ * A project's graph enrichment pass (sections 7 and 12.4): it extracts entities and relations
+ * with the LLM and builds the graph. Idempotent (find-or-create plus relate dedup). Reusable
+ * from the CLI (`enrich-run`) and from maintenance (`maintain`).
  */
 
 const CONCURRENCY = getEnvNum("CORTEX_ENRICH_CONCURRENCY", 3);
@@ -60,7 +60,7 @@ export async function enrichProject(
             nEnt++;
           }
           for (const rel of g.relations) {
-            const isEntry = rel.source.toUpperCase() === "ENTRADA";
+            const isEntry = rel.source.toUpperCase() === "ENTRY";
             const sourceId = isEntry ? e.id : nameToId.get(rel.source.toLowerCase());
             const targetId = nameToId.get(rel.target.toLowerCase());
             if (!sourceId || !targetId || sourceId === targetId) continue;

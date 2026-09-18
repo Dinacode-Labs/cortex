@@ -1,12 +1,12 @@
-# Despliegue de Cortex en un solo host: Caddy (TLS) → web / API / MCP, con Postgres y un
-# worker de mantenimiento detrás, y copias de seguridad diarias.
+# Cortex deployed on a single host: Caddy (TLS) → web / API / MCP, with Postgres and a
+# maintenance worker behind them, plus daily backups.
 #
-#   cp deploy/.env.example deploy/.env    # y edítalo: dominio, contraseñas, proveedores
+#   cp deploy/.env.example deploy/.env    # and edit it: domain, passwords, providers
 #   docker compose -f deploy/docker-compose.yml up -d
 #
-# La imagen se descarga de GHCR; `--build` solo hace falta para probar cambios locales.
-# El proyecto está AISLADO del compose de desarrollo (que se llama "cortex"): así su volumen
-# nunca colisiona con el de dev ni se lo lleva por delante un `down -v`.
+# The image comes from GHCR; `--build` is only needed to try out local changes. The project
+# is ISOLATED from the development compose (which is called "cortex"), so its volume never
+# collides with the dev one nor gets taken out by a `down -v`.
 name: cortex-deploy
 
 x-app: &app
@@ -17,8 +17,8 @@ x-app: &app
   env_file: [.env]
   environment:
     NODE_ENV: production
-    # Dentro del contenedor sí escucha en todas las interfaces: quien publica puertos al
-    # exterior es Caddy, y sólo él.
+    # Inside the container it does listen on every interface: the only thing publishing
+    # ports to the outside is Caddy.
     CORTEX_BIND_HOST: 0.0.0.0
   restart: unless-stopped
   networks: [internal]
@@ -27,17 +27,17 @@ x-app: &app
     migrate: { condition: service_completed_successfully }
 
 services:
-  # Único servicio con puertos publicados. Pide y renueva el certificado él solo.
+  # The only service with published ports. It requests and renews the certificate on its own.
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
-      CORTEX_DOMAIN: ${CORTEX_DOMAIN:?falta CORTEX_DOMAIN en deploy/.env}
-      CORTEX_ACME_EMAIL: ${CORTEX_ACME_EMAIL:?falta CORTEX_ACME_EMAIL en deploy/.env}
+      CORTEX_DOMAIN: ${CORTEX_DOMAIN:?CORTEX_DOMAIN is missing from deploy/.env}
+      CORTEX_ACME_EMAIL: ${CORTEX_ACME_EMAIL:?CORTEX_ACME_EMAIL is missing from deploy/.env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data      # certificados: perderlos significa volver a pedirlos (hay límites)
+      - caddy-data:/data      # certificates: losing them means asking again (there are rate limits)
       - caddy-config:/config
     networks: [internal]
     depends_on: [server, web, mcp]
@@ -46,7 +46,7 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cortex}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en deploy/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing from deploy/.env}
       POSTGRES_DB: ${POSTGRES_DB:-cortex}
     volumes:
       - cortex-pgdata:/var/lib/postgresql/data
@@ -56,9 +56,9 @@ services:
       timeout: 5s
       retries: 15
     restart: unless-stopped
-    networks: [internal]   # sin `ports`: la base de datos no se asoma a internet
+    networks: [internal]   # no `ports`: the database does not face the internet
 
-  # Aplica migraciones una vez y termina. Los demás esperan a que salga bien.
+  # Applies migrations once and exits. The rest wait for it to finish cleanly.
   migrate:
     <<: *app
     command: node packages/database/dist/migrate-cli.js
@@ -90,8 +90,8 @@ services:
       CORTEX_BIND_HOST: 0.0.0.0
       HEALTH_PORT: "8788"
 
-  # No escucha en ningún puerto, así que su salud se mide por el fichero de latido: sin él,
-  # un worker colgado parece sano desde fuera.
+  # It listens on no port, so its health is measured by the heartbeat file: without it, a
+  # hung worker looks healthy from the outside.
   worker:
     <<: *app
     command: node apps/admin/dist/index.js maintain-worker
@@ -105,15 +105,15 @@ services:
       retries: 3
       start_period: 30s
 
-  # Volcado diario. `--blobs` y sin `--schema=public` para que el dump incluya la extensión
-  # vector: restaurar sin ella deja una base de datos que no arranca.
+  # A daily dump. `--blobs` and no `--schema=public` so the dump includes the vector
+  # extension: restoring without it leaves a database that will not start.
   backup:
     image: prodrigestivill/postgres-backup-local:16
     restart: unless-stopped
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_USER: ${POSTGRES_USER:-cortex}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD en deploy/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is missing from deploy/.env}
       POSTGRES_DB: ${POSTGRES_DB:-cortex}
       POSTGRES_EXTRA_OPTS: "-Z1 --blobs"
       SCHEDULE: "@daily"

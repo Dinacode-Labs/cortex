@@ -4,26 +4,26 @@ import { getBrandLogoSvg, getBrandName, markSvg } from "@cortex/shared";
 import { ASSET_VERSION } from "../version.js";
 
 /**
- * Fragmento HTML del render (hono/html): autoescapado por defecto en cada
- * interpolación. Los componentes/vistas devuelven este tipo y se componen sin
- * re-escapar (hono respeta `isEscaped`).
+ * An HTML fragment of the render (hono/html): auto-escaped by default at every interpolation.
+ * Components and views return this type and compose without re-escaping (hono honours
+ * `isEscaped`).
  */
 export type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
 
-export interface Usuario {
+export interface User {
   email: string;
   admin: boolean;
 }
 
 /**
- * El sello por defecto, «Relay»: dos piezas que se sustituyen y un centro que no se mueve. El
- * dibujo vive en `@cortex/shared` (`MARK_GRID`), que es de donde salen también el favicon y el
- * splash del CLI. Aquí las piezas van huecas —relleno del papel y un trazo fino gris— y el
- * centro en el acento; los colores son variables de `styles.css`, y ahí está la animación,
- * enganchada a `mark-relay`, que un logo de operador no lleva. Un operador puede poner el
- * suyo con `CORTEX_BRAND_LOGO_SVG`; esto es lo que ve quien no pone nada.
+ * The default mark, "Relay": two pieces that change places and a centre that stays. The drawing
+ * lives in `@cortex/shared` (`MARK_GRID`), which is also where the favicon and the CLI splash come
+ * from. Here the pieces are hollow — paper fill and a hairline grey stroke — and the centre takes
+ * the accent; the colours are `styles.css` variables, and so is the animation, hooked on
+ * `mark-relay`, which an operator's logo never carries. An operator can set their own with
+ * `CORTEX_BRAND_LOGO_SVG`; this is what you get when you set nothing.
  */
-function marcaSvg(play: boolean): string {
+function defaultMarkSvg(play: boolean): string {
   return markSvg({
     ink: "var(--muted)",
     accent: "var(--accent)",
@@ -32,40 +32,41 @@ function marcaSvg(play: boolean): string {
   });
 }
 
-/** `raw()` solo sobre SVG de configuración o de este fichero, nunca sobre datos. */
+/** `raw()` only over SVG from configuration or from this file, never over data. */
 function brandMark(play: boolean): Html {
   const name = getBrandName();
   const logo = getBrandLogoSvg();
   return logo
     ? html`<span class="logo">${raw(logo)}</span><span class="tag">${name}</span>`
-    : html`${raw(marcaSvg(play))}<span class="wordmark">${name}</span>`;
+    : html`${raw(defaultMarkSvg(play))}<span class="wordmark">${name}</span>`;
 }
 
-export interface OpcionesLayout {
-  user?: Usuario | null;
-  /** Qué enlace del header va marcado como actual. */
-  activo?: "projects" | "admin";
-  /** Texto en la caja de búsqueda global, para que no se pierda al ver los resultados. */
+export interface LayoutOptions {
+  user?: User | null;
+  /** Which header link is marked as current. */
+  active?: "projects" | "admin";
+  /** The text in the global search box, so it is not lost when the results appear. */
   q?: string;
 }
 
 /**
- * Documento completo.
+ * The whole document.
  *
- * El header lleva **solo lo que es de verdad global**: la marca, la búsqueda —lo único que
- * cruza proyectos— y por dónde se sale. Las secciones cuelgan del proyecto (ADR-0050).
+ * The header carries **only what is genuinely global**: the brand, the search -- the one thing
+ * that crosses projects -- and the way out. The sections hang off the project (ADR-0050).
  *
- * La hoja de estilos va con la versión pegada. Sin eso, un despliegue que cambia el CSS deja a
- * quien ya había entrado con la copia vieja en la caché del navegador —sin `Cache-Control` ni
- * `ETag`, solo `Last-Modified`, el navegador se la queda sin preguntar— y la interfaz aparece
- * a medio pintar. Pasó, y desde fuera parece que el rediseño no se ha desplegado.
+ * The stylesheet carries the version pinned to it. Without that, a deploy that changes the CSS
+ * leaves anyone who had visited before with the old copy in their browser cache -- with neither
+ * `Cache-Control` nor `ETag`, only `Last-Modified`, the browser keeps it without asking -- and
+ * the interface shows up half painted. It happened, and from outside it looks as though the
+ * redesign was never deployed.
  */
-export function layout(title: string, body: Html, opts: OpcionesLayout | Usuario | null = {}): Html {
-  const o: OpcionesLayout = opts && "email" in opts ? { user: opts } : ((opts ?? {}) as OpcionesLayout);
+export function layout(title: string, body: Html, opts: LayoutOptions | User | null = {}): Html {
+  const o: LayoutOptions = opts && "email" in opts ? { user: opts } : ((opts ?? {}) as LayoutOptions);
   const user = o.user;
   const brand = getBrandName();
-  // El sello solo se anima al llegar (login) y en la portada: en cada página sería ruido.
-  const play = !user || o.activo === "projects";
+  // The mark only animates on arrival (sign-in) and on the home page: on every page it would be noise.
+  const play = !user || o.active === "projects";
   return html`<!doctype html>
 <html lang="en">
 <head>
@@ -88,8 +89,8 @@ export function layout(title: string, body: Html, opts: OpcionesLayout | Usuario
       : ""}
     <nav>
       ${user
-        ? html`<a class="${o.activo === "projects" ? "on" : ""}" href="/">Projects</a>
-            ${user.admin ? html`<a class="${o.activo === "admin" ? "on" : ""}" href="/admin/usage">Admin</a>` : ""}
+        ? html`<a class="${o.active === "projects" ? "on" : ""}" href="/">Projects</a>
+            ${user.admin ? html`<a class="${o.active === "admin" ? "on" : ""}" href="/admin/usage">Admin</a>` : ""}
             <span class="whoami">
               <span class="email">${user.email}</span>${user.admin ? html`<span class="pill tiny">admin</span>` : ""}
             </span>

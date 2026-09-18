@@ -15,12 +15,12 @@ import { badge, confidenceBadge, panel, statusBadge, typeBadge } from "../views/
 import { deniedPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
-/** Entradas de contexto: detalle, validación y captura (/save). */
+/** Context entries: detail, validation and capture (/save). */
 export const entriesRoutes = new Hono<WebEnv>();
 
 entriesRoutes.get("/entry/:id", async (c) => {
   const id = c.req.param("id");
-  // Gate por entrada (checkEntryAccess): sin acceso al proyecto de la entrada → 403.
+  // Per-entry gate (checkEntryAccess): no access to the entry's project -> 403.
   const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const detail = access.status === "ok" ? await getEntryDetail(id) : null;
@@ -42,14 +42,14 @@ entriesRoutes.get("/entry/:id", async (c) => {
     ? badge(`no longer in force since ${iso(entry.validTo)}`, "#cf222e")
     : badge("in force", "#1a7f37");
 
-  const proyecto = projectName ? await findProjectByName(projectName) : null;
-  const volver = proyecto?.slug ? `/p/${proyecto.slug}` : "/";
-  const editando = c.req.query("edit") === "1";
+  const project = projectName ? await findProjectByName(projectName) : null;
+  const back = project?.slug ? `/p/${project.slug}` : "/";
+  const editing = c.req.query("edit") === "1";
 
   const body = html`
-    <p><a class="back" href="${volver}">← ${projectName ?? "Projects"}</a></p>
+    <p><a class="back" href="${back}">← ${projectName ?? "Projects"}</a></p>
     <div class="card-head" style="margin-bottom:8px">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)} ${temporalBadge}</div>
-    ${editando
+    ${editing
       ? panel(
           "Edit",
           html`<form method="post" action="/entry/${entry.id}/edit">
@@ -60,7 +60,7 @@ entriesRoutes.get("/entry/:id", async (c) => {
               <a class="button quiet" href="/entry/${entry.id}">Cancel</a>
             </div>
           </form>`,
-          { ayuda: "Correcting what an agent wrote is the point of this screen. The change is re-indexed, so it stays findable." },
+          { help: "Correcting what an agent wrote is the point of this screen. The change is re-indexed, so it stays findable." },
         )
       : html`<div class="page-head row-between">
             <h1>${entry.title}</h1>
@@ -89,15 +89,15 @@ entriesRoutes.get("/entry/:id", async (c) => {
         ${validateForm("rejected", "No, it is wrong")}
         ${validateForm("obsolete", "It was, not any more")}
       </div>`,
-      { ayuda: "An agent wrote this. Saying so is what makes the rest of the memory worth trusting." },
+      { help: "An agent wrote this. Saying so is what makes the rest of the memory worth trusting." },
     )}`;
   return c.html(layout(entry.title, body, c.get("user")));
 });
 
 entriesRoutes.post("/entry/:id/validate", async (c) => {
   const id = c.req.param("id");
-  // Mismo gate que la vista de detalle (GET /entry/:id): sin acceso al proyecto de la
-  // entrada no se permite cambiar su estado.
+  // The same gate as the detail view (GET /entry/:id): without access to the entry's project,
+  // its status cannot be changed.
   const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
   if (access.status === "not_found") return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
@@ -107,21 +107,21 @@ entriesRoutes.post("/entry/:id/validate", async (c) => {
   return c.redirect(`/entry/${id}`);
 });
 
-// --- Guardar contexto ----------------------------------------------------------
+// --- Saving context ------------------------------------------------------------
 entriesRoutes.post("/save", async (c) => {
   const user = c.get("user")!;
   const form = await c.req.parseBody();
   const content = String(form.content ?? "").trim();
   if (!content) return c.redirect("/");
   const project = String(form.project ?? "").trim() || undefined;
-  // EXCEPCIÓN de escritura: proyecto inexistente se PERMITE (saveContext lo auto-crea,
-  // ver ADR); solo se deniega el acceso a un proyecto existente restringido.
+  // WRITE exception: a non-existent project is ALLOWED (saveContext auto-creates it, see the
+  // ADR); only access to an existing restricted project is denied.
   if (project) {
     const access = await checkProjectAccess(user.email, { name: project });
     if (access.status === "forbidden") return c.html(deniedPage(user), 403);
   }
-  // Input de formulario validado con el enum del dominio (antes `as never`): inválido
-  // o vacío se trata como ausente (clasificación automática).
+  // Form input validated against the domain enum (it used to be `as never`): invalid or empty
+  // is treated as absent (automatic classification).
   const typeParsed = contextEntryType.safeParse(String(form.type ?? "").trim());
   const type = typeParsed.success ? typeParsed.data : undefined;
 
@@ -145,12 +145,13 @@ entriesRoutes.post("/save", async (c) => {
 });
 
 /**
- * Corregir una entrada.
+ * Correcting an entry.
  *
- * Hasta ahora solo se podía validar, rechazar o marcar obsoleta: es decir, decir que algo
- * estaba mal sin poder arreglarlo. Como casi todo lo escribe un agente, eso dejaba la memoria
- * sin forma de mejorar — solo de marcarse como sospechosa. El gate es el mismo que el de ver
- * la entrada: quien puede leer el proyecto puede corregirlo, igual que ya podía validarlo.
+ * Until now you could only validate, reject or mark it obsolete: that is, say something was
+ * wrong without being able to fix it. Since an agent writes almost everything, that left the
+ * memory with no way to improve -- only to flag itself as suspect. The gate is the same as for
+ * viewing the entry: whoever can read the project can correct it, just as they could already
+ * validate it.
  */
 entriesRoutes.post("/entry/:id/edit", async (c) => {
   const id = c.req.param("id");

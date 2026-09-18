@@ -15,18 +15,25 @@ import { apiRequest, type ApiResult } from "./api-client.js";
 import { readCredentials, writeCredentials, clearCredentials } from "./credentials.js";
 
 /**
- * Cliente tipado de la API de Cortex. Una función por endpoint, con los tipos del contrato
- * compartido (`@cortex/shared`), para que el CLI y los hooks no construyan rutas ni parseen
- * respuestas a mano.
+ * Typed client for the Cortex API. One function per endpoint, using the shared contract's
+ * types (`@cortex/shared`), so the CLI and the hooks never build paths or parse responses by
+ * hand.
  *
- * Todo lo que hay aquí es HTTP puro: ni Postgres, ni LLM, ni nada que impida empaquetar
- * esto en un CLI que se instala con `npm i -g` (ADR-0025).
+ * Everything here is pure HTTP: no Postgres, no LLM, nothing that would stop this being
+ * bundled into a CLI installed with `npm i -g` (ADR-0025).
+ *
+ * **Rule when adding an endpoint or a field (ADR-0062):** the CLI and the server are NOT in
+ * lockstep; this client may be talking to a server from months ago. What the server does not
+ * know is "that feature is not there", not an error: a 404 on a new endpoint or a missing
+ * field in the response means "old server", and the caller degrades (skips the feature, uses
+ * the previous value, or says so clearly). Never assume a new field arrives; type anything
+ * new as optional on the side that reads it.
  */
 
 // --- Meta -----------------------------------------------------------------------------
 
-/** Configuración que anuncia el servidor. `null` si no responde o es una versión antigua
- *  que aún no expone el endpoint: el llamador decide el fallback. */
+/** The configuration the server announces. `null` when it does not respond or is an older
+ *  version that does not expose the endpoint yet: the caller decides the fallback. */
 export async function getClientConfig(server?: string): Promise<ClientConfig | null> {
   const res = await apiRequest<ClientConfig>("GET", "/client-config", undefined, {
     auth: false,
@@ -62,12 +69,12 @@ export function logout(): Promise<ApiResult<unknown>> {
   return apiRequest("POST", "/auth/logout", {});
 }
 
-/** Ticket de un solo uso para abrir la UI web ya autenticada. */
+/** Single-use ticket for opening the web UI already authenticated. */
 export function uiTicket(): Promise<ApiResult<{ ticket?: string }>> {
   return apiRequest("POST", "/auth/ui-ticket", {});
 }
 
-// --- Proyectos ------------------------------------------------------------------------
+// --- Projects -------------------------------------------------------------------------
 
 export function listProjects(): Promise<ApiResult<{ projects: ProjectSummary[] }>> {
   return apiRequest("GET", "/projects");
@@ -83,9 +90,9 @@ export function createProject(
   return apiRequest("POST", "/projects", body);
 }
 
-// --- Contexto -------------------------------------------------------------------------
+// --- Context --------------------------------------------------------------------------
 
-/** Context pack renderizado del proyecto. `null` si no hay sesión, acceso o servidor. */
+/** The project's rendered context pack. `null` with no session, no access or no server. */
 export async function getContextPack(slug: string): Promise<{ project: string; text: string } | null> {
   const res = await apiRequest<{ project: string; text: string }>(
     "GET",
@@ -99,11 +106,11 @@ export function capture(body: CaptureRequest): Promise<ApiResult<{ action?: stri
 }
 
 /**
- * Manda una sesión condensada para que el servidor la destile.
+ * Sends a condensed session for the server to distill.
  *
- * Por defecto NO espera (`202 queued`): los hooks de fin de sesión tienen un timeout corto
- * y destilar lleva su tiempo. Con `wait` se espera al resultado, que es lo que quieren los
- * conectores por lotes cuando muestran contadores.
+ * By default it does NOT wait (`202 queued`): end-of-session hooks have a short timeout and
+ * distilling takes a while. With `wait` it waits for the result, which is what the batch
+ * connectors want when they show counters.
  */
 export function captureSession(
   body: CaptureSessionRequest,
@@ -118,12 +125,12 @@ export function getCaptureSession(id: string): Promise<ApiResult<CaptureSessionR
   return apiRequest("GET", `/capture/session/${encodeURIComponent(id)}`);
 }
 
-// Re-export por comodidad: quien usa el cliente casi siempre necesita las credenciales.
+// Re-exported for convenience: whoever uses the client almost always needs the credentials.
 export { readCredentials, writeCredentials, clearCredentials };
 
-// --- Lectura: búsqueda y acceso por id -------------------------------------------------
+// --- Reading: search and access by id --------------------------------------------------
 
-/** Búsqueda híbrida. Sin `slug`, en todo lo accesible; con `slug`, solo en ese proyecto. */
+/** Hybrid search. Without `slug`, over everything accessible; with one, only that project. */
 export function searchEntries(input: SearchRequest): Promise<ApiResult<SearchResponse>> {
   const p = new URLSearchParams({ q: input.q });
   if (input.slug) p.set("slug", input.slug);
@@ -132,12 +139,12 @@ export function searchEntries(input: SearchRequest): Promise<ApiResult<SearchRes
   return apiRequest<SearchResponse>("GET", `/search?${p.toString()}`);
 }
 
-/** Una entrada por id, con su trazabilidad. */
+/** One entry by id, with its provenance. */
 export function getEntry(id: string): Promise<ApiResult<EntryDetailResponse>> {
   return apiRequest<EntryDetailResponse>("GET", `/entries/${encodeURIComponent(id)}`);
 }
 
-/** Corrige título y/o contenido de una entrada. */
+/** Corrects an entry's title and/or content. */
 export function updateEntry(id: string, body: UpdateEntryRequest): Promise<ApiResult<{ ok: boolean; id: string }>> {
   return apiRequest<{ ok: boolean; id: string }>("PATCH", `/entries/${encodeURIComponent(id)}`, body);
 }

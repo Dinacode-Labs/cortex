@@ -1,67 +1,66 @@
-# Guion de demo — Cortex
+# Demo script — Cortex
 
-Secuencia para enseñar la demo funcional (§15 y §20.8 del plan). Asume Postgres
-levantado y datos sembrados (`pnpm db:up && pnpm db:migrate && pnpm db:seed`) y el
-MCP conectado al agente (ver `config/README.md`).
+The sequence for showing the working demo (sections 15 and 20.8 of the plan). It assumes
+Postgres is up and the data is seeded (`pnpm db:up && pnpm db:migrate && pnpm db:seed`) and the
+MCP is connected to the agent (see `config/README.md`).
 
-Escenario: proyecto **Acme Portal**, cliente **Acme Corp**, stack Laravel + Vue +
-PostgreSQL, con un módulo legacy de facturación sensible.
+Scenario: the **Acme Portal** project, client **Acme Corp**, a Laravel + Vue + PostgreSQL
+stack, with a sensitive legacy billing module.
 
-## 1. El problema
+## 1. The problem
 
-El contexto de un proyecto vive disperso (decisiones, restricciones, incidencias).
-Un developer nuevo tarda semanas en adquirirlo. Cortex lo centraliza y lo sirve a
-personas y a Claude Code.
+A project's context lives scattered around (decisions, constraints, incidents). A new developer
+takes weeks to acquire it. Cortex centralises it and serves it to people and to Claude Code
+alike.
 
-## 2. Consultar contexto antes de tocar un módulo (§15.3)
+## 2. Checking the context before touching a module (section 15.3)
 
-En Claude Code:
+In Claude Code:
 
-> Antes de modificar el módulo de facturación de Acme Portal, consulta Cortex con
-> `get_project_context_pack` y dime qué debo tener en cuenta.
+> Before modifying Acme Portal's billing module, check Cortex with
+> `get_project_context_pack` and tell me what I should keep in mind.
 
-Resultado esperado: decisiones vigentes (mantener el legacy), restricciones del
-cliente (infra propia), riesgos (módulo sensible), deuda técnica (sin tests),
-módulos sensibles e incidencias relevantes al área.
+Expected result: the decisions in force (keep the legacy module), the client's constraints
+(their own infrastructure), the risks (a sensitive module), the technical debt (no tests), the
+sensitive modules and the incidents relevant to that area.
 
-## 3. Guardar contexto con baja fricción (§15.2)
+## 3. Storing context with low friction (section 15.2)
 
-> Guarda en Cortex esta decisión de Acme Portal: "Se añadió caché en la generación
-> de PDF de facturación para evitar timeouts en exportaciones grandes".
+> Save this Acme Portal decision to Cortex: "A cache was added to billing's PDF generation to
+> avoid timeouts on large exports."
 
-Cortex clasifica el tipo, extrae entidades (facturación), genera embedding y lo
-deja disponible. No hay que rellenar formularios largos.
+Cortex classifies the type, extracts the entities (billing), generates the embedding and makes
+it available. There are no long forms to fill in.
 
-## 4. Búsqueda semántica / relacional (§15.6)
+## 4. Semantic / relational search (section 15.6)
 
-> Busca en Cortex incidencias parecidas relacionadas con la generación de
-> documentos.
+> Search Cortex for similar incidents related to document generation.
 
-Devuelve la incidencia previa de timeouts y el ticket TASK-123 resuelto.
+It returns the earlier timeout incident and the resolved TASK-123 ticket.
 
-## 5. Loop de mejora: contradicción (§15.5)
+## 5. The improvement loop: a contradiction (section 15.5)
 
-> Guarda en Cortex (Acme Portal): "Se va a eliminar el módulo legacy de facturación
-> en la próxima release."
+> Save to Cortex (Acme Portal): "The legacy billing module will be removed in the next
+> release."
 
-Cortex detecta la **contradicción** con la decisión vigente de mantenerlo y pide
-revisión humana en lugar de aceptarla a ciegas.
+Cortex detects the **contradiction** with the decision in force to keep it, and asks for a
+human to look rather than accepting it blindly.
 
-## 6. Validación
+## 6. Validation
 
-> Marca como validada la entrada `<id>` en Cortex.
+> Mark entry `<id>` as validated in Cortex.
 
-(con `validate_context_entry`).
+(with `validate_context_entry`).
 
-## 7. Preparado para Codex
+## 7. Ready for Codex
 
-Las tools MCP son neutras: cualquier herramienta que hable MCP (Codex, ChatGPT,
-bots internos) puede consumir la misma capa sin cambios en Cortex.
+The MCP tools are neutral: any tool that speaks MCP (Codex, ChatGPT, internal bots) can consume
+the same layer with no changes to Cortex.
 
-## Qué demuestra (§21)
+## What it demonstrates (section 21)
 
-1. El conocimiento entra con poca fricción.
-2. Hay orquestación real, no una simple llamada a un modelo.
-3. MCP conecta Claude Code sin acoplarlo todo.
-4. El sistema recupera contexto útil, no solo documentos parecidos.
-5. Cortex mejora el conocimiento (duplicados, contradicciones, validación).
+1. Knowledge gets in with little friction.
+2. There is real orchestration, not a single call to a model.
+3. MCP connects Claude Code without coupling everything together.
+4. The system retrieves useful context, not merely similar-looking documents.
+5. Cortex improves the knowledge (duplicates, contradictions, validation).

@@ -1,19 +1,19 @@
 import { execFileSync } from "node:child_process";
 import { apiPost, useProjectServer } from "@cortex/client";
+import { requireCompatibleServer } from "../compat.js";
 import type { BatchItem } from "@cortex/shared";
 
 /**
- * Conector GitHub: ingiere PRs e issues de un repo en un proyecto, vía el CLI `gh`
- * (usa su autenticación). Escribe a través de la API autenticada de Cortex
- * (`POST /capture/batch`): atribución (created_by=email) + permisos. Requiere
- * `cortex auth login` y el servidor en marcha.
+ * GitHub connector: it ingests a repo's PRs and issues into a project through the `gh` CLI
+ * (using its authentication). It writes through Cortex's authenticated API
+ * (`POST /capture/batch`): attribution (created_by=email) plus permissions. It needs
+ * `cortex auth login` and a running server.
  *
- * Uso: cortex connect-github "<slug>" <owner/repo> [maxItems]
+ * Usage: cortex connect-github "<slug>" <owner/repo> [maxItems]
  *
- * El servidor sale de la carpeta desde la que se ejecuta (ADR-0033): con varios Cortex
- * configurados, escribir en el de por defecto sería mandar el conocimiento de un cliente al
- * servidor de otro.
- * Requiere `gh` en PATH y autenticado con acceso al repo.
+ * The server comes from the folder it is run in (ADR-0033): with several Cortex instances
+ * configured, writing to the default one would send one client's knowledge to another's server.
+ * It needs `gh` on the PATH, authenticated and with access to the repo.
  */
 
 function gh(args: string[]): string {
@@ -41,6 +41,7 @@ interface Issue {
 
 export async function run(args: string[]): Promise<void> {
   useProjectServer(process.env.INIT_CWD || process.cwd());
+  await requireCompatibleServer();
   const slug = args[0];
   const repo = args[1];
   const max = Number(args[2] ?? "100");

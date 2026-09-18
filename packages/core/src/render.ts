@@ -4,10 +4,10 @@ import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "./vectors.js";
 
 /**
- * Renderizadores a Markdown: es lo que devuelven las tools MCP y lo que el hook inyecta al
- * abrir sesión. Va en INGLÉS porque lo lee un modelo que puede estar trabajando en cualquier
- * idioma, y porque a menudo lo repite tal cual al usuario. El CONTENIDO de cada entrada
- * conserva el idioma en que se escribió; lo que se traduce es el andamiaje.
+ * Markdown renderers: this is what the MCP tools return and what the hook injects when a
+ * session opens. It is in ENGLISH because a model that may be working in any language reads
+ * it, and because it often repeats it verbatim to the user. Each entry's CONTENT keeps the
+ * language it was written in; what is translated is the scaffolding.
  */
 
 function entryLine(e: ContextEntry): string {
@@ -41,153 +41,153 @@ export function renderDecisions(entries: ContextEntry[]): string {
   return entries.map(entryLine).join("\n");
 }
 
-interface Seccion {
-  titulo: string;
-  bloques: string[];
-  /** Cuánto presupuesto le toca respecto a las demás. Ver `PACK_SECTIONS`. */
-  peso: number;
+interface Section {
+  title: string;
+  blocks: string[];
+  /** How much budget it gets relative to the others. See `PACK_SECTIONS`. */
+  weight: number;
 }
 
-function nota(n: number): string {
+function note(n: number): string {
   return `- _…and ${n} more here. Ask ${getBrandName()} for the rest._`;
 }
 
 /**
- * Escribe una sección con sus `n` primeras entradas, diciendo cuántas se ha dejado.
+ * Writes a section with its first `n` entries, saying how many were left out.
  *
- * Cuando no cabe ninguna va igualmente el título y la cuenta: que el agente sepa que este
- * proyecto tiene restricciones apuntadas vale mucho más que no mencionarlas, porque una
- * sección ausente se lee como «aquí no hay nada».
+ * When none fits, the title and the count still go in: an agent knowing this project has
+ * constraints on record is worth far more than not mentioning them, because an absent section
+ * reads as "there is nothing here".
  */
-function escribe(s: Seccion, n: number): string {
-  const fuera = s.bloques.length - n;
-  const cuerpo = [...s.bloques.slice(0, n), ...(fuera > 0 ? [nota(fuera)] : [])];
-  return `\n## ${s.titulo}\n${cuerpo.join("\n")}`;
+function write(s: Section, n: number): string {
+  const left = s.blocks.length - n;
+  const body = [...s.blocks.slice(0, n), ...(left > 0 ? [note(left)] : [])];
+  return `\n## ${s.title}\n${body.join("\n")}`;
 }
 
 /**
- * Reparte un presupuesto entre secciones que piden cantidades distintas, sin que las grandes
- * ahoguen a las pequeñas: cada una recibe según su peso, y lo que una no gasta vuelve al bote
- * para las demás (llenado por niveles). Devuelve cuánto le corresponde a cada una.
+ * Splits a budget between sections that ask for different amounts, without the big ones
+ * starving the small ones: each gets a share according to its weight, and what one does not
+ * spend returns to the pot for the others (level filling). It returns each one's allowance.
  *
- * El peso existe porque no todo el conocimiento vale lo mismo cuando hay que elegir: una
- * decisión en vigor gobierna lo que el agente va a hacer ahora, y una incidencia de hace tres
- * meses lo acompaña. Sin pesos, repartir entre once secciones dejaba a las decisiones con lo
- * mismo que a los how-to.
+ * The weight exists because not all knowledge is worth the same when something has to give: a
+ * decision in force governs what the agent is about to do, and an incident from three months
+ * ago merely accompanies it. Without weights, splitting across eleven sections left decisions
+ * with the same share as how-tos.
  */
-function reparte(costes: number[], pesos: number[], presupuesto: number): number[] {
-  const asignado = new Array<number>(costes.length).fill(0);
-  let pendientes = costes.map((_, i) => i);
-  let bote = presupuesto;
-  while (pendientes.length > 0 && bote > 0) {
-    const pesoTotal = pendientes.reduce((a, i) => a + pesos[i]!, 0);
-    if (pesoTotal <= 0) break;
-    const porPeso = bote / pesoTotal;
-    if (porPeso < 1) break;
-    const satisfechos = pendientes.filter((i) => costes[i]! <= porPeso * pesos[i]!);
-    if (satisfechos.length === 0) {
-      // Nadie cabe entero: cada una se queda con su parte proporcional y aquí se acaba.
-      for (const i of pendientes) asignado[i] = Math.floor(porPeso * pesos[i]!);
-      return asignado;
+function share(costs: number[], weights: number[], budget: number): number[] {
+  const allocated = new Array<number>(costs.length).fill(0);
+  let pending = costs.map((_, i) => i);
+  let pot = budget;
+  while (pending.length > 0 && pot > 0) {
+    const totalWeight = pending.reduce((a, i) => a + weights[i]!, 0);
+    if (totalWeight <= 0) break;
+    const perWeight = pot / totalWeight;
+    if (perWeight < 1) break;
+    const satisfied = pending.filter((i) => costs[i]! <= perWeight * weights[i]!);
+    if (satisfied.length === 0) {
+      // Nobody fits whole: each keeps its proportional share and that is the end of it.
+      for (const i of pending) allocated[i] = Math.floor(perWeight * weights[i]!);
+      return allocated;
     }
-    for (const i of satisfechos) {
-      asignado[i] = costes[i]!;
-      bote -= costes[i]!;
+    for (const i of satisfied) {
+      allocated[i] = costs[i]!;
+      pot -= costs[i]!;
     }
-    pendientes = pendientes.filter((i) => costes[i]! > porPeso * pesos[i]!);
+    pending = pending.filter((i) => costs[i]! > perWeight * weights[i]!);
   }
-  return asignado;
+  return allocated;
 }
 
-/** Cuántas entradas de la sección caben en lo que le ha tocado. */
-function cuantasCaben(s: Seccion, presupuesto: number): number {
+/** How many of the section's entries fit into what it was allocated. */
+function howManyFit(s: Section, budget: number): number {
   let n = 0;
-  while (n < s.bloques.length && escribe(s, n + 1).length <= presupuesto) n++;
+  while (n < s.blocks.length && write(s, n + 1).length <= budget) n++;
   return n;
 }
 
 export interface RenderPackOptions {
   /**
-   * Tope de caracteres. Sin él, el pack sale entero.
+   * Character cap. Without it, the pack comes out whole.
    *
-   * Existe porque el hook cortaba el pack con un `slice()` al final: con un proyecto de
-   * doscientas entradas, al agente le llegaban las decisiones y **nada más** —las
-   * restricciones, los riesgos y la deuda se quedaban fuera de la tijera sin que nadie se
-   * enterara—. Un corte ciego no es un resumen: es perder justo lo que no cupo por orden
-   * alfabético del andamiaje. Con tope, cada sección recibe su parte y lo que una no gasta
-   * vuelve al bote, así que siempre llega algo de cada tipo de conocimiento.
+   * It exists because the hook used to cut the pack with a `slice()` at the end: on a project
+   * with two hundred entries, the agent got the decisions and **nothing else** -- the
+   * constraints, the risks and the debt fell outside the scissors with nobody the wiser. A
+   * blind cut is not a summary: it loses precisely whatever did not fit, by the alphabetical
+   * order of the scaffolding. With a cap, each section gets its share and what one does not
+   * spend returns to the pot, so something from every kind of knowledge always arrives.
    */
   maxChars?: number;
 }
 
 export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {}): string {
-  // Aviso pegado a CADA entrada implicada, no en una sección aparte: si va al final, el
-  // agente ya se ha creído la entrada cuando llega el aviso.
-  const avisos = new Map<string, string>();
+  // The warning is glued to EVERY entry involved, not put in a section of its own: if it goes
+  // at the end, the agent has already believed the entry by the time the warning arrives.
+  const warnings = new Map<string, string>();
   for (const c of pack.conflicts ?? []) {
-    const lineas: string[] = [];
+    const lines: string[] = [];
     if (c.entries.length > 0) {
-      const con = c.entries.map((e) => `"${e.label}" (recorded ${e.recordedLater ? "later" : "earlier"})`).join(", ");
-      lineas.push(`  ⚠️ Conflicts with ${con}. Both are still recorded as current: check which one holds before relying on this.`);
+      const withWhat = c.entries.map((e) => `"${e.label}" (recorded ${e.recordedLater ? "later" : "earlier"})`).join(", ");
+      lines.push(`  ⚠️ Conflicts with ${withWhat}. Both are still recorded as current: check which one holds before relying on this.`);
     }
     for (const a of c.areas) {
-      lineas.push(`  ⚠️ Touches "${a.entity}", which is recorded as contradicting ${a.against.map((x) => `"${x}"`).join(", ")}. That corner is disputed: check it before relying on this.`);
+      lines.push(`  ⚠️ Touches "${a.entity}", which is recorded as contradicting ${a.against.map((x) => `"${x}"`).join(", ")}. That corner is disputed: check it before relying on this.`);
     }
-    if (lineas.length > 0) avisos.set(c.entryId, lineas.join("\n"));
+    if (lines.length > 0) warnings.set(c.entryId, lines.join("\n"));
   }
-  const linea = (e: ContextEntry): string => {
-    const aviso = avisos.get(e.id);
-    return aviso ? `${entryLine(e)}\n${aviso}` : entryLine(e);
+  const line = (e: ContextEntry): string => {
+    const warning = warnings.get(e.id);
+    return warning ? `${entryLine(e)}\n${warning}` : entryLine(e);
   };
 
-  const secciones: Seccion[] = [
-    ...pack.sections.map((s) => ({ titulo: s.titulo, peso: s.peso, bloques: s.entries.map(linea) })),
-    { titulo: "Sensitive modules", peso: 1, bloques: pack.sensitiveModules.map((m) => `- ${m}`) },
+  const sections: Section[] = [
+    ...pack.sections.map((s) => ({ title: s.title, weight: s.weight, blocks: s.entries.map(line) })),
+    { title: "Sensitive modules", weight: 1, blocks: pack.sensitiveModules.map((m) => `- ${m}`) },
     {
-      titulo: "Most relevant to the area you asked about",
-      // Lo que se ha pedido a mano pesa: alguien ha dicho explícitamente por dónde anda.
-      peso: 3,
-      bloques: pack.relevantToArea.map((h) => `- (${h.score.toFixed(2)}) ${h.entry.title} — ${h.entry.summary ?? ""}`),
+      title: "Most relevant to the area you asked about",
+      // What was asked for by hand carries weight: somebody said explicitly where they are.
+      weight: 3,
+      blocks: pack.relevantToArea.map((h) => `- (${h.score.toFixed(2)}) ${h.entry.title} — ${h.entry.summary ?? ""}`),
     },
-  ].filter((s) => s.bloques.length > 0);
+  ].filter((s) => s.blocks.length > 0);
 
-  const encabezado = [
+  const header = [
     `# Context Pack — ${pack.project}`,
     `_${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total · generated ${pack.generatedAt.toISOString()}_`,
   ].join("\n");
 
-  const junta = (piezas: string[]) => [encabezado, ...piezas].join("\n");
-  const tope = opts.maxChars;
-  if (!tope || tope <= 0) return junta(secciones.map((s) => escribe(s, s.bloques.length)));
+  const join = (pieces: string[]) => [header, ...pieces].join("\n");
+  const cap = opts.maxChars;
+  if (!cap || cap <= 0) return join(sections.map((s) => write(s, s.blocks.length)));
 
-  // Reparto inicial a partes iguales: garantiza que de CADA tipo de conocimiento llegue algo.
-  const partes = reparte(
-    secciones.map((s) => escribe(s, s.bloques.length).length),
-    secciones.map((s) => s.peso),
-    Math.max(tope - encabezado.length - secciones.length, 0),
+  // Initial weighted split: it guarantees something from EVERY kind of knowledge arrives.
+  const shares = share(
+    sections.map((s) => write(s, s.blocks.length).length),
+    sections.map((s) => s.weight),
+    Math.max(cap - header.length - sections.length, 0),
   );
-  const cuantas = secciones.map((s, i) => cuantasCaben(s, partes[i]!));
+  const counts = sections.map((s, i) => howManyFit(s, shares[i]!));
 
-  // Y luego se comprueba contra el tope de verdad, no contra la aritmética del reparto: se
-  // encoge por la cola si nos hemos pasado y se crece por la cabeza con lo que sobre. El
-  // orden de `secciones` es el de importancia para quien lo va a leer.
-  const cabe = () => junta(secciones.map((s, i) => escribe(s, cuantas[i]!))).length <= tope;
-  for (let i = secciones.length - 1; i >= 0 && !cabe(); i--) {
-    while (cuantas[i]! > 0 && !cabe()) cuantas[i] = cuantas[i]! - 1;
+  // And then it is checked against the real cap, not against the split's arithmetic: it shrinks
+  // from the tail when we overshot and grows from the head with whatever is left over. The
+  // order of `sections` is the order of importance for whoever is going to read it.
+  const fits = () => join(sections.map((s, i) => write(s, counts[i]!))).length <= cap;
+  for (let i = sections.length - 1; i >= 0 && !fits(); i--) {
+    while (counts[i]! > 0 && !fits()) counts[i] = counts[i]! - 1;
   }
-  for (let vuelta = 0; vuelta < secciones.length; vuelta++) {
-    let movido = false;
-    for (let i = 0; i < secciones.length; i++) {
-      while (cuantas[i]! < secciones[i]!.bloques.length) {
-        cuantas[i] = cuantas[i]! + 1;
-        if (cabe()) movido = true;
+  for (let pass = 0; pass < sections.length; pass++) {
+    let moved = false;
+    for (let i = 0; i < sections.length; i++) {
+      while (counts[i]! < sections[i]!.blocks.length) {
+        counts[i] = counts[i]! + 1;
+        if (fits()) moved = true;
         else {
-          cuantas[i] = cuantas[i]! - 1;
+          counts[i] = counts[i]! - 1;
           break;
         }
       }
     }
-    if (!movido) break;
+    if (!moved) break;
   }
-  return junta(secciones.map((s, i) => escribe(s, cuantas[i]!)));
+  return join(sections.map((s, i) => write(s, counts[i]!)));
 }

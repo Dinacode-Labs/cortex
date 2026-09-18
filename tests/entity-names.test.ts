@@ -1,44 +1,51 @@
 import { describe, it, expect } from "vitest";
-import { entityType, isUsableEntityName } from "@cortex/shared";
+import { entityType, extractableEntityType, isUsableEntityName } from "@cortex/shared";
 
 /**
- * Una entidad es una COSA QUE SE NOMBRA, no una afirmación sobre el proyecto.
+ * An entity is a THING THAT HAS A NAME, not a claim about the project.
  *
- * Cuando `entityType` admitía `decision` e `incident` —que son tipos de entrada— el extractor
- * creaba nodos cuyo nombre era la frase entera, duplicando en el grafo lo que ya estaba en la
- * memoria. En una instalación real: 222 nodos así, y las 18 contradicciones detectadas eran
- * todas entre nombres de nodo, ninguna entre entradas. Ver ADR-0055.
+ * When `entityType` accepted `decision` and `incident` -- which are entry types -- the
+ * extractor created nodes whose name was the whole sentence, duplicating in the graph what was
+ * already in the memory. In a real installation: 222 nodes like that, and all 18 contradictions
+ * detected were between node names, none between entries. See ADR-0055.
  */
-describe("qué puede ser una entidad", () => {
-  it("los tipos de entrada no son tipos de entidad", () => {
+describe("what can be an entity", () => {
+  it("entry types are not entity types", () => {
     for (const t of ["decision", "incident"]) {
-      expect(entityType.options as readonly string[], `"${t}" duplicaría entradas en el grafo`).not.toContain(t);
+      expect(entityType.options as readonly string[], `"${t}" would duplicate entries in the graph`).not.toContain(t);
     }
   });
 
-  it("los nombres de verdad pasan", () => {
-    for (const n of ["OkHttpClient", "src/cola.ts", "Stripe", "módulo de pagos", "GitLab CI"]) {
+  it("`project` is an entity type, but it is not offered to the extractor: a project is created, not extracted (#135)", () => {
+    expect(entityType.options).toContain("project");
+    expect(extractableEntityType.options as readonly string[]).not.toContain("project");
+    // And none of the others is missing: removing `project` is all it does.
+    expect([...extractableEntityType.options, "project"].sort()).toEqual([...entityType.options].sort());
+  });
+
+  it("real names get through", () => {
+    for (const n of ["OkHttpClient", "src/queue.ts", "Stripe", "payments module", "GitLab CI"]) {
       expect(isUsableEntityName(n), n).toBe(true);
     }
   });
 
-  it("las frases no", () => {
+  it("sentences are not", () => {
     for (const n of [
-      "No asumir rutas del origen en el destino",
-      "Publicar Cortex en abierto y monetizar la implementación",
-      "Comunicación no agresiva hacia el cliente.",
+      "Do not assume source paths in the target",
+      "Publish Cortex openly and monetise the implementation",
+      "Non-aggressive communication towards the client.",
     ]) {
       expect(isUsableEntityName(n), n).toBe(false);
     }
   });
 
-  it("los deícticos tampoco: no nombran nada por sí solos", () => {
-    for (const n of ["opción C", "opción A", "la opción b", "v3", "caso 2", "fase 1"]) {
+  it("nor are deictics: they name nothing on their own", () => {
+    for (const n of ["opción C", "opción A", "la opción b", "v3", "caso 2", "fase 1"]) { // Spanish on purpose: the corpus is Spanish
       expect(isUsableEntityName(n), n).toBe(false);
     }
   });
 
-  it("ni lo demasiado corto o sin letras", () => {
+  it("nor is anything too short or without letters", () => {
     for (const n of ["ab", "  ", "42", "—"]) expect(isUsableEntityName(n), JSON.stringify(n)).toBe(false);
   });
 });

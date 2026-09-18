@@ -1,5 +1,5 @@
--- Autenticación email + OTP (sin passwords). El usuario ES su correo. Base para
--- atribución (created_by = email) y permisos. Ver docs/decisions.md.
+-- Email + OTP authentication (no passwords). A user IS their email address. The basis for
+-- attribution (created_by = email) and permissions. See docs/decisions.md.
 
 CREATE TABLE IF NOT EXISTS users (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_login_at timestamptz
 );
 
--- Códigos OTP de un solo uso (hasheados; nunca en claro).
+-- Single-use OTP codes (hashed; never in clear text).
 CREATE TABLE IF NOT EXISTS otp_codes (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email       text NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS otp_codes (
 );
 CREATE INDEX IF NOT EXISTS otp_codes_email_idx ON otp_codes (email, created_at DESC);
 
--- Tokens de sesión (hasheados). Bearer en las peticiones a la API.
+-- Session tokens (hashed). Sent as Bearer on API requests.
 CREATE TABLE IF NOT EXISTS auth_tokens (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   token_hash   text UNIQUE NOT NULL,
