@@ -131,9 +131,11 @@ one, because what reads it is an agent that cannot tell which is which.
 ### How to run it
 
 ```bash
-pnpm admin eval-distill                                      # the fixture in the repo
-pnpm admin eval-distill --verbose                            # plus every item: type · title · first 120 chars
-pnpm admin eval-distill --windows <dir> --gold <file>        # another fixture
+pnpm admin eval-distill                                 # the Spanish set, windows/ + gold.json
+pnpm admin eval-distill --verbose                       # plus every item: type · title · first 120 chars
+pnpm admin eval-distill \
+  --windows tests/fixtures/eval/distill/windows-en \
+  --gold tests/fixtures/eval/distill/gold-en.json       # the English set
 ```
 
 **An LLM is required, and the command refuses to run without one.** The distiller *is* the
@@ -165,9 +167,32 @@ often names the alternative it rejected, and that is knowledge, not a leak. That
 `b-confirm-reject.txt` forbids only the idea nobody answered, and why what the window is really
 for is read with `--verbose`.
 
+### The same exam in English
+
+`windows-en/` and `gold-en.json` hold the same eight cases as English sessions. They are run
+**separately, with their own mark**: mixed into one total, a gain in one language would hide a
+loss in the other and the number would stop saying what happened.
+
+What they measure is not "does it distil in English". The distiller answers in Spanish whatever
+it is fed -- `OUTPUT_LANGUAGE` in `packages/agents/src/mastra.ts` is fixed, and changing it is a
+product decision, not a translation -- so an English window measures whether it understands an
+English session as well as a Spanish one, and whether the judgement survives the crossing.
+
+That is also why the English key is annotated only with **language-invariant keywords**: names
+and identifiers (`ULID`, `UTC`, `Redis`, `Kafka`, `OOM`, `ocr.ts`) and stems (`idempot`,
+`retroactiv`, `memor`). Annotate it with Spanish words and the window would be measuring the
+translation instead of the judgement, which is a different question and one nobody asked. There
+is a test for it (`tests/eval-distill-fixture.test.ts`), along with the rest of what breaks in
+silence here: a window with no entry in the key, a keyword that is nowhere in its own window, a
+type that is not in the domain.
+
+The two sets are deliberately the **same eight cases**. Compared side by side they answer the
+question worth asking: does the distiller lose anything when the session is not in the language
+of the corpus?
+
 ### Baseline
 
-**Pending a run against a real provider.** The table goes here, dated and naming the model, as
+**Pending a run against a real provider, for both sets.** The table goes here, dated and naming the model, as
 the output of `pnpm admin eval-distill`. It has to exist before the distiller's prompt is
 touched: a set like this is only worth anything as a comparison between two runs, and there is
 no point arguing about the second one if the first was never taken.

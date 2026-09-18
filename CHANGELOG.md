@@ -20,6 +20,19 @@ fixes things.
   would read as a perfect zero. What each window tests and what the numbers mean:
   `tests/fixtures/eval/README.md`.
 
+  The same eight cases also exist as **English sessions** (`windows-en/` + `gold-en.json`), run
+  separately and with their own mark: mixed into one total, a gain in one language would hide a
+  loss in the other. Since the agents answer in Spanish whatever they are fed
+  (`OUTPUT_LANGUAGE`), what the English set measures is whether the judgement survives a session
+  that is not in the language of the corpus, and it is annotated only with keywords that survive
+  translation.
+
+### Changed
+- **How to build an eval is written down**, in `.claude/rules/evals.md`: when a mark on a model
+  replaces an assertion, how the marking key is written, why half the exam has to expect nothing,
+  and why a set with no first run is worth nothing. The rules of thumb that are easy to get wrong
+  in silence are tests now, not paragraphs (`tests/eval-distill-fixture.test.ts`).
+
 ## [0.1.12] — 2026-09-18
 
 ### Added
