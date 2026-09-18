@@ -8,6 +8,18 @@ fixes things.
 
 ## [Unreleased]
 
+### Added
+- **The distiller can be measured.** `cortex-admin eval-distill` runs the session distiller over
+  a fixed set of eight transcript windows (`tests/fixtures/eval/distill/`) with an annotated
+  expectation each, and reports expected recall, forbidden leaks, mistyped items, items per
+  window and windows with nothing in them; `--verbose` prints every item it emitted, and
+  `--windows` / `--gold` point it at another fixture. Half of the windows expect **nothing** —
+  narration, an open discussion, a hiccup local to the session, acknowledgements — because
+  recall is cheap to buy by keeping everything. It needs an LLM and refuses to run without one:
+  the distiller *is* the model, so with no model every window comes back empty and the table
+  would read as a perfect zero. What each window tests and what the numbers mean:
+  `tests/fixtures/eval/README.md`.
+
 ## [0.1.12] — 2026-09-18
 
 ### Added
