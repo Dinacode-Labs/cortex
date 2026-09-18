@@ -7,21 +7,21 @@ import { extractText, getDocumentProxy } from "unpdf";
 import { getEnvNum, PLAIN_TEXT_EXTS } from "@cortex/shared";
 
 /**
- * Capa de extracción de ficheros REUTILIZABLE por todos los conectores (la idea
- * versátil: cualquier fuente que traiga ficheros —Notion, GitHub, carpeta— los parsea
- * y RAGea). Tipos: texto plano / Markdown (lectura directa), documentos ofimáticos
- * (determinista), diagramas .drawio (XML), e **imágenes** (caption con el modelo de
- * visión del proveedor LLM, p.ej. qwen3.6/gemma4 de nan). Vídeo/audio (transcripción)
- * igual. Ver research/multimodal-ingestion.md.
+ * File extraction layer, REUSABLE by every connector (the versatile idea: any source bringing
+ * files -- Notion, GitHub, a folder -- gets them parsed and RAG-ready). Kinds: plain text /
+ * Markdown (read directly), office documents (deterministic), .drawio diagrams (XML), and
+ * **images** (captioned with the LLM provider's vision model). Video/audio (transcription)
+ * likewise. See research/multimodal-ingestion.md.
  *
- * Este módulo es DETERMINISTA: la parte que necesita LLM (caption de imágenes, OCR de
- * PDF escaneado, whisper) se inyecta con setMediaExtractor() desde @cortex/agents
- * (media.ts, cableado en wireLlm) — mismo patrón que setClassifier/setReconciler. Sin
- * hook, esos formatos devuelven null, igual que antes sin API keys.
+ * This module is DETERMINISTIC: the part that needs an LLM (image captioning, OCR of a
+ * scanned PDF, whisper) is injected with setMediaExtractor() from @cortex/agents (media.ts,
+ * wired in wireLlm) -- the same pattern as setClassifier/setReconciler. With no hook, those
+ * formats return null, exactly as they did before when there were no API keys.
  */
 
-// La lista canónica vive en `@cortex/shared`, porque el CLI ligero también necesita saber qué
-// puede leer él y qué no (ADR-0058). Aquí solo se agrupa para decidir CÓMO se extrae cada uno.
+// The canonical list lives in `@cortex/shared`, because the lightweight CLI also needs to know
+// what it can and cannot read (ADR-0058). Here they are only grouped to decide HOW each one is
+// extracted.
 const TEXT_EXTS = PLAIN_TEXT_EXTS;
 const DOC_EXTS = ["docx", "pdf", "xlsx"];
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
@@ -29,37 +29,37 @@ const DRAWIO_EXTS = ["drawio", "xml"];
 const AUDIO_EXTS = ["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga"];
 const VIDEO_EXTS = ["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"];
 
-// Por debajo de esto, una imagen suele ser ruido (iconos, separadores) → no se captiona.
+// Below this, an image is usually noise (icons, separators) -> it is not captioned.
 const MIN_IMAGE_BYTES = getEnvNum("CORTEX_IMAGE_MIN_BYTES", 8000);
-const OCR_MIN_TEXT = getEnvNum("CORTEX_OCR_MIN_TEXT", 120); // < esto → PDF escaneado, OCR
+const OCR_MIN_TEXT = getEnvNum("CORTEX_OCR_MIN_TEXT", 120); // below this -> scanned PDF, use OCR
 
 export interface ExtractedFile {
   text: string;
   format: string;
 }
 
-// --- Hook de extracción multimodal opcional (capa LLM) ------------------------
+// --- Optional multimodal extraction hook (the LLM layer) ---------------------
 
-/** Extractor multimodal inyectable (lo provee @cortex/agents vía setMediaExtractor).
- * Cada función devuelve null si no obtiene texto útil (imagen irrelevante, sin texto,
- * herramienta externa ausente, fallo del proveedor…). */
+/** Injectable multimodal extractor (provided by @cortex/agents through setMediaExtractor).
+ * Each function returns null when it gets no useful text (irrelevant image, no text, missing
+ * external tool, provider failure...). */
 export interface MediaExtractorHooks {
-  /** Caption de una imagen (descripción indexable) o null si es decorativa. */
+  /** An image caption (an indexable description), or null when it is decorative. */
   captionImage?: (path: string, ext: string) => Promise<string | null>;
-  /** OCR de un PDF escaneado (sin capa de texto). */
+  /** OCR of a scanned PDF (one with no text layer). */
   ocrPdf?: (path: string) => Promise<string | null>;
-  /** Transcripción de audio/vídeo (whisper). `kind` distingue vídeo (extraer pista de audio). */
+  /** Audio/video transcription (whisper). `kind` marks video (the audio track is extracted). */
   transcribe?: (path: string, ext: string, kind: "audio" | "video") => Promise<string | null>;
 }
 
 let mediaExtractor: MediaExtractorHooks | null = null;
 
-/** Registra (o desregistra con null) el extractor multimodal. Lo cablean los entrypoints. */
+/** Registers (or, with null, unregisters) the multimodal extractor. Wired by the entrypoints. */
 export function setMediaExtractor(hooks: MediaExtractorHooks | null): void {
   mediaExtractor = hooks;
 }
 
-/** Extrae texto de los labels de un .drawio (XML de mxGraph; maneja diagramas comprimidos). */
+/** Extracts text from a .drawio's labels (mxGraph XML; it handles compressed diagrams). */
 function extractDrawio(path: string): string {
   const raw = readFileSync(path, "utf8");
   const values = new Set<string>();
@@ -71,25 +71,25 @@ function extractDrawio(path: string): string {
   };
   collect(raw);
   if (values.size === 0) {
-    // Diagrama comprimido: <diagram>base64(deflateRaw(urlencoded xml))</diagram>
+    // Compressed diagram: <diagram>base64(deflateRaw(urlencoded xml))</diagram>
     for (const m of raw.matchAll(/<diagram[^>]*>([^<]+)<\/diagram>/g)) {
       try {
         const xml = decodeURIComponent(inflateRawSync(Buffer.from(m[1]!.trim(), "base64")).toString("utf8"));
         collect(xml);
       } catch {
-        /* no comprimido o ilegible */
+        /* not compressed, or unreadable */
       }
     }
   }
   return [...values].join("\n");
 }
 
-/** Extrae texto de un fichero. null si no soportado, vacío o falla. */
+/** Extracts text from a file. null when unsupported, empty, or on failure. */
 export async function extractFileText(path: string): Promise<ExtractedFile | null> {
   const ext = extname(path).slice(1).toLowerCase();
   try {
     if (TEXT_EXTS.includes(ext)) {
-      // Texto plano / Markdown: se lee tal cual (ya es texto legible por humanos y LLM).
+      // Plain text / Markdown: read as is (it is already readable by humans and LLMs).
       return clean(readFileSync(path, "utf8"), ext);
     }
     if (ext === "docx") {
@@ -101,7 +101,7 @@ export async function extractFileText(path: string): Promise<ExtractedFile | nul
       const r = await extractText(pdf, { mergePages: true });
       const raw = Array.isArray(r.text) ? r.text.join("\n") : r.text;
       if (raw.trim().length >= OCR_MIN_TEXT) return clean(raw, ext);
-      // Sin capa de texto (escaneado) → OCR por visión, si hay extractor inyectado
+      // No text layer (scanned) -> vision OCR, when an extractor has been injected
       const ocr = mediaExtractor?.ocrPdf ? await mediaExtractor.ocrPdf(path) : null;
       return ocr ? clean(ocr, "pdf-ocr") : clean(raw, ext);
     }
@@ -113,7 +113,7 @@ export async function extractFileText(path: string): Promise<ExtractedFile | nul
       return clean(extractDrawio(path), "drawio");
     }
     if (IMAGE_EXTS.includes(ext)) {
-      if (statSync(path).size < MIN_IMAGE_BYTES) return null; // icono/ruido
+      if (statSync(path).size < MIN_IMAGE_BYTES) return null; // icon/noise
       const caption = mediaExtractor?.captionImage ? await mediaExtractor.captionImage(path, ext) : null;
       return caption ? { text: caption, format: ext } : null;
     }
@@ -123,9 +123,9 @@ export async function extractFileText(path: string): Promise<ExtractedFile | nul
       return t ? { text: t, format: ext } : null;
     }
   } catch (err) {
-    // Degradamos a "no soportado" para no tumbar la ingesta, pero dejamos rastro
-    // (antes un bug cualquiera se silenciaba como si el fichero no fuera soportado).
-    console.warn(`[cortex] extractFileText falló para ${path}: ${err instanceof Error ? err.message : String(err)}`);
+    // Degrade to "unsupported" so the ingest does not go down, but leave a trace (any bug
+    // used to be silenced as though the file simply were not supported).
+    console.warn(`[cortex] extractFileText failed for ${path}: ${err instanceof Error ? err.message : String(err)}`);
   }
   return null;
 }

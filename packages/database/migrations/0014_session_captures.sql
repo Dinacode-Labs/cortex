@@ -1,13 +1,13 @@
--- Registro de sesiones de agente ya destiladas (ADR-0025: la destilación pasa al servidor).
+-- Record of agent sessions already distilled (ADR-0025: distillation moves to the server).
 --
--- Existe por IDEMPOTENCIA, y el motivo es económico además de correcto: los hooks de fin de
--- sesión y de pre-compactación disparan varias veces sobre la MISMA sesión, y destilar es lo
--- caro del pipeline (una llamada al modelo por ventana de transcript). Sin esta tabla, cerrar
--- y reabrir una sesión pagaría dos veces por el mismo conocimiento.
+-- It exists for IDEMPOTENCE, and the reason is economic as well as correct: the end-of-session
+-- and pre-compaction hooks fire several times over the SAME session, and distilling is the
+-- expensive part of the pipeline (one model call per transcript window). Without this table,
+-- closing and reopening a session would pay twice for the same knowledge.
 --
--- `condensed_chars` permite algo mejor que "ya está hecha": si la sesión creció, se destila
--- SOLO la cola nueva. El condensado es determinista y append-only (los turnos anteriores no
--- cambian), así que el prefijo ya procesado no hace falta volver a mirarlo.
+-- `condensed_chars` allows something better than "already done": if the session grew, only
+-- the NEW tail is distilled. The condensed form is deterministic and append-only (earlier
+-- turns do not change), so the already-processed prefix need not be looked at again.
 CREATE TABLE IF NOT EXISTS session_captures (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id       uuid NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
@@ -24,6 +24,6 @@ CREATE TABLE IF NOT EXISTS session_captures (
   UNIQUE (project_id, platform, session_id)
 );
 
--- Para el barrido de trabajos encallados (un servidor que se reinicia a media destilación
--- deja filas en 'running' que nadie va a terminar).
+-- For sweeping up stuck jobs (a server restarting mid-distillation leaves 'running' rows
+-- that nobody is going to finish).
 CREATE INDEX IF NOT EXISTS session_captures_status_idx ON session_captures (status, updated_at);

@@ -1,13 +1,13 @@
 import { type EmbeddingProvider, l2normalize } from "./provider.js";
 
 /**
- * Proveedor local determinista, SIN claves (ADR-0005). Usa "feature hashing":
- * tokeniza el texto y acumula cada token (con signo) en un bucket de `dim`
- * posiciones, luego normaliza L2.
+ * Deterministic local provider, with NO keys (ADR-0005). It uses "feature hashing":
+ * it tokenises the text and accumulates each token (with a sign) into a bucket of `dim`
+ * positions, then L2-normalises.
  *
- * No es un embedding semántico: captura solape léxico, no significado. Sirve para
- * demostrar el cableado de la búsqueda vectorial sin depender de un proveedor
- * externo. Para relevancia real, configura EMBEDDINGS_PROVIDER=openai|voyage.
+ * This is not a semantic embedding: it captures lexical overlap, not meaning. It exists to
+ * demonstrate the vector-search wiring without depending on an external provider. For real
+ * relevance, set EMBEDDINGS_PROVIDER=openai|voyage.
  */
 export class LocalEmbeddingProvider implements EmbeddingProvider {
   readonly model = "local-feature-hash";
@@ -27,7 +27,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
     for (const token of tokenize(text)) {
       const h = fnv1a(token);
       const bucket = h % this.dim;
-      // bit alto del hash como signo, para reducir el sesgo de colisiones
+      // top bit of the hash as the sign, to reduce collision bias
       const sign = (h & 0x80000000) === 0 ? 1 : -1;
       vec[bucket] = (vec[bucket] ?? 0) + sign;
     }
@@ -35,7 +35,7 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
-/** Tokeniza: minúsculas, separa por no-alfanuméricos (unicode), descarta vacíos. */
+/** Tokenises: lowercase, split on non-alphanumerics (unicode), drop empties. */
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
@@ -43,7 +43,7 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length > 1);
 }
 
-/** FNV-1a 32-bit. Determinista y rápido; suficiente para feature hashing. */
+/** FNV-1a 32-bit. Deterministic and fast; good enough for feature hashing. */
 function fnv1a(str: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {

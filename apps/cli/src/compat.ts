@@ -5,31 +5,32 @@ import type { ClientConfig } from "@cortex/shared";
 import { CLI_VERSION, compareVersions } from "./version.js";
 
 /**
- * Compatibilidad entre este CLI y el servidor al que habla (ADR-0062).
+ * Compatibility between this CLI and the server it talks to (ADR-0062).
  *
- * El CLI lo actualiza cada persona desde npm; el servidor, un operador, a su ritmo. Son dos
- * relojes distintos y no se atan: el contrato es la API HTTP, no el número de versión. Lo que
- * sí se hace es **mirar los dos números que el servidor publica en `/client-config`** y sacar
- * de ahí una de cuatro conclusiones:
+ * Each person updates the CLI from npm; an operator updates the server, at their own pace. They
+ * are two different clocks and they are not tied together: the contract is the HTTP API, not
+ * the version number. What is done is **looking at the two numbers the server publishes in
+ * `/client-config`** and drawing one of four conclusions from them:
  *
- *   - `blocked`        el CLI está por debajo de `minClientVersion`: los comandos que ESCRIBEN
- *                      se niegan, para no dejar algo a medias. Los de lectura siguen.
- *   - `cli-behind`     el servidor va por delante: hay CLI nuevo en npm, se sugiere `upgrade`.
- *   - `server-behind`  el CLI va por delante: lo nuevo que traiga no estará hasta que quien
- *                      opera el servidor lo actualice. Es el caso que nadie veía.
- *   - `ok` / `unknown` iguales, o no se pudo saber (servidor caído o tan viejo que no publica
- *                      versión). No saber NUNCA bloquea: la petición real ya dirá lo que pase.
+ *   - `blocked`        the CLI is below `minClientVersion`: the commands that WRITE refuse, so
+ *                      nothing is left half-done. Read commands carry on.
+ *   - `cli-behind`     the server is ahead: there is a newer CLI on npm, `upgrade` is suggested.
+ *   - `server-behind`  the CLI is ahead: whatever new it brings will not be there until whoever
+ *                      operates the server updates it. This is the case nobody could see.
+ *   - `ok` / `unknown` equal, or it could not be determined (the server is down, or so old it
+ *                      publishes no version). Not knowing NEVER blocks: the real request will
+ *                      say what happens.
  *
- * El aviso es pasivo: una consulta cada 24 h por servidor, cacheada en `~/.cortex/`, y **una
- * línea a stderr** al terminar un comando interactivo. Los hooks y `cortex mcp` no pasan por
- * aquí jamás: ahí stdout es protocolo y un byte de más rompe la sesión del agente. Hay un
- * test que lo comprueba.
+ * The notice is passive: one query per server every 24 h, cached in `~/.cortex/`, and **one line
+ * to stderr** when an interactive command finishes. The hooks and `cortex mcp` never come
+ * through here: there, stdout is protocol and one extra byte breaks the agent's session. There
+ * is a test that checks it.
  */
 
 const CHECK_TTL_MS = 24 * 60 * 60 * 1000;
-/** Si el servidor no respondió, se reintenta antes: una caída de un minuto no debería callar el aviso un día. */
+/** When the server did not answer, it is retried sooner: a one-minute outage should not silence the notice for a day. */
 const FAILURE_TTL_MS = 60 * 60 * 1000;
-/** Corto a propósito: esto corre al final de cada comando y no puede añadir segundos de espera. */
+/** Deliberately short: this runs at the end of every command and cannot add seconds of waiting. */
 const TIMEOUT_MS = 3000;
 
 export type Compat =
@@ -40,11 +41,11 @@ export type Compat =
   | { kind: "blocked"; server: string; serverVersion: string; minClientVersion: string };
 
 interface Entry {
-  /** Cuándo se consultó (ISO). Sin `version` significa que la consulta falló. */
+  /** When it was queried (ISO). With no `version` it means the query failed. */
   at: string;
   version?: string;
   minClientVersion?: string;
-  /** Cuándo se enseñó el aviso por última vez, para no repetirlo en cada comando. */
+  /** When the notice was last shown, so it is not repeated on every command. */
   notifiedAt?: string;
 }
 
@@ -62,7 +63,7 @@ function readCache(): CacheFile {
     const raw = JSON.parse(readFileSync(compatCachePath(), "utf8")) as Partial<CacheFile>;
     if (raw && raw.version === 1 && raw.servers && typeof raw.servers === "object") return raw as CacheFile;
   } catch {
-    /* no existe o está corrupto: se empieza de cero */
+    /* it does not exist or is corrupt: start from scratch */
   }
   return { version: 1, servers: {} };
 }
@@ -72,14 +73,14 @@ function writeCache(cache: CacheFile): void {
     mkdirSync(join(credentialsHome(), ".cortex"), { recursive: true });
     writeFileSync(compatCachePath(), JSON.stringify(cache, null, 2) + "\n");
   } catch {
-    /* un disco de solo lectura no puede romper un comando por un aviso */
+    /* a read-only disk must not break a command over a notice */
   }
 }
 
 /**
- * La conclusión, a partir de lo que anuncia el servidor. Separado de la red y del disco para
- * poder probarlo con una tabla de casos. Un campo ausente es un servidor anterior a ese campo,
- * no un error: se degrada a «no se sabe» (regla de escritura del ADR-0062).
+ * The conclusion, drawn from what the server announces. Separated from the network and the disk
+ * so it can be tested with a table of cases. A missing field means a server predating that
+ * field, not an error: it degrades to "unknown" (ADR-0062's writing rule).
  */
 export function classify(server: string, cli: string, cfg: Partial<Pick<ClientConfig, "version" | "minClientVersion">> | null): Compat {
   if (!cfg || !cfg.version || cli === "dev" || cfg.version === "dev") return { kind: "unknown", server };
@@ -95,20 +96,20 @@ export function classify(server: string, cli: string, cfg: Partial<Pick<ClientCo
 
 async function fetchConfig(server: string): Promise<Pick<ClientConfig, "version" | "minClientVersion"> | null> {
   const res = await apiRequest<Partial<ClientConfig>>("GET", "/client-config", undefined, { auth: false, baseUrl: server, timeoutMs: TIMEOUT_MS });
-  // 404 = servidor anterior a `/client-config`; status 0 = no respondió. Los dos son «no se sabe».
+  // 404 = a server predating `/client-config`; status 0 = it did not answer. Both mean "unknown".
   if (!res.ok || !res.data || typeof res.data.version !== "string") return null;
   return { version: res.data.version, minClientVersion: typeof res.data.minClientVersion === "string" ? res.data.minClientVersion : "" };
 }
 
 export interface CompatOptions {
-  /** Consultar al servidor aunque la caché sea reciente. Lo usan los comandos que escriben. */
+  /** Query the server even when the cache is fresh. The commands that write use this. */
   fresh?: boolean;
   now?: () => number;
 }
 
 /**
- * Qué relación hay entre este CLI y `server`, consultándolo como mucho una vez cada 24 h.
- * `fetched` dice si esta llamada fue al servidor o vino de la caché.
+ * What the relationship is between this CLI and `server`, querying it at most once every 24 h.
+ * `fetched` says whether this call went to the server or came from the cache.
  */
 export async function serverCompat(server: string, opts: CompatOptions = {}): Promise<{ compat: Compat; fetched: boolean }> {
   const key = normalizeServer(server);
@@ -126,7 +127,7 @@ export async function serverCompat(server: string, opts: CompatOptions = {}): Pr
   return { compat: classify(key, CLI_VERSION, cfg), fetched: true };
 }
 
-/** La línea que se enseña por cada situación. `null` cuando no hay nada que decir. */
+/** The line shown for each situation. `null` when there is nothing to say. */
 export function noticeLine(c: Compat): string | null {
   switch (c.kind) {
     case "blocked":
@@ -140,7 +141,7 @@ export function noticeLine(c: Compat): string | null {
   }
 }
 
-/** El mensaje con el que falla un comando de escritura cuando el CLI está por debajo del mínimo. */
+/** The message a write command fails with when the CLI is below the minimum. */
 export function blockedMessage(c: Extract<Compat, { kind: "blocked" }>): string {
   return (
     `this CLI is ${CLI_VERSION} and the server at ${c.server} accepts ${c.minClientVersion} or newer. ` +
@@ -153,23 +154,23 @@ function checksDisabled(): boolean {
 }
 
 export interface NoticeOptions extends CompatOptions {
-  /** Si hay una persona delante. Por defecto, `process.stdout.isTTY`. */
+  /** Whether there is a person in front. Defaults to `process.stdout.isTTY`. */
   tty?: boolean;
-  /** Dónde escribir. Por defecto, stderr. */
+  /** Where to write. Defaults to stderr. */
   write?: (line: string) => void;
 }
 
 /**
- * El aviso pasivo: lo llama el dispatcher al terminar un comando interactivo. Una línea a
- * stderr, como mucho una vez cada 24 h por servidor, y solo si hay una terminal delante: en un
- * script, en CI o en una tubería no dice nada. Nunca lanza.
+ * The passive notice: the dispatcher calls it when an interactive command finishes. One line to
+ * stderr, at most once every 24 h per server, and only when there is a terminal in front: in a
+ * script, in CI or in a pipe it says nothing. It never throws.
  */
 export async function printVersionNotice(opts: NoticeOptions = {}): Promise<void> {
   try {
     const tty = opts.tty ?? Boolean(process.stdout.isTTY);
     if (!tty || checksDisabled() || process.env.CI) return;
     const server = normalizeServer(apiBase());
-    // Sin sesión en ese servidor no hay nada que comparar, y puede ni ser un Cortex.
+    // With no session on that server there is nothing to compare, and it may not even be a Cortex.
     if (!readCredentials(server)) return;
     const { compat } = await serverCompat(server, opts);
     const line = noticeLine(compat);
@@ -184,15 +185,15 @@ export async function printVersionNotice(opts: NoticeOptions = {}): Promise<void
       writeCache(cache);
     }
   } catch {
-    /* un aviso no puede hacer fallar el comando que acaba de funcionar */
+    /* a notice must not fail the command that just worked */
   }
 }
 
 /**
- * Para los comandos que ESCRIBEN: el motivo por el que no deben hacerlo, o `null`. Consulta al
- * servidor en fresco (una petición corta) porque un `minClientVersion` recién subido tiene que
- * frenar hoy, no mañana. Si el servidor no responde, no bloquea: la escritura fallará sola con
- * su propio mensaje. Llamar DESPUÉS de `useProjectServer(cwd)`, que es quien fija el servidor.
+ * For the commands that WRITE: the reason they must not, or `null`. It queries the server fresh
+ * (one short request) because a freshly raised `minClientVersion` has to stop things today, not
+ * tomorrow. When the server does not answer it does not block: the write will fail on its own
+ * with its own message. Call it AFTER `useProjectServer(cwd)`, which is what pins the server.
  */
 export async function writeBlocker(opts: CompatOptions = {}): Promise<string | null> {
   if (checksDisabled()) return null;
@@ -204,7 +205,7 @@ export async function writeBlocker(opts: CompatOptions = {}): Promise<string | n
   }
 }
 
-/** Igual que `writeBlocker`, pero lanza: para comandos que no formatean sus propios errores. */
+/** Like `writeBlocker`, but it throws: for commands that do not format their own errors. */
 export async function requireCompatibleServer(opts: CompatOptions = {}): Promise<void> {
   const why = await writeBlocker(opts);
   if (why) throw new Error(why);

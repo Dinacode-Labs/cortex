@@ -1,18 +1,18 @@
 import { z } from "zod";
 
 /**
- * Modelo de dominio de Cortex.
+ * Cortex domain model.
  *
- * Refleja el modelo de datos hipotético del §14 del documento de planteamiento.
- * Es una propuesta mínima para la demo y debe cuestionarse (ver docs/decisions.md).
+ * It mirrors the hypothetical data model in section 14 of the founding document. It is a
+ * minimal proposal for the demo and should be questioned (see docs/decisions.md).
  *
- * Definimos los enums como esquemas zod (fuente de verdad para validación en MCP y
- * Mastra) y derivamos los tipos TypeScript con z.infer.
+ * Enums are defined as zod schemas (the source of truth for validation in MCP and Mastra)
+ * and the TypeScript types are derived with z.infer.
  */
 
-// --- Enums del dominio -------------------------------------------------------
+// --- Domain enums ------------------------------------------------------------
 
-/** Tipo de unidad de conocimiento. §14 context_entries.type */
+/** Kind of knowledge unit. Section 14, context_entries.type */
 export const contextEntryType = z.enum([
   "decision",
   "constraint",
@@ -31,7 +31,7 @@ export const contextEntryType = z.enum([
 ]);
 export type ContextEntryType = z.infer<typeof contextEntryType>;
 
-/** Estado del ciclo de vida de una entrada. §14 context_entries.status */
+/** Lifecycle state of an entry. Section 14, context_entries.status */
 export const contextEntryStatus = z.enum([
   "draft",
   "pending_validation",
@@ -42,27 +42,27 @@ export const contextEntryStatus = z.enum([
 ]);
 export type ContextEntryStatus = z.infer<typeof contextEntryStatus>;
 
-/** Nivel de confianza en la información. §14 confidence */
+/** Confidence level in the information. Section 14, confidence */
 export const confidenceLevel = z.enum(["low", "medium", "high", "verified"]);
 export type ConfidenceLevel = z.infer<typeof confidenceLevel>;
 
 /**
- * Vigencia del conocimiento. El §14 lista `validity` sin enumerar valores;
- * proponemos este conjunto mínimo, a revisar.
+ * Whether the knowledge still holds. Section 14 lists `validity` without enumerating
+ * values; this minimal set is a proposal, up for review.
  */
 export const validity = z.enum(["current", "historical", "unknown"]);
 export type Validity = z.infer<typeof validity>;
 
 /**
- * Tipo de entidad del grafo relacional. §14 entities.type
+ * Entity type in the relational graph. Section 14, entities.type
  *
- * Una entidad es una **cosa que se nombra** —un módulo, un servicio, una tecnología, un
- * cliente—, no una afirmación sobre el proyecto. Aquí hubo `decision` e `incident`, que son
- * tipos de ENTRADA, y el resultado fue un grafo en sombra: la misma decisión guardada dos
- * veces, una como entrada y otra como nodo cuyo nombre era la frase entera. En una instalación
- * real, 222 nodos así, con nombres como «Publicar Cortex en abierto y monetizar la
- * implementación». Ensuciaban las huérfanas, el mapa y —sobre todo— las contradicciones, que
- * salían entre nombres de nodo en vez de entre entradas. Ver ADR-0055.
+ * An entity is a **thing that has a name** -- a module, a service, a technology, a client --
+ * not a claim about the project. This enum used to include `decision` and `incident`, which
+ * are ENTRY types, and the result was a shadow graph: the same decision stored twice, once
+ * as an entry and once as a node whose name was the whole sentence. One real installation
+ * had 222 nodes like that, with names such as "Publish Cortex openly and monetise the
+ * implementation". They polluted the orphan list, the map and -- above all -- the
+ * contradictions, which came out between node names instead of between entries. See ADR-0055.
  */
 export const entityType = z.enum([
   "client",
@@ -78,13 +78,13 @@ export const entityType = z.enum([
 export type EntityType = z.infer<typeof entityType>;
 
 /**
- * Los tipos que se le OFRECEN al extractor (clasificador y grafo). `project` no está: el
- * proyecto es el contenedor de la memoria y nace por `createProject` —con slug y dueño—, no
- * de un nombre propio que el LLM haya interpretado como proyecto. Cuando se ofrecía, cada
- * ticket, rama o microservicio mencionado acababa en `entities` con `type='project'`: la
- * misma fila que un proyecto real, y salía en `cortex link` y en la UI como tal (#135).
- * Mismo patrón que ADR-0055 con `decision`/`incident`, pero aquí el tipo sí es legítimo, así
- * que se quita de lo que se extrae, no del enum.
+ * The types OFFERED to the extractor (classifier and graph). `project` is absent: a project
+ * is the container of the memory and is born through `createProject` -- with a slug and an
+ * owner -- not from a proper noun the LLM read as a project. While it was offered, every
+ * ticket, branch or microservice mentioned ended up in `entities` with `type='project'`: the
+ * same row as a real project, and it showed up in `cortex link` and in the UI as such (#135).
+ * Same pattern as ADR-0055 with `decision`/`incident`, but here the type is legitimate, so
+ * it is removed from what gets extracted, not from the enum.
  */
 export const extractableEntityType = z.enum(
   entityType.options.filter((t) => t !== "project") as [Exclude<EntityType, "project">, ...Exclude<EntityType, "project">[]],
@@ -92,25 +92,27 @@ export const extractableEntityType = z.enum(
 export type ExtractableEntityType = z.infer<typeof extractableEntityType>;
 
 /**
- * Si un nombre sirve como entidad del grafo.
+ * Whether a name works as a graph entity.
  *
- * Las entidades son nombres, no frases. El extractor devolvía cosas como «opción C», «No asumir
- * rutas del origen en el destino» o «package», que luego aparecían como huérfanas y se
- * emparejaban entre sí en el informe de contradicciones. Un informe con la mitad de ruido
- * enseña a no mirarlo, así que el listón se pone aquí: si no parece un nombre propio de algo
- * del dominio, no entra.
+ * Entities are names, not sentences. The extractor used to return things like "opcion C",
+ * "Do not assume source paths in the target" or "package", which then showed up as orphans
+ * and paired with each other in the contradiction report. A report that is half noise teaches
+ * people not to look at it, so the bar is set here: if it does not look like the proper name
+ * of something in the domain, it does not get in.
  */
 export function isUsableEntityName(name: string): boolean {
   const n = name.trim();
   if (n.length < 3 || n.length > 60) return false;
-  if (n.split(/\s+/).length > 6) return false; // una frase, no un nombre
+  if (n.split(/\s+/).length > 6) return false; // a sentence, not a name
   if (/[.;]$/.test(n) || n.includes(": ")) return false;
-  // Deícticos: "opción C", "la opción a", "v3", "caso 2"… no nombran nada por sí solos.
+  // Spanish on purpose: this matches the corpus, not our source. Deictics -- "opcion C",
+  // "la opcion a", "v3", "caso 2" -- name nothing on their own. Add a language here only
+  // when a corpus in that language is actually being ingested.
   if (/^(la |el |una? )?(opci[oó]n|alternativa|caso|punto|paso|fase|v)\s*\d*[a-z]?$/i.test(n)) return false;
   return /[a-zA-Z]/.test(n);
 }
 
-/** Tipo de relación entre entidades o entradas. §14 relations.relation_type */
+/** Relation type between entities or entries. Section 14, relations.relation_type */
 export const relationType = z.enum([
   "belongs_to",
   "affects",
@@ -125,7 +127,7 @@ export const relationType = z.enum([
 ]);
 export type RelationType = z.infer<typeof relationType>;
 
-/** Origen de una pieza de conocimiento. §14 sources.source_type */
+/** Where a piece of knowledge came from. Section 14, sources.source_type */
 export const sourceType = z.enum([
   "manual",
   "claude_code",
@@ -142,9 +144,9 @@ export const sourceType = z.enum([
 ]);
 export type SourceType = z.infer<typeof sourceType>;
 
-// --- Entidades persistidas ---------------------------------------------------
+// --- Persisted entities ------------------------------------------------------
 
-/** Una unidad de conocimiento. §14 context_entries */
+/** A unit of knowledge. Section 14, context_entries */
 export const contextEntry = z.object({
   id: z.string().uuid(),
   projectId: z.string().uuid().nullable(),
@@ -163,14 +165,14 @@ export const contextEntry = z.object({
   updatedAt: z.date(),
   supersededBy: z.string().uuid().nullable(),
   metadata: z.record(z.unknown()),
-  // Bi-temporalidad: ventana de validez del hecho. validTo null = vigente.
+  // Bi-temporality: the fact's validity window. validTo null = still current.
   validFrom: z.date(),
   validTo: z.date().nullable(),
   observedAt: z.date(),
 });
 export type ContextEntry = z.infer<typeof contextEntry>;
 
-/** Una entidad del grafo relacional. §14 entities */
+/** An entity in the relational graph. Section 14, entities */
 export const entity = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -182,7 +184,7 @@ export const entity = z.object({
 });
 export type Entity = z.infer<typeof entity>;
 
-/** Una relación entre entidades/entradas. §14 relations */
+/** A relation between entities/entries. Section 14, relations */
 export const relation = z.object({
   id: z.string().uuid(),
   sourceId: z.string().uuid(),
@@ -196,7 +198,7 @@ export const relation = z.object({
 });
 export type Relation = z.infer<typeof relation>;
 
-/** La fuente original de una entrada. §14 sources */
+/** The original source of an entry. Section 14, sources */
 export const source = z.object({
   id: z.string().uuid(),
   sourceType: sourceType,
@@ -208,26 +210,26 @@ export const source = z.object({
 });
 export type Source = z.infer<typeof source>;
 
-// --- DTOs de entrada (compartidos por ingesta y tools MCP) -------------------
+// --- Input DTOs (shared by ingestion and the MCP tools) ----------------------
 
 /**
- * Entrada mínima para guardar contexto. La usan tanto la captura manual como
- * Claude Code (tool MCP save_project_context). Pensada para baja fricción: solo
- * `content` es obligatorio; Cortex completa/clasifica el resto (§5.2).
+ * Minimal input for saving context. Used both by manual capture and by Claude Code (the
+ * save_project_context MCP tool). Designed for low friction: only `content` is required;
+ * Cortex fills in and classifies the rest (section 5.2).
  */
 export const saveContextInput = z.object({
-  /** Texto libre del conocimiento a guardar. */
-  content: z.string().min(1, "content no puede estar vacío"),
-  /** Slug o nombre del proyecto. Se resuelve a entidad de tipo `project`; si no existe, se crea. */
+  /** Free text of the knowledge to store. */
+  content: z.string().min(1, "content cannot be empty"),
+  /** Project slug or name. Resolved to a `project` entity; created if it does not exist. */
   project: z.string().min(1).optional().describe("Project slug (what `cortex link` shows) or name; a new project is created if neither matches"),
-  /** Título corto opcional; si falta, se deriva del contenido. */
+  /** Optional short title; derived from the content when missing. */
   title: z.string().optional(),
-  /** Tipo de conocimiento; si falta, lo propone el agente de clasificación. */
+  /** Knowledge type; proposed by the classifier agent when missing. */
   type: contextEntryType.optional(),
-  /** Resumen opcional precalculado (p.ej. por un workflow); si falta, se deriva. */
+  /** Optional precomputed summary (e.g. from a workflow); derived when missing. */
   summary: z.string().optional(),
   confidence: confidenceLevel.optional(),
-  /** De dónde viene. Por defecto "manual". */
+  /** Where it comes from. Defaults to "manual". */
   sourceType: sourceType.optional(),
   sourceReference: z.string().optional(),
   createdBy: z.string().optional(),
@@ -235,7 +237,7 @@ export const saveContextInput = z.object({
 });
 export type SaveContextInput = z.infer<typeof saveContextInput>;
 
-/** Parámetros de búsqueda de contexto (tool MCP search_project_context). */
+/** Context search parameters (the search_project_context MCP tool). */
 export const searchContextInput = z.object({
   query: z.string().min(1),
   project: z.string().optional().describe("Project slug (what `cortex link` shows) or name"),

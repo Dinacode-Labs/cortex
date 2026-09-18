@@ -3,6 +3,8 @@
 Fixes, improvements and new capabilities arrive as **pull requests**. This guide explains how
 the repository is put together and where each thing lives.
 
+*En español: [`CONTRIBUTING.es.md`](./CONTRIBUTING.es.md).*
+
 > **Nothing corporate in here.** Named clients, people as owners of work, internal tooling and
 > brand material do **not** belong in this repository: they live in a separate private one
 > (ADR-0026). In the docs a client is "a real project" or "Acme", and a task has no owner.
@@ -87,11 +89,24 @@ are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
 
 ## Conventions
 
-- **Language.** Anything an outsider reads is in **English**: the README, this guide, the
-  security policy, CLI output, MCP tool descriptions, the web UI, and the code itself. The
-  team's working record stays in **Spanish**: code comments, the decision records, the roadmap
-  and the research notes. The prompts the LLM agents use are Spanish too, because the corpus
-  they process is.
+- **Language** ([ADR-0064](./docs/decisions.md#adr-0064))**.** The repository is in
+  **English** — all of it: the README, this guide, the
+  security policy, CLI output, MCP tool descriptions, the web UI, the code and its comments,
+  the decision records, the roadmap, the research notes and the agents' prompts. A public
+  repository that switches language halfway is a repository half of which nobody outside can
+  read, including the comments that explain the decisions worth reading.
+
+  Two things stay in Spanish, and both are **data rather than prose we wrote**: the patterns
+  that match the corpus (the classification rules in `packages/core/src/text.ts`, the
+  deictics in `domain.ts`, the eval fixtures) and the **output language** of the LLM agents
+  (`OUTPUT_LANGUAGE` in `packages/agents/src/mastra.ts`), because what they produce is stored
+  next to a corpus that is already Spanish. Each of those carries an English comment saying
+  why. Translating a prompt is a translation; changing the output language is a product
+  decision.
+
+  Being Spanish speakers, the two entry points are also kept in Spanish —
+  [`README.es.md`](./README.es.md) and [`CONTRIBUTING.es.md`](./CONTRIBUTING.es.md) — and
+  English is the version that must be current when they disagree.
 - **No secrets in the repository.** `.env` is ignored; use `.env.example`. Secrets are
   scrubbed before anything reaches an LLM and again before it is stored.
 - **Traceability.** Every unit of knowledge keeps its source, date, author, confidence, status

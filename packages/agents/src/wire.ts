@@ -6,10 +6,10 @@ import { createMediaExtractor } from "./media.js";
 import { wireReconciler } from "./reconcile.js";
 
 /**
- * ÚNICO punto de cableado de la capa LLM en core. Lo llama cada entrypoint tras
- * loadEnv() (antes este ritual estaba copiado con variaciones en mcp-server, web y
- * server, y parte se ejecutaba como side effect de import). Sin LLM configurado solo
- * registra el sink de uso de embeddings; core sigue funcionando con heurísticas.
+ * The ONE place where the LLM layer is wired into core. Every entrypoint calls it after
+ * loadEnv() (this ritual used to be copied, with variations, across mcp-server, web and
+ * server, and part of it ran as an import side effect). With no LLM configured it only
+ * registers the embedding usage sink; core keeps working on heuristics.
  */
 let wired = false;
 export function wireLlm(): void {

@@ -1,11 +1,11 @@
 /**
- * `@cortex/client` — todo el código del LADO CLIENTE de Cortex: hablar con el servidor por
- * HTTP, leer credenciales, resolver el `.cortex.json` de un repo y leer los transcripts de
- * los agentes.
+ * `@cortex/client` -- all of Cortex's CLIENT-SIDE code: talking to the server over HTTP,
+ * reading credentials, resolving a repo's `.cortex.json` and reading agent transcripts.
  *
- * La regla del paquete: **nada de Postgres, nada de LLM, nada pesado**. Solo depende de
- * `@cortex/shared` (tipos y contratos). Es lo que permite empaquetar el CLI y distribuirlo
- * con `npm i -g` sin arrastrar el monorepo entero al portátil de cada dev (ADR-0025).
+ * The package rule: **no Postgres, no LLM, nothing heavy**. It depends only on
+ * `@cortex/shared` (types and contracts). That is what allows the CLI to be bundled and
+ * shipped with `npm i -g` without dragging the whole monorepo onto every dev's laptop
+ * (ADR-0025).
  */
 export * from "./credentials.js";
 export * from "./api-client.js";

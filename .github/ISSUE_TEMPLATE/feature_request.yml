@@ -1,22 +1,22 @@
-name: Propuesta
-description: Sugerir una capacidad o un cambio
+name: Proposal
+description: Suggest a capability or a change
 labels: ["enhancement"]
 body:
   - type: textarea
     id: problem
     attributes:
-      label: Qué problema resuelve
-      description: Empieza por el problema, no por la solución. Qué intentabas hacer y con qué te chocaste.
+      label: What problem it solves
+      description: Start from the problem, not from the solution. What you were trying to do, and what you ran into.
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Qué propones
+      label: What you propose
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternativas que has considerado
-      description: Incluido "no hacer nada". Ayuda a valorar si compensa.
+      label: Alternatives you considered
+      description: Including "do nothing". It helps weigh whether this is worth it.

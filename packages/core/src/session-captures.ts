@@ -4,12 +4,12 @@ import type { CaptureSessionCounters } from "@cortex/shared";
 import type { Row } from "./map.js";
 
 /**
- * Registro de qué sesiones de agente se han destilado ya.
+ * A record of which agent sessions have already been distilled.
  *
- * Los hooks de fin de sesión y de pre-compactación disparan **varias veces sobre la misma
- * sesión**, y destilar es la parte cara del pipeline (una llamada al modelo por ventana de
- * transcript). Sin este registro, cerrar y reabrir una sesión pagaría dos veces por el
- * mismo conocimiento.
+ * The end-of-session and pre-compaction hooks fire **several times over the same session**,
+ * and distilling is the expensive part of the pipeline (one model call per transcript
+ * window). Without this record, closing and reopening a session would pay twice for the same
+ * knowledge.
  */
 
 export type SessionCaptureStatus = "queued" | "running" | "done" | "failed";
@@ -51,11 +51,11 @@ export async function findSessionCapture(
 }
 
 /**
- * Reserva (o re-reserva) el trabajo de destilar una sesión y lo deja en `queued`.
+ * Claims (or re-claims) the job of distilling a session and leaves it `queued`.
  *
- * Un solo `INSERT … ON CONFLICT DO UPDATE` en vez de comprobar-y-luego-escribir: dos hooks
- * simultáneos sobre la misma sesión son un caso real, y con check-then-act los dos se
- * creerían los primeros.
+ * A single `INSERT ... ON CONFLICT DO UPDATE` rather than check-then-write: two simultaneous
+ * hooks over the same session is a real case, and with check-then-act both would believe they
+ * were first.
  */
 export async function upsertSessionCapture(input: {
   projectId: string;
@@ -106,14 +106,14 @@ export async function getSessionCaptureById(id: string): Promise<SessionCapture 
 }
 
 /**
- * Marca como fallidos los trabajos que quedaron `running` más de `olderThanMinutes`.
- * Un reinicio del servidor a media destilación deja filas que nadie va a terminar, y sin
- * esto bloquearían para siempre la re-captura de esa sesión.
+ * Marks as failed any job left `running` for more than `olderThanMinutes`.
+ * A server restart mid-distillation leaves rows nobody is going to finish, and without this
+ * they would block re-capturing that session forever.
  */
 export async function reapStuckSessionCaptures(olderThanMinutes = 30): Promise<number> {
   const rows = (await getSql()`
     UPDATE session_captures
-    SET status = 'failed', error = 'interrumpido (el servidor se reinició durante la destilación)', updated_at = now()
+    SET status = 'failed', error = 'interrupted (the server restarted during distillation)', updated_at = now()
     WHERE status IN ('queued','running') AND updated_at < now() - (${olderThanMinutes} * interval '1 minute')
     RETURNING id
   `) as unknown as Row[];

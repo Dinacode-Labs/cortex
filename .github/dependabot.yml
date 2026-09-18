@@ -1,5 +1,5 @@
-# Actualizaciones automáticas. El objetivo es enterarse pronto, no fusionar a ciegas:
-# los PRs pasan el mismo CI que cualquier otro cambio.
+# Automatic updates. The point is to find out early, not to merge blindly:
+# these PRs go through the same CI as any other change.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -9,15 +9,15 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
-      # Agrupadas: un PR semanal en vez de veinte.
+      # Grouped: one PR a week instead of twenty.
       minor-and-patch:
         update-types: ["minor", "patch"]
     ignore:
-      # zod convive en dos versiones a propósito (v3 en todo el repo, v4 en agents porque lo
-      # exige Mastra; ADR-0008). Un bump automático rompería ese equilibrio.
+      # zod lives in two versions on purpose (v3 across the repo, v4 in agents because Mastra
+      # requires it; ADR-0008). An automatic bump would break that balance.
       - dependency-name: "zod"
-    # OJO: `xlsx` se instala desde el CDN de SheetJS por URL y Dependabot NO sigue tarballs.
-    # Hay que revisarlo a mano cada trimestre (ver SECURITY.md).
+    # Careful: `xlsx` installs from SheetJS's CDN by URL and Dependabot does NOT follow
+    # tarballs. It has to be reviewed by hand every quarter (see SECURITY.md).
   - package-ecosystem: github-actions
     directory: "/"
     schedule:

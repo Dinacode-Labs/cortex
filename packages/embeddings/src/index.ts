@@ -10,38 +10,38 @@ export { setEmbeddingUsageSink, type EmbeddingUsage } from "./usage-sink.js";
 
 let cached: EmbeddingProvider | undefined;
 
-/** Descarta el singleton. Solo para tests: en producción la config no cambia en caliente
- *  y recrear el proveedor a mitad de una ingesta mezclaría dimensiones. */
+/** Drops the singleton. Tests only: in production the config does not change at runtime,
+ *  and recreating the provider mid-ingest would mix dimensions. */
 export function resetEmbeddingProvider(): void {
   cached = undefined;
 }
 
 let warnedNanAlias = false;
 
-/** Lee la dimensión declarada y falla pronto si no es utilizable: la dimensión define el
- *  esquema vectorial, y un valor inválido no se detectaría hasta el primer INSERT. */
+/** Reads the declared dimension and fails early when it is unusable: the dimension defines
+ *  the vector schema, and an invalid value would go unnoticed until the first INSERT. */
 function requireDim(raw: string): number {
   const dim = Number(raw);
   if (!Number.isInteger(dim) || dim <= 0) {
-    throw new Error(`EMBEDDINGS_DIM debe ser un entero positivo (recibido: "${raw}").`);
+    throw new Error(`EMBEDDINGS_DIM must be a positive integer (got: "${raw}").`);
   }
   return dim;
 }
 
 /**
- * Devuelve el proveedor de embeddings configurado vía EMBEDDINGS_PROVIDER
- * (local | openai-compatible | openai | voyage). Por defecto "local" para arrancar sin
- * claves. Singleton perezoso.
+ * Returns the embedding provider configured through EMBEDDINGS_PROVIDER
+ * (local | openai-compatible | openai | voyage). Defaults to "local" so it starts with no
+ * keys. Lazy singleton.
  */
 export function getEmbeddingProvider(): EmbeddingProvider {
   if (cached) return cached;
-  // `|| "local"`: una variable declarada pero vacía cuenta como "sin configurar" y debe
-  // caer al default, no reventar el arranque con "proveedor desconocido: ''".
+  // `|| "local"`: a variable that is declared but empty counts as "unset" and must fall
+  // back to the default, not blow up startup with "unknown provider: ''".
   const provider = (getEnv("EMBEDDINGS_PROVIDER", "local").trim() || "local").toLowerCase();
   switch (provider) {
     case "openai":
-      // Modelo/dim configurables (ADR-0023). Default text-embedding-3-large (3072-dim,
-      // buen multilingüe); baja a text-embedding-3-small (1536) por coste con
+      // Model/dim are configurable (ADR-0023). Default text-embedding-3-large (3072-dim,
+      // good multilingual); drop to text-embedding-3-small (1536) for cost with
       // OPENAI_EMBEDDING_MODEL/OPENAI_EMBEDDING_DIM.
       cached = new OpenAICompatibleEmbeddingProvider({
         apiKey: requireEnv("OPENAI_API_KEY"),
@@ -51,7 +51,7 @@ export function getEmbeddingProvider(): EmbeddingProvider {
       });
       break;
     case "nan": {
-      // ALIAS OBSOLETO de openai-compatible con los defaults de NaN. Se retira en v0.2.0.
+      // DEPRECATED ALIAS of openai-compatible with NaN's defaults. Removed in v0.2.0.
       if (!warnedNanAlias) {
         warnedNanAlias = true;
         console.warn(
@@ -69,8 +69,8 @@ export function getEmbeddingProvider(): EmbeddingProvider {
       break;
     }
     case "openai-compatible": {
-      // Cualquier endpoint que sirva /v1/embeddings: NaN, Ollama, vLLM, TEI, LM Studio.
-      // La dimensión es OBLIGATORIA: no se puede adivinar y define el esquema vectorial.
+      // Any endpoint serving /v1/embeddings: NaN, Ollama, vLLM, TEI, LM Studio.
+      // The dimension is MANDATORY: it cannot be guessed and it defines the vector schema.
       const apiKey = getEnv("EMBEDDINGS_API_KEY", "").trim();
       cached = new OpenAICompatibleEmbeddingProvider({
         apiKey: apiKey || (getEnv("EMBEDDINGS_ALLOW_NO_KEY", "").trim() ? "no-key" : requireEnv("EMBEDDINGS_API_KEY")),
@@ -81,8 +81,8 @@ export function getEmbeddingProvider(): EmbeddingProvider {
       break;
     }
     case "voyage":
-      // Voyage es OpenAI-compatible para embeddings: reutilizamos el mismo cliente
-      // (con reintentos y reporte de uso unificado). Mismo env var y mismo fallo si falta.
+      // Voyage is OpenAI-compatible for embeddings: the same client is reused (with retries
+      // and unified usage reporting). Same env var, and the same failure when it is missing.
       cached = new OpenAICompatibleEmbeddingProvider({
         apiKey: requireEnv("VOYAGE_API_KEY"),
         baseURL: "https://api.voyageai.com/v1",
@@ -95,7 +95,7 @@ export function getEmbeddingProvider(): EmbeddingProvider {
       break;
     default:
       throw new Error(
-        `EMBEDDINGS_PROVIDER desconocido: "${provider}". Usa local | openai-compatible | openai | voyage.`,
+        `Unknown EMBEDDINGS_PROVIDER: "${provider}". Use local | openai-compatible | openai | voyage.`,
       );
   }
   return cached;

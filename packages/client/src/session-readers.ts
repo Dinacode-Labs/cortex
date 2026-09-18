@@ -3,17 +3,18 @@ import { homedir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
 /**
- * Lectores del STORE de sesiones de cada agente. Cada agente guarda sus conversaciones a su
- * manera —JSONL por sesión, ficheros sueltos por mensaje, SQLite— y aquí se traducen todas a
- * lo mismo: `{ sessionId, condensed }` con el diálogo útil, sin tool calls ni volcados.
+ * Readers for each agent's session STORE. Every agent stores its conversations its own way --
+ * JSONL per session, loose files per message, SQLite -- and here they are all translated into
+ * the same thing: `{ sessionId, condensed }` with the useful dialogue, no tool calls and no
+ * dumps.
  *
- * Se usan en dos sitios: el backfill (`connect-sessions`, que quiere TODAS las sesiones de un
- * repo) y el hook de captura (que quiere UNA, la que acaba de terminar). De ahí que cada
- * agente tenga las dos variantes.
+ * They are used in two places: the backfill (`connect-sessions`, which wants ALL of a repo's
+ * sessions) and the capture hook (which wants ONE, the session that just ended). Hence the two
+ * variants per agent.
  *
- * Defensivos por diseño: si el store no existe, cambia de formato o está a medio escribir,
- * devuelven vacío en vez de lanzar. Un hook no debe romper la sesión de nadie.
- * Ver docs/research/hooks-integration.md.
+ * Defensive by design: when the store does not exist, changes format or is half-written, they
+ * return empty instead of throwing. A hook must not break anybody's session.
+ * See docs/research/hooks-integration.md.
  */
 export interface RawSession {
   sessionId: string;
@@ -23,7 +24,7 @@ export interface RawSession {
 const MAX_MSG = 2000;
 const MAX_TOTAL = 60_000;
 
-/** Une mensajes {role,text} en un transcript legible (cap por mensaje y total). */
+/** Joins {role,text} messages into a readable transcript (capped per message and overall). */
 function condenseMessages(msgs: { role: string; text: string }[]): string {
   const out: string[] = [];
   let total = 0;
@@ -62,7 +63,7 @@ function codexRoot(): string {
   return process.env.CORTEX_CODEX_DIR || join(homedir(), ".codex", "sessions");
 }
 
-/** Lee un rollout de Codex. Devuelve también el `cwd` para poder filtrar por repo. */
+/** Reads a Codex rollout. It also returns the `cwd` so results can be filtered by repo. */
 function readCodexFile(file: string): (RawSession & { cwd: string }) | null {
   const lines = safe(() => readFileSync(file, "utf8").split("\n").filter(Boolean), [] as string[]);
   let cwd = "";
@@ -85,9 +86,9 @@ function readCodexFile(file: string): (RawSession & { cwd: string }) | null {
 }
 
 /**
- * Localiza el rollout de una sesión. Codex nombra los ficheros
- * `rollout-<fecha>-<uuid>.jsonl` y los reparte por año/mes/día, así que el id que llega por
- * el hook no basta para construir la ruta: hay que buscarlo.
+ * Locates a session's rollout. Codex names the files `rollout-<date>-<uuid>.jsonl` and spreads
+ * them across year/month/day, so the id the hook hands over is not enough to build the path:
+ * it has to be searched for.
  */
 export function findCodexRollout(sessionId: string): string | null {
   if (!sessionId) return null;
@@ -97,7 +98,7 @@ export function findCodexRollout(sessionId: string): string | null {
   return null;
 }
 
-/** El rollout más reciente de un repo: el recurso cuando el hook no da el id de sesión. */
+/** A repo's most recent rollout: the fallback when the hook gives no session id. */
 export function latestCodexRollout(repoPath: string): string | null {
   const target = resolve(repoPath);
   const files = walkJsonl(codexRoot())
@@ -110,7 +111,7 @@ export function latestCodexRollout(repoPath: string): string | null {
   return null;
 }
 
-/** Una sesión de Codex por ruta al rollout o por id. */
+/** One Codex session, by rollout path or by id. */
 export function readCodexSession(ref: string): RawSession | null {
   const file = ref.endsWith(".jsonl") && existsSync(ref) ? ref : findCodexRollout(ref);
   if (!file) return null;
@@ -123,40 +124,40 @@ export function readCodexSessions(repoPath: string): RawSession[] {
   const sessions: RawSession[] = [];
   for (const file of walkJsonl(codexRoot())) {
     const s = readCodexFile(file);
-    if (!s || resolve(s.cwd || "") !== target) continue; // solo sesiones de este repo
+    if (!s || resolve(s.cwd || "") !== target) continue; // only sessions from this repo
     sessions.push({ sessionId: s.sessionId, condensed: s.condensed });
   }
   return sessions;
 }
 
 /**
- * Carga `node:sqlite` sin que el bundler pueda tocar el nombre del módulo.
+ * Loads `node:sqlite` in a way the bundler cannot touch the module name.
  *
- * Con el especificador literal, esbuild (vía tsup) reescribía `import("node:sqlite")` como
- * `import("sqlite")` —quitando el prefijo— al empaquetar el CLI. Ese módulo no existe, la
- * importación lanzaba, el `catch` devolvía vacío y la captura de OpenCode y de Hermes se iba
- * en silencio: funcionaba desde las fuentes y no funcionaba desde npm, que es la peor forma de
- * que algo esté roto. Partir la cadena impide la reescritura, porque el bundler ya no ve una
- * constante. Hay un test que comprueba el bundle (`tests/cli-smoke.test.ts`).
+ * With the literal specifier, esbuild (through tsup) rewrote `import("node:sqlite")` as
+ * `import("sqlite")` -- dropping the prefix -- when bundling the CLI. That module does not
+ * exist, the import threw, the `catch` returned empty and OpenCode and Hermes capture failed
+ * silently: it worked from source and did not work from npm, which is the worst way for
+ * something to be broken. Splitting the string prevents the rewrite, because the bundler no
+ * longer sees a constant. There is a test covering the bundle (`tests/cli-smoke.test.ts`).
  */
-async function cargaSqlite(): Promise<any | null> {
-  const modulo = "node:" + "sqlite";
+async function loadSqlite(): Promise<any | null> {
+  const specifier = "node:" + "sqlite";
   try {
-    return await import(/* @vite-ignore */ modulo);
+    return await import(/* @vite-ignore */ specifier);
   } catch {
     return null; // Node < 22.5
   }
 }
 
-// --- OpenCode: SQLite (opencode.db) y, si no, el store de ficheros antiguo -----
+// --- OpenCode: SQLite (opencode.db) and, failing that, the old file store -----
 //
-// OpenCode movió las sesiones de `storage/{session,message,part}/*.json` a una base SQLite
-// (`opencode.db`, tablas session/message/part). El lector de ficheros seguía buscando el layout
-// viejo, no encontraba nada y la captura se iba en silencio: OpenCode parecía configurado y no
-// guardaba una sola sesión. Se soportan los dos, empezando por la base, porque un portátil con
-// OpenCode antiguo conserva el store de ficheros.
+// OpenCode moved sessions from `storage/{session,message,part}/*.json` into a SQLite database
+// (`opencode.db`, tables session/message/part). The file reader kept looking for the old
+// layout, found nothing, and capture failed silently: OpenCode looked configured and stored not
+// a single session. Both are supported, database first, because a laptop with an older
+// OpenCode still has the file store.
 
-/** Una sesión de OpenCode por id (lo que da el hook). */
+/** One OpenCode session by id (what the hook provides). */
 export async function readOpenCodeSession(sessionId: string): Promise<RawSession | null> {
   if (!sessionId) return null;
   return (await collectOpenCode(null, sessionId))[0] ?? null;
@@ -170,35 +171,35 @@ function openCodeRoot(): string {
   return process.env.CORTEX_OPENCODE_DIR || join(homedir(), ".local/share/opencode/storage");
 }
 
-/** La base vive un nivel por encima del store de ficheros (…/opencode/opencode.db). */
+/** The database lives one level above the file store (.../opencode/opencode.db). */
 function openCodeDbPath(): string {
   return process.env.CORTEX_OPENCODE_DB || join(openCodeRoot(), "..", "opencode.db");
 }
 
 async function collectOpenCode(target: string | null, wantedId: string | null): Promise<RawSession[]> {
-  const desdeDb = await collectOpenCodeDb(target, wantedId);
-  if (desdeDb.length > 0) return desdeDb;
+  const fromDb = await collectOpenCodeDb(target, wantedId);
+  if (fromDb.length > 0) return fromDb;
   return collectOpenCodeFiles(target, wantedId);
 }
 
-/** Formato actual: SQLite. `part.data` es JSON; solo interesa `{type:"text", text}`. */
+/** Current format: SQLite. `part.data` is JSON; only `{type:"text", text}` matters. */
 async function collectOpenCodeDb(target: string | null, wantedId: string | null): Promise<RawSession[]> {
   const dbPath = openCodeDbPath();
   if (!existsSync(dbPath)) return [];
-  const sqlite = await cargaSqlite();
-  if (!sqlite) return []; // Node < 22.5: se intentará el store de ficheros
+  const sqlite = await loadSqlite();
+  if (!sqlite) return []; // Node < 22.5: the file store will be tried instead
   const { DatabaseSync } = sqlite;
   const out: RawSession[] = [];
   try {
     const db = new DatabaseSync(dbPath, { readOnly: true });
-    const sesiones = db
+    const sessions = db
       .prepare("SELECT id, directory, parent_id FROM session ORDER BY time_created ASC")
       .all() as { id: string; directory?: string; parent_id?: string | null }[];
     const stmtMsgs = db.prepare("SELECT id, data FROM message WHERE session_id = ? ORDER BY time_created ASC");
     const stmtParts = db.prepare("SELECT data FROM part WHERE message_id = ? ORDER BY time_created ASC");
 
-    for (const s of sesiones) {
-      if (s.parent_id) continue; // subagentes: su diálogo ya viaja en el de la sesión padre
+    for (const s of sessions) {
+      if (s.parent_id) continue; // sub-agents: their dialogue already travels in the parent's
       if (wantedId && s.id !== wantedId) continue;
       if (target && s.directory && resolve(s.directory) !== target) continue;
 
@@ -218,12 +219,12 @@ async function collectOpenCodeDb(target: string | null, wantedId: string | null)
     }
     db.close();
   } catch {
-    return []; // base bloqueada o con otro esquema: que lo intente el store de ficheros
+    return []; // database locked or with a different schema: let the file store try
   }
   return out;
 }
 
-/** Formato antiguo: un fichero JSON por sesión, mensaje y parte. */
+/** Old format: one JSON file per session, message and part. */
 function collectOpenCodeFiles(target: string | null, wantedId: string | null): RawSession[] {
   const base = openCodeRoot();
   const sessionsDir = join(base, "session");
@@ -235,7 +236,7 @@ function collectOpenCodeFiles(target: string | null, wantedId: string | null): R
     for (const f of readdirSync(pdir)) {
       if (!f.endsWith(".json")) continue;
       const info = safe(() => JSON.parse(readFileSync(join(pdir, f), "utf8")) as { id?: string; directory?: string; parentID?: string }, null);
-      if (!info?.id || info.parentID) continue; // saltar subagentes
+      if (!info?.id || info.parentID) continue; // skip sub-agents
       if (wantedId && info.id !== wantedId) continue;
       if (target && info.directory && resolve(info.directory) !== target) continue;
       const sid = info.id;
@@ -267,7 +268,7 @@ function collectOpenCodeFiles(target: string | null, wantedId: string | null): R
 }
 
 // --- Hermes: ~/.hermes/state.db (SQLite: sessions, messages) ------------------
-/** Una sesión de Hermes por id. */
+/** One Hermes session by id. */
 export async function readHermesSession(sessionId: string): Promise<RawSession | null> {
   if (!sessionId) return null;
   const all = await collectHermes(null, sessionId);
@@ -281,16 +282,16 @@ export async function readHermesSessions(repoPath: string): Promise<RawSession[]
 async function collectHermes(target: string | null, wantedId: string | null): Promise<RawSession[]> {
   const dbPath = process.env.CORTEX_HERMES_DB || join(homedir(), ".hermes", "state.db");
   if (!existsSync(dbPath)) return [];
-  const sqlite = await cargaSqlite();
+  const sqlite = await loadSqlite();
   if (!sqlite) {
-    console.error("  (node:sqlite no disponible; Hermes requiere Node ≥ 22)");
+    console.error("  (node:sqlite unavailable; Hermes needs Node >= 22)");
     return [];
   }
   const { DatabaseSync } = sqlite;
   const out: RawSession[] = [];
   try {
     const db = new DatabaseSync(dbPath, { readOnly: true });
-    // sessions.cwd puede no existir; filtramos por cwd si está, si no, todas.
+    // sessions.cwd may not exist; filter by cwd when present, otherwise take them all.
     const cols = (db.prepare("PRAGMA table_info(sessions)").all() as { name: string }[]).map((c) => c.name);
     const hasCwd = cols.includes("cwd");
     const sessRows = (hasCwd ? db.prepare("SELECT id, cwd FROM sessions").all() : db.prepare("SELECT id FROM sessions").all()) as { id: string; cwd?: string }[];
@@ -304,23 +305,23 @@ async function collectHermes(target: string | null, wantedId: string | null): Pr
     }
     db.close();
   } catch (e) {
-    console.error(`  (no se pudo leer ${dbPath}: ${(e as Error).message})`);
+    console.error(`  (could not read ${dbPath}: ${(e as Error).message})`);
   }
   return out;
 }
 
-// --- Pi: ~/.pi/agent/sessions/<carpeta por cwd>/<ts>_<uuid>.jsonl ------------
+// --- Pi: ~/.pi/agent/sessions/<folder per cwd>/<ts>_<uuid>.jsonl -------------
 function piRoot(): string {
   return process.env.CORTEX_PI_DIR || join(homedir(), ".pi", "agent", "sessions");
 }
 
 /**
- * Lee una sesión de Pi. El fichero empieza por una línea `{"type":"session", cwd, id}` y
- * sigue con `{"type":"message", message:{role, content:[{type:"text", text}]}}`.
+ * Reads a Pi session. The file starts with a `{"type":"session", cwd, id}` line and continues
+ * with `{"type":"message", message:{role, content:[{type:"text", text}]}}`.
  *
- * El nombre de la carpeta sale de sanear el cwd (las barras pasan a guiones), lo que hace
- * imposible deshacerlo sin ambigüedad: por eso el repo se comprueba leyendo el `cwd` de
- * dentro del fichero y no adivinándolo desde la ruta.
+ * The folder name comes from sanitising the cwd (slashes become hyphens), which makes it
+ * impossible to undo unambiguously: that is why the repo is checked by reading the `cwd` from
+ * inside the file rather than guessing it from the path.
  */
 export function readPiSession(filePath: string): (RawSession & { cwd: string }) | null {
   if (!existsSync(filePath)) return null;
@@ -350,7 +351,7 @@ export function readPiSession(filePath: string): (RawSession & { cwd: string }) 
   return { sessionId: id || basename(filePath).replace(/\.jsonl$/, ""), condensed, cwd };
 }
 
-/** Todas las sesiones de Pi de un repo. */
+/** Every Pi session belonging to a repo. */
 export function readPiSessions(repoPath: string): RawSession[] {
   const root = piRoot();
   if (!existsSync(root)) return [];
@@ -371,9 +372,9 @@ export function readPiSessions(repoPath: string): RawSession[] {
 export type CaptureAgent = "claude" | "codex" | "opencode" | "hermes" | "pi";
 
 /**
- * Una sola sesión, sea cual sea el agente. `ref` es lo que tenga a mano el hook: una ruta de
- * fichero (Claude, Pi, Codex) o un id de sesión (OpenCode, Hermes, Codex). Devuelve `null`
- * si no se encuentra, y quien llama decide si eso merece un aviso o silencio.
+ * A single session, whichever the agent. `ref` is whatever the hook has at hand: a file path
+ * (Claude, Pi, Codex) or a session id (OpenCode, Hermes, Codex). It returns `null` when
+ * nothing is found, and the caller decides whether that deserves a warning or silence.
  */
 export async function readSessionByRef(platform: CaptureAgent, ref: string): Promise<RawSession | null> {
   if (!ref) return null;
@@ -389,7 +390,7 @@ export async function readSessionByRef(platform: CaptureAgent, ref: string): Pro
       return s ? { sessionId: s.sessionId, condensed: s.condensed } : null;
     }
     default:
-      return null; // claude va por `condenseSession(transcript_path)`, que conserva más señal
+      return null; // claude goes through `condenseSession(transcript_path)`, which keeps more signal
   }
 }
 

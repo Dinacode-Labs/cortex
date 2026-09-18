@@ -1,5 +1,6 @@
--- Búsqueda léxica (BM25-like) con Full-Text Search de Postgres, para combinar con
--- la búsqueda vectorial (híbrido + RRF). Config 'spanish' (stemming + stopwords ES).
+-- Lexical search (BM25-like) with Postgres Full-Text Search, to combine with vector
+-- search (hybrid + RRF). The 'spanish' configuration (stemming + ES stopwords) is chosen
+-- to match the corpus being ingested, not the language of this repository.
 
 ALTER TABLE context_entries
   ADD COLUMN content_tsv tsvector

@@ -2,11 +2,11 @@ import { spawnSync } from "node:child_process";
 import { CLI_VERSION } from "../version.js";
 
 /**
- * `cortex upgrade` — instala la última versión publicada.
+ * `cortex upgrade` -- installs the latest published version.
  *
- * Es un atajo a `npm i -g @dinacodelabs/cortex@latest`, que es lo que la gente no se acuerda de
- * escribir. Después recuerda `cortex setup --all`: una versión nueva puede traer hooks o
- * plugin nuevos, y el CLI por sí solo no reconfigura los agentes.
+ * It is a shortcut for `npm i -g @dinacodelabs/cortex@latest`, which is what people never
+ * remember to type. Afterwards it reminds you about `cortex setup --all`: a new version may
+ * bring new hooks or a new plugin, and the CLI on its own does not reconfigure the agents.
  */
 const PACKAGE = process.env.CORTEX_NPM_PACKAGE || "@dinacodelabs/cortex";
 

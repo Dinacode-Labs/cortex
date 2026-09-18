@@ -2,16 +2,18 @@ import { describe, it, expect } from "vitest";
 import { inferTypeFromQuery } from "../packages/core/src/query-intent.js";
 
 /**
- * Deducir el tipo de la pregunta salió del eval: «¿Qué deuda técnica hay alrededor de la
- * facturación?» recuperaba 0 de 2 porque los cinco resultados hablaban de facturación sin que
- * ninguno fuera deuda técnica.
+ * Inferring the type from the question came out of the eval: "what technical debt is there
+ * around billing?" retrieved 0 out of 2 because all five results were about billing without any
+ * of them being technical debt.
  *
- * Lo que se prueba aquí, sobre todo, es que NO se pase de listo: deducir un tipo donde la
- * pregunta no lo nombra empujaría a la respuesta equivocada en preguntas normales, que son la
- * mayoría.
+ * What is tested here, above all, is that it does NOT get clever: inferring a type where the
+ * question names none would nudge towards the wrong answer in ordinary questions, which are the
+ * majority.
+ *
+ * The questions are in Spanish because the corpus is: these are inputs, not our text.
  */
 describe("inferTypeFromQuery", () => {
-  it("reconoce la categoría cuando la pregunta la nombra", () => {
+  it("recognises the category when the question names it", () => {
     expect(inferTypeFromQuery("¿Qué deuda técnica hay alrededor de la facturación?")).toBe("technical_debt");
     expect(inferTypeFromQuery("¿Qué decisiones hay sobre los reintentos?")).toBe("decision");
     expect(inferTypeFromQuery("¿Qué restricciones tiene la subida?")).toBe("constraint");
@@ -22,13 +24,13 @@ describe("inferTypeFromQuery", () => {
     expect(inferTypeFromQuery("¿Cómo es la arquitectura del servicio?")).toBe("architecture");
   });
 
-  it("también en inglés, que es en lo que preguntan los agentes a veces", () => {
+  it("in English too, which is what agents sometimes ask in", () => {
     expect(inferTypeFromQuery("what technical debt is around billing?")).toBe("technical_debt");
     expect(inferTypeFromQuery("any constraints on uploads?")).toBe("constraint");
   });
 
-  it("no deduce nada en una pregunta normal", () => {
-    // Media pregunta en español empieza por "cómo": deducir `how_to` aquí haría daño.
+  it("infers nothing from an ordinary question", () => {
+    // Half the questions in Spanish start with "cómo": inferring `how_to` here would do harm.
     expect(inferTypeFromQuery("¿Cómo se autentican los usuarios?")).toBeNull();
     expect(inferTypeFromQuery("¿Cuánto pesa como mucho un documento?")).toBeNull();
     expect(inferTypeFromQuery("¿A qué hora se cierra la facturación?")).toBeNull();
@@ -36,8 +38,8 @@ describe("inferTypeFromQuery", () => {
     expect(inferTypeFromQuery("")).toBeNull();
   });
 
-  it("«deuda técnica» gana a «decisión» cuando aparecen las dos", () => {
-    // El orden de los patrones importa: lo específico primero.
+  it("\"technical debt\" beats \"decision\" when both appear", () => {
+    // The order of the patterns matters: the specific one first.
     expect(inferTypeFromQuery("¿Qué decisión tomamos sobre la deuda técnica de facturación?")).toBe("technical_debt");
   });
 });

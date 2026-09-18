@@ -1,16 +1,16 @@
 /**
- * Versión del CLI, inyectada por tsup al empaquetar (`define`). En desarrollo, con `tsx`, esa
- * constante no existe: de ahí el fallback, que también sirve para distinguir «ejecutando
- * desde el repo» de «instalado desde npm».
+ * The CLI's version, injected by tsup at bundle time (`define`). In development, under `tsx`,
+ * that constant does not exist: hence the fallback, which also distinguishes "running from the
+ * repo" from "installed from npm".
  */
 declare const __CORTEX_VERSION__: string | undefined;
 
 export const CLI_VERSION: string = typeof __CORTEX_VERSION__ === "string" ? __CORTEX_VERSION__ : "dev";
 
 /**
- * Los tres números de un semver, ignorando el prefijo `v` y cualquier sufijo de prerelease o
- * build (`0.1.12-beta.1` → 0.1.12). Con más precisión no hace falta: las versiones de Cortex
- * son `x.y.z` y lo que se compara es «¿va por delante o por detrás?».
+ * A semver's three numbers, ignoring the `v` prefix and any prerelease or build suffix
+ * (`0.1.12-beta.1` -> 0.1.12). More precision is not needed: Cortex's versions are `x.y.z` and
+ * what gets compared is "is it ahead or behind?".
  */
 function parts(version: string): [number, number, number] {
   const m = /^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?/.exec(version.trim());
@@ -19,9 +19,9 @@ function parts(version: string): [number, number, number] {
 }
 
 /**
- * Compara dos versiones: negativo si `a` < `b`, 0 si iguales, positivo si `a` > `b`.
- * `dev` (el CLI ejecutado desde el repo, o un servidor sin `package.json`) no es comparable:
- * se trata como igual a cualquier cosa, para que nunca bloquee ni avise.
+ * Compares two versions: negative when `a` < `b`, 0 when equal, positive when `a` > `b`.
+ * `dev` (the CLI run from the repo, or a server with no `package.json`) is not comparable: it
+ * is treated as equal to anything, so it never blocks and never warns.
  */
 export function compareVersions(a: string, b: string): number {
   if (a === "dev" || b === "dev") return 0;
@@ -33,7 +33,7 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/** `version` es anterior a `min`. `dev` nunca se considera antigua. */
+/** `version` is older than `min`. `dev` is never considered old. */
 export function isOlderThan(version: string, min: string): boolean {
   return compareVersions(version, min) < 0;
 }

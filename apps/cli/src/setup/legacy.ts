@@ -4,13 +4,13 @@ import { readText, tilde } from "./fs.js";
 import type { SetupCtx, SetupReport } from "./types.js";
 
 /**
- * Limpieza de la instalación anterior a ADR-0025: un clon del monorepo en
- * `~/.dinacode-cortex` y un shim `~/.local/bin/cortex` que ejecutaba `tsx` sobre él.
+ * Cleaning up the pre-ADR-0025 installation: a monorepo clone in `~/.dinacode-cortex` and a
+ * `~/.local/bin/cortex` shim that ran `tsx` over it.
  *
- * Mientras el shim siga en el PATH gana al `cortex` de npm (o al revés, según el orden), y el
- * dev acaba usando un binario distinto del que cree. Por eso se borra, y no se avisa y ya.
- * El clon, en cambio, solo se informa: puede tener un `.env` con claves y ramas sin subir,
- * así que borrarlo es cosa del usuario.
+ * While that shim stays on the PATH it beats npm's `cortex` (or the other way round, depending
+ * on the order), and the dev ends up using a different binary from the one they think. That is
+ * why it is deleted rather than merely warned about. The clone, by contrast, is only reported:
+ * it may hold a `.env` with keys and unpushed branches, so deleting it is the user's call.
  */
 
 const LEGACY_CLONE = ".dinacode-cortex";
@@ -19,7 +19,7 @@ export function legacyShimPath(ctx: SetupCtx): string {
   return join(ctx.home, ".local/bin/cortex");
 }
 
-/** ¿Es el shim viejo (tsx sobre un clon) y no un binario legítimo? */
+/** Is this the old shim (tsx over a clone) rather than a legitimate binary? */
 export function detectLegacyShim(ctx: SetupCtx): boolean {
   const file = legacyShimPath(ctx);
   if (!existsSync(file)) return false;

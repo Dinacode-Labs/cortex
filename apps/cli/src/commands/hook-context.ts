@@ -3,26 +3,27 @@ import { apiGet, useProjectServer } from "@cortex/client";
 import { readHookStdin } from "../hook-stdin.js";
 
 /**
- * Hook de INYECCIÓN DE CONTEXTO (SessionStart de Claude Code, y equivalentes). Lee el
- * JSON del hook por stdin (`cwd`), resuelve el proyecto (`.cortex.json`) y emite el
- * context-pack del proyecto como `additionalContext` para que el agente arranque
- * "sabiendo" el proyecto. Consulta la API autenticada (permisos + atribución); no usa
- * el MCP (en SessionStart aún no está conectado). Si no hay proyecto/contexto, no
- * emite nada. Ver research/hooks-integration.md.
+ * The CONTEXT INJECTION hook (Claude Code's SessionStart, and its equivalents). It reads the
+ * hook's JSON from stdin (`cwd`), resolves the project (`.cortex.json`) and emits the project's
+ * context pack as `additionalContext` so the agent starts already "knowing" the project. It
+ * queries the authenticated API (permissions plus attribution); it does not use MCP (at
+ * SessionStart it is not connected yet). With no project or no context, it emits nothing. See
+ * research/hooks-integration.md.
  *
- * Uso: el hook lo invoca con el JSON por stdin. Manual: echo '{"cwd":"/ruta"}' | cortex hook-context
+ * Usage: the hook invokes it with the JSON on stdin. By hand:
+ * echo '{"cwd":"/path"}' | cortex hook-context
  */
 
 /**
- * Lo que cabe de memoria en el arranque de una sesión. Es un presupuesto que se le PIDE al
- * servidor, no una tijera: el servidor lo reparte entre secciones para que llegue algo de cada
- * tipo de conocimiento en vez de decisiones y nada más.
+ * How much memory fits at the start of a session. It is a budget ASKED OF the server, not a
+ * pair of scissors: the server splits it between sections so something from every kind of
+ * knowledge arrives, rather than decisions and nothing else.
  *
- * Eran 6.000 cuando el pack cubría cinco tipos. Ahora cubre once (ADR-0054), y 6.000 dejaban
- * cuatro secciones anunciadas pero vacías. Medido sobre un proyecto real de 349 entradas,
- * **8.000 es el punto donde las once llevan contenido**: 25 entradas en vez de 13, por un 33 %
- * más de presupuesto. Son ~2.000 tokens en el arranque de una sesión, que es barato para lo
- * único que el agente no puede averiguar leyendo el código.
+ * It was 6,000 when the pack covered five types. It now covers eleven (ADR-0054), and 6,000
+ * left four sections announced but empty. Measured on a real project of 349 entries, **8,000 is
+ * the point where all eleven carry content**: 25 entries instead of 13, for 33% more budget.
+ * That is ~2,000 tokens at the start of a session, which is cheap for the one thing the agent
+ * cannot work out by reading the code.
  */
 const MAX_CTX = Number(process.env.CORTEX_HOOK_CTX_CHARS ?? "8000");
 
@@ -32,35 +33,35 @@ function argOf(name: string): string | undefined {
 }
 
 /**
- * Comando `managed: false`: gestiona su propio ciclo de vida. Un hook NUNCA debe romper
- * la sesión ni ensuciar stderr, así que traga cualquier error en silencio y sale con 0.
- * (loadEnv lo hace el dispatcher antes de invocar el comando.)
+ * A `managed: false` command: it manages its own lifecycle. A hook must NEVER break the session
+ * nor pollute stderr, so it swallows any error silently and exits with 0. (loadEnv is done by
+ * the dispatcher before invoking the command.)
  */
 export async function run(): Promise<void> {
   try {
-    // Formato de salida por agente: claude/codex (additionalContext) | hermes ({context}) | text.
+    // Output format per agent: claude/codex (additionalContext) | hermes ({context}) | text.
     const format = (argOf("--format") || "claude").toLowerCase();
-    // Quien pasa `--cwd` (Pi, OpenCode) ya lo ha dicho todo: leer stdin solo puede colgarlo,
-    // porque `execFile` deja la tubería abierta y muda. Ver `readHookStdin`.
+    // Whoever passes `--cwd` (Pi, OpenCode) has already said everything: reading stdin can
+    // only hang them, because `execFile` leaves the pipe open and silent. See `readHookStdin`.
     let input: { cwd?: string; hook_event_name?: string } = {};
     if (!argOf("--cwd")) {
       try {
         input = JSON.parse((await readHookStdin()) || "{}");
       } catch {
-        /* stdin vacío o a medias: se sigue con los valores por defecto */
+        /* empty or half-written stdin: carry on with the defaults */
       }
     }
     const cwd = argOf("--cwd") || input.cwd || process.cwd();
     const link = useProjectServer(cwd);
-    if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
+    if (!link || link.ignore || !link.slug) return; // no slug link (use `cortex link`)
 
-    // Vía API autenticada (no toca la BD): respeta permisos y no expone proyectos sin acceso.
+    // Through the authenticated API (it never touches the database): it respects permissions and exposes no inaccessible project.
     const res = await apiGet<{ project: string; text: string }>(
       `/context-pack?slug=${encodeURIComponent(link.slug)}&maxChars=${MAX_CTX}`,
     );
-    if (!res || !res.text.trim()) return; // sin sesión, sin servidor, sin acceso, o pack vacío
+    if (!res || !res.text.trim()) return; // no session, no server, no access, or an empty pack
 
-    const additionalContext = `## ${getBrandName()} context — project "${res.project}"\nLiving project memory (current decisions, constraints, risks). Check it before touching a module, and capture what is new.\n\n${res.text.slice(0, MAX_CTX)}`; // el slice es red de seguridad: el reparto lo hace el servidor
+    const additionalContext = `## ${getBrandName()} context — project "${res.project}"\nLiving project memory (current decisions, constraints, risks). Check it before touching a module, and capture what is new.\n\n${res.text.slice(0, MAX_CTX)}`; // the slice is a safety net: the server does the splitting
 
     if (format === "hermes") {
       process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call
@@ -70,7 +71,7 @@ export async function run(): Promise<void> {
       process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: input.hook_event_name || "SessionStart", additionalContext } })); // Claude / Codex
     }
   } catch {
-    /* un hook nunca debe romper la sesión: silencioso */
+    /* a hook must never break the session: stay silent */
   } finally {
     process.exit(0);
   }

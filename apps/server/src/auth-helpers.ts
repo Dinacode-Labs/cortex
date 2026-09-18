@@ -2,18 +2,17 @@ import type { Context } from "hono";
 import { validateToken, type AuthUser } from "@cortex/core";
 
 /**
- * Helpers de autenticación Bearer compartidos por los routers (`routes/*`).
- * Sin estado y sin side effects: extraen el token de la cabecera y lo resuelven
- * a usuario contra la BD.
+ * Bearer authentication helpers shared by the routers (`routes/*`). Stateless and free of side
+ * effects: they pull the token out of the header and resolve it to a user against the database.
  */
 
-/** Extrae el token de la cabecera `Authorization: Bearer <token>` (null si no hay). */
+/** Extracts the token from the `Authorization: Bearer <token>` header (null when absent). */
 export function bearer(c: Context): string | null {
   const m = (c.req.header("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
   return m ? m[1]!.trim() : null;
 }
 
-/** Resuelve el usuario autenticado a partir del Bearer (null si no hay sesión válida). */
+/** Resolves the authenticated user from the Bearer (null when there is no valid session). */
 export async function currentUser(c: Context): Promise<AuthUser | null> {
   const token = bearer(c);
   return token ? validateToken(token) : null;

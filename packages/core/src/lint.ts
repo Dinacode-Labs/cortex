@@ -3,21 +3,21 @@ import { findProjectIdByName } from "./projects.js";
 import type { Row } from "./map.js";
 
 /**
- * Lint del conocimiento (patrón "LLM Wiki" de Karpathy + loops §12): health-check
- * por proyecto que reporta señales de calidad para curar la memoria.
+ * Knowledge lint (Karpathy's "LLM Wiki" pattern + the loops of section 12): a per-project
+ * health check that reports quality signals for curating the memory.
  *
- * Todas las señales miran SOLO entradas vigentes (`valid_to IS NULL`) — salvo
- * `staleHistorical`, que precisamente cuenta las históricas. Sin este filtro, el lint
- * volvía a reportar como "duplicados" las entradas que `reconcile` ya había invalidado.
+ * Every signal looks ONLY at current entries (`valid_to IS NULL`) -- except
+ * `staleHistorical`, which is precisely a count of the historical ones. Without that filter,
+ * the lint kept reporting as "duplicates" the entries `reconcile` had already invalidated.
  */
 
 export interface LintReport {
   project: string;
   totalEntries: number;
   /**
-   * Los `*Id` son de ENTRADA, y pueden faltar: un extremo de una contradicción puede ser una
-   * entidad, que no tiene página propia. Sin ellos el informe era una lista de títulos que no
-   * llevaban a ninguna parte, y un hallazgo que no puedes abrir es un hallazgo que se ignora.
+   * The `*Id`s are ENTRY ids, and they can be missing: one end of a contradiction may be an
+   * entity, which has no page of its own. Without them the report was a list of titles that
+   * led nowhere, and a finding you cannot open is a finding that gets ignored.
    */
   contradictions: { a: string; b: string; aId: string | null; bId: string | null }[];
   duplicates: { a: string; b: string; score: number; aId: string; bId: string }[];
@@ -25,12 +25,13 @@ export interface LintReport {
   lowConfidence: number;
   staleHistorical: number;
   /**
-   * Entradas vigentes que nadie ha mirado nunca.
+   * Current entries nobody has ever looked at.
    *
-   * Es el hallazgo más grande de casi cualquier proyecto y no salía en ningún sitio: en uno
-   * real, **348 de 348**. Mientras nadie valide, el estado y la confianza no distinguen nada,
-   * así que el pack no puede priorizar por fiabilidad aunque sepa hacerlo. No es un fallo del
-   * código —esta mitad del bucle es de personas— pero callarlo tampoco ayuda.
+   * It is the largest finding in almost any project and it showed up nowhere: in a real one,
+   * **348 out of 348**. While nobody validates, status and confidence tell nothing apart, so
+   * the pack cannot prioritise by reliability even though it knows how. This is not a bug in
+   * the code -- this half of the loop belongs to people -- but keeping quiet does not help
+   * either.
    */
   neverReviewed: number;
   gaps: { area: string; type: string; incidents: number }[];
@@ -40,13 +41,13 @@ export interface LintReport {
 export async function lintProject(project: string): Promise<LintReport> {
   const sql = getSql();
   const pid = await findProjectIdByName(sql, project);
-  if (!pid) throw new Error(`Proyecto no encontrado: "${project}".`);
+  if (!pid) throw new Error(`Project not found: "${project}".`);
 
   const totalEntries = Number(
     ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
 
-  // Contradicciones: relaciones 'contradicts' con algún extremo en el proyecto.
+  // Contradictions: 'contradicts' relations with either end inside the project.
   const contraRows = (await sql`
     SELECT COALESCE(es.name, ces.title, '?') AS a, COALESCE(et.name, cet.title, '?') AS b,
            ces.id AS a_id, cet.id AS b_id
@@ -62,7 +63,7 @@ export async function lintProject(project: string): Promise<LintReport> {
     LIMIT 50
   `) as unknown as Row[];
 
-  // Duplicados casi idénticos por similitud vectorial (self-join sobre embeddings).
+  // Near-identical duplicates by vector similarity (a self-join over embeddings).
   const dupRows = (await sql`
     SELECT ca.title AS a, cb.title AS b, ca.id AS a_id, cb.id AS b_id,
            (1 - (a.vector <=> b.vector)) AS score
@@ -71,20 +72,20 @@ export async function lintProject(project: string): Promise<LintReport> {
       AND a.embedding_model = b.embedding_model
     JOIN context_entries ca ON ca.id=a.context_entry_id AND ca.project_id=${pid} AND ca.valid_to IS NULL
     JOIN context_entries cb ON cb.id=b.context_entry_id AND cb.project_id=${pid} AND cb.valid_to IS NULL
-    -- Umbral por tipo: entre tipos distintos un parecido alto suele ser legítimo (la incidencia
-    -- que motivó una decisión se parece mucho a la decisión, y no sobra ninguna de las dos), así
-    -- que ahí se mantiene el listón. Dentro del mismo tipo se baja a 0.85, porque es donde cae
-    -- el eco medido en un proyecto real —la misma decisión guardada por la tool y otra vez por
-    -- la destilación de la sesión, 0.86–0.88— que antes era invisible.
+    -- Threshold per type: across different types a high similarity is usually legitimate (the
+    -- incident that prompted a decision looks a lot like the decision, and neither is
+    -- redundant), so the bar stays high there. Within the same type it drops to 0.85, because
+    -- that is where the echo measured in a real project falls -- the same decision stored by
+    -- the tool and again by the session's distillation, 0.86-0.88 -- which used to be invisible.
     --
-    -- Es una señal para que alguien mire, no una verdad: reclassify puede cambiar el tipo de
-    -- una entrada y juntar dos que no lo estaban. Por eso el informe dice "likely".
+    -- It is a signal for someone to look at, not a truth: reclassify can change an entry's type
+    -- and bring together two that were not. That is why the report says "likely".
     WHERE (a.vector <=> b.vector) < CASE WHEN ca.type = cb.type THEN 0.15 ELSE 0.12 END
     ORDER BY score DESC
     LIMIT 25
   `) as unknown as Row[];
 
-  // Entidades huérfanas: 1 sola entrada y sin relaciones.
+  // Orphan entities: a single entry and no relations.
   const orphanRows = (await sql`
     SELECT en.name, en.type
     FROM entities en
@@ -104,10 +105,10 @@ export async function lintProject(project: string): Promise<LintReport> {
     ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND confidence='low' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
   const staleHistorical = Number(
-    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND (validity='historical' OR metadata->>'state'='Histórico')`) as unknown as Row[])[0]!.n,
+    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND (validity='historical' OR metadata->>'state'='Histórico')`) as unknown as Row[])[0]!.n, // 'Histórico' is Plane's own value
   );
 
-  // Huecos: áreas (módulo/servicio) con incidencias pero sin decisiones documentadas.
+  // Gaps: areas (module/service) with incidents but no documented decisions.
   const gapRows = (await sql`
     SELECT en.name, en.type, count(*) FILTER (WHERE ce.type='incident') AS incidents
     FROM entities en
@@ -145,7 +146,7 @@ export async function lintProject(project: string): Promise<LintReport> {
   };
 }
 
-/** Render del informe a Markdown (para CLI/MCP). */
+/** Renders the report as Markdown (for the CLI/MCP). */
 export function renderLintReport(r: LintReport): string {
   const L: string[] = [`# Lint — ${r.project}`, `_${r.totalEntries} ${r.totalEntries === 1 ? "entry" : "entries"}_`, ""];
   L.push(`## ⚠️ Contradictions (${r.contradictions.length})`);

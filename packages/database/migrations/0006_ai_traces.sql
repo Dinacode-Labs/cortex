@@ -1,8 +1,8 @@
--- Observabilidad B: trazas de IA (spans de Mastra). Cada llamada a un Agent genera
--- un árbol de spans (agent_run → model_generation → model_inference…). Las
--- exportamos a esta tabla vía un exporter propio (ver @cortex/agents trace-exporter).
--- Complementa a `llm_usage` (coste): aquí está el ÁRBOL de spans con latencia,
--- jerarquía padre/hijo, modelo y tokens. ADR-0016.
+-- Observability B: AI traces (Mastra spans). Every Agent call produces a tree of spans
+-- (agent_run -> model_generation -> model_inference...). We export them into this table
+-- through our own exporter (see @cortex/agents trace-exporter).
+-- It complements `llm_usage` (cost): what lives here is the span TREE with latency,
+-- parent/child hierarchy, model and tokens. ADR-0016.
 
 CREATE TABLE ai_traces (
   span_id        text PRIMARY KEY,
@@ -10,7 +10,7 @@ CREATE TABLE ai_traces (
   parent_span_id text,
   name           text,
   span_type      text,
-  entity_name    text,         -- p.ej. cortex-classifier / cortex-graph
+  entity_name    text,         -- e.g. cortex-classifier / cortex-graph
   model          text,
   input_tokens   integer,
   output_tokens  integer,

@@ -1,27 +1,27 @@
--- Todo proyecto tiene slug (ADR-0051).
+-- Every project has a slug (ADR-0051).
 --
--- El slug es la dirección de un proyecto: lo que va en `.cortex.json`, lo que la API recibe y
--- —desde ADR-0050— lo que lleva su URL en la web. Hasta ahora solo lo tenían los creados con
--- `cortex link --create`: los que nacían de un `save` se quedaban sin slug, sin dueño y
--- públicos, y no había forma de adoptarlos ni de cerrarlos. El CLI ya los listaba como
--- imposibles de vincular.
+-- The slug is a project's address: what goes in `.cortex.json`, what the API receives and --
+-- since ADR-0050 -- what its URL carries on the web. Until now only projects created with
+-- `cortex link --create` had one: those born from a `save` ended up with no slug, no owner and
+-- public, with no way to adopt or close them. The CLI already listed them as impossible to
+-- link.
 --
--- Esto rellena los que faltan a partir del nombre, con la misma normalización que `slugify`
--- (minúsculas, sin acentos, no alfanumérico a guiones, sin guiones al borde). Si dos nombres
--- colapsan en el mismo slug, el segundo y siguientes llevan un sufijo corto y estable derivado
--- del id: inventar `-2` dependería del orden en que se procesen.
+-- This fills in the missing ones from the name, with the same normalisation as `slugify`
+-- (lowercase, accents stripped, non-alphanumerics to hyphens, no hyphens at the edges). When
+-- two names collapse into the same slug, the second and later ones get a short, stable suffix
+-- derived from the id: making up a `-2` would depend on the order they happen to be processed.
 
--- `unaccent` es una extensión que no todos los despliegues tienen instalada; para esto basta
--- con traducir los caracteres que aparecen en la práctica.
-CREATE OR REPLACE FUNCTION cortex_slugify(texto text) RETURNS text AS $$
+-- `unaccent` is an extension not every deployment has installed; for this it is enough to
+-- translate the characters that actually show up in practice.
+CREATE OR REPLACE FUNCTION cortex_slugify(value text) RETURNS text AS $$
   SELECT trim(both '-' from regexp_replace(
-    lower(translate(texto,
+    lower(translate(value,
       'áàäâãåéèëêíìïîóòöôõúùüûñçÁÀÄÂÃÅÉÈËÊÍÌÏÎÓÒÖÔÕÚÙÜÛÑÇ',
       'aaaaaaeeeeiiiiooooouuuuncAAAAAAEEEEIIIIOOOOOUUUUNC')),
     '[^a-z0-9]+', '-', 'g'));
 $$ LANGUAGE sql IMMUTABLE;
 
-WITH candidatos AS (
+WITH candidates AS (
   SELECT id,
          cortex_slugify(name) AS base,
          row_number() OVER (PARTITION BY cortex_slugify(name) ORDER BY id) AS n
@@ -35,5 +35,5 @@ SET slug = CASE
                THEN c.base
              ELSE c.base || '-' || left(replace(e.id::text, '-', ''), 6)
            END
-FROM candidatos c
+FROM candidates c
 WHERE e.id = c.id;

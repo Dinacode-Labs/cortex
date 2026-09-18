@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// Pone la MISMA versión en todo el monorepo: raíz, paquetes, apps y los dos manifiestos del
-// plugin. También cierra la sección [Unreleased] del CHANGELOG con la fecha de hoy.
+// Sets the SAME version across the whole monorepo: root, packages, apps and the plugin's two
+// manifests. It also closes the CHANGELOG's [Unreleased] section with today's date.
 //
 //   node scripts/set-version.mjs 0.1.0
 //
-// La versión es única y en lockstep a propósito: con un solo artefacto publicable (el CLI) y
-// una imagen que lleva todo lo demás dentro, versionar cada paquete por separado sería
-// ceremonia sin beneficio, y nadie sabría qué versión tiene desplegada.
+// The version is single and in lockstep on purpose: with one publishable artefact (the CLI) and
+// an image carrying everything else inside, versioning each package separately would be
+// ceremony with no benefit, and nobody would know which version they had deployed.
 import { readFileSync, writeFileSync } from "node:fs";
 import { globSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -16,7 +16,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.argv[2];
 
 if (!version || !/^\d+\.\d+\.\d+(-[\w.]+)?$/.test(version)) {
-  console.error("Uso: node scripts/set-version.mjs <x.y.z>");
+  console.error("Usage: node scripts/set-version.mjs <x.y.z>");
   process.exit(1);
 }
 
@@ -39,8 +39,8 @@ for (const m of manifests) {
   console.log(`  ${m} → ${version}`);
 }
 
-// El plugin lleva su propia versión, y el marketplace la repite: si se separan, Claude Code
-// ofrece actualizar a una versión que no existe.
+// The plugin carries its own version, and the marketplace repeats it: if they drift apart,
+// Claude Code offers an update to a version that does not exist.
 const pluginFile = rel("plugin/claude-code/.claude-plugin/plugin.json");
 const plugin = readJson(pluginFile);
 plugin.version = version;
@@ -54,19 +54,19 @@ for (const p of market.plugins) if (p.name === "cortex") p.version = version;
 writeJson(marketFile, market);
 console.log(`  .claude-plugin/marketplace.json → ${version}`);
 
-// CHANGELOG: [Unreleased] pasa a ser la versión, con la fecha de hoy, y se abre una
-// [Unreleased] vacía encima.
+// CHANGELOG: [Unreleased] becomes the version, with today's date, and a fresh empty
+// [Unreleased] is opened above it.
 const changelogFile = rel("CHANGELOG.md");
 let changelog = readFileSync(changelogFile, "utf8");
 if (changelog.includes(`## [${version}]`)) {
-  console.log(`  CHANGELOG.md ya tiene [${version}]`);
+  console.log(`  CHANGELOG.md already has [${version}]`);
 } else if (changelog.includes("## [Unreleased]")) {
   const today = new Date().toISOString().slice(0, 10);
   changelog = changelog.replace("## [Unreleased]", `## [Unreleased]\n\n## [${version}] — ${today}`);
   writeFileSync(changelogFile, changelog);
   console.log(`  CHANGELOG.md → [${version}] (${today})`);
 } else {
-  console.warn("  ⚠️  CHANGELOG.md no tiene sección [Unreleased]; revísalo a mano");
+  console.warn("  ⚠️  CHANGELOG.md has no [Unreleased] section; check it by hand");
 }
 
-console.log(`\nListo. Ahora:\n  git commit -am "chore(release): v${version}"\n  git tag v${version} && git push origin main v${version}`);
+console.log(`\nDone. Now:\n  git commit -am "chore(release): v${version}"\n  git tag v${version} && git push origin main v${version}`);

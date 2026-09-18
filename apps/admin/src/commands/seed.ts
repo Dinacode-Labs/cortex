@@ -3,10 +3,10 @@ import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shar
 import { createProject, registerUsageSink, relate, resolveEntity, saveContext } from "@cortex/core";
 
 /**
- * Datos de demo: proyecto ficticio "Acme Portal" del cliente "Acme Corp"
- * (§15.1). Idempotente: vacía las tablas de conocimiento y vuelve a sembrar.
- * Usa el pipeline real (saveContext) para generar embeddings, entidades y
- * relaciones igual que en producción.
+ * Demo data: the fictional "Acme Portal" project belonging to the client "Acme Corp"
+ * (section 15.1). Idempotent: it empties the knowledge tables and seeds again. It uses the
+ * real pipeline (saveContext) to generate embeddings, entities and relations exactly as in
+ * production.
  */
 
 const PROJECT = "Acme Portal";
@@ -23,37 +23,37 @@ interface SeedEntry {
 const ENTRIES: SeedEntry[] = [
   {
     content:
-      "Arquitectura del proyecto: Laravel como backend, Vue en el frontend y PostgreSQL como base de datos principal.",
+      "Project architecture: Laravel on the backend, Vue on the frontend and PostgreSQL as the main database.",
     type: "architecture",
     confidence: "high",
     sourceType: "manual",
   },
   {
     content:
-      "Se decidió mantener el módulo legacy de facturación porque el cliente depende de una integración externa que todavía no puede migrarse.",
+      "We decided to keep the legacy billing module because the client depends on an external integration that cannot be migrated yet.",
     type: "decision",
     confidence: "high",
     sourceType: "manual",
-    sourceReference: "ADR interno #12",
+    sourceReference: "Internal ADR #12",
   },
   {
     content:
-      "El cliente Acme Corp no permite usar servicios cloud públicos; la solución debe desplegarse en infraestructura propia.",
+      "The client Acme Corp does not allow public cloud services; the solution must be deployed on their own infrastructure.",
     type: "constraint",
     confidence: "verified",
     sourceType: "meeting_transcript",
-    sourceReference: "Reunión kickoff 2026-01",
+    sourceReference: "Kickoff meeting 2026-01",
   },
   {
     content:
-      "Se decidió usar OAuth con un proveedor externo para la autenticación, por el requisito de integrar las cuentas corporativas del cliente.",
+      "We decided to use OAuth with an external provider for authentication, because of the requirement to integrate the client's corporate accounts.",
     type: "decision",
     confidence: "high",
     sourceType: "manual",
   },
   {
     content:
-      "Incidencia previa: la generación de documentos PDF en el módulo de facturación fallaba con cargas grandes por timeouts.",
+      "Past incident: PDF document generation in the billing module failed on large loads because of timeouts.",
     type: "incident",
     confidence: "high",
     sourceType: "jira_ticket",
@@ -61,49 +61,49 @@ const ENTRIES: SeedEntry[] = [
   },
   {
     content:
-      "Deuda técnica: el módulo legacy de facturación no tiene tests automatizados y mezcla lógica de negocio con la capa de presentación.",
+      "Technical debt: the legacy billing module has no automated tests and mixes business logic with the presentation layer.",
     type: "technical_debt",
     confidence: "medium",
     sourceType: "claude_code",
   },
   {
     content:
-      "Riesgo: el módulo de facturación es sensible; modificarlo sin cuidado puede romper la integración externa con el ERP del cliente.",
+      "Risk: the billing module is sensitive; changing it carelessly can break the external integration with the client's ERP.",
     type: "risk",
     confidence: "high",
     sourceType: "manual",
   },
   {
     content:
-      "Convención: las ramas siguen el patrón feature/JIRA-id y los commits usan Conventional Commits.",
+      "Convention: branches follow the feature/JIRA-id pattern and commits use Conventional Commits.",
     type: "convention",
     confidence: "high",
     sourceType: "notion_doc",
   },
   {
     content:
-      "Integración con el ERP del cliente mediante API REST para sincronizar las facturas generadas en el portal.",
+      "Integration with the client's ERP over a REST API to sync the invoices generated in the portal.",
     type: "integration_note",
     confidence: "medium",
     sourceType: "manual",
   },
   {
     content:
-      "La facturación se calcula aplicando el IVA español del 21% salvo para clientes marcados como exentos.",
+      "Billing is calculated by applying the Spanish 21% VAT, except for clients marked as exempt.",
     type: "business_rule",
     confidence: "high",
     sourceType: "manual",
   },
   {
     content:
-      "El Portal Cliente permite a los usuarios de Acme consultar y descargar sus facturas históricas.",
+      "The Client Portal lets Acme's users look up and download their historical invoices.",
     type: "module_note",
     confidence: "medium",
     sourceType: "manual",
   },
   {
     content:
-      "TASK-123 (Done): corregido el error de generación de documentos del módulo de facturación añadiendo paginación al export. PR #456 fusionada.",
+      "TASK-123 (Done): fixed the billing module's document generation bug by paginating the export. PR #456 merged.",
     type: "ticket_resolution",
     confidence: "verified",
     sourceType: "github_pr",
@@ -115,21 +115,21 @@ export async function run(): Promise<void> {
   registerUsageSink();
   const sql = getSql();
 
-  // Salvaguarda: el seed BORRA todas las tablas y recarga el demo Acme. Para no
-  // destruir datos reales (p.ej. una ingesta de proyecto), exige confirmación.
+  // Safeguard: the seed WIPES every table and reloads the Acme demo. So as not to destroy
+  // real data (a project ingest, for instance), it requires confirmation.
   if (process.env.CORTEX_SEED_CONFIRM !== "1") {
     throw new Error(
-      "db:seed VACÍA todas las tablas y recarga el proyecto demo 'Acme Portal'. " +
-        "Si de verdad quieres descartar los datos actuales, ejecútalo con " +
+      "db:seed EMPTIES every table and reloads the demo project 'Acme Portal'. " +
+        "If you really do want to discard the current data, run it with " +
         "CORTEX_SEED_CONFIRM=1.",
     );
   }
 
-  console.log("Vaciando tablas de conocimiento...");
+  console.log("Emptying the knowledge tables...");
   await sql`TRUNCATE context_entry_entities, embeddings, relations, context_entries, sources, entities RESTART IDENTITY CASCADE`;
 
   const client = await resolveEntity(sql, CLIENT, "client");
-  const project = await createProject(PROJECT); // con slug: la base no admite proyectos sin él (#135)
+  const project = await createProject(PROJECT); // with a slug: the database rejects projects without one (#135)
   await relate(sql, {
     sourceId: project.id,
     sourceType: "entity",
@@ -139,7 +139,7 @@ export async function run(): Promise<void> {
     confidence: "verified",
   });
 
-  console.log(`Sembrando ${ENTRIES.length} entradas para "${PROJECT}"...`);
+  console.log(`Seeding ${ENTRIES.length} entries for "${PROJECT}"...`);
   for (const e of ENTRIES) {
     const { entry, warnings } = await saveContext({
       content: e.content,
@@ -150,11 +150,11 @@ export async function run(): Promise<void> {
       sourceReference: e.sourceReference,
       createdBy: "seed",
     });
-    const warn = warnings.length ? `  [${warnings.length} señal(es)]` : "";
+    const warn = warnings.length ? `  [${warnings.length} signal(s)]` : "";
     console.log(`  ✓ ${entry.type.padEnd(18)} ${entry.title.slice(0, 60)}${warn}`);
   }
 
-  console.log("\nSeed completado.");
+  console.log("\nSeed finished.");
 }
 
 

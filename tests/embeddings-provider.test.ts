@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getEmbeddingProvider, resetEmbeddingProvider } from "@cortex/embeddings";
 
 /**
- * La dimensión del embedding fija el esquema vectorial: si se cuela mal, el fallo aparece
- * tarde (al insertar o, peor, al comparar vectores de dimensiones distintas). Por eso el
- * proveedor genérico la exige explícitamente. Aquí se fija ese contrato y el del alias
- * obsoleto `nan` (ADR-0024).
+ * The embedding's dimension fixes the vector schema: if a wrong one slips through, the failure
+ * appears late (on insert or, worse, when comparing vectors of different dimensions). That is
+ * why the generic provider demands it explicitly. This pins that contract and the deprecated
+ * `nan` alias's (ADR-0024).
  */
 const VARS = [
   "EMBEDDINGS_PROVIDER", "EMBEDDINGS_BASE_URL", "EMBEDDINGS_API_KEY", "EMBEDDINGS_MODEL",
@@ -25,16 +25,16 @@ afterEach(() => {
 });
 
 describe("getEmbeddingProvider", () => {
-  it("por defecto usa el proveedor local (arranque sin claves)", () => {
+  it("defaults to the local provider (startup with no keys)", () => {
     expect(getEmbeddingProvider().model).toBeTruthy();
   });
 
-  it("openai-compatible exige base URL, modelo y dimensión", () => {
+  it("openai-compatible requires a base URL, a model and a dimension", () => {
     vi.stubEnv("EMBEDDINGS_PROVIDER", "openai-compatible");
     vi.stubEnv("EMBEDDINGS_API_KEY", "k");
     vi.stubEnv("EMBEDDINGS_BASE_URL", "https://api.nan.builders/v1");
     vi.stubEnv("EMBEDDINGS_MODEL", "qwen3-embedding");
-    // Sin EMBEDDINGS_DIM no arranca: la dimensión no se puede adivinar.
+    // Without EMBEDDINGS_DIM it does not start: the dimension cannot be guessed.
     expect(() => getEmbeddingProvider()).toThrow(/EMBEDDINGS_DIM/);
 
     resetEmbeddingProvider();
@@ -44,16 +44,16 @@ describe("getEmbeddingProvider", () => {
     expect(p.dim).toBe(4096);
   });
 
-  it("rechaza una dimensión que no sea un entero positivo", () => {
+  it("rejects a dimension that is not a positive integer", () => {
     vi.stubEnv("EMBEDDINGS_PROVIDER", "openai-compatible");
     vi.stubEnv("EMBEDDINGS_API_KEY", "k");
     vi.stubEnv("EMBEDDINGS_BASE_URL", "https://x/v1");
     vi.stubEnv("EMBEDDINGS_MODEL", "m");
     vi.stubEnv("EMBEDDINGS_DIM", "4096.5");
-    expect(() => getEmbeddingProvider()).toThrow(/entero positivo/);
+    expect(() => getEmbeddingProvider()).toThrow(/positive integer/);
   });
 
-  it("el alias `nan` sigue funcionando con los defaults de NaN", () => {
+  it("the `nan` alias still works, with NaN's defaults", () => {
     vi.stubEnv("EMBEDDINGS_PROVIDER", "nan");
     vi.stubEnv("NAN_API_KEY", "nan-key");
     const p = getEmbeddingProvider();
@@ -61,7 +61,7 @@ describe("getEmbeddingProvider", () => {
     expect(p.dim).toBe(4096);
   });
 
-  it("un proveedor desconocido falla con la lista de opciones válidas", () => {
+  it("an unknown provider fails, listing the valid options", () => {
     vi.stubEnv("EMBEDDINGS_PROVIDER", "inventado");
     expect(() => getEmbeddingProvider()).toThrow(/local \| openai-compatible \| openai \| voyage/);
   });

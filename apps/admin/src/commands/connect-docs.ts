@@ -5,25 +5,25 @@ import { chunkDocument, extractFileText, SUPPORTED_EXTS, IGNORE_DIRS, type Batch
 import { wireLlm } from "@cortex/agents";
 
 /**
- * Conector GENÉRICO de documentos: recorre un directorio e ingiere los ficheros (vía la
- * capa `extract` multimodal). Escribe a través de la API autenticada (`POST /capture/batch`):
- * atribución (created_by=email) + permisos + embedding por lotes server-side. Requiere
- * `cortex auth login` y el servidor en marcha.
+ * The GENERIC document connector: it walks a directory and ingests the files (through the
+ * multimodal `extract` layer). It writes through the authenticated API
+ * (`POST /capture/batch`): attribution (created_by=email) plus permissions plus server-side
+ * batch embedding. It needs `cortex auth login` and a running server.
  *
- * Cada documento se **trocea** (chunkDocument, ADR-0023): un doc largo produce N chunks,
- * cada uno una entrada/vector con `sourceReference` propio (`ref#k`) y referencia a su
- * documento padre en metadata. Antes se truncaba a 8k y se perdía el resto en silencio.
+ * Each document is **chunked** (chunkDocument, ADR-0023): a long doc produces N chunks, each
+ * one an entry/vector with its own `sourceReference` (`ref#k`) and a reference to its parent
+ * document in metadata. It used to be truncated at 8k and the rest lost silently.
  *
- * Uso: cortex connect-docs "<slug>" <ruta-dir>
+ * Usage: cortex-admin connect-docs "<slug>" <dir-path>
  */
 const MIN_CHARS = Number(process.env.CORTEX_DOCS_MIN_CHARS ?? "40");
 const CHUNK = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
 const HEX32 = /\s+[0-9a-f]{32}$/i;
 
-/** Recorre `dir` y devuelve los ficheros con extensión soportada, SALTANDO dotfiles y
- * los directorios de dependencias/artefactos (IGNORE_DIRS: node_modules, vendor, dist…).
- * Sin ese filtro, apuntar el conector a la raíz de un repo arrastra basura de `vendor/`
- * (p.ej. fixtures de php_codesniffer) a la memoria. Exportada para test. */
+/** Walks `dir` and returns the files with a supported extension, SKIPPING dotfiles and the
+ * dependency/artefact directories (IGNORE_DIRS: node_modules, vendor, dist...). Without that
+ * filter, pointing the connector at a repo root drags junk from `vendor/` (php_codesniffer
+ * fixtures, for instance) into the memory. Exported for tests. */
 export function walk(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
@@ -37,7 +37,7 @@ export function walk(dir: string): string[] {
 }
 
 export async function run(args: string[]): Promise<void> {
-  wireLlm(); // extract multimodal: caption/OCR/whisper vía setMediaExtractor
+  wireLlm(); // multimodal extract: caption/OCR/whisper through setMediaExtractor
   const slug = args[0];
   const dir = args[1];
   if (!slug || !dir) {
@@ -61,7 +61,7 @@ export async function run(args: string[]): Promise<void> {
     const chunks = chunkDocument(ex.text);
     for (const ch of chunks) {
       const multi = ch.total > 1;
-      // El título lleva el doc + parte (+ sección); captureBatch lo incluye en el embedding.
+      // The title carries the doc + part (+ section); captureBatch includes it in the embedding.
       const partTitle = multi
         ? `${title} (${ch.index + 1}/${ch.total}${ch.section ? ` · ${ch.section}` : ""})`
         : title;
@@ -69,7 +69,7 @@ export async function run(args: string[]): Promise<void> {
         content: ch.content,
         title: partTitle.slice(0, 200),
         sourceType: "document",
-        // ref único por chunk → incremental idempotente; doc de 1 chunk conserva el ref plano.
+        // A unique ref per chunk -> idempotent incremental; a 1-chunk doc keeps the flat ref.
         sourceReference: multi ? `${ref}#${ch.index}` : ref,
         metadata: {
           format: ex.format,
@@ -80,21 +80,21 @@ export async function run(args: string[]): Promise<void> {
       });
     }
   }
-  console.log(`${docs} documentos con texto → ${items.length} chunks (${skipped} vacíos/escaneados/no soportados). Subiendo a "${slug}" vía API...`);
+  console.log(`${docs} documents with text → ${items.length} chunks (${skipped} empty/scanned/unsupported). Uploading to "${slug}" through the API...`);
 
   let added = 0;
   let existing = 0;
   for (let i = 0; i < items.length; i += CHUNK) {
     const r = await apiPost<{ results?: { action: string }[]; error?: string }>("/capture/batch", { slug, items: items.slice(i, i + CHUNK) });
     if (!r.ok) {
-      console.error(`✗ Captura fallida (${r.status}): ${r.data.error ?? "¿cortex auth login / servidor en marcha?"}`);
+      console.error(`✗ Capture failed (${r.status}): ${r.data.error ?? "is the server running, and are you signed in (cortex auth login)?"}`);
       process.exitCode = 1;
       return;
     }
     for (const x of r.data.results ?? []) x.action === "added" ? added++ : existing++;
     console.log(`  ${Math.min(i + CHUNK, items.length)}/${items.length}`);
   }
-  console.log(`Conector docs: ${added} nuevos, ${existing} ya existían.`);
+  console.log(`Docs connector: ${added} new, ${existing} already known.`);
 }
 
 

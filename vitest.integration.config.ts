@@ -8,9 +8,9 @@ const cortexAlias = Object.fromEntries(
 );
 
 /**
- * Tests de INTEGRACIÓN: contra una BD Postgres real (cortex_test), con embeddings `local`
- * y LLM `none` (herméticos, sin red). Requiere el Postgres de dev (`pnpm db:up`); el
- * globalSetup crea+migra la BD de test. Ejecútalos con `pnpm test:integration`.
+ * INTEGRATION tests: against a real Postgres database (cortex_test), with `local` embeddings
+ * and LLM `none` (hermetic, no network). They need the dev Postgres (`pnpm db:up`); the
+ * globalSetup creates and migrates the test database. Run them with `pnpm test:integration`.
  */
 const TEST_DB = process.env.CORTEX_TEST_DATABASE_URL || "postgres://cortex:cortex@localhost:5433/cortex_test";
 
@@ -33,7 +33,7 @@ export default defineConfig({
     include: ["tests/integration/**/*.test.ts"],
     environment: "node",
     globalSetup: ["tests/integration/global-setup.ts"],
-    fileParallelism: false, // comparten una BD; secuencial para evitar carreras
+    fileParallelism: false, // they share one database; sequential to avoid races
     testTimeout: 30_000,
     env: {
       DATABASE_URL: TEST_DB,

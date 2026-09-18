@@ -5,23 +5,24 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Versionado entre CLI y servidor (ADR-0062). Son dos relojes distintos: el CLI lo actualiza
- * cada persona desde npm y el servidor, un operador. No se atan; se comparan los dos números
- * que el servidor publica y de ahí salen tres comportamientos:
+ * Versioning between CLI and server (ADR-0062). They are two different clocks: each person
+ * updates the CLI from npm, and an operator updates the server. They are not tied together; the
+ * two numbers the server publishes are compared and three behaviours come out of that:
  *
- *   - un aviso pasivo, UNA línea a stderr, solo con terminal delante y como mucho una vez al día;
- *   - un bloqueo de los comandos que escriben cuando el CLI está por debajo del mínimo;
- *   - y nada, nunca, en los hooks ni en `cortex mcp`, donde stdout es protocolo.
+ *   - a passive notice, ONE line to stderr, only with a terminal in front and at most once a day;
+ *   - a block on the commands that write when the CLI is below the minimum;
+ *   - and nothing, ever, in the hooks or in `cortex mcp`, where stdout is protocol.
  *
- * El CLI en tests dice `dev`, que no se compara con nada; aquí se le hace creer que es 0.1.9.
+ * The CLI says `dev` in tests, which compares with nothing; here it is made to believe it is
+ * 0.1.9.
  */
 vi.mock("../apps/cli/src/version.ts", async (orig) => ({ ...(await orig<typeof import("../apps/cli/src/version.js")>()), CLI_VERSION: "0.1.9" }));
 
 const SERVER = "http://cortex.test";
 let home: string;
 
-/** Un servidor que anuncia `version` y `minClientVersion`; `null` = no responde; 404 = servidor sin `/client-config`. */
-function servidor(cfg: { version: string; minClientVersion?: string } | null | 404): ReturnType<typeof vi.fn> {
+/** A server announcing `version` and `minClientVersion`; `null` = no answer; 404 = a server with no `/client-config`. */
+function server(cfg: { version: string; minClientVersion?: string } | null | 404): ReturnType<typeof vi.fn> {
   const f = vi.fn(async (url: string) => {
     if (cfg === null) throw new TypeError("fetch failed");
     if (cfg === 404 || !String(url).endsWith("/client-config")) return new Response("{}", { status: 404 });
@@ -56,7 +57,7 @@ afterEach(() => {
 });
 
 describe("comparar versiones", () => {
-  it("ordena por número, no por texto, y tolera prefijos y prereleases", async () => {
+  it("orders by number, not by text, and tolerates prefixes and prereleases", async () => {
     const { compareVersions, isOlderThan } = await import("../apps/cli/src/version.js");
     expect(compareVersions("0.9.0", "0.10.0")).toBeLessThan(0);
     expect(compareVersions("1.0.0", "0.9.9")).toBeGreaterThan(0);
@@ -64,24 +65,24 @@ describe("comparar versiones", () => {
     expect(compareVersions("v0.1.12", "0.1.12-beta.1")).toBe(0);
     expect(compareVersions("0.1.12-rc.1", "0.1.11")).toBeGreaterThan(0);
     expect(compareVersions("0.2", "0.2.0")).toBe(0);
-    // `dev` no es comparable: ni bloquea ni avisa.
+    // `dev` is not comparable: it neither blocks nor warns.
     expect(compareVersions("dev", "9.9.9")).toBe(0);
     expect(isOlderThan("0.1.9", "0.1.10")).toBe(true);
     expect(isOlderThan("dev", "9.9.9")).toBe(false);
   });
 });
 
-describe("qué relación hay entre CLI y servidor", () => {
-  it("una conclusión por caso, y lo que no se conoce es «no se sabe», no un error", async () => {
+describe("what the relationship between CLI and server is", () => {
+  it("one conclusion per case, and what is unknown is \"unknown\", not an error", async () => {
     const { classify } = await compat();
     const k = (cli: string, cfg: Parameters<typeof classify>[2]) => classify(SERVER, cli, cfg).kind;
     expect(k("0.1.9", { version: "0.1.9", minClientVersion: "0.1.0" })).toBe("ok");
     expect(k("0.1.9", { version: "0.1.12", minClientVersion: "0.1.0" })).toBe("cli-behind");
     expect(k("0.1.12", { version: "0.1.9", minClientVersion: "0.1.0" })).toBe("server-behind");
     expect(k("0.1.9", { version: "0.1.12", minClientVersion: "0.1.10" })).toBe("blocked");
-    // El mínimo manda sobre todo lo demás: un CLI por debajo está bloqueado aunque el servidor vaya por delante.
+    // The minimum wins over everything else: a CLI below it is blocked even when the server is ahead.
     expect(k("0.1.9", { version: "0.1.12", minClientVersion: "0.1.9" })).toBe("cli-behind");
-    // Servidor anterior a `minClientVersion`, o sin `/client-config`, o en desarrollo.
+    // A server predating `minClientVersion`, or with no `/client-config`, or in development.
     expect(k("0.1.9", { version: "0.1.12" })).toBe("cli-behind");
     expect(k("0.1.9", null)).toBe("unknown");
     expect(k("0.1.9", { version: "dev" })).toBe("unknown");
@@ -89,12 +90,12 @@ describe("qué relación hay entre CLI y servidor", () => {
   });
 });
 
-describe("la consulta se cachea", () => {
-  it("una vez cada 24 h por servidor; `fresh` fuerza; un fallo se reintenta antes", async () => {
+describe("the query is cached", () => {
+  it("once every 24 h per server; `fresh` forces it; a failure is retried sooner", async () => {
     const { serverCompat, compatCachePath } = await compat();
     let t = Date.parse("2026-09-16T10:00:00Z");
     const now = () => t;
-    const f = servidor({ version: "0.1.12", minClientVersion: "0.1.0" });
+    const f = server({ version: "0.1.12", minClientVersion: "0.1.0" });
 
     expect((await serverCompat(SERVER, { now })).fetched).toBe(true);
     expect(existsSync(compatCachePath())).toBe(true);
@@ -108,8 +109,8 @@ describe("la consulta se cachea", () => {
     expect(r.compat.kind).toBe("cli-behind");
     expect(f).toHaveBeenCalledTimes(3);
 
-    // Servidor caído: no se sabe, y en una hora se vuelve a mirar (no en un día).
-    servidor(null);
+    // The server is down: unknown, and it is checked again in an hour (not a day).
+    server(null);
     t += 25 * 3600_000;
     expect((await serverCompat(SERVER, { now })).compat.kind).toBe("unknown");
     t += 30 * 60_000;
@@ -118,30 +119,30 @@ describe("la consulta se cachea", () => {
     expect((await serverCompat(SERVER, { now })).fetched).toBe(true);
   });
 
-  it("una caché corrupta se ignora en vez de romper el comando", async () => {
+  it("a corrupt cache is ignored rather than breaking the command", async () => {
     const { serverCompat, compatCachePath } = await compat();
     mkdirSync(join(home, ".cortex"), { recursive: true });
-    writeFileSync(compatCachePath(), "{ esto no es json");
-    servidor({ version: "0.1.9", minClientVersion: "0.1.0" });
+    writeFileSync(compatCachePath(), "{ this is not json");
+    server({ version: "0.1.9", minClientVersion: "0.1.0" });
     expect((await serverCompat(SERVER)).compat.kind).toBe("ok");
     expect(JSON.parse(readFileSync(compatCachePath(), "utf8")).version).toBe(1);
   });
 });
 
-describe("el aviso pasivo", () => {
-  it("sin terminal delante no dice nada, aunque haya versión nueva", async () => {
+describe("the passive notice", () => {
+  it("with no terminal in front it says nothing, even when a new version exists", async () => {
     const { printVersionNotice } = await compat();
     conSesion();
-    servidor({ version: "0.1.12", minClientVersion: "0.1.0" });
+    server({ version: "0.1.12", minClientVersion: "0.1.0" });
     const out: string[] = [];
     await printVersionNotice({ tty: false, write: (l) => out.push(l) });
     expect(out).toEqual([]);
   });
 
-  it("con terminal: UNA línea, y no se repite hasta pasado un día", async () => {
+  it("with a terminal: ONE line, and it is not repeated until a day has passed", async () => {
     const { printVersionNotice } = await compat();
     conSesion();
-    servidor({ version: "0.1.12", minClientVersion: "0.1.0" });
+    server({ version: "0.1.12", minClientVersion: "0.1.0" });
     let t = Date.parse("2026-09-16T10:00:00Z");
     const now = () => t;
     const out: string[] = [];
@@ -154,10 +155,10 @@ describe("el aviso pasivo", () => {
     expect(out).toHaveLength(2);
   });
 
-  it("cuando el que va por detrás es el servidor, se lo dice a quien pueda avisar al operador", async () => {
+  it("when it is the server that is behind, it tells whoever can warn the operator", async () => {
     const { printVersionNotice } = await compat();
     conSesion();
-    servidor({ version: "0.1.7", minClientVersion: "0.1.0" });
+    server({ version: "0.1.7", minClientVersion: "0.1.0" });
     const out: string[] = [];
     await printVersionNotice({ tty: true, write: (l) => out.push(l) });
     expect(out).toHaveLength(1);
@@ -165,12 +166,12 @@ describe("el aviso pasivo", () => {
     expect(out[0]).toContain("whoever operates it");
   });
 
-  it("calla si no hay sesión en ese servidor, si CI está definida o si se apagó por variable", async () => {
+  it("stays quiet with no session for that server, with CI set, or when switched off by variable", async () => {
     const { printVersionNotice } = await compat();
-    const f = servidor({ version: "0.1.12", minClientVersion: "0.1.0" });
+    const f = server({ version: "0.1.12", minClientVersion: "0.1.0" });
     const out: string[] = [];
     await printVersionNotice({ tty: true, write: (l) => out.push(l) });
-    expect(f).not.toHaveBeenCalled(); // sin credenciales ni se consulta
+    expect(f).not.toHaveBeenCalled(); // with no credentials it is not even queried
 
     conSesion();
     process.env.CI = "1";
@@ -182,22 +183,22 @@ describe("el aviso pasivo", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("no se enseña con el CLI al día, ni cuando el servidor no responde", async () => {
+  it("it is not shown with an up-to-date CLI, nor when the server does not answer", async () => {
     const { printVersionNotice } = await compat();
     conSesion();
     const out: string[] = [];
-    servidor({ version: "0.1.9", minClientVersion: "0.1.0" });
+    server({ version: "0.1.9", minClientVersion: "0.1.0" });
     await printVersionNotice({ tty: true, write: (l) => out.push(l) });
-    servidor(null);
+    server(null);
     await printVersionNotice({ tty: true, fresh: true, write: (l) => out.push(l) });
     expect(out).toEqual([]);
   });
 });
 
-describe("bloqueo de escrituras por debajo del mínimo", () => {
-  it("por debajo del mínimo, un motivo claro que manda a `cortex upgrade`", async () => {
+describe("blocking writes below the minimum", () => {
+  it("below the minimum, a clear reason pointing at `cortex upgrade`", async () => {
     const { writeBlocker, requireCompatibleServer } = await compat();
-    servidor({ version: "0.1.12", minClientVersion: "0.1.10" });
+    server({ version: "0.1.12", minClientVersion: "0.1.10" });
     const why = await writeBlocker();
     expect(why).toContain("0.1.9");
     expect(why).toContain("0.1.10");
@@ -205,37 +206,37 @@ describe("bloqueo de escrituras por debajo del mínimo", () => {
     await expect(requireCompatibleServer()).rejects.toThrow(/cortex upgrade/);
   });
 
-  it("consulta en fresco: un mínimo recién subido frena hoy, no mañana", async () => {
+  it("queries fresh: a freshly raised minimum stops things today, not tomorrow", async () => {
     const { serverCompat, writeBlocker } = await compat();
-    servidor({ version: "0.1.12", minClientVersion: "0.1.0" });
-    await serverCompat(SERVER); // caché reciente que dice «todo bien»
-    servidor({ version: "0.1.12", minClientVersion: "0.1.10" });
+    server({ version: "0.1.12", minClientVersion: "0.1.0" });
+    await serverCompat(SERVER); // a fresh cache saying all is well
+    server({ version: "0.1.12", minClientVersion: "0.1.10" });
     expect(await writeBlocker()).not.toBeNull();
   });
 
-  it("no bloquea lo que no sabe: servidor caído, servidor viejo sin `/client-config`, o dentro del mínimo", async () => {
+  it("does not block what it does not know: a server down, an old server with no `/client-config`, or within the minimum", async () => {
     const { writeBlocker } = await compat();
-    servidor(null);
+    server(null);
     expect(await writeBlocker()).toBeNull();
-    servidor(404);
+    server(404);
     expect(await writeBlocker()).toBeNull();
-    servidor({ version: "0.1.12", minClientVersion: "0.1.9" });
+    server({ version: "0.1.12", minClientVersion: "0.1.9" });
     expect(await writeBlocker()).toBeNull();
   });
 
-  it("`cortex mem save` se niega con el mismo mensaje, también en --json", async () => {
+  it("`cortex mem save` refuses with the same message, in --json too", async () => {
     const { run } = await import("../apps/cli/src/commands/mem.js");
-    servidor({ version: "0.1.12", minClientVersion: "0.1.10" });
+    server({ version: "0.1.12", minClientVersion: "0.1.10" });
     conSesion();
     const cwd = mkdtempSync(join(tmpdir(), "cortex-compat-cwd-"));
     writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "acme" }));
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
     try {
       await run(["save", "hola", "--cwd", cwd, "--json"]);
-      const salida = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as { error?: string };
-      expect(salida.error).toContain("cortex upgrade");
+      const output = JSON.parse(String(log.mock.calls.at(-1)?.[0])) as { error?: string };
+      expect(output.error).toContain("cortex upgrade");
       expect(process.exitCode).toBe(1);
-      // Y ni se intentó guardar: la única petición fue la de versión.
+      // And it did not even try to store: the only request was the version one.
       expect((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.every((c) => String(c[0]).endsWith("/client-config"))).toBe(true);
     } finally {
       log.mockRestore();
@@ -246,17 +247,17 @@ describe("bloqueo de escrituras por debajo del mínimo", () => {
 });
 
 /**
- * Lo crítico. En los hooks y en `cortex mcp` stdout es el canal del protocolo del agente: un
- * byte de más rompe la sesión. Se comprueba de dos formas: que esas entradas ni conocen el
- * módulo del aviso (y el dispatcher las suelta antes de llegar a él), y arrancando el CLI de
- * verdad con una caché que dice «hay versión nueva» para ver que no sale nada por ninguna de
- * las dos salidas.
+ * The critical part. In the hooks and in `cortex mcp`, stdout is the agent's protocol channel:
+ * one extra byte breaks the session. It is checked two ways: that those entrypoints do not even
+ * know the notice module (and the dispatcher lets them go before reaching it), and by starting
+ * the real CLI with a cache saying "there is a new version" to see that nothing comes out of
+ * either stream.
  */
-describe("los hooks y el MCP no dicen NADA", () => {
+describe("the hooks and the MCP say NOTHING", () => {
   const RAIZ = resolve(import.meta.dirname, "..");
   const SRC = join(RAIZ, "apps/cli/src");
 
-  it("ni importan el aviso, ni el dispatcher se lo aplica (son `managed: false`)", () => {
+  it("they neither import the notice nor have the dispatcher apply it (they are `managed: false`)", () => {
     for (const f of ["commands/hook-context.ts", "commands/hook-capture.ts", "commands/mcp.ts", "mcp/proxy.ts", "mcp/upstream.ts"]) {
       expect(readFileSync(join(SRC, f), "utf8"), f).not.toMatch(/compat\.js/);
     }
@@ -264,13 +265,13 @@ describe("los hooks y el MCP no dicen NADA", () => {
     for (const cmd of ["mcp", "hook-context", "hook-capture"]) {
       expect(index, cmd).toMatch(new RegExp(`"?${cmd}"?: \\{[^}]*managed: false`));
     }
-    // El aviso va DESPUÉS del `return` de los `managed: false`.
+    // The notice comes AFTER the `return` of the `managed: false` ones.
     expect(index.indexOf("cmd.managed === false")).toBeGreaterThan(0);
     expect(index.indexOf("printVersionNotice()")).toBeGreaterThan(index.indexOf("cmd.managed === false"));
   });
 
-  function corre(args: string[], env: Record<string, string>): Promise<{ code: number | null; out: string; err: string }> {
-    return new Promise((cumplir, fallar) => {
+  function run(args: string[], env: Record<string, string>): Promise<{ code: number | null; out: string; err: string }> {
+    return new Promise((resolve, reject) => {
       const hijo = spawn(process.execPath, ["--conditions=development", "--import", "tsx", join(SRC, "index.ts"), ...args], {
         cwd: RAIZ,
         stdio: ["pipe", "pipe", "pipe"],
@@ -282,27 +283,27 @@ describe("los hooks y el MCP no dicen NADA", () => {
       hijo.stderr.on("data", (d) => (err += String(d)));
       const corte = setTimeout(() => {
         hijo.kill("SIGKILL");
-        fallar(new Error("el hook no terminó"));
+        reject(new Error("the hook did not finish"));
       }, 20_000);
       hijo.stdin.end();
       hijo.on("exit", (code) => {
         clearTimeout(corte);
-        cumplir({ code, out, err });
+        resolve({ code, out, err });
       });
-      hijo.on("error", fallar);
+      hijo.on("error", reject);
     });
   }
 
-  it("hook-context y hook-capture, con una caché que dice «hay versión nueva», no emiten ni un byte", async () => {
+  it("hook-context and hook-capture, with a cache saying there is a new version, emit not one byte", async () => {
     conSesion();
     const { compatCachePath } = await compat();
     writeFileSync(compatCachePath(), JSON.stringify({ version: 1, servers: { [SERVER]: { at: new Date().toISOString(), version: "9.9.9", minClientVersion: "9.0.0" } } }));
     const repo = mkdtempSync(join(tmpdir(), "cortex-compat-repo-"));
     try {
       const env = { CORTEX_HOME: home, CORTEX_SERVER_URL: "http://127.0.0.1:9" };
-      const ctx = await corre(["hook-context", "--format", "text", "--cwd", repo], env);
+      const ctx = await run(["hook-context", "--format", "text", "--cwd", repo], env);
       expect(ctx).toEqual({ code: 0, out: "", err: "" });
-      const cap = await corre(["hook-capture", "--platform", "pi", "--session", join(repo, "no.jsonl"), "--cwd", repo], env);
+      const cap = await run(["hook-capture", "--platform", "pi", "--session", join(repo, "no.jsonl"), "--cwd", repo], env);
       expect(cap).toEqual({ code: 0, out: "", err: "" });
     } finally {
       rmSync(repo, { recursive: true, force: true });

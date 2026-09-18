@@ -6,28 +6,28 @@ import { readCortexLink } from "../packages/client/src/project-config";
 import { slugify } from "../packages/core/src/project-config";
 
 describe("slugify", () => {
-  it("genera slugs estables (kebab, sin acentos)", () => {
+  it("generates stable slugs (kebab-case, accents stripped)", () => {
     expect(slugify("Acme Portal")).toBe("acme-portal");
-    expect(slugify("Ñandú Pasión")).toBe("nandu-pasion");
+    expect(slugify("Ñandú Pasión")).toBe("nandu-pasion"); // accented input is what the corpus brings
     expect(slugify("  Acme  API  ")).toBe("acme-api");
   });
-  it("vacío/sin alfanuméricos → 'proyecto'", () => {
-    expect(slugify("")).toBe("proyecto");
-    expect(slugify("@@@ ---")).toBe("proyecto");
+  it("empty / no alphanumerics → 'project'", () => {
+    expect(slugify("")).toBe("project");
+    expect(slugify("@@@ ---")).toBe("project");
   });
 });
 
-describe("readCortexLink (.cortex.json, el más cercano manda)", () => {
+describe("readCortexLink (.cortex.json, the nearest one wins)", () => {
   const make = (): string => mkdtempSync(join(tmpdir(), "cortex-cfg-"));
 
-  it("lee slug del directorio", () => {
+  it("reads the slug from the directory", () => {
     const dir = make();
     writeFileSync(join(dir, ".cortex.json"), JSON.stringify({ slug: "ce-portal" }));
     expect(readCortexLink(dir)).toEqual({ slug: "ce-portal" });
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("hereda el .cortex.json del padre en subdirectorios", () => {
+  it("inherits the parent's .cortex.json in subdirectories", () => {
     const dir = make();
     writeFileSync(join(dir, ".cortex.json"), JSON.stringify({ slug: "padre" }));
     const sub = join(dir, "a", "b");
@@ -36,20 +36,20 @@ describe("readCortexLink (.cortex.json, el más cercano manda)", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("opt-out con { ignore: true }", () => {
+  it("opt-out with { ignore: true }", () => {
     const dir = make();
     writeFileSync(join(dir, ".cortex.json"), JSON.stringify({ ignore: true }));
     expect(readCortexLink(dir)).toEqual({ ignore: true });
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("sin .cortex.json → null", () => {
+  it("with no .cortex.json → null", () => {
     const dir = make();
     expect(readCortexLink(dir)).toBeNull();
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it("JSON inválido → null (no rompe)", () => {
+  it("invalid JSON → null (it does not break)", () => {
     const dir = make();
     writeFileSync(join(dir, ".cortex.json"), "{ no json");
     expect(readCortexLink(dir)).toBeNull();

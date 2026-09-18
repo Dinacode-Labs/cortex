@@ -8,22 +8,22 @@ import { validateToken, type AuthUser } from "@cortex/core";
 import { buildMcpServer } from "./server.js";
 
 /**
- * Cortex MCP — app HTTP (Streamable HTTP, Web-standard) AUTENTICADA. El MCP deja
- * de ser solo local (stdio): se sirve por HTTP con sesiones, exigiendo el mismo token
- * Bearer que el resto de la API (`cortex auth login`). Un McpServer por sesión.
+ * Cortex MCP -- the AUTHENTICATED HTTP app (Streamable HTTP, Web-standard). MCP stops being
+ * local-only (stdio): it is served over HTTP with sessions, requiring the same Bearer token as
+ * the rest of the API (`cortex auth login`). One McpServer per session.
  *
- * Este módulo NO tiene efectos al importar (ni loadEnv ni serve): `createMcpHttpApp()`
- * construye la app completa (leyendo la config del entorno en ese momento) y el
- * entrypoint fino (`http.ts`) la arranca. Así los tests la ejercitan con `app.request()`.
+ * This module has NO import-time effects (neither loadEnv nor serve): `createMcpHttpApp()`
+ * builds the whole app (reading the environment config at that moment) and the thin entrypoint
+ * (`http.ts`) starts it. That way the tests can exercise it with `app.request()`.
  */
 
-/** Sesión MCP: su transporte, el usuario dueño y la última actividad (para el barrido). */
+/** An MCP session: its transport, the owning user and the last activity (for the sweep). */
 type McpSession = { transport: WebStandardStreamableHTTPServerTransport; email?: string; lastSeen: number };
 
-/** Resultado de autenticación: user (Bearer válido), anónimo (sin token) o inválido.
- * Distinguir "sin token" de "token inválido" importa con auth off: un token presente
- * pero caducado debe dar 401 (el cliente cree estar autenticado), no degradar en
- * silencio a anónimo sin atribución. */
+/** The authentication result: a user (valid Bearer), anonymous (no token) or invalid.
+ * Telling "no token" from "invalid token" matters with auth off: a token that is present but
+ * expired must give a 401 (the client believes it is authenticated), not silently degrade to
+ * anonymous with no attribution. */
 async function authUser(c: Context): Promise<{ user: AuthUser | null; invalidToken: boolean }> {
   const m = (c.req.header("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
   if (!m) return { user: null, invalidToken: false };
@@ -34,21 +34,21 @@ async function authUser(c: Context): Promise<{ user: AuthUser | null; invalidTok
 const rpcError = (c: Context, code: number, message: string, status: 400 | 401) =>
   c.json({ jsonrpc: "2.0", error: { code, message }, id: null }, status);
 
-/** Construye la app HTTP del MCP. La config se lee del entorno AL CONSTRUIR la app
- *  (tras el loadEnv del entrypoint o el env del test), no al importar el módulo. */
+/** Builds the MCP's HTTP app. The config is read from the environment WHEN THE APP IS BUILT
+ *  (after the entrypoint's loadEnv, or the test's env), not when the module is imported. */
 export function createMcpHttpApp(): Hono {
   const REQUIRE_AUTH = process.env.CORTEX_MCP_AUTH !== "off"; // por defecto: exige token
-  // Barrido de sesiones (M4): TTL de inactividad y tope de sesiones vivas, para que los
-  // clientes que mueren sin cerrar (sin DELETE/onclose) no dejen transportes para siempre.
+  // Session sweep (M4): an inactivity TTL and a cap on live sessions, so clients that die
+  // without closing (no DELETE/onclose) do not leave transports around forever.
   const SESSION_TTL_MS = Number(process.env.CORTEX_MCP_SESSION_TTL_SEC ?? 1800) * 1000;
   const MAX_SESSIONS = Number(process.env.CORTEX_MCP_MAX_SESSIONS ?? 200);
 
-  // Sesión → su transporte + el usuario dueño (las tools del server llevan ese usuario baked).
+  // Session -> its transport plus the owning user (the server's tools bake that user in).
   const sessions = new Map<string, McpSession>();
 
-  // Cada 60s se cierran las sesiones inactivas > TTL. `transport.close()` dispara el
-  // `onclose` (que borra del Map); borramos también aquí por si el cierre fallara.
-  // `unref()` para no mantener vivo el proceso (imprescindible en tests).
+  // Every 60s, sessions inactive for longer than the TTL are closed. `transport.close()`
+  // fires `onclose` (which deletes from the Map); we delete here too in case the close fails.
+  // `unref()` so the process is not kept alive (essential in tests).
   setInterval(() => {
     const now = Date.now();
     for (const [sid, s] of sessions) {
@@ -68,28 +68,28 @@ export function createMcpHttpApp(): Hono {
 
   async function handleMcp(c: Context): Promise<Response> {
     const { user, invalidToken } = await authUser(c);
-    // Token presente pero inválido/caducado → 401 SIEMPRE (también con auth off).
-    if (invalidToken) return rpcError(c, -32001, "Token inválido o caducado.", 401);
-    // Con auth OFF y sin token, `user` es null → el MCP se construye SIN usuario
-    // (sin guards, como stdio) y la sesión no se liga a ningún email. Con Bearer válido,
-    // igual que con auth on: la identidad aporta atribución + permisos.
+    // A token that is present but invalid/expired -> ALWAYS a 401 (even with auth off).
+    if (invalidToken) return rpcError(c, -32001, "Invalid or expired token.", 401);
+    // With auth OFF and no token, `user` is null -> the MCP is built WITHOUT a user (no
+    // guards, like stdio) and the session is tied to no email. With a valid Bearer it behaves
+    // as with auth on: the identity brings attribution and permissions.
     if (!user && REQUIRE_AUTH) return rpcError(c, -32001, "No autenticado (Bearer requerido).", 401);
 
     const sid = c.req.header("mcp-session-id");
     const existing = sid ? sessions.get(sid) : undefined;
-    // La sesión pertenece a un usuario: otro token no puede reutilizar su session-id
-    // (solo aplica con auth ON; con auth off las sesiones anónimas no tienen dueño).
+    // The session belongs to a user: another token cannot reuse its session id (this only
+    // applies with auth ON; with auth off, anonymous sessions have no owner).
     if (existing && REQUIRE_AUTH && existing.email !== user?.email) {
-      return rpcError(c, -32001, "La sesión pertenece a otro usuario.", 401);
+      return rpcError(c, -32001, "That session belongs to another user.", 401);
     }
-    if (existing) existing.lastSeen = Date.now(); // actividad → la sesión sigue viva
+    if (existing) existing.lastSeen = Date.now(); // activity -> the session is still alive
     let transport = existing?.transport;
     let parsedBody: unknown;
 
     if (!transport) {
       if (c.req.method === "POST") parsedBody = await c.req.json().catch(() => undefined);
-      if (!isInitializeRequest(parsedBody)) return rpcError(c, -32000, "Sesión no encontrada o se requiere 'initialize'.", 400);
-      // Tope de sesiones: por encima del límite no se aceptan `initialize` nuevos.
+      if (!isInitializeRequest(parsedBody)) return rpcError(c, -32000, "Session not found, or 'initialize' is required.", 400);
+      // Session cap: above the limit, no new `initialize` is accepted.
       if (sessions.size >= MAX_SESSIONS) return rpcError(c, -32000, "Demasiadas sesiones MCP activas.", 400);
       const t = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),
@@ -100,7 +100,7 @@ export function createMcpHttpApp(): Hono {
       t.onclose = () => {
         if (t.sessionId) sessions.delete(t.sessionId);
       };
-      await buildMcpServer(user ?? undefined).connect(t); // identidad del Bearer → atribución + permisos en las tools
+      await buildMcpServer(user ?? undefined).connect(t); // the Bearer's identity -> attribution and permissions in the tools
       transport = t;
     }
     return transport.handleRequest(c.req.raw, parsedBody !== undefined ? { parsedBody } : undefined);

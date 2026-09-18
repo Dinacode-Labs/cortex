@@ -3,41 +3,41 @@ import { findProjectByName } from "@cortex/core";
 import type { WebEnv } from "../middleware/session.js";
 
 /**
- * Las direcciones viejas siguen funcionando (ADR-0050).
+ * The old addresses keep working (ADR-0050).
  *
- * Las URL de la UI están en marcadores, en pestañas abiertas y en enlaces que alguien pegó en
- * un chat hace semanas. Cambiar la estructura y dejar 404 detrás convierte una mejora en una
- * molestia para justo la gente que más la usaba, así que cada ruta antigua lleva a su sitio
- * nuevo. Se van cuando dejen de recibir visitas, no antes.
+ * The UI's URLs live in bookmarks, in open tabs and in links somebody pasted into a chat weeks
+ * ago. Changing the structure and leaving 404s behind turns an improvement into an annoyance
+ * for precisely the people who used it most, so every old path leads to its new home. They go
+ * away when they stop getting visits, not before.
  */
 export const redirectRoutes = new Hono<WebEnv>();
 
-/** `?project=<nombre>` era como se identificaba un proyecto; ahora es el slug. */
-async function slugDe(nombre: string | undefined): Promise<string | null> {
-  if (!nombre) return null;
-  const p = await findProjectByName(nombre);
+/** `?project=<name>` was how a project used to be identified; now it is the slug. */
+async function slugOf(name: string | undefined): Promise<string | null> {
+  if (!name) return null;
+  const p = await findProjectByName(name);
   return p?.slug ?? null;
 }
 
-const viejas: { ruta: string; seccion: string }[] = [
-  { ruta: "/lint", seccion: "/health" },
-  { ruta: "/pack", seccion: "/agents" },
-  { ruta: "/graph", seccion: "/map" },
-  { ruta: "/code", seccion: "/code" },
-  { ruta: "/ask", seccion: "/ask" },
+const oldPaths: { path: string; section: string }[] = [
+  { path: "/lint", section: "/health" },
+  { path: "/pack", section: "/agents" },
+  { path: "/graph", section: "/map" },
+  { path: "/code", section: "/code" },
+  { path: "/ask", section: "/ask" },
 ];
 
-for (const { ruta, seccion } of viejas) {
-  redirectRoutes.get(ruta, async (c) => {
-    const slug = await slugDe(c.req.query("project"));
-    if (!slug) return c.redirect("/", 302); // sin proyecto identificable, a elegir uno
+for (const { path, section } of oldPaths) {
+  redirectRoutes.get(path, async (c) => {
+    const slug = await slugOf(c.req.query("project"));
+    if (!slug) return c.redirect("/", 302); // no identifiable project: go and pick one
     const q = c.req.query("q");
-    return c.redirect(`/p/${slug}${seccion}${q ? `?q=${encodeURIComponent(q)}` : ""}`, 301);
+    return c.redirect(`/p/${slug}${section}${q ? `?q=${encodeURIComponent(q)}` : ""}`, 301);
   });
 }
 
-/** El antiguo listado de proyectos es ahora la portada. */
+/** The old project list is now the home page. */
 redirectRoutes.get("/projects", (c) => c.redirect("/", 301));
 
-/** El coste pasó a ser cosa de operador. */
+/** Cost became an operator's concern. */
 redirectRoutes.get("/usage", (c) => c.redirect("/admin/usage", 301));

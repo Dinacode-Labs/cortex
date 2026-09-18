@@ -5,22 +5,22 @@ import { createProject, requestOtp, saveContext, verifyOtp, type ProjectRef } fr
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 
 /**
- * Que lo que se pinta esté realmente estilado.
+ * Making sure what gets painted is actually styled.
  *
- * Es un fallo silencioso y feo: el HTML sale con su `class`, el navegador no se queja, y la
- * página aparece a medio vestir. Pasó con la reestructuración —clases nuevas en las plantillas
- * y ninguna regla detrás— y no lo vio ningún test porque todos miraban el contenido, no el
- * aspecto. Esto compara las dos listas.
+ * It is a silent, ugly failure: the HTML comes out with its `class`, the browser does not
+ * complain, and the page shows up half dressed. It happened during the restructuring -- new
+ * classes in the templates and no rule behind them -- and no test saw it because they all
+ * looked at the content, not at the appearance. This compares the two lists.
  */
 const CSS = readFileSync(resolve(import.meta.dirname, "../../apps/web/public/styles.css"), "utf8");
 const RID = Math.random().toString(36).slice(2, 8);
 const USER = `styles-${RID}@example.com`;
 
 async function otpDe(email: string): Promise<string> {
-  // El emisor `log` imprime `[email:log] (asunto) to <email>: …`. Se busca el código EN LA
-  // LÍNEA DE ESTE EMAIL, no el primer número de seis cifras que pase: varios ficheros de
-  // integración interceptan `console.log` a la vez y, sin esto, uno se lleva el código de otro
-  // y falla con «Código incorrecto» en un sitio que no tiene nada que ver.
+  // The `log` sender prints `[email:log] (subject) to <email>: ...`. The code is looked for ON
+  // THIS EMAIL'S LINE, not the first six-digit number that goes by: several integration files
+  // intercept `console.log` at once and, without this, one takes another's code and fails with
+  // "Wrong code" somewhere entirely unrelated.
   let cap = "";
   const orig = console.log;
   console.log = ((...a: unknown[]) => {
@@ -31,56 +31,56 @@ async function otpDe(email: string): Promise<string> {
   } finally {
     console.log = orig;
   }
-  const linea = cap.split("\n").find((l) => l.includes(email));
-  const m = linea?.match(/(\d{6})/);
-  if (!m) throw new Error(`no se capturo el OTP de ${email}`);
+  const line = cap.split("\n").find((l) => l.includes(email));
+  const m = line?.match(/(\d{6})/);
+  if (!m) throw new Error(`the OTP for ${email} was not captured`);
   return m[1]!;
 }
 
 let cookie: string;
-let proyecto: ProjectRef;
+let project_: ProjectRef;
 
 beforeAll(async () => {
   const { token } = await verifyOtp(USER, await otpDe(USER));
   cookie = `cortex_session=${token}`;
-  proyecto = await createProject(`Styles ${RID}`, { ownerEmail: USER });
-  await saveContext({ content: `Una decisión cualquiera ${RID}.`, project: proyecto.name, createdBy: USER });
+  project_ = await createProject(`Styles ${RID}`, { ownerEmail: USER });
+  await saveContext({ content: `Some decision or other ${RID}.`, project: project_.name, createdBy: USER });
 }, 120_000);
 
 const clasesDe = (html: string): string[] => [
   ...new Set([...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1]!.split(/\s+/).filter(Boolean))),
 ];
 
-describe("estilos de la UI", () => {
-  it("toda clase que se pinta tiene una regla detrás", async () => {
+describe("the UI's styles", () => {
+  it("every class that gets painted has a rule behind it", async () => {
     const web = createWebApp();
-    const rutas = [
+    const paths = [
       "/",
-      `/p/${proyecto.slug}`,
-      `/p/${proyecto.slug}?capture=1`,
-      `/p/${proyecto.slug}/health`,
-      `/p/${proyecto.slug}/agents`,
-      `/p/${proyecto.slug}/settings`,
-      `/p/${proyecto.slug}/map`,
-      `/p/${proyecto.slug}/code`,
+      `/p/${project_.slug}`,
+      `/p/${project_.slug}?capture=1`,
+      `/p/${project_.slug}/health`,
+      `/p/${project_.slug}/agents`,
+      `/p/${project_.slug}/settings`,
+      `/p/${project_.slug}/map`,
+      `/p/${project_.slug}/code`,
       "/search?q=decision",
     ];
     const sinEstilo = new Set<string>();
-    for (const ruta of rutas) {
-      const html = await (await web.request(ruta, { headers: { cookie } })).text();
-      for (const c of clasesDe(html)) if (!CSS.includes(`.${c}`)) sinEstilo.add(`${c} (${ruta})`);
+    for (const path of paths) {
+      const html = await (await web.request(path, { headers: { cookie } })).text();
+      for (const c of clasesDe(html)) if (!CSS.includes(`.${c}`)) sinEstilo.add(`${c} (${path})`);
     }
     expect([...sinEstilo]).toEqual([]);
   }, 180_000);
 
-  it("la hoja de estilos va versionada, o el navegador sirve la vieja", async () => {
-    // Sin `Cache-Control` ni `ETag` el navegador aplica su heurística y se queda la copia
-    // anterior sin preguntar: un rediseño desplegado que nadie ve.
+  it("the stylesheet is versioned, or the browser serves the old one", async () => {
+    // With neither `Cache-Control` nor `ETag` the browser applies its own heuristic and keeps
+    // the previous copy without asking: a deployed redesign nobody sees.
     const html = await (await createWebApp().request("/", { headers: { cookie } })).text();
     expect(html).toMatch(/\/styles\.css\?v=[^"]+/);
   });
 
-  it("el CSS está balanceado (una llave suelta se come el resto del fichero)", () => {
+  it("the CSS is balanced (one stray brace eats the rest of the file)", () => {
     expect(CSS.split("{").length).toBe(CSS.split("}").length);
   });
 });

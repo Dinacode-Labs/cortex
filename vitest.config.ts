@@ -8,9 +8,9 @@ const cortexAlias = Object.fromEntries(
 );
 
 /**
- * Vitest a nivel de workspace. Los tests viven en `tests/` e importan las APIs públicas
- * (@cortex/*) o módulos sueltos. El plugin resuelve los imports NodeNext con extensión
- * `.js` a sus fuentes `.ts` (el repo usa ESM NodeNext + tsx, no hay build).
+ * Workspace-level Vitest. The tests live in `tests/` and import either the public APIs
+ * (@cortex/*) or individual modules. The plugin resolves NodeNext imports with a `.js`
+ * extension to their `.ts` sources (the repo runs ESM NodeNext + tsx, there is no build).
  */
 export default defineConfig({
   plugins: [
@@ -28,7 +28,7 @@ export default defineConfig({
   ],
   resolve: { alias: cortexAlias },
   test: {
-    include: ["tests/*.test.ts"], // unit (raíz de tests/); la integración va en su propio config
+    include: ["tests/*.test.ts"], // unit (the root of tests/); integration has a config of its own
     environment: "node",
   },
 });

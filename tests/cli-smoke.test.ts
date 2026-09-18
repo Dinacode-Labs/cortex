@@ -4,10 +4,10 @@ import { resolve } from "node:path";
 import { CLI_VERSION, isOlderThan } from "../apps/cli/src/version.js";
 
 /**
- * El CLI se publica en npm, así que dos cosas tienen que cuadrar antes de eso: que todos los
- * comandos que anuncia el `--help` existan de verdad (un `import()` roto solo se ve al
- * ejecutarlo), y que el paquete declare como dependencias justo lo que el bundle NO lleva
- * dentro. Publicar un `@cortex/client` como dependencia haría que npm intentara descargarlo.
+ * The CLI is published to npm, so two things have to line up before that: every command
+ * `--help` announces must really exist (a broken `import()` only shows up when it runs), and
+ * the package must declare as dependencies exactly what the bundle does NOT carry inside.
+ * Publishing `@cortex/client` as a dependency would make npm try to download it.
  */
 
 const pkg = JSON.parse(readFileSync(resolve(import.meta.dirname, "../apps/cli/package.json"), "utf8")) as {
@@ -20,28 +20,28 @@ const pkg = JSON.parse(readFileSync(resolve(import.meta.dirname, "../apps/cli/pa
 };
 
 describe("paquete @dinacodelabs/cortex", () => {
-  it("se publica con un solo binario y solo lo que hace falta", () => {
+  it("is published with a single binary and only what is needed", () => {
     expect(pkg.name).toBe("@dinacodelabs/cortex");
     expect(pkg.bin).toEqual({ cortex: "./dist/cortex.js" });
     expect(pkg.files).toContain("dist");
   });
 
-  it("no declara los paquetes del monorepo como dependencias: van dentro del bundle", () => {
+  it("does not declare the monorepo packages as dependencies: they go inside the bundle", () => {
     for (const dep of Object.keys(pkg.dependencies)) {
-      expect(dep.startsWith("@cortex/"), `${dep} no se puede descargar de npm`).toBe(false);
+      expect(dep.startsWith("@cortex/"), `${dep} cannot be downloaded from npm`).toBe(false);
     }
-    // Y sí están como devDependencies, o el bundler no los encontraría.
+    // And they ARE devDependencies, or the bundler would not find them.
     expect(Object.keys(pkg.devDependencies)).toContain("@cortex/client");
   });
 
-  it("deja fuera del bundle lo que un bundle plano rompería", () => {
-    // El SDK de MCP hace require dinámicos; zod y yaml son públicos y no cuesta nada bajarlos.
+  it("keeps out of the bundle what a flat bundle would break", () => {
+    // The MCP SDK does dynamic requires; zod and yaml are public and cost nothing to download.
     for (const dep of ["@modelcontextprotocol/sdk", "zod", "yaml"]) expect(pkg.dependencies).toHaveProperty(dep);
   });
 });
 
 describe("comandos anunciados", () => {
-  it("todos los que salen en la ayuda se pueden cargar y tienen `run`", async () => {
+  it("everything listed in the help can be loaded and has a `run`", async () => {
     const src = readFileSync(resolve(import.meta.dirname, "../apps/cli/src/index.ts"), "utf8");
     const rutas = [...src.matchAll(/import\("(\.\/commands\/[a-z-]+\.js)"\)/g)].map((m) => m[1]!);
     expect(rutas.length).toBeGreaterThan(8);
@@ -54,41 +54,41 @@ describe("comandos anunciados", () => {
   });
 });
 
-describe("versión del CLI", () => {
-  it("en desarrollo dice `dev`, y `dev` nunca se considera antigua", () => {
-    // Con tsx no hay bundle, así que la constante inyectada no existe.
+describe("the CLI's version", () => {
+  it("says `dev` in development, and `dev` is never considered old", () => {
+    // Under tsx there is no bundle, so the injected constant does not exist.
     expect(CLI_VERSION).toBe("dev");
     expect(isOlderThan("dev", "9.9.9")).toBe(false);
   });
 
   it("compara versiones sin sorpresas", () => {
     expect(isOlderThan("0.1.0", "0.2.0")).toBe(true);
-    expect(isOlderThan("0.9.0", "0.10.0")).toBe(true); // no es orden alfabético
+    expect(isOlderThan("0.9.0", "0.10.0")).toBe(true); // this is not alphabetical order
     expect(isOlderThan("1.0.0", "0.9.9")).toBe(false);
     expect(isOlderThan("0.1.0", "0.1.0")).toBe(false);
   });
 });
 
 /**
- * El bundle publicado tiene que comportarse como las fuentes. Aquí se comprueba lo que ya se
- * rompió una vez: esbuild reescribía `import("node:sqlite")` como `import("sqlite")` al
- * empaquetar, ese módulo no existe, la importación lanzaba y la captura de OpenCode y de
- * Hermes se iba en silencio. Funcionaba en desarrollo y no funcionaba instalado desde npm,
- * que es la peor forma de que algo esté roto.
+ * The published bundle has to behave like the sources. What is checked here is what broke once
+ * already: esbuild rewrote `import("node:sqlite")` as `import("sqlite")` when bundling, that
+ * module does not exist, the import threw and OpenCode and Hermes capture failed silently. It
+ * worked in development and did not work installed from npm, which is the worst way for
+ * something to be broken.
  *
- * Solo corre si el bundle está construido: en local no siempre lo está, y en CI sí (hay un
- * paso de build antes de los tests).
+ * It only runs when the bundle is built: locally it is not always, and in CI it is (there is a
+ * build step before the tests).
  */
 describe("bundle publicado", () => {
   const bundlePath = resolve(import.meta.dirname, "../apps/cli/dist/cortex.js");
   const bundle = existsSync(bundlePath) ? readFileSync(bundlePath, "utf8") : null;
 
-  it.skipIf(!bundle)("no pierde el prefijo `node:` de los módulos internos", () => {
+  it.skipIf(!bundle)("does not lose the `node:` prefix of the built-in modules", () => {
     expect(bundle).not.toMatch(/import\(\s*["']sqlite["']\s*\)/);
     expect(bundle).toContain("node:sqlite");
   });
 
-  it.skipIf(!bundle)("no lee ficheros por `import.meta.dirname`, que tras el bundle no apunta a nada", () => {
+  it.skipIf(!bundle)("does not read files through `import.meta.dirname`, which points nowhere after bundling", () => {
     expect(bundle).not.toContain("import.meta.dirname");
   });
 });

@@ -3,37 +3,37 @@ import { closeSql } from "@cortex/database";
 import { createApp as createServerApp } from "../../apps/server/src/app.js";
 
 /**
- * Los chequeos de salud dicen si el servicio responde, y eso deja fuera los dos problemas que
- * de verdad duelen aquí: que el worker muera —no tiene puerto, y es quien mantiene la memoria
- * viva— y que las capturas empiecen a fallar mientras todo lo demás parece bien.
+ * Health checks say whether the service answers, and that leaves out the two problems that
+ * really hurt here: the worker dying -- it has no port, and it is what keeps the memory alive
+ * -- and captures starting to fail while everything else looks fine.
  *
- * Se expone en el formato de texto de Prometheus a propósito: esto lo despliega otra gente,
- * que ya tiene su forma de vigilar. Un panel propio obliga a mirarlo; un formato estándar lo
- * lee su stack y deja que pongan sus umbrales.
+ * It is exposed in Prometheus's text format on purpose: other people deploy this, and they
+ * already have their own way of watching. A dashboard of our own forces them to look at it; a
+ * standard format is read by their stack and lets them set their own thresholds.
  */
 afterAll(async () => {
   await closeSql();
 });
 
 describe("GET /metrics", () => {
-  it("apagado por defecto, y responde 404 en vez de 403", async () => {
-    // 403 anunciaría que hay algo que pedir. 404 no dice nada.
+  it("off by default, and it answers 404 rather than 403", async () => {
+    // A 403 would announce there is something to ask for. A 404 says nothing.
     const res = await createServerApp().request("/metrics");
     expect(res.status).toBe(404);
   });
 
-  it("con token configurado, sin él o con uno que no es, sigue siendo 404", async () => {
+  it("with a token configured, without it or with the wrong one, it is still 404", async () => {
     vi.stubEnv("CORTEX_METRICS_TOKEN", "s3cr3t");
     try {
       const app = createServerApp();
       expect((await app.request("/metrics")).status).toBe(404);
-      expect((await app.request("/metrics", { headers: { authorization: "Bearer otro" } })).status).toBe(404);
+      expect((await app.request("/metrics", { headers: { authorization: "Bearer other" } })).status).toBe(404);
     } finally {
       vi.unstubAllEnvs();
     }
   });
 
-  it("con el token correcto, devuelve métricas que un Prometheus puede leer", async () => {
+  it("with the right token, it returns metrics a Prometheus can read", async () => {
     vi.stubEnv("CORTEX_METRICS_TOKEN", "s3cr3t");
     try {
       const res = await createServerApp().request("/metrics", { headers: { authorization: "Bearer s3cr3t" } });
@@ -41,7 +41,7 @@ describe("GET /metrics", () => {
       expect(res.headers.get("content-type")).toContain("text/plain");
 
       const texto = await res.text();
-      // Formato: cada métrica con su HELP y su TYPE, que es lo que la hace legible.
+      // Format: every metric with its HELP and its TYPE, which is what makes it readable.
       for (const m of ["cortex_up", "cortex_session_captures_total", "cortex_worker_heartbeat_age_seconds", "cortex_entries_total", "cortex_llm_tokens_total"]) {
         expect(texto, m).toContain(`# HELP ${m}`);
         expect(texto, m).toContain(`# TYPE ${m}`);

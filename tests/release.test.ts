@@ -5,10 +5,10 @@ import { resolve } from "node:path";
 import { parse as yamlParse } from "yaml";
 
 /**
- * Publicar una versión es de las pocas cosas que no se pueden deshacer: una vez que
- * `@dinacodelabs/cortex@0.2.0` está en npm, ese número ya no se puede reutilizar. Así que lo que
- * se comprueba aquí es que todas las versiones del repo van a la par, y que el workflow no ha
- * perdido el paso que lo verifica antes de publicar nada.
+ * Publishing a version is one of the few things that cannot be undone: once
+ * `@dinacodelabs/cortex@0.2.0` is on npm, that number can never be reused. So what is checked
+ * here is that every version in the repo moves together, and that the workflow has not lost the
+ * step that verifies it before publishing anything.
  */
 const ROOT = resolve(import.meta.dirname, "..");
 const json = (p: string): any => JSON.parse(readFileSync(resolve(ROOT, p), "utf8"));
@@ -16,7 +16,7 @@ const json = (p: string): any => JSON.parse(readFileSync(resolve(ROOT, p), "utf8
 describe("versiones del monorepo", () => {
   const root = json("package.json").version as string;
 
-  it("todos los paquetes y apps van a la misma versión", () => {
+  it("every package and app is on the same version", () => {
     const files = execFileSync("sh", ["-c", "ls packages/*/package.json apps/*/package.json"], { cwd: ROOT, encoding: "utf8" })
       .trim()
       .split("\n");
@@ -24,13 +24,13 @@ describe("versiones del monorepo", () => {
     expect(distintas).toEqual([]);
   });
 
-  it("el plugin y su marketplace también, o Claude ofrece actualizar a algo que no existe", () => {
+  it("so are the plugin and its marketplace, or Claude offers an update to something that does not exist", () => {
     expect(json("plugin/claude-code/.claude-plugin/plugin.json").version).toBe(root);
     const market = json(".claude-plugin/marketplace.json");
     expect(market.plugins.find((p: { name: string }) => p.name === "cortex").version).toBe(root);
   });
 
-  it("el CHANGELOG tiene una sección para esta versión", () => {
+  it("the CHANGELOG has a section for this version", () => {
     const notas = execFileSync("node", ["scripts/changelog-notes.mjs", root], { cwd: ROOT, encoding: "utf8" });
     expect(notas.trim().length).toBeGreaterThan(100);
   });
@@ -42,12 +42,12 @@ describe("workflow de release", () => {
     jobs: Record<string, { needs?: string | string[]; steps?: { name?: string; run?: string; uses?: string }[] }>;
   };
 
-  it("lo dispara un tag de versión, no un push a main", () => {
+  it("it is triggered by a version tag, not by a push to main", () => {
     expect(JSON.stringify(wf.on)).toContain("v*.*.*");
     expect(JSON.stringify(wf.on)).not.toContain("branches");
   });
 
-  it("nada se publica sin que verify haya pasado antes", () => {
+  it("nothing is published without verify having passed first", () => {
     for (const job of ["image", "npm"]) {
       expect(JSON.stringify(wf.jobs[job]!.needs), job).toContain("verify");
     }
@@ -55,33 +55,33 @@ describe("workflow de release", () => {
   });
 
   /**
-   * Cada job arranca con su propio checkout y sin nada construido. El bundle del CLI se arma
-   * desde los `dist/` de los paquetes del monorepo, así que el job que publica tiene que
-   * compilarlos él. Que `verify` lo haga no sirve: es otra máquina.
+   * Every job starts with its own checkout and nothing built. The CLI's bundle is assembled
+   * from the monorepo packages' `dist/`, so the publishing job has to compile them itself.
+   * `verify` doing it is no use: that is another machine.
    *
-   * Esto se llevó por delante un release entero — con la imagen ya publicada y el tag ya
-   * puesto— porque tsup no resolvía `@cortex/client`.
+   * This took down an entire release -- with the image already published and the tag already
+   * pushed -- because tsup could not resolve `@cortex/client`.
    */
-  it("el job que publica en npm construye el monorepo antes, y en ese orden", () => {
+  it("the job that publishes to npm builds the monorepo first, and in that order", () => {
     const pasos = wf.jobs.npm!.steps ?? [];
     const iBuild = pasos.findIndex((p) => p.run?.trim() === "pnpm build");
     const iPublish = pasos.findIndex((p) => p.run?.includes("publish"));
-    expect(iBuild, "falta `pnpm build` en el job de npm").toBeGreaterThanOrEqual(0);
+    expect(iBuild, "`pnpm build` is missing from the npm job").toBeGreaterThanOrEqual(0);
     expect(iPublish).toBeGreaterThanOrEqual(0);
-    expect(iBuild, "se construye después de publicar, que no sirve de nada").toBeLessThan(iPublish);
+    expect(iBuild, "it builds after publishing, which is no use at all").toBeLessThan(iPublish);
   });
 
-  it("verify comprueba que el tag coincide con las versiones del repo", () => {
+  it("verify checks that the tag matches the repo's versions", () => {
     const pasos = JSON.stringify(wf.jobs.verify!.steps);
     expect(pasos).toContain("GITHUB_REF_NAME");
     expect(pasos).toContain("changelog-notes");
-    // Y corre todo lo que corre CI: publicar algo que no pasa los tests no tiene arreglo.
+    // And it runs everything CI runs: publishing something that fails the tests cannot be undone.
     for (const cmd of ["pnpm typecheck", "pnpm test", "pnpm test:integration", "pnpm build"]) {
       expect(pasos, cmd).toContain(cmd);
     }
   });
 
-  it("las notas de la Release salen del CHANGELOG, no de los commits", () => {
+  it("the Release notes come from the CHANGELOG, not from the commits", () => {
     const pasos = JSON.stringify(wf.jobs["github-release"]!.steps);
     expect(pasos).toContain("changelog-notes.mjs");
     expect(pasos).toContain("body_path");

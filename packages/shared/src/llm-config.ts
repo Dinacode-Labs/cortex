@@ -1,18 +1,18 @@
 import { getEnv, loadEnv } from "./env.js";
 
 /**
- * Resolución de credenciales/modelo del LLM. Todo endpoint soportado habla el dialecto
- * OpenAI (`/v1/chat/completions`), así que el proveedor es genérico y lo define la config:
+ * LLM credential/model resolution. Every supported endpoint speaks the OpenAI dialect
+ * (`/v1/chat/completions`), so the provider is generic and config decides which one:
  *
- *   LLM_PROVIDER=none               -> sin LLM (heurísticas locales)
+ *   LLM_PROVIDER=none               -> no LLM (local heuristics)
  *   LLM_PROVIDER=openai-compatible  -> LLM_BASE_URL + LLM_API_KEY + LLM_MODEL
- *                                      (NaN, Ollama, vLLM, LM Studio, TGI…)
+ *                                      (NaN, Ollama, vLLM, LM Studio, TGI...)
  *   LLM_PROVIDER=openrouter         -> OPENROUTER_API_KEY + OPENROUTER_MODEL
- *   LLM_PROVIDER=nan                -> ALIAS OBSOLETO de openai-compatible con los
- *                                      defaults de NaN. Se retira en v0.2.0.
+ *   LLM_PROVIDER=nan                -> DEPRECATED ALIAS of openai-compatible with NaN's
+ *                                      defaults. Removed in v0.2.0.
  *
- * Aquí solo vive la resolución; las llamadas las hacen los consumidores en
- * @cortex/agents. Ver ADR-0006/0008/0015/0024.
+ * Only the resolution lives here; the calls are made by consumers in @cortex/agents.
+ * See ADR-0006/0008/0015/0024.
  */
 
 export interface LlmConfig {
@@ -25,12 +25,12 @@ export interface LlmConfig {
 const NAN_BASE_URL = "https://api.nan.builders/v1";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
-/** Proveedores que pueden aparecer como prefijo en `CORTEX_MODEL_<ROL>`. La lista es
- *  cerrada a propósito: un modelo puede llevar `:` en su id (Ollama usa `llama3:8b`),
- *  así que solo se interpreta como proveedor lo que sea un proveedor conocido. */
+/** Providers that may appear as a prefix in `CORTEX_MODEL_<ROLE>`. The list is closed on
+ *  purpose: a model id can contain `:` (Ollama uses `llama3:8b`), so only a known provider
+ *  is ever read as a provider. */
 const KNOWN_PROVIDERS = new Set(["openai-compatible", "openrouter", "nan"]);
 
-/** Defaults heredados de un alias de proveedor (hoy solo `nan`). */
+/** Defaults inherited from a provider alias (today only `nan`). */
 interface AliasDefaults {
   baseURL?: string;
   apiKey?: string;
@@ -39,7 +39,7 @@ interface AliasDefaults {
 
 let warnedNanAlias = false;
 
-/** Traduce el proveedor declarado a uno canónico + los defaults que aporte el alias. */
+/** Maps the declared provider to a canonical one plus whatever defaults the alias brings. */
 function normalizeProvider(declared: string): { provider: string; defaults: AliasDefaults } {
   if (declared !== "nan") return { provider: declared, defaults: {} };
   if (!warnedNanAlias) {
@@ -49,8 +49,8 @@ function normalizeProvider(declared: string): { provider: string; defaults: Alia
         "LLM_BASE_URL / LLM_API_KEY / LLM_MODEL (see .env.example). The alias is removed in v0.2.0.",
     );
   }
-  // `||` en vez de getEnv: una env declarada pero vacía cuenta como "sin configurar"
-  // (getEnv solo aplica su default cuando la variable no existe).
+  // `||` rather than getEnv: an env var that is declared but empty counts as "unset"
+  // (getEnv only applies its default when the variable does not exist).
   return {
     provider: "openai-compatible",
     defaults: {
@@ -61,7 +61,7 @@ function normalizeProvider(declared: string): { provider: string; defaults: Alia
   };
 }
 
-/** Separa `proveedor:modelo` cuando el prefijo es un proveedor conocido. */
+/** Splits `provider:model` when the prefix is a known provider. */
 function splitModelSpec(spec: string): { provider?: string; model: string } {
   const i = spec.indexOf(":");
   if (i <= 0) return { model: spec };
@@ -70,16 +70,16 @@ function splitModelSpec(spec: string): { provider?: string; model: string } {
   return { provider: prefix, model: spec.slice(i + 1).trim() };
 }
 
-/** Construye la config de un proveedor concreto, o null si le faltan credenciales. */
+/** Builds the config for one provider, or null when its credentials are missing. */
 function resolveProvider(provider: string, model: string, defaults: AliasDefaults): LlmConfig | null {
   if (provider === "openai-compatible") {
     const baseURL = (getEnv("LLM_BASE_URL", "").trim() || defaults.baseURL || "").trim();
-    if (!baseURL) return null; // sin endpoint no hay LLM
-    // `||` y no `??`: una env declarada pero VACÍA (`LLM_API_KEY=` en .env.example) significa
-    // "sin configurar", así que debe caer al siguiente candidato.
+    if (!baseURL) return null; // no endpoint, no LLM
+    // `||` and not `??`: an env var that is declared but EMPTY (`LLM_API_KEY=` in
+    // .env.example) means "unset", so it must fall through to the next candidate.
     const apiKey = (process.env.LLM_API_KEY || defaults.apiKey || "").trim();
-    // Endpoints locales (Ollama, LM Studio) no piden clave: hay que declararlo explícitamente
-    // para que un despliegue no se quede sin LLM en silencio por una key olvidada.
+    // Local endpoints (Ollama, LM Studio) need no key: that has to be stated explicitly so a
+    // deployment does not silently end up with no LLM because of a forgotten key.
     if (!apiKey && !getEnv("LLM_ALLOW_NO_KEY", "").trim()) return null;
     return {
       provider,
@@ -102,15 +102,15 @@ function resolveProvider(provider: string, model: string, defaults: AliasDefault
 }
 
 /**
- * Devuelve la config LLM si está habilitada, o null.
+ * Returns the LLM config when enabled, or null.
  *
- * Con `role`, el modelo sale de `CORTEX_MODEL_<ROLE>` (p. ej. `CORTEX_MODEL_DISTILLER`),
- * que gana al default del proveedor. El valor admite dos formas:
- *   - `modelo`              -> mismo proveedor, otro modelo
- *   - `proveedor:modelo`    -> OTRO proveedor para ese rol (p. ej.
- *                              `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`),
- *                              resuelto con sus propias credenciales.
- * Permite routing barato/potente por rol sin tocar código (ADR-0023/0024).
+ * With `role`, the model comes from `CORTEX_MODEL_<ROLE>` (e.g. `CORTEX_MODEL_DISTILLER`),
+ * which beats the provider default. The value takes two shapes:
+ *   - `model`             -> same provider, different model
+ *   - `provider:model`    -> a DIFFERENT provider for that role (e.g.
+ *                            `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`),
+ *                            resolved with its own credentials.
+ * This allows cheap/powerful routing per role without touching code (ADR-0023/0024).
  */
 export function getLlmConfig(role?: string): LlmConfig | null {
   loadEnv();
@@ -119,8 +119,8 @@ export function getLlmConfig(role?: string): LlmConfig | null {
   const spec = role ? getEnv(`CORTEX_MODEL_${role.toUpperCase()}`, "").trim() : "";
   const { provider: roleProvider, model: roleModel } = splitModelSpec(spec);
   if (!roleProvider) return resolveProvider(baseProvider, roleModel, defaults);
-  // El rol apunta a otro proveedor: se resuelve con SUS credenciales, sin heredar los
-  // defaults del alias del proveedor base (serían de otro endpoint).
+  // The role points at another provider: resolve it with ITS credentials, without
+  // inheriting the base provider's alias defaults (they belong to a different endpoint).
   const { provider, defaults: roleDefaults } = normalizeProvider(roleProvider);
   return resolveProvider(provider, roleModel, roleDefaults);
 }
@@ -129,10 +129,10 @@ export function isLlmEnabled(): boolean {
   return getLlmConfig() !== null;
 }
 
-/** Config del modelo de VISIÓN (caption de imágenes / OCR). Mismo endpoint que el LLM de
- * chat salvo que `CORTEX_VISION_MODEL` diga otra cosa: permite apuntar a un multimodal
- * cuando el de chat es text-only, y admite `proveedor:modelo` igual que los roles.
- * Null si no hay LLM. */
+/** Config for the VISION model (image captioning / OCR). Same endpoint as the chat LLM
+ * unless `CORTEX_VISION_MODEL` says otherwise: that allows pointing at a multimodal model
+ * when the chat one is text-only, and it accepts `provider:model` just like the roles.
+ * Null when there is no LLM. */
 export function getVisionConfig(): LlmConfig | null {
   const model = getEnv("CORTEX_VISION_MODEL", "").trim();
   if (!model) return getLlmConfig();
@@ -151,11 +151,11 @@ export interface SttConfig {
   model: string;
 }
 
-/** Config de STT (transcripción de audio/vídeo, whisper). Endpoint PROPIO, desacoplado del
- * proveedor de chat: no todos sirven `/audio/transcriptions` (OpenRouter no lo hace).
- * Clave: `CORTEX_STT_API_KEY` o, en su defecto, `LLM_API_KEY`/`OPENAI_API_KEY`; base URL
- * `CORTEX_STT_BASE_URL` (def. OpenAI); modelo `CORTEX_STT_MODEL` (def. whisper-1).
- * Con NaN: fijar las tres (`…/v1`, la key de NaN y `whisper`). Null si no hay clave. */
+/** STT config (audio/video transcription, whisper). Its OWN endpoint, decoupled from the
+ * chat provider: not all of them serve `/audio/transcriptions` (OpenRouter does not).
+ * Key: `CORTEX_STT_API_KEY`, falling back to `LLM_API_KEY`/`OPENAI_API_KEY`; base URL
+ * `CORTEX_STT_BASE_URL` (default OpenAI); model `CORTEX_STT_MODEL` (default whisper-1).
+ * With NaN: set all three (`.../v1`, the NaN key and `whisper`). Null when there is no key. */
 export function getSttConfig(): SttConfig | null {
   loadEnv();
   const key = (process.env.CORTEX_STT_API_KEY || process.env.LLM_API_KEY || process.env.OPENAI_API_KEY || "").trim();

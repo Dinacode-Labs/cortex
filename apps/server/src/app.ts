@@ -13,30 +13,29 @@ import { metricsRoutes } from "./routes/metrics.js";
 import { projectRoutes } from "./routes/projects.js";
 
 /**
- * API HTTP de Cortex (Hono). Autenticación email + OTP + endpoints autenticados de
- * contexto (los hooks/conectores los usan en vez de tocar la BD directamente): la
- * escritura se atribuye al usuario (created_by = email) y respeta permisos. Ver
- * docs/decisions.md.
+ * Cortex's HTTP API (Hono). Email + OTP authentication plus authenticated context endpoints
+ * (the hooks and connectors use these instead of touching the database directly): writes are
+ * attributed to the user (created_by = email) and respect permissions. See docs/decisions.md.
  *
- * Este módulo NO tiene efectos al importar (ni loadEnv ni serve): `createApp()`
- * solo COMPONE la app — health + routers (`routes/`, uno por recurso) + onError —
- * y el entrypoint fino (`index.ts`) la arranca. Así los tests pueden ejercitar
- * las rutas con `app.request()` sin levantar un servidor.
+ * This module has NO import-time effects (neither loadEnv nor serve): `createApp()` only
+ * COMPOSES the app -- health + routers (`routes/`, one per resource) + onError -- and the thin
+ * entrypoint (`index.ts`) starts it. That way the tests can exercise the routes with
+ * `app.request()` without standing up a server.
  */
 
 export interface AppDeps {
-  /** Inyectable para poder testear las rutas de captura sin llamar a un modelo real. */
+  /** Injectable so the capture routes can be tested without calling a real model. */
   distill?: DistillSessionFn;
-  /** Llamadas al modelo en paralelo. Baja porque el proveedor limita por API key. */
+  /** Parallel model calls. Low, because the provider limits per API key. */
   captureConcurrency?: number;
 }
 
-/** Construye la API HTTP completa (auth + contexto + captura). Sin side effects. */
+/** Builds the whole HTTP API (auth + context + capture). No side effects. */
 export function createApp(deps: AppDeps = {}): Hono {
   const app = new Hono();
 
-  // Cabeceras de seguridad antes que nada. Los defaults de Hono no incluyen CSP, que es lo
-  // que rompería las fuentes externas de la UI.
+  // Security headers before anything else. Hono's defaults do not include a CSP, which is
+  // what would break the UI's external fonts.
   app.use("*", secureHeaders());
   const distill = deps.distill ?? distillSession;
   const captureQueue = createCaptureQueue<CaptureJob>({
@@ -44,8 +43,9 @@ export function createApp(deps: AppDeps = {}): Hono {
     run: makeCaptureRunner(distill),
   });
 
-  // Health de verdad: sin base de datos el servidor no sirve para nada, así que decirlo
-  // "ok" solo porque el proceso vive engaña al orquestador y al que mira el dashboard.
+  // A real health check: with no database the server is useless, so saying "ok" merely
+  // because the process is alive misleads both the orchestrator and whoever reads the
+  // dashboard.
   app.get("/health", async (c) => {
     const db = await pingDatabase();
     return c.json({ ok: db, service: "cortex-server", db: db ? "ok" : "down" }, db ? 200 : 503);
@@ -59,10 +59,10 @@ export function createApp(deps: AppDeps = {}): Hono {
   app.route("/", projectRoutes);
   app.route("/", captureSessionRoutes({ distill, queue: captureQueue }));
 
-  // Errores no controlados: log completo en servidor + 500 JSON genérico,
-  // sin filtrar detalles internos al cliente.
+  // Unhandled errors: a full log on the server plus a generic JSON 500, leaking no internal
+  // detail to the client.
   app.onError((err, c) => {
-    console.error("[cortex-server] error no controlado:", err);
+    console.error("[cortex-server] unhandled error:", err);
     return c.json({ error: "Internal error." }, 500);
   });
 
