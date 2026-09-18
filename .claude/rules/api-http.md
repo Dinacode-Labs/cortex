@@ -25,6 +25,21 @@ paths:
 Adding an endpoint or a field is a contract change: whoever reads it tolerates its absence
 (ADR-0062), because on the other side there may be a CLI from months ago.
 
+## When a change breaks older CLIs
+
+Adding is never breaking. What breaks is **removing or renaming** a route, a field or a value
+that a shipped CLI sends or reads, or **tightening** a schema so that a body an older CLI sends
+is now rejected. If your PR does that, it is your job, not the operator's, to raise the floor:
+
+1. Bump the default of `MIN_CLIENT_VERSION` in `apps/server/src/version.ts` to the **first CLI
+   version that survives the change**, which is the version this PR will ship in.
+2. Say so in the CHANGELOG entry: "CLIs older than X can no longer write; run `cortex upgrade`".
+
+The default in code is what every deployment gets. The `CORTEX_MIN_CLIENT_VERSION` variable is
+an operator override, for a deployment that needs a higher floor for its own reasons; it is not
+where compatibility breaks are recorded. Never raise the floor as a nudge to update: the passive
+notice already does that without stopping anyone's work.
+
 ## An MCP tool
 
 - They are registered in `apps/mcp-server/src/server.ts`, with `inputSchema` taken from the domain

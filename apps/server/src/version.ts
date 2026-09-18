@@ -21,9 +21,13 @@ export const SERVER_VERSION = readVersion();
 
 /**
  * The oldest CLI THIS server accepts (ADR-0062). It is the only number that can block: below
- * it, the CLI refuses to write (reading keeps working). The operator raises it when a server
- * change genuinely breaks older clients, not on every release; that is why the default is so
- * low. `SERVER_VERSION`, by contrast, is informational only: the CLI uses it to warn that a
- * new version exists, or that the server has fallen behind.
+ * it, the CLI refuses to write (reading keeps working).
+ *
+ * Who raises it: **the PR that breaks compatibility** with a shipped CLI (a route or field
+ * removed or renamed, a schema tightened), by bumping the default here to the version it ships
+ * in and saying so in the CHANGELOG. Not on every release, which is why the default is so low.
+ * The environment variable is an operator override for one deployment, not where breaks are
+ * recorded. `SERVER_VERSION`, by contrast, is informational only: the CLI uses it to warn that
+ * a new version exists, or that the server has fallen behind.
  */
 export const MIN_CLIENT_VERSION = process.env.CORTEX_MIN_CLIENT_VERSION?.trim() || "0.1.0";
