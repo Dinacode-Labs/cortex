@@ -20,7 +20,7 @@ fixes things.
   would read as a perfect zero. What each window tests and what the numbers mean:
   `tests/fixtures/eval/README.md`.
 
-  The same eight cases also exist as **English sessions** (`windows-en/` + `gold-en.json`), run
+  The same eight cases also exist as **English sessions** (`distill/en/`), run
   separately and with their own mark: mixed into one total, a gain in one language would hide a
   loss in the other. Since the agents answer in Spanish whatever they are fed
   (`OUTPUT_LANGUAGE`), what the English set measures is whether the judgement survives a session

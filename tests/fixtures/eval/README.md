@@ -1,9 +1,21 @@
 # Evaluation sets
 
-Two fixed sets, one per half of the pipeline: **retrieval** (`corpus.json` + `questions.json`),
-what can be found of what is already stored, and **distillation** (`distill/`), what gets stored
-in the first place. Both exist to answer the only question that matters when the chunking, the
-rerank, the embeddings or a prompt get touched: **did it get better or worse?**
+Two fixed sets, one per half of the pipeline: **retrieval**, what can be found of what is
+already stored, and **distillation**, what gets stored in the first place. Both exist to answer
+the only question that matters when the chunking, the rerank, the embeddings or a prompt get
+touched: **did it get better or worse?**
+
+```
+retrieval/        corpus.json · questions.json
+distill/
+  es/             windows/ · gold.json     the language of the corpus, and the default
+  en/             windows/ · gold.json     the same eight cases as English sessions
+```
+
+One directory per set, and inside distillation one per language, each carrying its own windows
+and its own marking key. Neither half is the implicit one: the first set in does not get to sit
+in the root and the first language in does not get to be the one with no suffix, or whatever
+arrives second is an afterthought bolted onto a name.
 
 ## Why an invented corpus and not the real memory
 
@@ -131,11 +143,10 @@ one, because what reads it is an agent that cannot tell which is which.
 ### How to run it
 
 ```bash
-pnpm admin eval-distill                                 # the Spanish set, windows/ + gold.json
-pnpm admin eval-distill --verbose                       # plus every item: type · title · first 120 chars
-pnpm admin eval-distill \
-  --windows tests/fixtures/eval/distill/windows-en \
-  --gold tests/fixtures/eval/distill/gold-en.json       # the English set
+pnpm admin eval-distill                       # es, the language of the corpus
+pnpm admin eval-distill --lang en             # the same eight cases as English sessions
+pnpm admin eval-distill --verbose             # plus every item: type · title · first 120 chars
+pnpm admin eval-distill --windows <dir> --gold <file>   # a fixture from outside the repo
 ```
 
 **An LLM is required, and the command refuses to run without one.** The distiller *is* the
@@ -167,9 +178,11 @@ often names the alternative it rejected, and that is knowledge, not a leak. That
 `b-confirm-reject.txt` forbids only the idea nobody answered, and why what the window is really
 for is read with `--verbose`.
 
-### The same exam in English
+### The same exam in other languages
 
-`windows-en/` and `gold-en.json` hold the same eight cases as English sessions. They are run
+`distill/en/` holds the same eight cases as English sessions. Each language is a directory of
+its own with its **own windows and its own gold**, because the two are useless apart, and
+adding a third is copying a directory rather than editing anything. They are run
 **separately, with their own mark**: mixed into one total, a gain in one language would hide a
 loss in the other and the number would stop saying what happened.
 

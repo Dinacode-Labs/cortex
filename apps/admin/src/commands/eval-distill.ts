@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { getLlmConfig } from "@cortex/shared";
 import { distill, shutdownObservability } from "@cortex/agents";
@@ -12,16 +12,26 @@ import { matchDistillItems, summarizeDistillMatches, type DistillItem, type Gold
  * an opinion. This answers the same question that one does -- did it get better or worse? --
  * over a fixed set of transcript windows with an annotated expectation each.
  *
- * The windows are invented (`tests/fixtures/eval/distill/`) and not real sessions: an eval
- * exists to compare runs, and real sessions change every day.
+ * The windows are invented (`tests/fixtures/eval/distill/<language>/`) and not real sessions:
+ * an eval exists to compare runs, and real sessions change every day. One directory per
+ * language, each holding its own windows and its own gold: the two are useless apart, and
+ * adding a language has to be copying a directory rather than editing this file.
  *
- *   cortex-admin eval-distill                    the fixture in the repo
+ *   cortex-admin eval-distill                    the Spanish set, the language of the corpus
+ *   cortex-admin eval-distill --lang en          another language of the same eight cases
  *   cortex-admin eval-distill --verbose          plus every item emitted
- *   cortex-admin eval-distill --windows <dir> --gold <file>    another fixture
+ *   cortex-admin eval-distill --windows <dir> --gold <file>    a fixture from outside the repo
  */
 
-/** The fictional project the whole eval corpus is about (`tests/fixtures/eval/corpus.json`). */
+/** The fictional project the whole eval corpus is about (`tests/fixtures/eval/retrieval/`). */
 const PROJECT = "Nébula";
+
+/**
+ * The language of the corpus Cortex actually ingests, and the one the baseline was measured
+ * against. It is explicit in the path rather than being the directory with no suffix: the first
+ * language in is not the implicit one, or the second arrives as an afterthought.
+ */
+const DEFAULT_LANGUAGE = "es";
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
@@ -71,8 +81,20 @@ export async function run(args: string[]): Promise<void> {
 
 async function evalDistill(args: string[]): Promise<void> {
   const verbose = args.includes("--verbose");
-  const windowsDir = flag(args, "windows") ?? join(FIXTURES_DIR, "windows");
-  const goldFile = flag(args, "gold") ?? join(FIXTURES_DIR, "gold.json");
+  const language = flag(args, "lang") ?? DEFAULT_LANGUAGE;
+  const set = join(FIXTURES_DIR, language);
+  const custom = flag(args, "windows") ?? flag(args, "gold");
+  if (!custom && !existsSync(set)) {
+    const available = readdirSync(FIXTURES_DIR, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort();
+    console.error(`There is no fixture for --lang ${language}. There is one for: ${available.join(", ")}.`);
+    process.exitCode = 1;
+    return;
+  }
+  const windowsDir = flag(args, "windows") ?? join(set, "windows");
+  const goldFile = flag(args, "gold") ?? join(set, "gold.json");
 
   const gold = JSON.parse(readFileSync(goldFile, "utf8")) as GoldWindow[];
   const files = new Set(readdirSync(windowsDir).filter((f) => f.endsWith(".txt")));
@@ -86,7 +108,10 @@ async function evalDistill(args: string[]): Promise<void> {
   if (unlisted.length > 0) console.warn(`⚠️  No expectation in the gold file, not evaluated: ${unlisted.join(", ")}\n`);
 
   const model = getLlmConfig("distiller");
-  console.log(`Distilling ${plural(gold.length, "window")} with ${model?.provider}/${model?.model}...`);
+  // A run says which set it came from: two languages are never averaged into one number, so a
+  // table that does not name its own set is a table nobody can compare against anything.
+  const source = custom ? windowsDir : language;
+  console.log(`Distilling ${plural(gold.length, "window")} (${source}) with ${model?.provider}/${model?.model}...`);
 
   const matches: WindowMatch[] = [];
   const emitted = new Map<string, DistillItem[]>();
@@ -124,7 +149,7 @@ async function evalDistill(args: string[]): Promise<void> {
   ]);
 
   console.log(`\n# Distillation eval — ${PROJECT}`);
-  console.log(`_${plural(matches.length, "window")} · ${model?.provider}/${model?.model}_\n`);
+  console.log(`_${plural(matches.length, "window")} · ${source} · ${model?.provider}/${model?.model}_\n`);
   console.log(table(rows));
   console.log(
     `\nexpected recall ${summary.recall.toFixed(3)} · forbidden leaks ${summary.leakRate.toFixed(3)} · ` +

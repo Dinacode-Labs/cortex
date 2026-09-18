@@ -19,15 +19,20 @@ const FIXTURES = resolve(import.meta.dirname, "fixtures/eval/distill");
 /** `CORTEX_SESSIONS_WINDOW_CHARS` default: a bigger window is not what the pipeline produces. */
 const WINDOW_CHARS = 9000;
 
-const SETS = [
-  { language: "es", dir: "windows", gold: "gold.json" },
-  { language: "en", dir: "windows-en", gold: "gold-en.json" },
-];
+/**
+ * Read off the disk rather than listed here: a language added tomorrow gets checked by all of
+ * this without anybody remembering to come back and add it to a list.
+ */
+const LANGUAGES = readdirSync(FIXTURES, { withFileTypes: true })
+  .filter((d) => d.isDirectory())
+  .map((d) => d.name)
+  .sort();
 
-const load = (set: (typeof SETS)[number]): { gold: GoldWindow[]; files: string[] } => ({
-  gold: JSON.parse(readFileSync(join(FIXTURES, set.gold), "utf8")) as GoldWindow[],
-  files: readdirSync(join(FIXTURES, set.dir)).filter((f) => f.endsWith(".txt")).sort(),
-});
+const windowsOf = (language: string): string[] =>
+  readdirSync(join(FIXTURES, language, "windows")).filter((f) => f.endsWith(".txt")).sort();
+
+const goldOf = (language: string): GoldWindow[] =>
+  JSON.parse(readFileSync(join(FIXTURES, language, "gold.json"), "utf8")) as GoldWindow[];
 
 const keywordsOf = (g: GoldWindow): string[][] => [
   ...g.expected.map((e) => e.must_mention),
@@ -35,22 +40,30 @@ const keywordsOf = (g: GoldWindow): string[][] => [
 ];
 
 describe("the distillation fixture", () => {
+  it("there is at least one set, and each one is a language of its own", () => {
+    // The whole point of the layout: no set without a language, and no language without a set.
+    expect(LANGUAGES.length).toBeGreaterThan(0);
+    expect(LANGUAGES).toContain("es");
+  });
+
   /** A window with no entry is never evaluated, and an entry with no window aborts the run. */
   it("every window has an expectation and every expectation has a window", () => {
     const orphans: string[] = [];
-    for (const set of SETS) {
-      const { gold, files } = load(set);
+    for (const language of LANGUAGES) {
+      const gold = goldOf(language);
+      const files = windowsOf(language);
       const named = new Set(gold.map((g) => g.window));
-      for (const f of files) if (!named.has(f)) orphans.push(`${set.dir}/${f} has no entry in ${set.gold}`);
-      for (const g of gold) if (!files.includes(g.window)) orphans.push(`${set.gold} names ${g.window}, which does not exist`);
+      for (const f of files) if (!named.has(f)) orphans.push(`${language}: ${f} has no entry in its gold`);
+      for (const g of gold) if (!files.includes(g.window)) orphans.push(`${language}: the gold names ${g.window}, which does not exist`);
     }
     expect(orphans).toEqual([]);
   });
 
-  /** The two runs are read side by side; if the cases drift apart there is nothing to compare. */
-  it("both languages cover the same cases", () => {
-    const [es, en] = SETS.map((s) => load(s).files);
-    expect(en).toEqual(es);
+  /** The runs are read side by side; if the cases drift apart there is nothing to compare. */
+  it("every language covers the same cases", () => {
+    const reference = windowsOf("es");
+    const drifted = LANGUAGES.filter((l) => JSON.stringify(windowsOf(l)) !== JSON.stringify(reference));
+    expect(drifted).toEqual([]);
   });
 
   /**
@@ -60,14 +73,14 @@ describe("the distillation fixture", () => {
    */
   it("the windows look like what condenseSession produces", () => {
     const offenders: string[] = [];
-    for (const set of SETS) {
-      for (const f of load(set).files) {
-        const text = readFileSync(join(FIXTURES, set.dir, f), "utf8").trim();
-        if (text.length > WINDOW_CHARS) offenders.push(`${set.dir}/${f}: ${text.length} characters, over ${WINDOW_CHARS}`);
+    for (const language of LANGUAGES) {
+      for (const f of windowsOf(language)) {
+        const text = readFileSync(join(FIXTURES, language, "windows", f), "utf8").trim();
+        if (text.length > WINDOW_CHARS) offenders.push(`${language}/${f}: ${text.length} characters, over ${WINDOW_CHARS}`);
         const turns = text.split("\n\n");
-        if (turns.length < 2) offenders.push(`${set.dir}/${f}: fewer than two turns`);
+        if (turns.length < 2) offenders.push(`${language}/${f}: fewer than two turns`);
         for (const [i, turn] of turns.entries()) {
-          if (!/^(USER|ASSISTANT): /.test(turn)) offenders.push(`${set.dir}/${f}: turn ${i + 1} starts with "${turn.slice(0, 24)}…"`);
+          if (!/^(USER|ASSISTANT): /.test(turn)) offenders.push(`${language}/${f}: turn ${i + 1} starts with "${turn.slice(0, 24)}…"`);
         }
       }
     }
@@ -86,13 +99,12 @@ describe("the distillation fixture", () => {
    */
   it("every keyword appears in its own window", () => {
     const unfindable: string[] = [];
-    for (const set of SETS) {
-      const { gold } = load(set);
-      for (const g of gold) {
-        const window = canonicalize(readFileSync(join(FIXTURES, set.dir, g.window), "utf8"));
+    for (const language of LANGUAGES) {
+      for (const g of goldOf(language)) {
+        const window = canonicalize(readFileSync(join(FIXTURES, language, "windows", g.window), "utf8"));
         for (const keywords of keywordsOf(g)) {
           for (const k of keywords) {
-            if (!window.includes(canonicalize(k))) unfindable.push(`${set.gold} → ${g.window}: "${k}"`);
+            if (!window.includes(canonicalize(k))) unfindable.push(`${language} → ${g.window}: "${k}"`);
           }
         }
       }
@@ -107,9 +119,9 @@ describe("the distillation fixture", () => {
   it("the expected types exist in the domain", () => {
     const types = new Set<string>(contextEntryType.options);
     const unknown: string[] = [];
-    for (const set of SETS) {
-      for (const g of load(set).gold) {
-        for (const e of g.expected) if (!types.has(e.type)) unknown.push(`${set.gold} → ${g.window}: "${e.type}"`);
+    for (const language of LANGUAGES) {
+      for (const g of goldOf(language)) {
+        for (const e of g.expected) if (!types.has(e.type)) unknown.push(`${language} → ${g.window}: "${e.type}"`);
       }
     }
     expect(unknown).toEqual([]);
@@ -117,16 +129,18 @@ describe("the distillation fixture", () => {
 
   /**
    * The distiller answers in Spanish whatever it is fed (`OUTPUT_LANGUAGE` in
-   * `packages/agents/src/mastra.ts`), so the English set can only be annotated with keywords
-   * that survive the translation: names, identifiers and stems. A Spanish spelling in the
-   * English gold means somebody annotated the output language rather than the subject, and
-   * that window would then measure translation instead of judgement.
+   * `packages/agents/src/mastra.ts`), so any set that is not the Spanish one can only be
+   * annotated with keywords that survive the translation: names, identifiers and stems. A
+   * Spanish spelling in another language's gold means somebody annotated the output language
+   * rather than the subject, and that window would then measure translation, not judgement.
    */
-  it("the English gold is annotated with language-invariant keywords", () => {
+  it("the other languages are annotated with language-invariant keywords", () => {
     const spanish: string[] = [];
-    for (const g of load(SETS[1]!).gold) {
-      for (const keywords of keywordsOf(g)) {
-        for (const k of keywords) if (/[áéíóúüñ]/i.test(k)) spanish.push(`gold-en.json → ${g.window}: "${k}"`);
+    for (const language of LANGUAGES.filter((l) => l !== "es")) {
+      for (const g of goldOf(language)) {
+        for (const keywords of keywordsOf(g)) {
+          for (const k of keywords) if (/[áéíóúüñ]/i.test(k)) spanish.push(`${language} → ${g.window}: "${k}"`);
+        }
       }
     }
     expect(spanish).toEqual([]);

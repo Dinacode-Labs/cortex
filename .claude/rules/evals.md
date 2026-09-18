@@ -57,8 +57,10 @@ Four pieces, and the names in `tests/fixtures/eval/` are the reference:
   keywords that survive translation: names, identifiers and stems. Annotate the output language
   instead and the set measures translation rather than judgement.
 - **Keep populations apart.** Two languages, two domains or two models do not share a total: a
-  gain on one hides a loss on the other. One mark per set — that is what `--windows` / `--gold`
-  are for.
+  gain on one hides a loss on the other. One mark per set, one directory per set, and each one
+  carrying everything it needs (`distill/es/`, `distill/en/`): the halves of a set are useless
+  apart, and adding one has to be copying a directory rather than editing the command. Neither
+  the first set in nor the first language in gets to be the implicit one.
 
 ## What must not be left to memory
 
