@@ -31,6 +31,23 @@ fixes things.
   `CONTRIBUTING.es.md`, with English as the version that must be current when they disagree.
   ADR-0064.
 
+- **The rules this repo is worked by can now be read, and cited** (ADR-0065). `CLAUDE.md` was the
+  only thing written for an agent, it had reached 11.6 KB, and it still left out most of what has
+  to be got right: how a route, a command or a screen is written here, when to throw and when to
+  return, what a comment is for. That now lives in `.claude/rules/`, one file per subject. Four
+  load always, because they hold for any change — architecture, language, tests and documentation
+  — and five carry a `paths:` header and only show up when you touch what they cover: TypeScript
+  style, the HTTP API and MCP, the CLI, the web and the LLM layer. `CLAUDE.md` comes down to under
+  7 KB and keeps what only it can say. What covers one corner of the tree no longer costs context
+  until you open that corner, so the detail can be written where it used to be too expensive.
+
+  Two conventions the repo had been following without stating them are settled along the way:
+  there is no formatter and no linter, and the style is written down instead; and `any` is only
+  valid at a boundary with a foreign format that has no schema, never crossing into the domain.
+  And a test watches the rules themselves, as with the CLI's weight or the configuration template:
+  it fails if a rule is imported twice into context, or if a `paths:` header points at a directory
+  that no longer exists.
+
 ### Fixed
 - **`/context-pack` answered 500 instead of 404 for a project that does not exist.** The route
   matched the error by the text of a message defined in `packages/core`, and the two had drifted

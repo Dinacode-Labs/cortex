@@ -20,6 +20,7 @@ const DOCS = [
   "config/README.md",
   ...SPANISH_DOCS,
   ...globSync("docs/**/*.md", { cwd: ROOT }),
+  ...globSync(".claude/rules/*.md", { cwd: ROOT }),
 ];
 
 const read = (p: string): string => readFileSync(resolve(ROOT, p), "utf8");
@@ -153,5 +154,30 @@ describe("documentation", () => {
 
   it("the CHANGELOG keeps an [Unreleased] section for the next PR", () => {
     expect(read("CHANGELOG.md")).toContain("## [Unreleased]");
+  });
+
+  /**
+   * The rules in `.claude/rules/` are loaded by the agent on its own (ADR-0065), and that is the
+   * trap: nothing fails when one stops being loaded. If somebody imports one from CLAUDE.md, the
+   * same text enters the context twice; if a `paths:` header points at a directory that was
+   * renamed, the rule exists, reads fine, and never applies.
+   */
+  it("the rules load as rules: not imported twice, not pointing at nothing", () => {
+    const rules = globSync(".claude/rules/*.md", { cwd: ROOT }).map((f) => f.replaceAll("\\", "/"));
+    expect(rules.length, "there are no rules to load").toBeGreaterThan(0);
+
+    const imported = [...read("CLAUDE.md").matchAll(/^@(\S*\.claude\/rules\/\S+\.md)$/gm)].map((m) => m[1]!);
+    expect(imported, "CLAUDE.md imports them and the agent already loads them: they would enter twice").toEqual([]);
+
+    // Only the literal part of each glob is checked: "apps/web/**/*.ts" -> "apps/web".
+    const orphans: string[] = [];
+    for (const rule of rules) {
+      const frontmatter = /^---\n([\s\S]*?)\n---/.exec(read(rule))?.[1];
+      for (const m of frontmatter?.matchAll(/^\s*-\s*"([^"]+)"/gm) ?? []) {
+        const base = m[1]!.split("*")[0]!.replace(/\/[^/]*$/, "");
+        if (base && !existsSync(resolve(ROOT, base))) orphans.push(`${rule} -> ${m[1]}`);
+      }
+    }
+    expect(orphans, "a paths: that does not exist is a rule that never applies").toEqual([]);
   });
 });

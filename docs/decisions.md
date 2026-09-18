@@ -63,6 +63,11 @@ CLI and the server are two clocks that are compared, not tied. The same lesson c
 phase ([0064](#adr-0064)): a repository that switches language halfway is one whose
 explanations only its authors can read.
 
+**Writing down what had only been imitated — 18 September 2026** ([0065](#adr-0065)). The rules
+an agent works by moved out of one long document and into a file per subject, some of which load
+only when the part of the tree they cover is opened, and two conventions that had been followed
+without ever being stated — formatting, and where `any` is allowed — were finally given an answer.
+
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
 > to by title alone. They were numbered on 2026-09-12, taking the next free identifiers. The
@@ -1904,3 +1909,56 @@ explanations only its authors can read.
 - **Revisit when:** the corpus stops being predominantly Spanish. That single premise holds up
   both exceptions — the patterns and the output language — and nothing else about this decision
   depends on anything that is likely to change.
+
+<a id="adr-0065"></a>
+
+## ADR-0065 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
+
+- **Status:** accepted (2026-09-18).
+- **Context:** `CLAUDE.md` was the only written guidance for an agent working in this repository,
+  and it had grown to 11.6 KB while still leaving out most of what an agent actually needs to get
+  right: how a route, a command or a screen is written here, when to throw and when to return,
+  what a comment is for. Two conventions the tree follows consistently were written down nowhere at
+  all, so anyone — human or model — had to infer them from whichever files they happened to open:
+
+  1. **Formatting.** There is no ESLint and no Prettier, yet the tree is uniform: double quotes in
+     all 613 imports, two spaces, lines up to about 120 columns. Uniform by imitation, with nothing
+     to imitate from when a file is new.
+  2. **`any`.** Eighteen uses, every one of them at a boundary with a foreign format, and no rule
+     saying that is the limit.
+
+  A third question — which language all of this is written in — was open while this was being
+  drafted, and is settled on its own terms by [0064](#adr-0064).
+- **Decision:**
+  1. Rules live in **`.claude/rules/*.md`**, one file per subject, picked up by the agent's own
+     rule mechanism rather than imported from `CLAUDE.md` — an import would put the same text in
+     context twice. Four load in every session, because they hold for every change: architecture,
+     language, tests, documentation. Five carry a `paths:` header and load only when a file they
+     cover is opened: TypeScript style, HTTP and MCP, CLI, web, the LLM layer. `CLAUDE.md` keeps
+     what only it can say: what the product is, the stack, the tree, the commands. They are plain
+     markdown, so an agent that does not know the convention can still be pointed at them.
+  2. **No formatter and no linter.** Style is written down instead: double quotes, two spaces, ~120
+     columns, and no reformatting of code you are not touching.
+  3. **`any` only at a boundary with a foreign format that has no schema** — transcripts from other
+     agents, untyped APIs, SQL rows through `Row` — and it never crosses into the domain: it is
+     validated with zod or mapped first. `@ts-ignore` stays banned; there are zero today.
+- **Alternatives:** leave the conventions unwritten — they are decided in practice already, just
+  not anywhere a newcomer can read them, which is how drift starts; put everything in `CLAUDE.md` —
+  it doubles a file that already asks to be pruned, and makes every rule harder to cite; import the
+  rule files from `CLAUDE.md` instead — the same text would then load twice, once through the
+  import and once through the rule mechanism; skills loaded on demand — cheaper still, but they may
+  not fire when they are needed, and the four unconditional rules apply to every change; adopt
+  Prettier — a tree-wide reformat, and a noisy history, for a problem nobody has yet.
+- **Consequences:** a rule is now a thing you can point at, and `CLAUDE.md` came down from 11.6 KB
+  to under 7 KB. What covers one corner of the tree costs nothing until that corner is opened, so
+  the detail can go where it was previously too expensive to write: how a route is written, how a
+  command is registered, why the web talks to `core` and not to the API. The trade is that the four
+  unconditional files load every session, so they have to stay short — and anything checkable
+  should become a test rather than a paragraph, which is what this repository already does with the
+  CLI weight, the configuration template and the documentation itself. There is now one for the
+  rules as well: it fails if a rule is imported twice, or if a `paths:` header points at a
+  directory that no longer exists, which is the failure this mechanism has no other way of
+  reporting.
+- **Revisit when:** contributors from outside start arriving and style diverges in pull requests,
+  at which point a formatter finally earns its cost; or the rules grow past what is worth loading
+  in every session, at which point the rarely-needed ones move to skills.

@@ -19,6 +19,19 @@ a database or a model key.
 > skills for internal tooling, no branding. That lives in the private `Dinacode-Labs/ai-toolbelt`
 > repo.
 
+## Rules
+
+What you have to respect when writing code here lives in `.claude/rules/`, one file per subject.
+Claude Code loads them by itself, so **do not import them from here and do not duplicate their
+content** (ADR-0065):
+
+- Always: `architecture.md`, `language.md`, `tests.md`, `documentation.md`.
+- Only when you touch what they cover (a `paths:` header): `typescript-style.md`, `api-http.md`,
+  `cli.md`, `web.md`, `llm-agents.md`.
+
+If you work with another agent that does not read `.claude/rules/`, those files are still the
+reference: they are written for anyone.
+
 ## Stack (see `docs/decisions.md` for the why)
 
 - A pnpm **monorepo** (`packages/*` libraries, `apps/*` executables).
@@ -75,49 +88,8 @@ docs/
   toolbelt-registry.md
 ```
 
-> **What does NOT go in this repo** (ADR-0031): operational decisions (which provider, with
-> which key, at what cost), security audits and refactor plans with findings per file, business
-> priorities and owners, and client data (ADR-0026). All of that lives in the private
-> `Dinacode-Labs/ai-toolbelt` repo. Quick rule: if it helps somebody outside use, understand or
-> improve Cortex, it is public; if it describes how we operate it, it is private.
-
-`@cortex/core` is deterministic (no LLM). The intelligence layer (`@cortex/agents`, Mastra over
-an OpenAI-compatible endpoint) is injected from each entrypoint by calling `wireLlm()` after
-`loadEnv()` (it wires `setClassifier`/`setReranker`/`setReconciler` and the embeddings usage
-sink; with no `LLM_PROVIDER`, core falls back to heuristics). MCP, the API, the UI and the CLI
-all consume `core`. Note: `agents` uses zod v4 (Mastra requires it), isolated from the zod v3
-the rest of the repo uses; do not cross schemas between the two.
-
-## Dependency rules (what may import what)
-
-```
-shared      → (no internal dependencies)      # types, API contracts, pure utilities
-client      → shared                          # client side: HTTP, credentials, transcripts
-database    → shared
-embeddings  → shared
-core        → client, database, embeddings, shared   # no LLM; from client, only .cortex.json
-agents      → client, core, database, shared         # it implements core's LLM hooks
-apps/*      → any package
-```
-
-- Packages **never** import from `apps/*`, nor another package's files by path.
-- Side effects (`loadEnv`, wiring hooks, `serve`, `process.exit`) belong **only** in
-  entrypoints, never at import time in a library module.
-- These rules **hold** today: the multimodal LLM layer is injected with `setMediaExtractor`,
-  just like the classifier, the reranker and the reconciler. Do not add exceptions.
-- **`apps/cli` may depend only on `client` and `shared`.** If a command needs the database, the
-  model or to stand up a service, it goes in `apps/admin`. There is a test for it
-  (`tests/client-package.test.ts`).
-- **`client` is kept lightweight on purpose**: no Postgres, no Mastra, no embeddings. That is
-  what allows the CLI to be packaged and distributed with `npm i -g` without dragging ~95 MB of
-  dependencies onto every dev's laptop (ADR-0025). There is a test for it
-  (`tests/client-package.test.ts`), because it is an easy rule to break without noticing.
-
-## Discipline
-
-One PR per change, `typecheck` and tests green, docs updated in the same PR, and no
-"while-I-am-here" fixes outside the scope. If you find something broken that is not yours to
-touch, note it in the PR and move on.
+`@cortex/core` is deterministic (no LLM): the intelligence layer is **injected** from each
+entrypoint through `wireLlm()`. How and why, in `.claude/rules/architecture.md`.
 
 ## Commands
 
@@ -140,64 +112,8 @@ Copy `.env.example` to `.env` before starting. By default everything works **wit
 (`local` embeddings, not semantic); connect a real endpoint (`openai-compatible` with NaN, or
 OpenAI/Voyage) when you want genuine quality.
 
-## Conventions
+## Keeping this alive
 
-- Language (ADR-0064): **the repository is in English — all of it**. That includes CLI messages, MCP tool
-  descriptions, the skill and the plugin's commands, API errors, the web UI, `README.md`,
-  `docs/how-it-works.md`, `CONTRIBUTING.md` and `SECURITY.md`, and equally the code comments,
-  the ADRs (`docs/decisions.md`), the roadmap, the research notes and the LLM agents' prompts.
-  The repository is public, and a repo that switches language halfway is a repo half of which
-  nobody outside can read — including the comments that explain the decisions worth reading.
-
-  Two things stay in Spanish, and both are **data, not prose we wrote**:
-  - **Patterns that match the corpus**, which is Spanish: `CLASSIFY_RULES`, `MODULE_KEYWORDS`
-    and `polarityTags` in `packages/core/src/text.ts`, the deictics regex in
-    `packages/shared/src/domain.ts`, and the eval fixtures in `tests/fixtures/eval/` (the
-    baseline was measured against them). They match what users write, not the language of the
-    file they live in.
-  - The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in
-    `packages/agents/src/mastra.ts`). The prompts themselves are in English; what the agents
-    produce is knowledge entries stored next to a corpus that is already Spanish, so changing
-    it is a product decision, not a translation.
-
-  Anything an external system owns keeps its own spelling too (Plane's `'Histórico'`, Notion's
-  property names, migration filenames — they are primary keys in `schema_migrations`). Each of
-  these carries an English comment saying why.
-
-  Since we are Spanish speakers, the two entry points are also kept in Spanish —
-  `README.es.md` and `CONTRIBUTING.es.md` — and English is the version that must be current
-  when the two disagree.
-- No secrets in the repo. `.env` is ignored; use `.env.example` as the template.
-- **One client can talk to several servers** (ADR-0033). The server comes from the repo's
-  `.cortex.json`, not from a global variable: whoever is going to call the API from a folder has
-  to go through `useProjectServer(cwd)` first. The token is looked up **per server**; do not
-  assume `readCredentials()` with no argument is the right one.
-- **The CLI and the server are not in lockstep** (ADR-0062). The contract is the HTTP API. If
-  you add an endpoint or a field, the side that reads it tolerates its absence: an optional
-  field, 404 = an old server, and it degrades instead of failing. `minClientVersion` is the only
-  thing that blocks (writes only) and the operator raises it when something genuinely breaks.
-  Version comparison lives in `apps/cli/src/version.ts` and the notice/block in
-  `apps/cli/src/compat.ts`; the hooks and `cortex mcp` never call it (stdout is protocol; there
-  is a test).
-- **Scrubbing secrets**: `scrub()` lives in `@cortex/shared` (a pure function, no I/O). `agents`
-  applies it before sending anything to the LLM and `core` applies it when persisting
-  (`saveContext`, `captureBatch`): the server does not trust the client to have cleaned up. It
-  is idempotent, so applying it at several layers is safe. If you add a way for text to come in,
-  route it through one of those two points.
-- Every unit of knowledge keeps its **source, date, author, confidence, status and validity**
-  (the traceability principle, §5.5). Do not turn inferences into facts.
-
-## Documentation: keep it alive (important)
-
-Documentation is part of the work, not an extra. When behaviour changes, **update in the same
-PR** whatever it affects: `README.md` (capabilities/architecture/commands/structure),
-`docs/decisions.md` (an ADR: a decision is a hypothesis to revisit — add an entry for decisions
-that carry weight), `docs/roadmap.md`, `CONTRIBUTING.md` and this `CLAUDE.md`.
-
-- **Keep this `CLAUDE.md` up to date** when the stack, the structure or the conventions change,
-  so the next agent is not working from stale information.
-- **Prune it every now and then**: reread it and **clear out** whatever has gone out of date,
-  become duplicated or stopped mattering. A short, truthful CLAUDE.md is worth more than a long,
-  outdated one.
-- Before claiming something "works like this", check the file/function/flag you are citing
-  still exists (the code wins over the docs).
+Update this document and `.claude/rules/` when the stack, the structure or a convention changes, so
+the next agent is not working from stale information. And **prune them**: a short, truthful
+CLAUDE.md is worth more than a long, outdated one.
