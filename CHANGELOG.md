@@ -8,6 +8,41 @@ fixes things.
 
 ## [Unreleased]
 
+### Added
+- **The distiller can be measured.** `cortex-admin eval-distill` runs the session distiller over
+  a fixed set of eight transcript windows (`tests/fixtures/eval/distill/`) with an annotated
+  expectation each, and reports expected recall, forbidden leaks, mistyped items, items per
+  window and windows with nothing in them; `--verbose` prints every item it emitted, and
+  `--windows` / `--gold` point it at another fixture. Half of the windows expect **nothing** —
+  narration, an open discussion, a hiccup local to the session, acknowledgements — because
+  recall is cheap to buy by keeping everything. It needs an LLM and refuses to run without one:
+  the distiller *is* the model, so with no model every window comes back empty and the table
+  would read as a perfect zero. What each window tests and what the numbers mean:
+  `tests/fixtures/eval/README.md`.
+
+  The eight cases exist **in English and in Spanish**, one directory per language
+  (`distill/en/`, `distill/es/`), run separately and each with its own mark: mixed into one
+  total, a gain in one language would hide a loss in the other. English is what `eval-distill`
+  runs with no arguments and `--lang es` gets the other. Since the agents answer in Spanish
+  whatever they are fed (`OUTPUT_LANGUAGE`), the English set measures whether the judgement
+  survives a session that is not in the language of the corpus, and it is annotated only with
+  keywords that survive translation.
+
+### Changed
+- **`commands/` holds commands and nothing else**, in both CLIs: what a command needs and is not
+  one itself lives in a sibling directory. A module parked in there reads as a subcommand that
+  cannot be invoked, and a command that never reaches the dispatcher exists without being
+  reachable; `tests/cli-commands.test.ts` now checks both.
+- **What a command is, written down.** `.claude/rules/cli.md` now answers without opening any
+  code what a command is and why it is a layer of its own, what goes in its file (`run(args)`,
+  its own flag parsing, its own usage line) and what does not (library code, side effects at
+  import time, `process.exit`), how it reaches its dispatcher and why loading is lazy and by a
+  literal path, what `managed: false` takes over, and where whatever is not a command belongs.
+- **How to build an eval is written down**, in `.claude/rules/evals.md`: when a mark on a model
+  replaces an assertion, how the marking key is written, why half the exam has to expect nothing,
+  and why a set with no first run is worth nothing. The rules of thumb that are easy to get wrong
+  in silence are tests now, not paragraphs (`tests/eval-distill-fixture.test.ts`).
+
 ## [0.1.12] — 2026-09-18
 
 ### Added

@@ -1,0 +1,21 @@
+USER: Yesterday one account had four hundred documents stuck in "processing" and we only found out when they phoned.
+
+ASSISTANT: I went through the logs for that window. Every stuck job came from the same batch, and the worker that picked them up died without leaving an error: its last line is the one announcing the document.
+
+USER: I found it. The extractor loads the whole PDF into memory before splitting it, and that batch carried a nine-hundred-page document. The worker went over the container's memory limit and the kernel killed it, which is why there is no exception anywhere. A textbook OOM.
+
+ASSISTANT: And since the job never went back to the queue, the document stayed in "processing" forever. That is two failures chained: the memory use, and a job held by a dead worker never being recovered.
+
+USER: Exactly, and the fix is both. Extraction goes page by page in streaming, never loading the whole document, and the queue returns to pending anything held for more than fifteen minutes without an acknowledgement. Plus an alert when a document sits in "processing" for over thirty minutes.
+
+ASSISTANT: Done. I put the recovery limit at fifteen minutes, below the ten-minute processing maximum plus the startup margin.
+
+USER: Good. Point the alert at the on-call channel, not at email. Nobody reads email on a Sunday.
+
+ASSISTANT: By the way, the MCP server for the ticket tool will not connect in this environment, so I could not open the incident from here.
+
+USER: Never mind, I will open it myself.
+
+ASSISTANT: One more thing: the queue integration test failed once and passed on retry without me touching anything. It looks flaky when the Postgres port is slow to come up.
+
+USER: Write it down for another day, not now.

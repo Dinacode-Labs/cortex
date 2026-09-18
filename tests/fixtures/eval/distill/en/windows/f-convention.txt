@@ -1,0 +1,17 @@
+USER: From now on, every job entering the queue carries an idempotency key. Always, no exceptions, in all three services.
+
+ASSISTANT: Who generates the key, the producer or the queue on receipt?
+
+USER: The producer, from the document identifier and the job type. If the queue generates it, it is worth nothing: by then the duplicate is already in.
+
+ASSISTANT: And what do we do with a message that arrives without one?
+
+USER: It is rejected at the entry point, not processed "just in case". We have had two incidents of jobs duplicated by retries, one of them billing the same pages twice, and I do not want a third.
+
+ASSISTANT: So a check at the enqueue point, with an explicit error.
+
+USER: And the same job with the same key can be resent without fear: if it is already done, it answers that it is done and does not run again.
+
+ASSISTANT: Do we apply it retroactively to what is already queued?
+
+USER: That we will see, do not take it as decided.

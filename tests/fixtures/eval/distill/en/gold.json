@@ -1,0 +1,46 @@
+[
+  {
+    "window": "a-decisions.txt",
+    "expected": [
+      { "type": "decision", "must_mention": ["ulid"] },
+      { "type": "decision", "must_mention": ["utc"] },
+      { "type": "decision", "must_mention": ["redis", "postgres"] }
+    ],
+    "forbidden": [{ "must_mention": ["dates.ts"] }]
+  },
+  {
+    "window": "b-confirm-reject.txt",
+    "expected": [{ "type": "decision", "must_mention": ["http", "json"] }],
+    "forbidden": [{ "must_mention": ["kafka"] }]
+  },
+  {
+    "window": "c-open-discussion.txt",
+    "expected": [],
+    "forbidden": [{ "must_mention": ["prometheus"] }, { "must_mention": ["datadog"] }]
+  },
+  {
+    "window": "d-incident-vs-hiccup.txt",
+    "expected": [{ "type": "incident", "must_mention": ["memor"] }],
+    "forbidden": [{ "must_mention": ["mcp"] }, { "must_mention": ["flaky"] }]
+  },
+  {
+    "window": "e-narration.txt",
+    "expected": [],
+    "forbidden": [{ "must_mention": ["ocr.ts"] }, { "must_mention": ["typecheck"] }]
+  },
+  {
+    "window": "f-convention.txt",
+    "expected": [{ "type": "convention", "must_mention": ["idempot"] }],
+    "forbidden": [{ "must_mention": ["retroactiv"] }]
+  },
+  {
+    "window": "g-exploration.txt",
+    "expected": [],
+    "forbidden": [{ "must_mention": ["logo"] }]
+  },
+  {
+    "window": "h-trivial.txt",
+    "expected": [],
+    "forbidden": []
+  }
+]

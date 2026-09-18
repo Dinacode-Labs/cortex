@@ -4,6 +4,7 @@ export { extractGraph, type GraphExtraction } from "./enrich.js";
 export { synthesizeContextAnswer, type ContextSnippet } from "./synthesize.js";
 export { askProjectContext, type AskResult } from "./ask.js";
 export { rerankLLM } from "./rerank.js";
+export { distill, type Item as DistilledItem } from "./distill.js";
 export { distillSession, type DistillSessionFn, type DistillSessionInput } from "./session-distill.js";
 export { wireLlm } from "./wire.js";
 export { enrichProject, type EnrichResult } from "./enrich-project.js";
