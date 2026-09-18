@@ -9,6 +9,13 @@ fixes things.
 ## [Unreleased]
 
 ### Changed
+- **Who raises `minClientVersion`, written down.** ADR-0062 said the operator raises it "when
+  something really breaks", which left the one thing that blocks a client to memory. Now the
+  rule is explicit for whoever writes the code: the PR that removes or renames a route or field,
+  or tightens a schema, bumps the default in `apps/server/src/version.ts` to the version it ships
+  in and says so here. `CORTEX_MIN_CLIENT_VERSION` stays as a per-deployment override. It lives
+  in `.claude/rules/api-http.md` and `cli.md`, in CONTRIBUTING and in the release checklist.
+
 - **The repository is in English, all of it.** Half of it already was — the README, the CLI, the
   MCP tools, the web UI — and the other half, deliberately, was not: code comments, the ADRs,
   the roadmap, the research notes, test names and the agents' prompts were the team's working
