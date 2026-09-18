@@ -33,6 +33,11 @@ fixes things.
   one itself lives in a sibling directory. A module parked in there reads as a subcommand that
   cannot be invoked, and a command that never reaches the dispatcher exists without being
   reachable; `tests/cli-commands.test.ts` now checks both.
+- **What a command is, written down.** `.claude/rules/cli.md` now answers without opening any
+  code what a command is and why it is a layer of its own, what goes in its file (`run(args)`,
+  its own flag parsing, its own usage line) and what does not (library code, side effects at
+  import time, `process.exit`), how it reaches its dispatcher and why loading is lazy and by a
+  literal path, what `managed: false` takes over, and where whatever is not a command belongs.
 - **How to build an eval is written down**, in `.claude/rules/evals.md`: when a mark on a model
   replaces an assertion, how the marking key is written, why half the exam has to expect nothing,
   and why a set with no first run is worth nothing. The rules of thumb that are easy to get wrong
