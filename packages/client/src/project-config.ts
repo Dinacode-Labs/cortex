@@ -2,26 +2,26 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { setActiveServer } from "./api-client.js";
 
-/** Contenido de un `.cortex.json` (puntero a un proyecto Cortex). */
+/** The contents of a `.cortex.json` (a pointer to a Cortex project). */
 export interface CortexLink {
-  /** Slug del proyecto en Cortex (clave de vínculo preferida). */
+  /** The project's slug in Cortex (the preferred linking key). */
   slug?: string;
-  /** Nombre del proyecto (legacy / back-compat). */
+  /** The project's name (legacy / back-compat). */
   project?: string;
-  /** Opt-out explícito: este repo NO usa Cortex. */
+  /** Explicit opt-out: this repo does NOT use Cortex. */
   ignore?: boolean;
   /**
-   * A qué servidor pertenece este repo. Ausente = el de por defecto, que es el caso de casi
-   * todo el mundo.
+   * Which server this repo belongs to. Absent = the default one, which is the case for
+   * almost everybody.
    *
-   * El servidor es propiedad del REPO y no un modo global que se enciende y se apaga
-   * (ADR-0033). Quien trabaja para varias organizaciones no tiene que acordarse de en cuál
-   * está: lo decidió al vincular la carpeta.
+   * The server is a property of the REPO, not a global mode that gets switched on and off
+   * (ADR-0033). Someone working for several organisations does not have to remember which
+   * one they are in: they decided that when they linked the folder.
    */
   server?: string;
 }
 
-/** Lee el `.cortex.json` MÁS CERCANO hacia arriba desde cwd (el más cercano manda). */
+/** Reads the NEAREST `.cortex.json` walking up from cwd (the nearest one wins). */
 export function readCortexLink(cwd: string): CortexLink | null {
   let dir = cwd;
   for (let i = 0; i < 15; i++) {
@@ -30,7 +30,7 @@ export function readCortexLink(cwd: string): CortexLink | null {
       try {
         return JSON.parse(readFileSync(f, "utf8")) as CortexLink;
       } catch {
-        /* json inválido → seguir hacia arriba */
+        /* invalid json -> keep walking up */
       }
     }
     const parent = dirname(dir);
@@ -40,12 +40,12 @@ export function readCortexLink(cwd: string): CortexLink | null {
   return null;
 }
 
-/** Ruta del `.cortex.json` de un directorio (sin buscar hacia arriba). */
+/** Path of a directory's `.cortex.json` (without walking up). */
 export function cortexLinkPath(dir: string): string {
   return join(dir, ".cortex.json");
 }
 
-/** Escribe el `.cortex.json` de un directorio y devuelve la ruta escrita. */
+/** Writes a directory's `.cortex.json` and returns the path written. */
 export function writeCortexLink(dir: string, link: CortexLink): string {
   const f = cortexLinkPath(dir);
   mkdirSync(dir, { recursive: true });
@@ -54,11 +54,11 @@ export function writeCortexLink(dir: string, link: CortexLink): string {
 }
 
 /**
- * Resuelve el vínculo del repo y deja el proceso hablando con SU servidor.
+ * Resolves the repo's link and leaves the process talking to ITS server.
  *
- * Lo llaman los hooks y los comandos que operan sobre una carpeta, antes de tocar la API.
- * Es lo que garantiza que la captura de un repo nunca acabe en el servidor de otro: quien
- * escribe siempre conoce el `cwd`, y el `cwd` conoce su servidor.
+ * The hooks and the commands that operate on a folder call it before touching the API. It is
+ * what guarantees one repo's capture never lands on another's server: whoever writes always
+ * knows the `cwd`, and the `cwd` knows its server.
  */
 export function useProjectServer(cwd: string): CortexLink | null {
   const link = readCortexLink(cwd);

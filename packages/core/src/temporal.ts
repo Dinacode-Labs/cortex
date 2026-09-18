@@ -2,15 +2,16 @@ import { getSql } from "@cortex/database";
 import type { Row } from "./map.js";
 
 /**
- * Invalidación bi-temporal (patrón Zep/Graphiti): cierra la ventana de validez
- * de hechos que han dejado de ser vigentes, en lugar de borrarlos. Así el grafo
- * conserva la historia y soporta consultas point-in-time.
+ * Bi-temporal invalidation (the Zep/Graphiti pattern): it closes the validity window of facts
+ * that stopped being current, rather than deleting them. That way the graph keeps its history
+ * and supports point-in-time queries.
  *
- * Señales usadas (deterministas y reales):
- *  - Estado `Histórico` de Plane (tareas migradas/legacy) → conocimiento no vigente.
- *  - Relaciones `supersedes` entrada→entrada → la entrada superada se cierra.
+ * Signals used (deterministic and real):
+ *  - Plane's `Historico` state (migrated/legacy tasks) -> knowledge no longer current. The
+ *    literal below stays in Spanish because it is Plane's own value, not our text.
+ *  - `supersedes` relations entry->entry -> the superseded entry is closed.
  *
- * Idempotente: solo toca hechos aún vigentes (valid_to IS NULL).
+ * Idempotent: it only touches facts that are still current (valid_to IS NULL).
  */
 export async function applyTemporalInvalidation(): Promise<{
   historical: number;

@@ -2,66 +2,65 @@ import { loadEnv } from "@cortex/shared";
 import { closeSql } from "@cortex/database";
 
 /**
- * `cortex-admin` — comandos de OPERADOR: los que hablan con la base de datos, llaman al
- * modelo o arrancan un servicio. Viven en la imagen de despliegue, no en el portátil de
- * cada dev.
+ * `cortex-admin` -- OPERATOR commands: the ones that talk to the database, call the model or
+ * start a service. They live in the deployment image, not on every dev's laptop.
  *
- * Está separado del CLI `cortex` a propósito (ADR-0025): mientras esos comandos vivían en
- * el mismo binario, instalar Cortex significaba arrastrar Postgres, Mastra y la extracción
- * documental a la máquina de cualquiera que solo quisiera vincular un repo.
+ * It is separated from the `cortex` CLI on purpose (ADR-0025): while those commands lived in
+ * the same binary, installing Cortex meant dragging Postgres, Mastra and document extraction
+ * onto the machine of anyone who only wanted to link a repo.
  *
- * Uso típico en producción:
- *   docker compose exec server node apps/admin/dist/index.js maintain "Mi Proyecto"
+ * Typical production usage:
+ *   docker compose exec server node apps/admin/dist/index.js maintain "My Project"
  */
 type CommandModule = { run: (args: string[]) => Promise<void> };
 
 interface Cmd {
   help: string;
   load: () => Promise<CommandModule>;
-  /** false = el comando gestiona su propio ciclo de vida (servidores, workers). */
+  /** false = the command manages its own lifecycle (servers, workers). */
   managed?: boolean;
 }
 
-/** Arranca otra app importando su entrypoint (que levanta el servidor al cargarse). */
+/** Starts another app by importing its entrypoint (which stands the server up on load). */
 function boot(load: () => Promise<unknown>, help: string): Cmd {
   return { help, managed: false, load: async () => ({ run: async () => void (await load()) }) };
 }
 
 const COMMANDS: Record<string, Cmd> = {
-  // --- Servicios ---
-  server: boot(() => import("@cortex/server/start"), "arrancar la API HTTP (auth + contexto)"),
-  "mcp-http": boot(() => import("@cortex/mcp-server/http"), "arrancar el MCP por HTTP autenticado"),
-  "maintain-worker": { help: "worker de mantenimiento programado (cron)", managed: false, load: () => import("./commands/maintain-worker.js") },
+  // --- Services ---
+  server: boot(() => import("@cortex/server/start"), "start the HTTP API (auth + context)"),
+  "mcp-http": boot(() => import("@cortex/mcp-server/http"), "start the authenticated MCP over HTTP"),
+  "maintain-worker": { help: "scheduled maintenance worker (cron)", managed: false, load: () => import("./commands/maintain-worker.js") },
 
-  // --- Esquema y datos ---
-  migrate: { help: "aplicar las migraciones pendientes de la base de datos", load: () => import("./commands/migrate.js") },
-  seed: { help: "cargar los datos de demo (proyecto ficticio Acme Portal)", load: () => import("./commands/seed.js") },
-  ingest: { help: "ingesta masiva de contexto desde un JSON de items", load: () => import("./commands/ingest.js") },
+  // --- Schema and data ---
+  migrate: { help: "apply the database's pending migrations", load: () => import("./commands/migrate.js") },
+  seed: { help: "load the demo data (the fictional Acme Portal project)", load: () => import("./commands/seed.js") },
+  ingest: { help: "bulk context ingestion from a JSON of items", load: () => import("./commands/ingest.js") },
 
-  // --- Curación del conocimiento ---
-  maintain: { help: "mantenimiento: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
-  enrich: { help: "pase de enriquecimiento de grafo (entidades + relaciones)", load: () => import("./commands/enrich.js") },
-  lint: { help: "salud del conocimiento de un proyecto (contradicciones, huecos…)", load: () => import("./commands/lint.js") },
-  eval: { help: "mide la recuperación contra el conjunto de preguntas con evidencia anotada", load: () => import("./commands/eval.js") },
-  "lint-act": { help: "plan de acciones (dry-run) a partir del lint", load: () => import("./commands/lint-act.js") },
-  temporal: { help: "invalidación temporal: cierra la validez de hechos no vigentes", load: () => import("./commands/temporal.js") },
-  "resolve-entities": { help: "fusionar variantes de entidades en una canónica", load: () => import("./commands/resolve-entities.js") },
-  "index-code": { help: "indexar el código de un repo local en un proyecto", load: () => import("./commands/index-code.js") },
+  // --- Knowledge curation ---
+  maintain: { help: "maintenance: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
+  enrich: { help: "graph enrichment pass (entities + relations)", load: () => import("./commands/enrich.js") },
+  lint: { help: "a project's knowledge health (contradictions, gaps...)", load: () => import("./commands/lint.js") },
+  eval: { help: "measure retrieval against the question set with annotated evidence", load: () => import("./commands/eval.js") },
+  "lint-act": { help: "action plan (dry run) derived from the lint", load: () => import("./commands/lint-act.js") },
+  temporal: { help: "temporal invalidation: closes the validity of facts no longer current", load: () => import("./commands/temporal.js") },
+  "resolve-entities": { help: "merge entity variants into a canonical one", load: () => import("./commands/resolve-entities.js") },
+  "index-code": { help: "index a local repo's code into a project", load: () => import("./commands/index-code.js") },
 
-  // --- Conectores pesados (extracción local: Office, PDF, audio, visión) ---
-  "connect-docs": { help: "ingerir una carpeta de documentos (Word/PDF/Excel/…)", load: () => import("./commands/connect-docs.js") },
-  "connect-notion": { help: "ingerir un export de Notion (páginas + adjuntos)", load: () => import("./commands/connect-notion.js") },
-  "connect-meeting": { help: "transcribir grabaciones de reunión e ingerirlas", load: () => import("./commands/connect-meeting.js") },
+  // --- Heavy connectors (local extraction: Office, PDF, audio, vision) ---
+  "connect-docs": { help: "ingest a folder of documents (Word/PDF/Excel/...)", load: () => import("./commands/connect-docs.js") },
+  "connect-notion": { help: "ingest a Notion export (pages + attachments)", load: () => import("./commands/connect-notion.js") },
+  "connect-meeting": { help: "transcribe meeting recordings and ingest them", load: () => import("./commands/connect-meeting.js") },
 };
 
 function usage(): void {
-  console.log("cortex-admin — comandos de operador de Cortex (requieren acceso a la base de datos)\n");
-  console.log("Uso: cortex-admin <comando> [args]\n");
-  console.log("Comandos:");
+  console.log("cortex-admin — Cortex operator commands (they need database access)\n");
+  console.log("Usage: cortex-admin <command> [args]\n");
+  console.log("Commands:");
   const w = Math.max(...Object.keys(COMMANDS).map((k) => k.length));
   for (const [name, c] of Object.entries(COMMANDS)) console.log(`  ${name.padEnd(w)}  ${c.help}`);
-  console.log('\nEjemplos:\n  cortex-admin migrate\n  cortex-admin maintain "Mi Proyecto"\n  cortex-admin connect-docs "Mi Proyecto" ./docs');
-  console.log("\nLos comandos de developer (auth, link, hooks, mcp) están en el CLI `cortex`.");
+  console.log('\nExamples:\n  cortex-admin migrate\n  cortex-admin maintain "My Project"\n  cortex-admin connect-docs "My Project" ./docs');
+  console.log("\nThe developer commands (auth, link, hooks, mcp) live in the `cortex` CLI.");
 }
 
 async function main(): Promise<void> {
@@ -79,7 +78,7 @@ async function main(): Promise<void> {
   loadEnv();
   const mod = await cmd.load();
   if (cmd.managed === false) {
-    // Servidores y workers: gestionan su propio shutdown.
+    // Servers and workers: they handle their own shutdown.
     await mod.run(rest);
     return;
   }

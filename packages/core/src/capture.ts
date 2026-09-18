@@ -10,15 +10,16 @@ export type { BatchItem };
 import type { Row } from "./map.js";
 
 /**
- * Captura por LOTES para conectores (vía API autenticada). Conserva la ingesta en 2 fases:
- * guarda sin embedding e indexa por lotes al final (respeta los límites del proveedor).
- * Incremental por `sourceReference` (salta lo ya ingerido). Atribuye con `createdBy`.
+ * BATCH capture for connectors (through the authenticated API). It keeps ingestion in 2
+ * phases: store without an embedding, then index in batches at the end (which respects the
+ * provider's limits). Incremental by `sourceReference` (it skips what was already ingested).
+ * Attribution comes from `createdBy`.
  *
- * Clasificación: por defecto los items entran con tipo por HEURÍSTICA (barato, sin LLM) —
- * la inteligencia (grafo, reconcile, curación) la aplica luego `cortex maintain`. Con
- * `CORTEX_CAPTURE_LLM=1` se clasifica cada item con el LLM ya en la ingesta (tipo fiable:
- * decisiones/constraints/riesgos bien tipados), a cambio de 1 llamada LLM por item. Un
- * `type` explícito del conector (p.ej. `pr_summary`) siempre gana al LLM (precedencia).
+ * Classification: by default items enter with a HEURISTIC type (cheap, no LLM) -- the
+ * intelligence (graph, reconcile, curation) is applied later by `cortex maintain`. With
+ * `CORTEX_CAPTURE_LLM=1` every item is classified with the LLM at ingest time (a reliable
+ * type: decisions/constraints/risks properly typed), at the cost of 1 LLM call per item. An
+ * explicit `type` from the connector (e.g. `pr_summary`) always beats the LLM.
  */
 export interface BatchItemResult {
   ref: string | null;
@@ -30,13 +31,13 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
   const useClassifier = process.env.CORTEX_CAPTURE_LLM === "1";
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, projectName);
-  if (!projectId) throw new Error(`Proyecto no encontrado: ${projectName}`);
+  if (!projectId) throw new Error(`Project not found: ${projectName}`);
 
   const results: BatchItemResult[] = [];
   const toEmbed: { contextEntryId: string; text: string }[] = [];
   for (const rawItem of items) {
-    // Escrubado aquí y no solo dentro de `saveContext` porque el texto del embedding
-    // (`toEmbed`) se construye a partir del item, no de la entrada persistida.
+    // Scrubbed here and not only inside `saveContext` because the embedding text (`toEmbed`)
+    // is built from the item, not from the persisted entry.
     const it = {
       ...rawItem,
       content: scrub(rawItem.content),
@@ -70,7 +71,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
   return results;
 }
 
-/** Crea una relación entre entradas (p.ej. adjunto `belongs_to` su página de Notion). */
+/** Creates a relation between entries (e.g. an attachment `belongs_to` its Notion page). */
 export async function relateEntries(sourceId: string, targetId: string, relationType: RelationType): Promise<void> {
   await relate(getSql(), { sourceId, sourceType: "context_entry", targetId, targetType: "context_entry", relationType });
 }

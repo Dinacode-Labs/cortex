@@ -7,13 +7,13 @@ import { runSetup } from "../apps/cli/src/setup/index.js";
 import type { SetupCtx } from "../apps/cli/src/setup/types.js";
 
 /**
- * `cortex setup claude-code` escribe en ficheros que el dev ha configurado a mano y ejecuta
- * el CLI de Claude. Aquí no se ejecuta nada de verdad: el HOME es temporal y `exec` es un
- * espía, así que lo que se comprueba es exactamente lo que le pasaría a la máquina de alguien.
+ * `cortex setup claude-code` writes into files the dev configured by hand and runs Claude's
+ * CLI. Nothing is really executed here: HOME is temporary and `exec` is a spy, so what is
+ * checked is exactly what would happen to somebody's machine.
  *
- * Los casos que importan son los feos: un settings.json con hooks ajenos, un hook nuestro de
- * la época del clon del monorepo, un `claude plugin install` que falla porque el repo es
- * privado, y desinstalar sin llevarse por delante lo que no es nuestro.
+ * The cases that matter are the ugly ones: a settings.json with somebody else's hooks, one of
+ * our hooks from the monorepo-clone era, a `claude plugin install` that fails because the repo
+ * is private, and uninstalling without taking down what is not ours.
  */
 
 let home: string;
@@ -53,7 +53,7 @@ beforeEach(() => {
 afterEach(() => rmSync(home, { recursive: true, force: true }));
 
 describe("cortex setup claude-code (modo settings)", () => {
-  it("instalación limpia: hooks de sesión + MCP registrado contra el servidor", async () => {
+  it("clean install: session hooks plus an MCP registered against the server", async () => {
     const ctx = ctxWith({ noPlugin: true });
     const report = await claudeCodeAdapter.apply(ctx);
 
@@ -62,14 +62,14 @@ describe("cortex setup claude-code (modo settings)", () => {
     expect(hooks.SessionStart[0].matcher).toBe("startup|resume|clear|compact");
     expect(hooks.SessionStart[0].hooks[0].command).toBe("cortex hook-context");
     expect(hooks.SessionEnd[0].hooks[0].command).toBe("cortex hook-capture");
-    // PreCompact además de SessionEnd: el SessionEnd de Claude tiene timeout y a veces no llega.
+    // PreCompact as well as SessionEnd: Claude's SessionEnd has a timeout and sometimes never arrives.
     expect(hooks.PreCompact[0].hooks[0].command).toBe("cortex hook-capture");
 
     expect(calls).toContainEqual(["claude", "mcp", "add", "cortex", "-s", "user", "--", "cortex", "mcp"]);
     expect(report.warnings).toHaveLength(0);
   });
 
-  it("no toca los hooks del usuario y guarda copia antes de escribir", async () => {
+  it("does not touch the user's hooks and takes a backup before writing", async () => {
     writeSettings({ hooks: { PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "audit.sh" }] }] }, model: "opus" });
     await claudeCodeAdapter.apply(ctxWith({ noPlugin: true }));
 
@@ -79,7 +79,7 @@ describe("cortex setup claude-code (modo settings)", () => {
     expect(backups()).toHaveLength(1);
   });
 
-  it("sustituye el hook de la instalación antigua en vez de duplicarlo", async () => {
+  it("replaces the old installation's hook instead of duplicating it", async () => {
     writeSettings({
       hooks: {
         SessionStart: [{ hooks: [{ type: "command", command: "pnpm -C /Users/x/.dinacode-cortex cortex hook-context" }] }],
@@ -95,14 +95,14 @@ describe("cortex setup claude-code (modo settings)", () => {
     expect(report.changed.join(" ")).toContain("older version");
   });
 
-  it("--dry-run no escribe nada ni ejecuta nada", async () => {
+  it("--dry-run writes nothing and runs nothing", async () => {
     const report = await claudeCodeAdapter.apply(ctxWith({ noPlugin: true, dryRun: true }));
     expect(existsSync(settingsPath())).toBe(false);
     expect(calls.filter((c) => c[1] === "mcp" && c[2] === "add")).toHaveLength(0);
     expect(report.changed.length).toBeGreaterThan(0);
   });
 
-  it("re-registra el MCP si apuntaba al repo clonado", async () => {
+  it("re-registers the MCP when it pointed at the cloned repo", async () => {
     const ctx = ctxWith({
       noPlugin: true,
       exec: (bin, args) => {
@@ -117,7 +117,7 @@ describe("cortex setup claude-code (modo settings)", () => {
     expect(report.changed.join(" ")).toContain("cloned repo");
   });
 
-  it("si el MCP ya está bien registrado, no lo vuelve a tocar", async () => {
+  it("when the MCP is already registered correctly, it is left alone", async () => {
     const ctx = ctxWith({
       noPlugin: true,
       exec: (bin, args) => {
@@ -131,17 +131,17 @@ describe("cortex setup claude-code (modo settings)", () => {
     expect(report.skipped.join(" ")).toContain("already registered");
   });
 
-  it("un settings.json roto se deja en paz y se avisa", async () => {
+  it("a broken settings.json is left in peace and reported", async () => {
     mkdirSync(join(home, ".claude"), { recursive: true });
-    writeFileSync(settingsPath(), "{ esto no es json");
+    writeFileSync(settingsPath(), "{ this is not json");
     const report = await claudeCodeAdapter.apply(ctxWith({ noPlugin: true }));
-    expect(readFileSync(settingsPath(), "utf8")).toBe("{ esto no es json");
+    expect(readFileSync(settingsPath(), "utf8")).toBe("{ this is not json");
     expect(report.warnings.join(" ")).toContain("JSON");
   });
 });
 
 describe("cortex setup claude-code (modo plugin)", () => {
-  it("con el plugin instalado, no deja hooks en settings: capturaría dos veces", async () => {
+  it("with the plugin installed, it leaves no hooks in settings: it would capture twice", async () => {
     writeSettings({ hooks: { SessionStart: [{ hooks: [{ type: "command", command: "pnpm -C /repo cortex hook-context" }] }] } });
     const report = await claudeCodeAdapter.apply(ctxWith());
 
@@ -151,7 +151,7 @@ describe("cortex setup claude-code (modo plugin)", () => {
     expect(report.changed.join(" ")).toContain("plugin");
   });
 
-  it("si el marketplace no está accesible, cae a settings.json y avisa", async () => {
+  it("when the marketplace is unreachable, it falls back to settings.json and says so", async () => {
     const ctx = ctxWith({
       exec: (bin, args) => {
         calls.push([bin, ...args]);
@@ -161,14 +161,14 @@ describe("cortex setup claude-code (modo plugin)", () => {
     });
     const report = await claudeCodeAdapter.apply(ctx);
     expect(report.warnings.join(" ")).toContain("plugin");
-    // Lo importante: el dev acaba con Cortex funcionando igual.
+    // The point: the dev ends up with Cortex working all the same.
     expect(readSettings().hooks.SessionStart[0].hooks[0].command).toBe("cortex hook-context");
     expect(calls).toContainEqual(["claude", "mcp", "add", "cortex", "-s", "user", "--", "cortex", "mcp"]);
   });
 });
 
 describe("cortex setup claude-code --remove", () => {
-  it("quita lo de Cortex y conserva lo demás", async () => {
+  it("removes Cortex's and keeps the rest", async () => {
     writeSettings({ hooks: { PreToolUse: [{ hooks: [{ type: "command", command: "audit.sh" }] }] }, model: "opus" });
     await claudeCodeAdapter.apply(ctxWith({ noPlugin: true }));
     await claudeCodeAdapter.remove(ctxWith({ remove: true }));
@@ -181,8 +181,8 @@ describe("cortex setup claude-code --remove", () => {
   });
 });
 
-describe("limpieza de la instalación anterior", () => {
-  it("borra el shim de ~/.local/bin y avisa del clon, sin borrarlo", async () => {
+describe("cleanup of the previous installation", () => {
+  it("deletes the ~/.local/bin shim and reports the clone, without deleting it", async () => {
     mkdirSync(join(home, ".local/bin"), { recursive: true });
     const shim = join(home, ".local/bin/cortex");
     writeFileSync(shim, `#!/bin/sh\nexec pnpm -C "$HOME/.dinacode-cortex" exec tsx apps/cli/src/index.ts "$@"\n`);
@@ -192,12 +192,12 @@ describe("limpieza de la instalación anterior", () => {
     const sistema = results.find((r) => r.id === "sistema")!;
     expect(existsSync(shim)).toBe(false);
     expect(sistema.report.changed.join(" ")).toContain("old shim removed");
-    // El clon puede tener un .env con claves: se avisa, no se borra.
+    // The clone may hold a .env with keys: it is reported, not deleted.
     expect(existsSync(join(home, ".dinacode-cortex"))).toBe(true);
     expect(sistema.report.warnings.join(" ")).toContain(".dinacode-cortex");
   });
 
-  it("borra los symlinks de skill y comando que apuntaban al clon", async () => {
+  it("deletes the skill and command symlinks that pointed at the clone", async () => {
     const repo = join(home, "repo");
     mkdirSync(join(repo, "config/skills/cortex-capture"), { recursive: true });
     mkdirSync(join(repo, "config/commands"), { recursive: true });
@@ -214,7 +214,7 @@ describe("limpieza de la instalación anterior", () => {
 });
 
 describe("status", () => {
-  it("avisa si conviven plugin y hooks (la sesión se capturaría dos veces)", async () => {
+  it("warns when plugin and hooks coexist (the session would be captured twice)", async () => {
     mkdirSync(join(home, ".claude/plugins"), { recursive: true });
     writeFileSync(
       join(home, ".claude/plugins/installed_plugins.json"),

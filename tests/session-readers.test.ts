@@ -31,7 +31,7 @@ afterEach(() => {
 });
 
 describe("readCodexSessions (~/.codex/sessions/*.jsonl)", () => {
-  it("extrae user+assistant del repo y omite tool calls", () => {
+  it("extracts user+assistant from the repo and skips tool calls", () => {
     const dir = tmp("codex-");
     const day = join(dir, "2026/06/24");
     mkdirSync(day, { recursive: true });
@@ -52,7 +52,7 @@ describe("readCodexSessions (~/.codex/sessions/*.jsonl)", () => {
     expect(sessions[0]!.condensed).not.toContain("exec_command"); // tool call omitida
   });
 
-  it("ignora sesiones de otro repo (cwd distinto)", () => {
+  it("ignores sessions from another repo (a different cwd)", () => {
     const dir = tmp("codex-");
     const day = join(dir, "2026/06/24");
     mkdirSync(day, { recursive: true });
@@ -60,7 +60,7 @@ describe("readCodexSessions (~/.codex/sessions/*.jsonl)", () => {
       join(day, "rollout-y.jsonl"),
       [
         JSON.stringify({ type: "session_meta", payload: { cwd: "/otro/repo" } }),
-        JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "hola que tal todo bien por aqui" }] } }),
+        JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "hi, how is everything going" }] } }),
       ].join("\n"),
     );
     process.env.CORTEX_CODEX_DIR = dir;
@@ -68,8 +68,8 @@ describe("readCodexSessions (~/.codex/sessions/*.jsonl)", () => {
   });
 });
 
-describe("readOpenCodeSessions (store de ficheros antiguo)", () => {
-  it("une partes de texto y omite partes tool/subagentes", async () => {
+describe("readOpenCodeSessions (the old file store)", () => {
+  it("joins text parts and leaves out tool/subagent parts", async () => {
     const base = tmp("oc-");
     mkdirSync(join(base, "session/proj1"), { recursive: true });
     mkdirSync(join(base, "message/ses1"), { recursive: true });
@@ -78,27 +78,27 @@ describe("readOpenCodeSessions (store de ficheros antiguo)", () => {
     writeFileSync(join(base, "session/proj1/ses1.json"), JSON.stringify({ id: "ses1", directory: REPO }));
     writeFileSync(join(base, "message/ses1/m1.json"), JSON.stringify({ id: "m1", role: "user" }));
     writeFileSync(join(base, "message/ses1/m2.json"), JSON.stringify({ id: "m2", role: "assistant" }));
-    writeFileSync(join(base, "part/m1/p1.json"), JSON.stringify({ type: "text", text: "Como añado un endpoint?" }));
+    writeFileSync(join(base, "part/m1/p1.json"), JSON.stringify({ type: "text", text: "How do I add an endpoint?" }));
     writeFileSync(join(base, "part/m2/p1.json"), JSON.stringify({ type: "tool", tool: "bash" }));
-    writeFileSync(join(base, "part/m2/p2.json"), JSON.stringify({ type: "text", text: "Añade la ruta en apps/server." }));
+    writeFileSync(join(base, "part/m2/p2.json"), JSON.stringify({ type: "text", text: "Add the route in apps/server." }));
     process.env.CORTEX_OPENCODE_DIR = base;
-    process.env.CORTEX_OPENCODE_DB = join(base, "no-hay-base.db"); // forzar el camino de ficheros
+    process.env.CORTEX_OPENCODE_DB = join(base, "no-database-here.db"); // force the file path
     const sessions = await readOpenCodeSessions(REPO);
     expect(sessions).toHaveLength(1);
-    expect(sessions[0]!.condensed).toContain("[user] Como añado un endpoint?");
-    expect(sessions[0]!.condensed).toContain("[assistant] Añade la ruta");
+    expect(sessions[0]!.condensed).toContain("[user] How do I add an endpoint?");
+    expect(sessions[0]!.condensed).toContain("[assistant] Add the route");
     expect(sessions[0]!.condensed).not.toContain("bash"); // parte tool omitida
   });
 });
 
 describe("readHermesSessions (SQLite)", () => {
-  it("degrada con elegancia si no hay state.db", async () => {
-    process.env.CORTEX_HERMES_DB = "/tmp/no-existe-cortex.db";
+  it("degrades gracefully when there is no state.db", async () => {
+    process.env.CORTEX_HERMES_DB = "/tmp/does-not-exist-cortex.db";
     expect(await readHermesSessions(REPO)).toEqual([]);
   });
 });
 
-/** Un rollout de Codex con dos turnos, en la estructura de carpetas que usa el agente. */
+/** A Codex rollout with two turns, in the folder structure the agent uses. */
 function codexRollout(cwd = REPO): string {
   const dir = tmp("codex-one-");
   const day = join(dir, "2026/09/10");
@@ -108,22 +108,22 @@ function codexRollout(cwd = REPO): string {
     file,
     [
       JSON.stringify({ type: "session_meta", payload: { cwd } }),
-      JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "por que Caddy y no nginx?" }] } }),
-      JSON.stringify({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "por el TLS automatico" }] } }),
+      JSON.stringify({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "why Caddy and not nginx?" }] } }),
+      JSON.stringify({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: "because of the automatic TLS" }] } }),
     ].join("\n"),
   );
   process.env.CORTEX_CODEX_DIR = dir;
   return file;
 }
 
-describe("una sola sesión de Codex (lo que necesita el hook)", () => {
-  it("encuentra el rollout por id, aunque esté enterrado en año/mes/día", () => {
+describe("a single Codex session (what the hook needs)", () => {
+  it("finds the rollout by id, even buried under year/month/day", () => {
     const file = codexRollout();
     expect(findCodexRollout("abc123-def")).toBe(file);
-    expect(findCodexRollout("no-existe")).toBeNull();
+    expect(findCodexRollout("does-not-exist")).toBeNull();
   });
 
-  it("lee la sesión por ruta o por id, indistintamente", () => {
+  it("reads the session by path or by id, either way", () => {
     const file = codexRollout();
     for (const ref of [file, "abc123-def"]) {
       const s = readCodexSession(ref)!;
@@ -132,7 +132,7 @@ describe("una sola sesión de Codex (lo que necesita el hook)", () => {
     }
   });
 
-  it("como último recurso, el rollout más reciente de ESTE repo", () => {
+  it("as a last resort, THIS repo's most recent rollout", () => {
     const file = codexRollout();
     expect(latestCodexRollout(REPO)).toBe(file);
     expect(latestCodexRollout("/otro/repo")).toBeNull();
@@ -140,7 +140,7 @@ describe("una sola sesión de Codex (lo que necesita el hook)", () => {
 });
 
 describe("readPiSession / readPiSessions", () => {
-  /** El formato de Pi: una línea `session` con el cwd y luego mensajes con content[]. */
+  /** Pi's format: a `session` line with the cwd and then messages with content[]. */
   function piSession(cwd = REPO): { dir: string; file: string } {
     const dir = tmp("pi-");
     const sub = join(dir, "--tmp-fake-repo-cortex--");
@@ -151,60 +151,61 @@ describe("readPiSession / readPiSessions", () => {
       [
         JSON.stringify({ type: "session", version: 3, id: "01a0-uuid", cwd }),
         JSON.stringify({ type: "model_change", provider: "nan", modelId: "glm5.3-flash" }),
-        JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text: "donde guardamos los backups?" }] } }),
-        JSON.stringify({ type: "message", message: { role: "assistant", content: [{ type: "text", text: "en un volumen aparte, retencion 7d" }] } }),
+        JSON.stringify({ type: "message", message: { role: "user", content: [{ type: "text", text: "where do we keep the backups?" }] } }),
+        JSON.stringify({ type: "message", message: { role: "assistant", content: [{ type: "text", text: "on a separate volume, 7d retention" }] } }),
       ].join("\n"),
     );
     process.env.CORTEX_PI_DIR = dir;
     return { dir, file };
   }
 
-  it("saca el diálogo y el id de dentro del fichero", () => {
+  it("takes the dialogue and the id from inside the file", () => {
     const { file } = piSession();
     const s = readPiSession(file)!;
     expect(s.sessionId).toBe("01a0-uuid");
     expect(s.cwd).toBe(REPO);
     expect(s.condensed).toContain("backups");
-    expect(s.condensed).toContain("retencion 7d");
-    expect(s.condensed).not.toContain("glm5.3-flash"); // los cambios de modelo no son diálogo
+    expect(s.condensed).toContain("7d retention");
+    expect(s.condensed).not.toContain("glm5.3-flash"); // model switches are not dialogue
   });
 
-  it("filtra por el cwd de dentro, no por el nombre de la carpeta", () => {
-    // El nombre de carpeta de Pi sale de sanear el cwd y no se puede deshacer sin ambigüedad.
-    piSession("/otro/proyecto");
+  it("filters by the cwd inside, not by the folder's name", () => {
+    // Pi's folder name comes from sanitising the cwd and cannot be undone unambiguously.
+    piSession("/another/project");
     expect(readPiSessions(REPO)).toHaveLength(0);
   });
 
-  it("lista las sesiones del repo", () => {
+  it("lists the repo's sessions", () => {
     piSession();
     const all = readPiSessions(REPO);
     expect(all).toHaveLength(1);
     expect(all[0]!.sessionId).toBe("01a0-uuid");
   });
 
-  it("un fichero que no existe no revienta", () => {
+  it("a file that does not exist does not blow up", () => {
     expect(readPiSession("/no/existe.jsonl")).toBeNull();
   });
 });
 
 describe("readSessionByRef", () => {
-  it("despacha al lector de cada agente", async () => {
+  it("dispatches to each agent's reader", async () => {
     const file = codexRollout();
     expect((await readSessionByRef("codex", file))!.condensed).toContain("Caddy");
     expect(await readSessionByRef("codex", "nada")).toBeNull();
     expect(await readSessionByRef("pi", "/no/existe.jsonl")).toBeNull();
-    // Claude no pasa por aquí: su transcript se lee con condenseSession, que conserva más.
-    expect(await readSessionByRef("claude", "/lo/que/sea")).toBeNull();
+    // Claude does not come through here: its transcript is read with condenseSession, which keeps more.
+    expect(await readSessionByRef("claude", "/whatever")).toBeNull();
   });
 });
 
 /**
- * OpenCode movió las sesiones de ficheros JSON a SQLite. El lector seguía buscando el layout
- * viejo, no encontraba nada, y la captura se iba en silencio: parecía configurado y no guardaba
- * una sola sesión. Aquí se construye una base con el esquema real y se comprueba que la lee.
+ * OpenCode moved sessions from JSON files to SQLite. The reader kept looking for the old
+ * layout, found nothing, and capture failed silently: it looked configured and stored not a
+ * single session. Here a database with the real schema is built and it is checked that it
+ * gets read.
  */
-describe("readOpenCodeSessions (SQLite, el formato actual)", () => {
-  it("lee sesiones de opencode.db y prefiere la base al store de ficheros", async () => {
+describe("readOpenCodeSessions (SQLite, the current format)", () => {
+  it("reads sessions from opencode.db and prefers the database to the file store", async () => {
     const { DatabaseSync } = await import("node:sqlite");
     const base = tmp("oc-db-");
     mkdirSync(base, { recursive: true });
@@ -225,57 +226,57 @@ describe("readOpenCodeSessions (SQLite, el formato actual)", () => {
 
     ses("ses1", REPO, null, 1);
     msg("m1", "ses1", "user", 1);
-    part("p1", "m1", "ses1", { type: "text", text: "Que backoff usamos?" }, 1);
+    part("p1", "m1", "ses1", { type: "text", text: "Which backoff do we use?" }, 1);
     msg("m2", "ses1", "assistant", 2);
-    part("p2", "m2", "ses1", { type: "reasoning", text: "pensando en voz alta" }, 1);
-    part("p3", "m2", "ses1", { type: "text", text: "Exponencial con tope de 60s." }, 2);
-    ses("ses-sub", REPO, "ses1", 3); // subagente: no debe salir suelto
-    ses("ses-otra", "/otro/repo", null, 4); // otro repo
-    msg("m3", "ses-otra", "user", 4);
-    part("p4", "m3", "ses-otra", { type: "text", text: "Esto es de otro repositorio." }, 4);
+    part("p2", "m2", "ses1", { type: "reasoning", text: "thinking out loud" }, 1);
+    part("p3", "m2", "ses1", { type: "text", text: "Exponential, capped at 60s." }, 2);
+    ses("ses-sub", REPO, "ses1", 3); // a sub-agent: it must not come out on its own
+    ses("ses-other", "/other/repo", null, 4); // another repo
+    msg("m3", "ses-other", "user", 4);
+    part("p4", "m3", "ses-other", { type: "text", text: "This belongs to another repository." }, 4);
 
     db.close();
 
     process.env.CORTEX_OPENCODE_DIR = join(base, "storage");
     process.env.CORTEX_OPENCODE_DB = dbPath;
 
-    const sesiones = await readOpenCodeSessions(REPO);
-    expect(sesiones).toHaveLength(1);
-    expect(sesiones[0]!.sessionId).toBe("ses1");
-    expect(sesiones[0]!.condensed).toContain("[user] Que backoff usamos?");
-    expect(sesiones[0]!.condensed).toContain("[assistant] Exponencial con tope de 60s.");
-    expect(sesiones[0]!.condensed).not.toContain("pensando en voz alta"); // reasoning fuera
+    const sessions = await readOpenCodeSessions(REPO);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.sessionId).toBe("ses1");
+    expect(sessions[0]!.condensed).toContain("[user] Which backoff do we use?");
+    expect(sessions[0]!.condensed).toContain("[assistant] Exponential, capped at 60s.");
+    expect(sessions[0]!.condensed).not.toContain("thinking out loud"); // reasoning left out
 
     expect((await readOpenCodeSession("ses1"))!.condensed).toContain("backoff");
-    expect(await readOpenCodeSession("ses-otra")).not.toBeNull(); // por id no se filtra por repo
-    expect(await readOpenCodeSession("no-existe")).toBeNull();
+    expect(await readOpenCodeSession("ses-other")).not.toBeNull(); // by id there is no repo filter
+    expect(await readOpenCodeSession("does-not-exist")).toBeNull();
   });
 });
 
-describe("readOpenCodeSession (por id)", () => {
-  it("devuelve solo la sesión pedida", async () => {
+describe("readOpenCodeSession (by id)", () => {
+  it("returns only the session asked for", async () => {
     const base = tmp("oc-one-");
     process.env.CORTEX_OPENCODE_DIR = base;
-    process.env.CORTEX_OPENCODE_DB = join(base, "no-hay-base.db");
-    const mk = (sid: string, texto: string): void => {
+    process.env.CORTEX_OPENCODE_DB = join(base, "no-database-here.db");
+    const mk = (sid: string, text: string): void => {
       mkdirSync(join(base, "session/prj"), { recursive: true });
       writeFileSync(join(base, `session/prj/${sid}.json`), JSON.stringify({ id: sid, directory: REPO }));
       mkdirSync(join(base, `message/${sid}`), { recursive: true });
       writeFileSync(join(base, `message/${sid}/m1.json`), JSON.stringify({ id: `${sid}-m1`, role: "user" }));
       mkdirSync(join(base, `part/${sid}-m1`), { recursive: true });
-      writeFileSync(join(base, `part/${sid}-m1/p1.json`), JSON.stringify({ type: "text", text: texto }));
+      writeFileSync(join(base, `part/${sid}-m1/p1.json`), JSON.stringify({ type: "text", text }));
     };
-    mk("ses-a", "hablamos de la cola de captura");
-    mk("ses-b", "hablamos de otra cosa");
-    expect((await readOpenCodeSession("ses-a"))!.condensed).toContain("cola de captura");
-    expect((await readOpenCodeSession("ses-b"))!.condensed).toContain("otra cosa");
-    expect(await readOpenCodeSession("no-existe")).toBeNull();
+    mk("ses-a", "we talked about the capture queue");
+    mk("ses-b", "we talked about something else");
+    expect((await readOpenCodeSession("ses-a"))!.condensed).toContain("capture queue");
+    expect((await readOpenCodeSession("ses-b"))!.condensed).toContain("something else");
+    expect(await readOpenCodeSession("does-not-exist")).toBeNull();
     expect(await readOpenCodeSessions(REPO)).toHaveLength(2);
   });
 });
 
-describe("qué agente ha llamado al hook", () => {
-  it("se deduce de la ruta del transcript, porque el plugin es el mismo para varios", async () => {
+describe("which agent called the hook", () => {
+  it("is derived from the transcript's path, because the plugin is shared by several", async () => {
     const { detectPlatform } = await import("../apps/cli/src/commands/hook-capture.js");
     expect(detectPlatform("/Users/x/.codex/sessions/2026/09/10/rollout-a.jsonl")).toBe("codex");
     expect(detectPlatform("/Users/x/.pi/agent/sessions/--x--/a.jsonl")).toBe("pi");

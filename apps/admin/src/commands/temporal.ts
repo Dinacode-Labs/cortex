@@ -1,7 +1,7 @@
 import { applyTemporalInvalidation } from "@cortex/core";
 
-/** Cierra la ventana de validez de hechos no vigentes (histórico/superseded). */
+/** Closes the validity window of facts that are no longer current (historical/superseded). */
 export async function run(): Promise<void> {
   const r = await applyTemporalInvalidation();
-  console.log(`Invalidación temporal: ${r.historical} marcadas históricas, ${r.superseded} superadas.`);
+  console.log(`Temporal invalidation: ${r.historical} marked historical, ${r.superseded} superseded.`);
 }

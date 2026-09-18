@@ -1,49 +1,52 @@
-# `config/` — registry del toolbelt de terceros
+# `config/` — the third-party toolbelt registry
 
-Aquí **ya no vive nada de Cortex**. Su MCP, la skill `cortex-capture` y el comando
-`/cortex-save` se reparten en el plugin de Claude Code (`plugin/claude-code/`) y los instala
-`cortex setup` (ADR-0014 revisado y ADR-0032). Lo que queda es el esquema del registry con el
-que una organización reparte **sus** herramientas.
+**Nothing of Cortex lives here any more.** Its MCP, the `cortex-capture` skill and the
+`/cortex-save` command are shipped in the Claude Code plugin (`plugin/claude-code/`) and
+installed by `cortex setup` (ADR-0014 revised, and ADR-0032). What remains is the schema of the
+registry an organisation uses to distribute **its own** tools.
 
 ```
 config/
-  toolbelt.json   # registry vacío: la plantilla del esquema
-  README.md       # esto
+  toolbelt.json   # an empty registry: the schema's template
+  README.md       # this
 ```
 
-## Para qué sirve
+## What it is for
 
-Un registry declara qué MCPs, skills y comandos debe tener un dev, y el CLI los instala de
-forma idempotente en cada agente detectado. El de tu organización vive en un repo propio
-—normalmente privado— porque no es producto, es la configuración de una empresa concreta
+A registry declares which MCPs, skills and commands a dev should have, and the CLI installs
+them idempotently into every detected agent. Your organisation's registry lives in a repo of
+its own -- usually private -- because it is not product, it is one company's configuration
 (ADR-0026):
 
 ```bash
-cortex toolbelt sync https://…/toolbelt.json     # llega en el PR de `cortex toolbelt`
+cortex toolbelt sync https://…/toolbelt.json     # arrives with the `cortex toolbelt` PR
 ```
 
-El esquema del fichero está en [`docs/toolbelt-registry.md`](../docs/toolbelt-registry.md).
+The file's schema is in [`docs/toolbelt-registry.md`](../docs/toolbelt-registry.md).
 
-Se reparte **configuración, nunca credenciales**: cada entrada documenta en `auth` qué tiene
-que configurar el dev por su cuenta, y una entrada cuyas variables no estén exportadas se
-omite con un aviso en vez de romper la instalación.
+What is distributed is **configuration, never credentials**: each entry documents in `auth`
+what the dev has to configure themselves, and an entry whose variables are not exported is
+skipped with a warning rather than breaking the installation.
 
-## Y lo de Cortex, ¿dónde está?
+## And where is Cortex's own, then?
 
 ```bash
-cortex setup --all        # configura todos los agentes detectados
-cortex setup --status     # qué hay instalado y dónde
+cortex setup --all        # configures every detected agent
+cortex setup --status     # what is installed and where
 ```
 
-En Claude Code eso instala el plugin `cortex@dinacode-cortex`, que trae los hooks
-(contexto al empezar, captura al terminar), el MCP (`cortex mcp`, que habla con el servidor y
-respeta tus permisos), la skill de captura y `/cortex-save`. Si el plugin no se puede instalar
-—por ejemplo, sin acceso al repo— se cae a hooks en `~/.claude/settings.json` y funciona igual.
+In Claude Code that installs the `cortex@dinacode-cortex` plugin, which brings the hooks
+(context at the start, capture at the end), the MCP (`cortex mcp`, which talks to the server
+and respects your permissions), the capture skill and `/cortex-save`. When the plugin cannot be
+installed -- with no access to the repo, for instance -- it falls back to hooks in
+`~/.claude/settings.json` and works just the same.
 
-**Cortex es opt-in por repo**: los hooks están a nivel de usuario, pero solo actúan donde hay
-un `.cortex.json`, que se crea con `cortex link`. Sin vínculo no se inyecta ni se captura nada.
+**Cortex is opt-in per repo**: the hooks live at user level, but they only act where there is a
+`.cortex.json`, which `cortex link` creates. With no link, nothing is injected and nothing is
+captured.
 
-## En este mismo repo
+## In this repo itself
 
-`.claude/skills/cortex-capture` y `.claude/commands/cortex-save.md` son symlinks a
-`plugin/claude-code/`, para trabajar en la skill y verla en vivo sin instalar el plugin.
+`.claude/skills/cortex-capture` and `.claude/commands/cortex-save.md` are symlinks into
+`plugin/claude-code/`, so the skill can be worked on and seen live without installing the
+plugin.

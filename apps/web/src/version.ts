@@ -1,22 +1,22 @@
 import { createRequire } from "node:module";
 
 /**
- * Sufijo de las URL de los estáticos.
+ * Suffix for the static assets' URLs.
  *
- * `/styles.css` se sirve sin `Cache-Control` ni `ETag` —solo `Last-Modified`—, así que el
- * navegador aplica su heurística y se queda la copia vieja sin preguntar. El resultado es que
- * quien ya había entrado ve la interfaz nueva con los estilos antiguos, a medio pintar, y
- * desde fuera parece que el despliegue no ha llegado. Pegar la versión a la URL convierte
- * cada release en un fichero distinto, que es la forma barata y sin dependencias de hacerlo.
+ * `/styles.css` is served with neither `Cache-Control` nor `ETag` -- only `Last-Modified` -- so
+ * the browser applies its own heuristic and keeps the old copy without asking. The result is
+ * that anyone who had visited before sees the new interface with the old styles, half painted,
+ * and from outside it looks as though the deploy never landed. Pinning the version into the URL
+ * turns every release into a different file, which is the cheap, dependency-free way to do it.
  */
-function versionDelPaquete(): string {
+function packageVersion(): string {
   try {
     const require = createRequire(import.meta.url);
-    // Misma profundidad desde `src/` y desde `dist/`.
+    // The same depth from `src/` and from `dist/`.
     return (require("../package.json") as { version?: string }).version ?? "dev";
   } catch {
     return "dev";
   }
 }
 
-export const ASSET_VERSION = versionDelPaquete();
+export const ASSET_VERSION = packageVersion();

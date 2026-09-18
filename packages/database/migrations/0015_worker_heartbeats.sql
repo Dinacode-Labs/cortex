@@ -1,11 +1,11 @@
--- Latido de los procesos sin puerto (el worker de mantenimiento).
+-- Heartbeat for the processes with no port (the maintenance worker).
 --
--- El worker ya escribía un latido a un fichero, pero vive DENTRO de su contenedor: solo lo ve
--- su propio healthcheck de Docker. Desde fuera nadie sabe si sigue vivo, y es quien mantiene
--- la memoria (enriquecido, reconciliación, lint). Si muere en silencio, la memoria se degrada
--- despacio y nadie se entera hasta que alguien nota que algo no cuadra.
+-- The worker already wrote a heartbeat to a file, but that file lives INSIDE its container:
+-- only its own Docker healthcheck sees it. From outside nobody knows whether it is alive, and
+-- it is what maintains the memory (enrichment, reconciliation, lint). If it dies silently, the
+-- memory degrades slowly and nobody notices until someone spots that something is off.
 --
--- Una fila por proceso, sobrescrita en cada latido. No crece.
+-- One row per process, overwritten on every beat. It does not grow.
 CREATE TABLE IF NOT EXISTS worker_heartbeats (
   name       text PRIMARY KEY,
   beat_at    timestamptz NOT NULL DEFAULT now()

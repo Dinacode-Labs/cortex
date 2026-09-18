@@ -11,20 +11,21 @@ import {
 import { readHookStdin } from "../hook-stdin.js";
 
 /**
- * Hook de AUTO-CAPTURA (fin de sesión, y pre-compactación). Resuelve el proyecto por el
- * `.cortex.json` del repo, saca el diálogo de la sesión que acaba de terminar —quitando tool
- * calls, volcados y secretos— y lo manda al servidor, que es quien lo destila a conocimiento
- * tipado (ADR-0025). Aquí no hay ni LLM ni base de datos: solo la sesión de `cortex auth login`.
+ * The AUTO-CAPTURE hook (end of session, and pre-compaction). It resolves the project through
+ * the repo's `.cortex.json`, pulls the dialogue out of the session that just ended -- stripping
+ * tool calls, dumps and secrets -- and sends it to the server, which is what distills it into
+ * typed knowledge (ADR-0025). There is neither an LLM nor a database here: only the
+ * `cortex auth login` session.
  *
- * Cada agente cuenta la sesión a su manera. Claude y Codex pasan la ruta del transcript;
- * OpenCode y Hermes, un id; Pi, la ruta de su fichero de sesión. Por eso hay tres formas de
- * decirle cuál es: `--session`, el JSON del stdin, o —último recurso, Codex— la sesión más
- * reciente de este repo.
+ * Each agent reports the session its own way. Claude and Codex pass the transcript's path;
+ * OpenCode and Hermes, an id; Pi, the path of its session file. Hence three ways of telling it
+ * which one: `--session`, the JSON on stdin, or -- as a last resort, for Codex -- this repo's
+ * most recent session.
  *
- * Silencioso por diseño: un hook corre dentro de la sesión de un agente y nunca debe
- * romperla. Ver docs/research/hooks-integration.md.
+ * Silent by design: a hook runs inside an agent's session and must never break it. See
+ * docs/research/hooks-integration.md.
  *
- *   cortex hook-capture [--platform claude|codex|opencode|hermes|pi] [--session <id|ruta>] [--cwd <dir>]
+ *   cortex hook-capture [--platform claude|codex|opencode|hermes|pi] [--session <id|path>] [--cwd <dir>]
  */
 
 const PLATFORMS: CaptureAgent[] = ["claude", "codex", "opencode", "hermes", "pi"];
@@ -36,8 +37,8 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 /**
- * De dónde sale el agente cuando nadie lo dice: de la propia ruta del transcript. El plugin
- * lo comparten Claude Code y Codex, así que el hook no puede llevarlo cableado.
+ * Where the agent comes from when nobody says: from the transcript's own path. Claude Code and
+ * Codex share the plugin, so the hook cannot have it hardcoded.
  */
 export function detectPlatform(transcript: string | undefined): CaptureAgent {
   if (transcript?.includes("/.codex/")) return "codex";
@@ -47,8 +48,8 @@ export function detectPlatform(transcript: string | undefined): CaptureAgent {
 
 export async function run(args: string[] = []): Promise<void> {
   try {
-    // Con `--session` no hace falta stdin, y leerlo puede colgar el hook: quien invoca con
-    // `execFile` (Pi, OpenCode) deja la tubería abierta y muda. Ver `readHookStdin`.
+    // With `--session` stdin is not needed, and reading it can hang the hook: callers using
+    // `execFile` (Pi, OpenCode) leave the pipe open and silent. See `readHookStdin`.
     let input: { cwd?: string; session_id?: string; sessionId?: string; transcript_path?: string } = {};
     if (!flag(args, "session")) {
       try {
@@ -60,7 +61,7 @@ export async function run(args: string[] = []): Promise<void> {
 
     const cwd = flag(args, "cwd") || input.cwd || process.cwd();
     const link = useProjectServer(cwd);
-    if (!link || link.ignore || !link.slug) return; // sin vínculo por slug (usa `cortex link`)
+    if (!link || link.ignore || !link.slug) return; // no slug link (use `cortex link`)
 
     const asked = flag(args, "platform") as CaptureAgent | undefined;
     if (asked && !PLATFORMS.includes(asked)) return;
@@ -72,13 +73,13 @@ export async function run(args: string[] = []): Promise<void> {
     let id: string;
 
     if (platform === "claude") {
-      // El transcript de Claude conserva más señal que el store, así que se lee tal cual.
+      // Claude's transcript keeps more signal than the store, so it is read as is.
       if (!transcript || !existsSync(transcript)) return;
       condensed = condenseSession(transcript);
       id = sessionId || basename(transcript).replace(/\.jsonl$/, "");
     } else {
-      // Codex a veces no da ni ruta ni id (según el evento): entonces, la sesión más
-      // reciente de ESTE repo. Es la que acaba de cerrarse.
+      // Codex sometimes gives neither a path nor an id (depending on the event): then, THIS
+      // repo's most recent session. It is the one that just closed.
       const ref = transcript || sessionId || (platform === "codex" ? latestCodexRollout(cwd) : null);
       if (!ref) return;
       const session = await readSessionByRef(platform, ref);
@@ -89,8 +90,8 @@ export async function run(args: string[] = []): Promise<void> {
 
     if (!condensed.trim()) return;
 
-    // No se espera al resultado: destilar tarda y el hook tiene un timeout corto. El
-    // servidor encola el trabajo y responde 202.
+    // It does not wait for the result: distilling takes a while and the hook has a short
+    // timeout. The server queues the job and answers 202.
     const r = await sendCondensedSession({ slug: link.slug, condensed, sessionId: id, platform });
     if (r.status === "failed") {
       console.error(`[cortex hook] could not capture "${link.slug}": ${r.error ?? "error"} (check cortex auth login and the server)`);
@@ -98,7 +99,7 @@ export async function run(args: string[] = []): Promise<void> {
       console.error(`[cortex hook] ${platform} session sent to "${link.slug}"; the server will distil it.`);
     }
   } catch {
-    /* silencioso: un hook no debe romper la sesión */
+    /* silent: a hook must not break the session */
   } finally {
     process.exit(0);
   }

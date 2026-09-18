@@ -1,23 +1,24 @@
 import { spawn } from "node:child_process";
-import { resolveServidor } from "../servidor.js";
+import { resolveServer } from "../server.js";
 import { platform } from "node:os";
 import { getClientConfig, readCredentials } from "@cortex/client";
 
 /**
- * `cortex ui` — abre la UI web YA AUTENTICADA. Pide al servidor un **ticket de un solo
- * uso** (autenticado con el token de la CLI) y abre /auth/cli?ticket=… La web lo canjea
- * por una sesión propia. Así el token de larga vida del CLI nunca viaja en la URL.
+ * `cortex ui` -- opens the web UI ALREADY AUTHENTICATED. It asks the server for a **single-use
+ * ticket** (authenticated with the CLI's token) and opens /auth/cli?ticket=... The web
+ * exchanges it for a session of its own. That way the CLI's long-lived token never travels in
+ * the URL.
  */
 export async function run(args: string[] = []): Promise<void> {
-  const elegido = await resolveServidor(args, { verbo: "open" });
+  const elegido = await resolveServer(args, { verb: "open" });
   if (!elegido) {
     process.exitCode = 1;
     return;
   }
-  // La dirección de la web la dice el SERVIDOR (`/client-config`), no una variable con un
-  // default de desarrollo. Antes `ui` se autenticaba correctamente contra el servidor bueno y
-  // luego abría el navegador en localhost, que es de los fallos más desconcertantes que hay:
-  // todo parece ir bien y la ventana que se abre no existe.
+  // The web's address is stated by the SERVER (`/client-config`), not by a variable with a
+  // development default. `ui` used to authenticate correctly against the right server and then
+  // open the browser on localhost, which is one of the most baffling failures there is:
+  // everything looks fine and the window that opens does not exist.
   const cfg = await getClientConfig(elegido);
   const WEB = process.env.CORTEX_WEB_URL?.trim() || cfg?.webUrl || "http://localhost:8080";
 

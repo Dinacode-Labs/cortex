@@ -2,15 +2,15 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Carga un `.env` una sola vez, sin dependencias externas (Node ≥ 20.6 trae
- * `process.loadEnvFile`). No pisa variables ya definidas en el entorno real.
- * Los entrypoints (migrate, seed, servidores) la llaman al arrancar.
+ * Loads a `.env` once, with no external dependency (Node >= 20.6 ships
+ * `process.loadEnvFile`). It never overwrites variables already set in the real
+ * environment. Entrypoints (migrate, seed, servers) call it on startup.
  *
- * Busca, en este orden: `CORTEX_ENV_FILE`, el `.env` del directorio desde el que se lanzó
- * el comando (`INIT_CWD`, que pnpm fija a la raíz del monorepo aunque `--filter` cambie el
- * cwd) y el `.env` del cwd. **No** se resuelve relativo a este fichero: eso ataba la
- * función a vivir en `packages/shared/src` y se rompía al compilar a `dist/` o al
- * empaquetar (era un hallazgo conocido del refactor).
+ * Lookup order: `CORTEX_ENV_FILE`, the `.env` of the directory the command was launched
+ * from (`INIT_CWD`, which pnpm pins to the monorepo root even when `--filter` changes the
+ * cwd) and the `.env` of the cwd. It is **not** resolved relative to this file: doing that
+ * tied the function to living in `packages/shared/src` and broke once compiled to `dist/`
+ * or bundled.
  */
 let loaded = false;
 export function loadEnv(): void {
@@ -26,28 +26,28 @@ export function loadEnv(): void {
   if (hit) process.loadEnvFile(hit);
 }
 
-/** Devuelve una variable de entorno o lanza si falta. */
+/** Returns an environment variable, or throws if it is missing. */
 export function requireEnv(name: string): string {
   loadEnv();
   const value = process.env[name];
   if (!value) {
-    throw new Error(`La variable de entorno ${name} es obligatoria y no está definida.`);
+    throw new Error(`Environment variable ${name} is required and is not set.`);
   }
   return value;
 }
 
-/** Devuelve una variable de entorno o un valor por defecto. */
+/** Returns an environment variable, or a default value. */
 export function getEnv(name: string, fallback: string): string {
   loadEnv();
   return process.env[name] ?? fallback;
 }
 
 /**
- * Lee una env var numérica (int o float) con default. NaN → default.
+ * Reads a numeric env var (int or float) with a default. NaN -> default.
  *
- * OJO comportamiento: `Number(process.env.X ?? "8")` con X="" da Number("")=0
- * (¡no 8!); getEnvNum trata ""→fallback y NaN→fallback, más correcto (mejora
- * deliberada). Ningún caller del repo depende del antiguo ""→0.
+ * Behaviour worth noting: `Number(process.env.X ?? "8")` with X="" yields Number("")=0
+ * (not 8!); getEnvNum maps ""->fallback and NaN->fallback, which is more correct (a
+ * deliberate improvement). No caller in the repo relies on the old ""->0.
  */
 export function getEnvNum(name: string, fallback: number): number {
   const raw = process.env[name];

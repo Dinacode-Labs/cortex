@@ -1,6 +1,6 @@
--- Observabilidad de coste/uso de IA (ADR-0016).
--- Registra cada llamada al LLM (Agents de Mastra) y a embeddings, con tokens y
--- una estimación de coste según una tabla de precios por modelo. nan = gratis (0).
+-- AI cost/usage observability (ADR-0016).
+-- Records every call to the LLM (Mastra Agents) and to embeddings, with tokens and an
+-- estimated cost from a per-model price table. nan = free (0).
 
 CREATE TABLE llm_usage (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -9,7 +9,7 @@ CREATE TABLE llm_usage (
   provider      text NOT NULL,                 -- nan | openrouter | openai | voyage
   model         text NOT NULL,
   operation     text NOT NULL,                 -- classifier | graph | reranker | retriever | embedding | ...
-  project       text,                          -- proyecto asociado (si se conoce)
+  project       text,                          -- associated project (when known)
   input_tokens  integer NOT NULL DEFAULT 0,
   output_tokens integer NOT NULL DEFAULT 0,
   total_tokens  integer NOT NULL DEFAULT 0,

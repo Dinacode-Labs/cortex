@@ -23,61 +23,61 @@ import {
   renderContextPack,
 } from "@cortex/core";
 
-const RID = Date.now().toString(36); // sufijo único → aísla cada ejecución
+const RID = Date.now().toString(36); // a unique suffix -> it isolates each run
 afterAll(async () => {
   await closeSql();
 });
 
-describe("persistencia y búsqueda (BD real, embeddings local)", () => {
-  it("guarda y recupera por búsqueda híbrida", async () => {
+describe("persistence and search (a real database, local embeddings)", () => {
+  it("stores and retrieves through hybrid search", async () => {
     const p = await createProject(`IT Search ${RID}`);
-    await saveContext({ content: "Usamos pgvector pg16 para embeddings y búsqueda vectorial.", project: p.name, type: "decision" });
+    await saveContext({ content: "We use pgvector pg16 for embeddings and vector search.", project: p.name, type: "decision" });
     const hits = await searchContext({ query: "pgvector embeddings vectorial", project: p.name, limit: 5 });
     expect(hits.length).toBeGreaterThan(0);
     expect(hits.some((h) => /pgvector/.test(h.entry.content))).toBe(true);
   });
 
-  it("context-pack hereda del proyecto padre (jerarquía)", async () => {
+  it("the context pack inherits from the parent project (the hierarchy)", async () => {
     const parent = await createProject(`IT Acme ${RID}`);
     const child = await createProject(`IT Acme API ${RID}`, { parentSlug: parent.slug! });
-    await saveContext({ content: "Convención: todas las APIs usan OAuth2 corporativo.", project: parent.name, type: "convention", confidence: "high" });
-    await saveContext({ content: "Decisión: el endpoint de facturas usa paginación cursor.", project: child.name, type: "decision", confidence: "high" });
+    await saveContext({ content: "Convention: every API uses corporate OAuth2.", project: parent.name, type: "convention", confidence: "high" });
+    await saveContext({ content: "Decision: the invoices endpoint uses cursor pagination.", project: child.name, type: "decision", confidence: "high" });
     const pack = await getContextPack(child.name);
     const text = pack.sections.flatMap((s) => s.entries).map((e) => e.content).join(" \n ");
-    expect(text).toMatch(/OAuth2/); // heredado del padre
-    expect(text).toMatch(/facturas/); // propio del subproyecto
+    expect(text).toMatch(/OAuth2/); // inherited from the parent
+    expect(text).toMatch(/invoices/); // the sub-project's own
   });
 });
 
-describe("captura por lotes + reconciliación (BD real)", () => {
-  it("captureBatch es incremental por sourceReference y atribuye created_by", async () => {
+describe("batch capture plus reconciliation (a real database)", () => {
+  it("captureBatch is incremental by sourceReference and attributes created_by", async () => {
     const p = await createProject(`IT Batch ${RID}`);
-    const item = { content: "Contrato de mantenimiento 2026.", title: "Contrato 2026", sourceType: "document", sourceReference: "docs/contrato-2026" };
+    const item = { content: "2026 maintenance contract.", title: "Contract 2026", sourceType: "document", sourceReference: "docs/contract-2026" };
     const r1 = await captureBatch(p.name, [item], "dev@example.com");
     expect(r1[0]!.action).toBe("added");
     const r2 = await captureBatch(p.name, [item], "dev@example.com");
-    expect(r2[0]!.action).toBe("existing"); // ya ingerido
+    expect(r2[0]!.action).toBe("existing"); // already ingested
     const entries = await listEntries({ project: p.name });
     expect(entries.some((e) => e.createdBy === "dev@example.com")).toBe(true);
   });
 
-  it("captureBatch clasifica con el LLM solo si CORTEX_CAPTURE_LLM=1", async () => {
+  it("captureBatch classifies with the LLM only when CORTEX_CAPTURE_LLM=1", async () => {
     const p = await createProject(`IT CaptureLLM ${RID}`);
     let calls = 0;
-    // Clasificador falso: fuerza un tipo que la heurística no daría para este texto.
+    // A fake classifier: it forces a type the heuristic would not give for this text.
     setClassifier(async () => {
       calls++;
-      return { type: "business_rule", title: "Regla", summary: "s", entities: [] };
+      return { type: "business_rule", title: "Rule", summary: "s", entities: [] };
     });
     try {
-      // Sin el flag → NO se llama al clasificador (tipo por heurística).
+      // Without the flag -> the classifier is NOT called (a heuristic type).
       delete process.env.CORTEX_CAPTURE_LLM;
-      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, alfa.", sourceType: "document", sourceReference: "cap-off" }], "dev@example.com");
+      await captureBatch(p.name, [{ content: "A loose document with no explicit type, alpha.", sourceType: "document", sourceReference: "cap-off" }], "dev@example.com");
       expect(calls).toBe(0);
 
-      // Con el flag → se clasifica con el LLM y el tipo lo pone el clasificador.
+      // With the flag -> it is classified with the LLM and the classifier sets the type.
       process.env.CORTEX_CAPTURE_LLM = "1";
-      await captureBatch(p.name, [{ content: "Documento suelto sin tipo explícito, beta.", sourceType: "document", sourceReference: "cap-on" }], "dev@example.com");
+      await captureBatch(p.name, [{ content: "A loose document with no explicit type, beta.", sourceType: "document", sourceReference: "cap-on" }], "dev@example.com");
       expect(calls).toBe(1);
 
       const entries = await listEntries({ project: p.name });
@@ -90,151 +90,152 @@ describe("captura por lotes + reconciliación (BD real)", () => {
   });
 
   /**
-   * Dos decisiones vigentes que se contradicen: el pack entregaba las dos como buenas sin
-   * decir nada, y el agente decidía a ciegas. No se invalida ninguna —cuál sobra no se puede
-   * juzgar en automático sin arriesgarse a borrar la buena—, pero se avisa al lado de cada una.
+   * Two current decisions that contradict each other: the pack handed both over as good
+   * without saying anything, and the agent decided blind. Neither is invalidated -- which one
+   * is redundant cannot be judged automatically without risking deleting the good one -- but a
+   * warning goes next to each.
    */
-  it("el context-pack avisa de las decisiones que se contradicen, sin invalidar ninguna", async () => {
+  it("the context pack warns about decisions that contradict each other, without invalidating any", async () => {
     const p = await createProject(`IT Conflicto ${RID}`);
     const opts = { useClassifier: false } as const;
-    const vieja = await saveContext({ content: "Los reintentos usan backoff fijo de 30 segundos.", project: p.name, title: "Backoff fijo de 30s", type: "decision" }, opts);
-    const nueva = await saveContext({ content: "Los reintentos usan backoff exponencial con tope de 60 segundos.", project: p.name, title: "Backoff exponencial con tope", type: "decision" }, opts);
+    const older = await saveContext({ content: "Retries use a fixed 30-second backoff.", project: p.name, title: "Fixed 30s backoff", type: "decision" }, opts);
+    const newer = await saveContext({ content: "Retries use exponential backoff capped at 60 seconds.", project: p.name, title: "Capped exponential backoff", type: "decision" }, opts);
 
     await relate(getSql(), {
-      sourceId: nueva.entry.id,
+      sourceId: newer.entry.id,
       sourceType: "context_entry",
-      targetId: vieja.entry.id,
+      targetId: older.entry.id,
       targetType: "context_entry",
       relationType: "contradicts",
     });
 
     const pack = await getContextPack(p.name);
-    expect(pack.conflicts).toHaveLength(2); // una por cada lado: las dos reciben el aviso
+    expect(pack.conflicts).toHaveLength(2); // one per side: both receive the warning
 
-    const texto = renderContextPack(pack);
-    // Las DOS siguen en el pack: no se ha invalidado nada.
-    expect(texto).toContain("Backoff fijo de 30s");
-    expect(texto).toContain("Backoff exponencial con tope");
-    // Y cada una avisa de la otra, con la dirección correcta.
-    const lineas = texto.split("\n");
-    const iVieja = lineas.findIndex((l) => l.includes("**Backoff fijo de 30s**"));
-    const iNueva = lineas.findIndex((l) => l.includes("**Backoff exponencial con tope**"));
-    expect(lineas.slice(iVieja, iVieja + 3).join(" ")).toContain('Conflicts with "Backoff exponencial con tope" (recorded later)');
-    expect(lineas.slice(iNueva, iNueva + 3).join(" ")).toContain('Conflicts with "Backoff fijo de 30s" (recorded earlier)');
+    const text = renderContextPack(pack);
+    // BOTH are still in the pack: nothing was invalidated.
+    expect(text).toContain("Fixed 30s backoff");
+    expect(text).toContain("Capped exponential backoff");
+    // And each one warns about the other, with the right direction.
+    const lines = text.split("\n");
+    const iOlder = lines.findIndex((l) => l.includes("**Fixed 30s backoff**"));
+    const iNewer = lines.findIndex((l) => l.includes("**Capped exponential backoff**"));
+    expect(lines.slice(iOlder, iOlder + 3).join(" ")).toContain('Conflicts with "Capped exponential backoff" (recorded later)');
+    expect(lines.slice(iNewer, iNewer + 3).join(" ")).toContain('Conflicts with "Fixed 30s backoff" (recorded earlier)');
   });
 
   /**
-   * El caso que de verdad ocurre: `maintain` no relaciona entradas entre sí, relaciona
-   * ENTIDADES del grafo ("README" contradice "src/webhook.js"). El aviso tiene que bajar a las
-   * entradas colgadas de cada entidad, que es lo que el agente está leyendo.
+   * The case that really happens: `maintain` does not relate entries to each other, it relates
+   * graph ENTITIES ("README" contradicts "src/webhook.js"). The warning has to come down to the
+   * entries hanging off each entity, which is what the agent is reading.
    */
-  it("avisa también cuando la contradicción está entre entidades del grafo", async () => {
+  it("warns when the contradiction is between graph entities too", async () => {
     const p = await createProject(`IT Conflicto Grafo ${RID}`);
     const opts = { useClassifier: false } as const;
-    const entrada = await saveContext(
-      { content: "El README dice que no hay idempotencia de webhooks.", project: p.name, title: "README sobre idempotencia", type: "decision" },
+    const entry_ = await saveContext(
+      { content: "The README says there is no webhook idempotence.", project: p.name, title: "README on idempotence", type: "decision" },
       opts,
     );
     const sql = getSql();
     const readme = await resolveEntity(sql, `README ${RID}`, "module");
     const webhook = await resolveEntity(sql, `src/webhook.js ${RID}`, "module");
-    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entrada.entry.id}, ${readme.id}) ON CONFLICT DO NOTHING`;
+    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entry_.entry.id}, ${readme.id}) ON CONFLICT DO NOTHING`;
     await relate(sql, { sourceId: readme.id, sourceType: "entity", targetId: webhook.id, targetType: "entity", relationType: "contradicts" });
 
-    const texto = renderContextPack(await getContextPack(p.name));
-    expect(texto).toContain("README sobre idempotencia");
-    // No dice "esta entrada contradice X" —no es verdad—, dice que la zona está en disputa.
-    expect(texto).toContain(`Touches "README ${RID}", which is recorded as contradicting "src/webhook.js ${RID}"`);
+    const text = renderContextPack(await getContextPack(p.name));
+    expect(text).toContain("README on idempotence");
+    // It does not say "this entry contradicts X" -- that is not true -- it says the area is disputed.
+    expect(text).toContain(`Touches "README ${RID}", which is recorded as contradicting "src/webhook.js ${RID}"`);
 
-    // Y no se avisa a una entrada de que choca consigo misma: si está colgada de los DOS
-    // lados de la disputa, no está en medio de la discusión, es la discusión.
-    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entrada.entry.id}, ${webhook.id}) ON CONFLICT DO NOTHING`;
+    // And an entry is not warned that it clashes with itself: when it hangs off BOTH sides of
+    // the dispute, it is not caught in the middle of the argument, it is the argument.
+    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entry_.entry.id}, ${webhook.id}) ON CONFLICT DO NOTHING`;
     const pack2 = await getContextPack(p.name);
-    expect(pack2.conflicts.find((c) => c.entryId === entrada.entry.id)?.areas ?? []).toHaveLength(0);
+    expect(pack2.conflicts.find((c) => c.entryId === entry_.entry.id)?.areas ?? []).toHaveLength(0);
   });
 
-  it("saveWithReconciliation hace NOOP de un near-duplicate idéntico", async () => {
+  it("saveWithReconciliation NOOPs an identical near-duplicate", async () => {
     const p = await createProject(`IT Recon ${RID}`);
-    const content = "El servicio de pagos usa Stripe en modo test para las pruebas.";
+    const content = "The payments service uses Stripe in test mode for the test suite.";
     const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
     const a = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "s1" } as never, opts);
     expect(a.action).toBe("add");
     expect(await isNearDuplicate(p.name, content)).toBe(true);
     const b = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "s2" } as never, opts);
-    expect(b.action).toBe("noop"); // idéntico (≥ NOOP) y mismo source_type → NOOP
+    expect(b.action).toBe("noop"); // identical (>= NOOP) and the same source_type -> NOOP
   });
 
   /**
-   * El eco de dos vías: el agente guarda la decisión con la tool (`manual`) y, al cerrar la
-   * sesión, la destilación la vuelve a guardar (`agent_session`) con otras palabras. Medido en
-   * un proyecto real, ese par puntúa 0.86–0.88: ni llega al NOOP de 0.95 ni pasaba por las ramas
-   * de abajo, que exigen el mismo origen. Se guardaba dos veces.
+   * The two-route echo: the agent stores the decision with the tool (`manual`) and, on closing
+   * the session, distillation stores it again (`agent_session`) in different words. Measured in
+   * a real project, that pair scores 0.86-0.88: it neither reaches the 0.95 NOOP nor went
+   * through the branches below, which require the same origin. It was stored twice.
    */
-  it("no repite conocimiento que ya está, aunque venga por otra vía", async () => {
+  it("does not repeat knowledge that is already there, even arriving by another route", async () => {
     const p = await createProject(`IT Eco ${RID}`);
     const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
-    // El par está elegido para puntuar ~0.88 con los embeddings locales de los tests: en la
-    // banda del eco real medido en producción (0.86–0.88), ni idéntico (≥0.95) ni distinto.
-    const original = "El backoff de reintentos es exponencial con tope de 60 segundos y jitter.";
-    const eco = "El backoff de reintentos es exponencial con tope de 60 segundos y jitter aleatorio para evitar sincronizacion.";
+    // The pair is chosen to score ~0.88 with the tests' local embeddings: in the band of the
+    // real echo measured in production (0.86-0.88), neither identical (>=0.95) nor different.
+    const original = "The retry backoff is exponential, capped at 60 seconds, with jitter.";
+    const echo = "The retry backoff is exponential, capped at 60 seconds, with random jitter to avoid synchronisation.";
 
     const a = await saveWithReconciliation({ content: original, project: p.name, type: "decision", confidence: "low", sourceType: "manual", sourceReference: "tool" } as never, opts);
     expect(a.action).toBe("add");
 
-    // Reconciliador de prueba: dice que es lo mismo, que es lo que haría el de verdad.
+    // A test reconciler: it says it is the same thing, which is what the real one would do.
     setReconciler({ decide: async () => "noop", merge: async (x: string) => x });
     try {
-      const b = await saveWithReconciliation({ content: eco, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "sesion" } as never, opts);
+      const b = await saveWithReconciliation({ content: echo, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "session" } as never, opts);
       expect(b.action).toBe("noop");
-      expect(b.entryId).toBe(a.entryId); // apunta a la que ya estaba, no a una nueva
+      expect(b.entryId).toBe(a.entryId); // it points at the one already there, not at a newer one
     } finally {
       setReconciler(null);
     }
 
-    // Y sin reconciliador no se inventa nada: se guarda, como antes.
-    const c = await saveWithReconciliation({ content: eco, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "sesion2" } as never, opts);
+    // And with no reconciler nothing is invented: it gets stored, as before.
+    const c = await saveWithReconciliation({ content: echo, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "session2" } as never, opts);
     expect(c.action).toBe("add");
   });
 
-  it("un eco de la sesión NO se vuelve a guardar aunque la original sea manual", async () => {
-    // El caso real: alguien captura algo a mano, un agente lo repite en su respuesta porque
-    // la memoria se lo acaba de contar, y la captura de la sesión lo destila otra vez. Antes
-    // se añadía, porque el NOOP exigía el mismo source_type y "manual" ≠ "agent_session".
+  it("a session echo is NOT stored again even when the original is manual", async () => {
+    // The real case: somebody captures something by hand, an agent repeats it in its answer
+    // because the memory just told it, and the session's capture distills it again. It used to
+    // be added, because the NOOP required the same source_type and "manual" != "agent_session".
     const p = await createProject(`IT Eco ${RID}`);
-    const content = "Las exportaciones se procesan de forma asíncrona con reintentos y backoff exponencial.";
+    const content = "The exports are processed asynchronously with retries and exponential backoff.";
     const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
 
     const manual = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "medium", sourceType: "manual" } as never, opts);
     expect(manual.action).toBe("add");
 
-    const eco = await saveWithReconciliation(
+    const echo = await saveWithReconciliation(
       { content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "claude:x" } as never,
       opts,
     );
-    expect(eco.action).toBe("noop");
-    expect(eco.entryId).toBe(manual.entryId); // apunta a la original, no crea otra
+    expect(echo.action).toBe("noop");
+    expect(echo.entryId).toBe(manual.entryId); // it points at the original, it does not create another
   });
 
-  it("la resolución de proyecto es canónica: reconcilia aunque cambie la capitalización", async () => {
+  it("project resolution is canonical: it reconciles even when the casing changes", async () => {
     const p = await createProject(`IT Canonical ${RID}`);
-    const content = "La cola de trabajos usa Redis con reintentos exponenciales.";
+    const content = "The job queue uses Redis with exponential retries.";
     const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
     const a = await saveWithReconciliation({ content, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "c1" } as never, opts);
     expect(a.action).toBe("add");
-    // Mismo proyecto con otra grafía: con el lookup por `name` exacto (bug) esto no
-    // encontraba el proyecto y devolvía "add" (dedup silenciosamente inoperante).
+    // The same project spelled differently: with the exact-`name` lookup (the bug) this did
+    // not find the project and returned "add" (dedup silently inoperative).
     const b = await saveWithReconciliation({ content, project: p.name.toLowerCase(), type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "c2" } as never, opts);
     expect(b.action).toBe("noop");
     expect(await isNearDuplicate(p.name.toUpperCase(), content)).toBe(true);
   });
 });
 
-describe("reclasificación diferida (maintain, BD real)", () => {
-  it("reclassifyProject re-tipa con LLM solo las entradas heurísticas, no las ya-LLM", async () => {
+describe("deferred reclassification (maintain, a real database)", () => {
+  it("reclassifyProject re-types with the LLM only the heuristic entries, not the already-LLM ones", async () => {
     const p = await createProject(`IT Reclass ${RID}`);
     const opts = { detectImprovements: false, skipEmbedding: false } as const;
-    // Entrada HEURÍSTICA (sin clasificador) → enrichedBy != 'llm'.
-    await saveContext({ content: "Cerramos que el panel usará diálogos en cascada.", project: p.name, type: "incident", sourceReference: "rc-h" } as never, { ...opts, useClassifier: false });
+    // A HEURISTIC entry (no classifier) -> enrichedBy != 'llm'.
+    await saveContext({ content: "We settled that the panel will use cascading dialogs.", project: p.name, type: "incident", sourceReference: "rc-h" } as never, { ...opts, useClassifier: false });
 
     let calls = 0;
     setClassifier(async () => {
@@ -242,54 +243,54 @@ describe("reclasificación diferida (maintain, BD real)", () => {
       return { type: "decision", title: "T", summary: "s", entities: [] };
     });
     try {
-      // Entrada ya clasificada por el LLM → no debe reprocesarse.
-      await saveContext({ content: "Otra cosa distinta clasificada por el LLM.", project: p.name, sourceReference: "rc-llm" } as never, { ...opts, useClassifier: true });
-      const callsAfterSaves = calls; // 1 (solo el save con useClassifier:true)
+      // An entry the LLM already classified → it must not be reprocessed.
+      await saveContext({ content: "Something else entirely, classified by the LLM.", project: p.name, sourceReference: "rc-llm" } as never, { ...opts, useClassifier: true });
+      const callsAfterSaves = calls; // 1 (only the save with useClassifier:true)
 
       const rc = await reclassifyProject(p.name);
-      expect(rc.scanned).toBe(1); // solo la heurística
+      expect(rc.scanned).toBe(1); // only the heuristic one
       expect(rc.reclassified).toBe(1);
-      expect(calls).toBe(callsAfterSaves + 1); // 1 llamada extra: solo la heurística
+      expect(calls).toBe(callsAfterSaves + 1); // 1 extra call: only the heuristic one
 
       const entries = await listEntries({ project: p.name });
-      expect(entries.find((e) => e.sourceReference === "rc-h")?.type).toBe("decision"); // re-tipada
-      expect(entries.find((e) => e.sourceReference === "rc-llm")?.type).toBe("decision"); // ya lo era, intacta
+      expect(entries.find((e) => e.sourceReference === "rc-h")?.type).toBe("decision"); // re-typed
+      expect(entries.find((e) => e.sourceReference === "rc-llm")?.type).toBe("decision"); // it already was, left untouched
     } finally {
       setClassifier(null);
     }
   });
 });
 
-describe("lint solo mira entradas vigentes (BD real)", () => {
-  it("no cuenta como duplicado un par que reconcile ya invalidó (histórica)", async () => {
+describe("lint only looks at current entries (a real database)", () => {
+  it("does not count as a duplicate a pair reconcile already invalidated (historical)", async () => {
     const p = await createProject(`IT Lint ${RID}`);
-    const content = "El worker de exportaciones usa RabbitMQ con reintentos y DLQ.";
+    const content = "The exports worker uses RabbitMQ with retries and a DLQ.";
     const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
-    // Dos entradas idénticas y VIGENTES → el lint las ve como duplicado.
+    // Two identical, CURRENT entries -> the lint sees them as a duplicate.
     const a = await saveContext({ content, project: p.name, type: "decision", sourceReference: "l1" } as never, opts);
     const b = await saveContext({ content, project: p.name, type: "decision", sourceReference: "l2" } as never, opts);
     const before = await lintProject(p.name);
     expect(before.duplicates.length).toBeGreaterThan(0);
     expect(before.totalEntries).toBe(2);
 
-    // Invalidar una (como hace reconcile) → deja de ser vigente.
+    // Invalidate one (the way reconcile does) → it stops being current.
     await invalidateEntry(b.entry.id, a.entry.id);
     const after = await lintProject(p.name);
-    expect(after.duplicates.length).toBe(0); // ya no cuenta la histórica
-    expect(after.totalEntries).toBe(1); // solo la vigente
-    expect(after.staleHistorical).toBeGreaterThan(0); // pero sí la reporta como histórica
+    expect(after.duplicates.length).toBe(0); // the historical one no longer counts
+    expect(after.totalEntries).toBe(1); // only the current one
+    expect(after.staleHistorical).toBeGreaterThan(0); // but it does report it as historical
   });
 });
 
-describe("integridad del grafo (UNIQUE parcial de aristas activas, D-5)", () => {
-  it("relate es idempotente: dos veces la misma arista → una sola fila", async () => {
+describe("graph integrity (the partial UNIQUE on active edges, D-5)", () => {
+  it("relate is idempotent: the same edge twice → a single row", async () => {
     const sql = getSql();
-    // Entidades no-proyecto (evitan la exclusión de `project` en resolveEntities).
+    // Non-project entities (they avoid resolveEntities' `project` exclusion).
     const a = await resolveEntity(sql, `Vendor A ${RID}`, "vendor");
     const b = await resolveEntity(sql, `Vendor B ${RID}`, "vendor");
 
     await relate(sql, { sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
-    // Segunda vez: con el UNIQUE parcial + ON CONFLICT DO NOTHING no lanza ni duplica.
+    // A second time: with the partial UNIQUE + ON CONFLICT DO NOTHING it neither throws nor duplicates.
     await relate(sql, { sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
 
     const rows = (await sql`
@@ -299,29 +300,30 @@ describe("integridad del grafo (UNIQUE parcial de aristas activas, D-5)", () => 
     expect(rows[0]!.n).toBe(1);
   });
 
-  it("resolveEntities fusiona entidades con aristas colisionantes sin lanzar (re-apuntado conflict-safe)", async () => {
+  it("resolveEntities merges entities with colliding edges without throwing (conflict-safe re-pointing)", async () => {
     const sql = getSql();
-    // Dos variantes del mismo nombre normalizado → se fusionan; un tercero como destino común.
+    // Two variants of the same normalised name -> they merge; a third one as a common target.
     const canon = await resolveEntity(sql, `Acme Corp ${RID}`, "vendor");
-    const dup = await resolveEntity(sql, `acme-corp ${RID}`, "vendor"); // misma norma → loser
+    const dup = await resolveEntity(sql, `acme-corp ${RID}`, "vendor"); // the same normalisation → loser
     const target = await resolveEntity(sql, `Payments Svc ${RID}`, "service");
 
-    // Ambas variantes tienen una arista al MISMO tercero con el MISMO tipo: tras re-apuntar
-    // `source_id` del loser a la canónica, chocaría con la de la canónica (UNIQUE parcial).
+    // Both variants have an edge to the SAME third entity with the SAME type: after re-pointing
+    // the loser's `source_id` to the canonical one, it would clash with the canonical one's
+    // (the partial UNIQUE).
     await relate(sql, { sourceId: canon.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
     await relate(sql, { sourceId: dup.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
 
-    // No debe lanzar (sin el fix del punto 3, el UPDATE viola relations_active_unique → excepción).
+    // It must not throw (without point 3's fix, the UPDATE violates relations_active_unique -> an exception).
     await expect(resolveEntities()).resolves.toBeDefined();
 
-    // Sobrevive UNA sola de las dos variantes (cuál de ellas es la canónica lo decide el
-    // desempate por enlaces/longitud/id, no el orden de filas: aquí ambas empatan, así que
-    // se asserta la propiedad —quedan fusionadas— y no el ganador concreto).
+    // Exactly ONE of the two variants survives (which one is canonical is decided by the
+    // links/length/id tie-break, not by row order: here both tie, so the property is asserted
+    // -- they end up merged -- rather than the specific winner).
     const survivors = (await sql`
       SELECT id FROM entities WHERE id IN (${canon.id}, ${dup.id})
     `) as unknown as { id: string }[];
     expect(survivors.length).toBe(1);
-    // Y queda UNA sola arista activa superviviente→target (las colisionantes se dedupan).
+    // And ONE single active survivor→target edge is left (the colliding ones are deduped).
     const edges = (await sql`
       SELECT count(*)::int AS n FROM relations
       WHERE source_id = ${survivors[0]!.id} AND target_id = ${target.id}
@@ -330,9 +332,9 @@ describe("integridad del grafo (UNIQUE parcial de aristas activas, D-5)", () => 
     expect(edges[0]!.n).toBe(1);
   });
 
-  it("resolveEntities NO fusiona homónimos de tipos distintos", async () => {
+  it("resolveEntities does NOT merge same-named entities of different types", async () => {
     const sql = getSql();
-    // Mismo nombre normalizado, tipos distintos: son cosas diferentes (backlog #7).
+    // The same normalised name, different types: they are different things (backlog #7).
     const vendor = await resolveEntity(sql, `Stripe ${RID}`, "vendor");
     const service = await resolveEntity(sql, `stripe ${RID}`, "service");
     expect(vendor.id).not.toBe(service.id);
@@ -342,18 +344,18 @@ describe("integridad del grafo (UNIQUE parcial de aristas activas, D-5)", () => 
     const rows = (await sql`
       SELECT id FROM entities WHERE id IN (${vendor.id}, ${service.id})
     `) as unknown as { id: string }[];
-    expect(rows.length).toBe(2); // ambas siguen vivas
+    expect(rows.length).toBe(2); // both are still alive
   });
 });
 
-describe("un proyecto se crea, no se extrae (BD real)", () => {
+describe("a project is created, not extracted (a real database)", () => {
   /**
-   * El clasificador ofrecía `project` entre los tipos de entidad, así que cualquier nombre propio
-   * acababa en `entities` con `type='project'`: la misma fila que un proyecto de verdad, pero
-   * sin slug ni dueño, y salía en `cortex link` y en la UI como si lo fuera. En una instalación
-   * real, 26 fantasmas frente a 10 proyectos (#135).
+   * The classifier offered `project` among the entity types, so any proper noun ended up in
+   * `entities` with `type='project'`: the same row as a real project, but with no slug and no
+   * owner, and it showed up in `cortex link` and in the UI as though it were one. In a real
+   * installation, 26 ghosts against 10 projects (#135).
    */
-  it("una entidad `project` devuelta por el LLM no se convierte en proyecto", async () => {
+  it("a `project` entity returned by the LLM does not become a project", async () => {
     const p = await createProject(`IT Ghost ${RID}`);
     const ghost = `ghost-svc-${RID}`;
     setClassifier(async () => ({
@@ -367,7 +369,7 @@ describe("un proyecto se crea, no se extrae (BD real)", () => {
     }));
     try {
       await saveContext(
-        { content: `El servicio ${ghost} consume la API de pagos.`, project: p.name, sourceReference: "ghost" } as never,
+        { content: `The ${ghost} service consumes the payments API.`, project: p.name, sourceReference: "ghost" } as never,
         { detectImprovements: false, useClassifier: true },
       );
     } finally {
@@ -375,20 +377,20 @@ describe("un proyecto se crea, no se extrae (BD real)", () => {
     }
     const sql = getSql();
     const rows = (await sql`SELECT type FROM entities WHERE canonical_name = ${ghost}`) as unknown as { type: string }[];
-    expect(rows.map((r) => r.type)).toEqual([]); // ni como project ni recolocada en otro tipo
+    expect(rows.map((r) => r.type)).toEqual([]); // neither as a project nor moved to another type
     const listed = await listAccessibleProjects(null);
     expect(listed.map((x) => x.name)).not.toContain(ghost);
-    expect(listed.find((x) => x.id === p.id)?.slug).toBeTruthy(); // el de verdad sigue ahí, con slug
-    // La entidad legítima de la misma respuesta sí entra.
+    expect(listed.find((x) => x.id === p.id)?.slug).toBeTruthy(); // the real one is still there, with a slug
+    // The legitimate entity from the same response does get in.
     const ok = (await sql`SELECT 1 FROM entities WHERE canonical_name = ${`stripe ${RID}`} AND type = 'integration'`) as unknown as unknown[];
     expect(ok.length).toBe(1);
   });
 
-  it("resolveEntity se niega a crear proyectos: eso es de createProject", async () => {
+  it("resolveEntity refuses to create projects: that is createProject's job", async () => {
     await expect(resolveEntity(getSql(), `IT Refused ${RID}`, "project")).rejects.toThrow(/createProject/);
   });
 
-  it("la base tampoco admite un proyecto sin slug, ni por SQL a mano", async () => {
+  it("the database does not accept a project with no slug either, not even through hand-written SQL", async () => {
     const sql = getSql();
     await expect(
       sql`INSERT INTO entities (name, canonical_name, type) VALUES (${`IT Raw ${RID}`}, ${`it raw ${RID}`}, 'project')`,
@@ -396,44 +398,44 @@ describe("un proyecto se crea, no se extrae (BD real)", () => {
   });
 });
 
-describe("el slug identifica al proyecto también al leer (BD real)", () => {
+describe("the slug identifies the project when reading too (a real database)", () => {
   /**
-   * El slug es la identidad del proyecto en todo el producto (`cortex link`, `.cortex.json`,
-   * `/p/<slug>`, la API), pero las lecturas resolvían `project` solo por nombre canónico, y
-   * `canonicalize` no toca los guiones: escribir con el slug acertaba (createProject mira el
-   * slug) y leer con el mismo valor decía «no encontrado» (#136).
+   * The slug is the project's identity across the whole product (`cortex link`, `.cortex.json`,
+   * `/p/<slug>`, the API), but reads resolved `project` by canonical name only, and
+   * `canonicalize` leaves hyphens alone: writing with the slug hit the right project
+   * (createProject looks at the slug) and reading with the same value said "not found" (#136).
    */
-  it("pack, búsqueda, decisiones y guard aceptan el slug igual que el nombre", async () => {
+  it("pack, search, decisions and the guard accept the slug just like the name", async () => {
     const p = await createProject(`IT Slug Read ${RID}`);
     expect(p.slug).toBe(`it-slug-read-${RID}`);
     const opts = { detectImprovements: false, useClassifier: false } as const;
-    // Escribir con el slug ya caía en el proyecto correcto; queda fijado para que no se mueva.
-    await saveContext({ content: "Decisión: las facturas se numeran por serie y año.", project: p.slug!, type: "decision", title: "Numeración de facturas" }, opts);
+    // Writing with the slug already landed on the right project; it is pinned so it does not move.
+    await saveContext({ content: "Decision: invoices are numbered by series and year.", project: p.slug!, type: "decision", title: "Invoice numbering" }, opts);
     expect((await listEntries({ project: p.name })).length).toBe(1);
 
-    // …y ahora leer con el slug ve lo mismo que leer con el nombre.
+    // …and now reading with the slug sees the same as reading with the name.
     const pack = await getContextPack(p.slug!);
     expect(pack.project).toBe(p.name);
-    expect(pack.sections.flatMap((s) => s.entries).map((e) => e.title)).toContain("Numeración de facturas");
+    expect(pack.sections.flatMap((s) => s.entries).map((e) => e.title)).toContain("Invoice numbering");
     expect((await listDecisions(p.slug!)).length).toBe(1);
     expect((await listEntries({ project: p.slug! })).length).toBe(1);
-    const hits = await searchContext({ query: "numeración facturas serie", project: p.slug!, limit: 5 });
-    expect(hits.map((h) => h.entry.title)).toContain("Numeración de facturas");
+    const hits = await searchContext({ query: "invoice numbering series", project: p.slug!, limit: 5 });
+    expect(hits.map((h) => h.entry.title)).toContain("Invoice numbering");
 
-    // El guard del MCP pasa por aquí con `{ name }`: con slug, con el nombre exacto y con otra
-    // capitalización del nombre tiene que responder lo mismo.
+    // The MCP's guard comes through here with `{ name }`: with the slug, with the exact name
+    // and with a different casing of the name it has to answer the same.
     for (const ref of [p.slug!, p.name, p.name.toUpperCase()]) {
       const access = await checkProjectAccess(null, { name: ref });
       expect(access.status, ref).toBe("ok");
       if (access.status === "ok") expect(access.project.id).toBe(p.id);
     }
-    expect((await checkProjectAccess(null, { name: `no-existe-${RID}` })).status).toBe("not_found");
+    expect((await checkProjectAccess(null, { name: `does-not-exist-${RID}` })).status).toBe("not_found");
   });
 
-  it("si un nombre coincide con el slug de otro proyecto, gana el slug: es la identidad", async () => {
-    const real = await createProject(`IT Colision ${RID}`); // slug it-colision-<rid>
-    const homonimo = await createProject(`IT-Colision-${RID}-x`); // otro proyecto, otro slug
-    expect(homonimo.id).not.toBe(real.id);
+  it("when a name matches another project's slug, the slug wins: it is the identity", async () => {
+    const real = await createProject(`IT Collision ${RID}`); // slug it-collision-<rid>
+    const homonym = await createProject(`IT-Collision-${RID}-x`); // another project, another slug
+    expect(homonym.id).not.toBe(real.id);
     const access = await checkProjectAccess(null, { name: real.slug! });
     expect(access.status === "ok" && access.project.id).toBe(real.id);
   });

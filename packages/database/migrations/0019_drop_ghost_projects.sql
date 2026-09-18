@@ -1,22 +1,22 @@
--- Fuera los proyectos fantasma: entidades `project` que nadie creó (#135).
+-- Out with the ghost projects: `project` entities nobody created (#135).
 --
--- El clasificador ofrecía `project` entre los tipos de entidad, así que cualquier nombre propio
--- que el LLM tomara por un proyecto —códigos de ticket, ramas, ficheros, microservicios— acababa
--- en `entities` con `type='project'`: la misma fila que representa a un proyecto de verdad, pero
--- sin slug ni dueño. Como «proyecto» era «todo lo que tenga type='project'», salían en
--- `cortex link` y en la UI mezclados con los reales. En una instalación real: 26 fantasmas
--- frente a 10 proyectos, todos con 0 entradas.
+-- The classifier offered `project` among the entity types, so any proper noun the LLM read as a
+-- project -- ticket codes, branches, files, microservices -- ended up in `entities` with
+-- `type='project'`: the same row that represents a real project, but with no slug and no owner.
+-- Since "project" meant "anything with type='project'", they showed up in `cortex link` and in
+-- the UI mixed in with the real ones. In one real installation: 26 ghosts against 10 projects,
+-- all of them with 0 entries.
 --
--- Mismo patrón que 0017 (ADR-0055), con una diferencia: `project` SÍ es un tipo legítimo, es la
--- fila del proyecto. Lo que distingue a un proyecto real de una mención es el slug, que desde
--- 0016 tiene todo proyecto creado a propósito. Así que:
---   1. Los `project` sin slug que no tienen nada colgando (ni entradas, ni hijos, ni miembros)
---      se borran con sus enlaces y relaciones. No se toca ninguna entrada.
---   2. Si alguno sí tuviera algo colgando —no debería, pero una migración no es sitio para
---      suponer— se le da slug como hizo 0016, en vez de borrarlo.
---   3. Un CHECK deja escrito el invariante: un `project` tiene slug, o no es un proyecto.
+-- Same pattern as 0017 (ADR-0055), with one difference: `project` IS a legitimate type, it is
+-- the project's row. What tells a real project from a mention is the slug, which since 0016
+-- every deliberately created project has. So:
+--   1. `project` rows with no slug and nothing hanging off them (no entries, no children, no
+--      members) are deleted along with their links and relations. No entry is touched.
+--   2. Should one of them actually have something hanging off it -- it should not, but a
+--      migration is no place for assumptions -- it is given a slug as 0016 did, not deleted.
+--   3. A CHECK writes the invariant down: a `project` has a slug, or it is not a project.
 
-CREATE TEMP TABLE fantasmas AS
+CREATE TEMP TABLE ghosts AS
   SELECT e.id
     FROM entities e
    WHERE e.type = 'project'
@@ -26,19 +26,19 @@ CREATE TEMP TABLE fantasmas AS
      AND NOT EXISTS (SELECT 1 FROM project_members pm WHERE pm.project_id = e.id);
 
 DELETE FROM relations r
- WHERE r.source_id IN (SELECT id FROM fantasmas)
-    OR r.target_id IN (SELECT id FROM fantasmas);
+ WHERE r.source_id IN (SELECT id FROM ghosts)
+    OR r.target_id IN (SELECT id FROM ghosts);
 
 DELETE FROM context_entry_entities cee
- WHERE cee.entity_id IN (SELECT id FROM fantasmas);
+ WHERE cee.entity_id IN (SELECT id FROM ghosts);
 
-DELETE FROM entities WHERE id IN (SELECT id FROM fantasmas);
+DELETE FROM entities WHERE id IN (SELECT id FROM ghosts);
 
-DROP TABLE fantasmas;
+DROP TABLE ghosts;
 
--- Los que sí tienen algo colgando conservan la fila y reciben slug (misma regla que 0016:
--- el nombre normalizado, con sufijo estable del id si colisiona).
-WITH candidatos AS (
+-- Those that do have something hanging off them keep their row and get a slug (same rule as
+-- 0016: the normalised name, with a stable id suffix when it collides).
+WITH candidates AS (
   SELECT id,
          cortex_slugify(name) AS base,
          row_number() OVER (PARTITION BY cortex_slugify(name) ORDER BY id) AS n
@@ -52,10 +52,11 @@ SET slug = CASE
                THEN c.base
              ELSE c.base || '-' || left(replace(e.id::text, '-', ''), 6)
            END
-FROM candidatos c
+FROM candidates c
 WHERE e.id = c.id;
 
--- Que no puedan volver ni por SQL a mano: un proyecto tiene slug, o no es un proyecto.
+-- So they cannot come back even through hand-written SQL: a project has a slug, or it is not
+-- a project.
 ALTER TABLE entities DROP CONSTRAINT IF EXISTS entities_project_has_slug_check;
 ALTER TABLE entities ADD CONSTRAINT entities_project_has_slug_check
   CHECK (type <> 'project' OR (slug IS NOT NULL AND slug <> ''));

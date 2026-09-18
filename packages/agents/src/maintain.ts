@@ -4,18 +4,18 @@ import { enrichProject } from "./enrich-project.js";
 import { shutdownObservability } from "./mastra.js";
 
 /**
- * Pipeline de MANTENIMIENTO de Cortex (loops §12), pensado para ejecutarse en server
- * de forma periódica (ver maintain-worker / cron). Encadena, de forma idempotente:
- *   1) reclassify (tipos heurísticos → LLM)  2) enrich (only-missing) por proyecto
- *   3) resolve-entities (global)             4) invalidación temporal (global)
- *   5) curate + reconcile por proyecto        6) lint (salud) por proyecto
+ * Cortex's MAINTENANCE pipeline (the loops of section 12), meant to run periodically on the
+ * server (see maintain-worker / cron). It chains, idempotently:
+ *   1) reclassify (heuristic types -> LLM)   2) enrich (only-missing) per project
+ *   3) resolve-entities (global)             4) temporal invalidation (global)
+ *   5) curate + reconcile per project        6) lint (health) per project
  *
- * El **sync de fuentes NO va aquí**: lo dispara el developer manualmente (tiene su
- * contexto/criterio). Esto es solo mantenimiento, que ocurre 100% en server.
+ * **Source sync does NOT belong here**: the developer triggers it by hand (they have the
+ * context and the judgement). This is maintenance only, which happens entirely on the server.
  *
- * Lock de exclusión (advisory lock en conexión reservada) para no solapar ejecuciones.
+ * An exclusion lock (an advisory lock on a reserved connection) keeps runs from overlapping.
  *
- * Uso CLI: tsx src/maintain.ts ["<Proyecto>"]   (sin arg = todos los proyectos)
+ * CLI usage: tsx src/maintain.ts ["<Project>"]   (no argument = every project)
  */
 
 const LOCK_KEY = 4242421;
@@ -41,55 +41,55 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
     const rows = (await conn`SELECT pg_try_advisory_lock(${LOCK_KEY}) AS locked`) as unknown as { locked: boolean }[];
     locked = rows[0]?.locked === true;
     if (!locked) {
-      console.log("[maintain] otro mantenimiento en curso (lock no adquirido) — saltando.");
+      console.log("[maintain] another maintenance run is in progress (lock not acquired) -- skipping.");
       return { ran: false, projects: [], enriched: {}, merged: 0, historical: 0, superseded: 0, promoted: 0, decayed: 0, deduped: 0, reclassified: 0 };
     }
 
     const projects = only ? [only] : (await listProjects()).map((p) => p.entity.name);
-    console.log(`[maintain] ${projects.length} proyecto(s): ${projects.join(", ")}`);
+    console.log(`[maintain] ${projects.length} project(s): ${projects.join(", ")}`);
 
-    // Reclasificación diferida: arregla con el LLM los tipos heurísticos de lo ingerido
-    // por conectores (decisiones/constraints/riesgos), sin re-ingerir. Antes de enrich/lint
-    // para que el grafo y los "huecos" se calculen sobre tipos correctos.
+    // Deferred reclassification: uses the LLM to fix the heuristic types of what the
+    // connectors ingested (decisions/constraints/risks), without re-ingesting. It runs before
+    // enrich/lint so the graph and the "gaps" are computed over correct types.
     let reclassified = 0;
     for (const p of projects) {
       const rc = await reclassifyProject(p);
       reclassified += rc.reclassified;
-      if (rc.reclassified) console.log(`  [reclassify] ${p}: ${rc.reclassified}/${rc.scanned} re-tipadas con LLM`);
+      if (rc.reclassified) console.log(`  [reclassify] ${p}: ${rc.reclassified}/${rc.scanned} re-typed with the LLM`);
     }
 
     const enriched: Record<string, number> = {};
     for (const p of projects) {
       const r = await enrichProject(p, { onlyMissing: true });
       enriched[p] = r.entities;
-      console.log(`  [enrich] ${p}: ${r.processed} nuevas → +${r.entities} ent, +${r.relations} rel (${r.skipped} ya, ${r.failed} fallos)`);
+      console.log(`  [enrich] ${p}: ${r.processed} new → +${r.entities} ent, +${r.relations} rel (${r.skipped} already done, ${r.failed} failed)`);
     }
 
     const res = await resolveEntities();
-    console.log(`  [resolve] ${res.merged} variantes fusionadas (${res.groups} grupos)`);
+    console.log(`  [resolve] ${res.merged} variants merged (${res.groups} groups)`);
 
     const t = await applyTemporalInvalidation();
-    console.log(`  [temporal] ${t.historical} históricas, ${t.superseded} superadas`);
+    console.log(`  [temporal] ${t.historical} marked historical, ${t.superseded} superseded`);
 
-    // Auto-curación (sin humano): promueve lo corroborado, decae lo viejo nunca corroborado.
+    // Auto-curation (no human): it promotes what was corroborated and decays the old and never corroborated.
     const c = await autoCurate();
-    console.log(`  [curate] ${c.promoted} promovidas (corroboradas), ${c.decayed} decaídas (obsoletas)`);
+    console.log(`  [curate] ${c.promoted} promoted (corroborated), ${c.decayed} decayed (obsolete)`);
 
-    // Reconciliación a posteriori: dedup de near-idénticos (incl. lo ingerido por
-    // conectores), reusando embeddings. Antes del lint para que reporte el estado limpio.
+    // After-the-fact reconciliation: dedup of near-identical entries (including what the
+    // connectors ingested), reusing embeddings. Before the lint so it reports the clean state.
     let deduped = 0;
     for (const p of projects) {
       const d = await reconcileProject(p);
       deduped += d.deduped;
-      if (d.deduped) console.log(`  [reconcile] ${p}: ${d.deduped} near-idénticos deduplicados`);
+      if (d.deduped) console.log(`  [reconcile] ${p}: ${d.deduped} near-identical entries deduplicated`);
     }
 
     for (const p of projects) {
       const l = await lintProject(p);
-      console.log(`  [lint] ${p}: ${l.contradictions.length} contradicciones · ${l.gaps.length} huecos · ${l.duplicates.length} dups · ${l.orphanEntities.length} huérfanas · ${l.lowConfidence} baja-conf`);
+      console.log(`  [lint] ${p}: ${l.contradictions.length} contradictions · ${l.gaps.length} gaps · ${l.duplicates.length} dups · ${l.orphanEntities.length} orphans · ${l.lowConfidence} low-confidence`);
     }
 
-    console.log("[maintain] completado.");
+    console.log("[maintain] done.");
     return { ran: true, projects, enriched, merged: res.merged, historical: t.historical, superseded: t.superseded, promoted: c.promoted, decayed: c.decayed, deduped, reclassified };
   } finally {
     if (locked) { try { await conn`SELECT pg_advisory_unlock(${LOCK_KEY})`; } catch { /* best-effort */ } }

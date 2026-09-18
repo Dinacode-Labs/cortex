@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { checkProjectAccess, getProjectGraph } from "@cortex/core";
 import type { WebEnv } from "../middleware/session.js";
 
-/** Datos del grafo. La página que los pinta es `/p/<slug>/map` (ADR-0050). */
+/** The graph's data. The page that paints it is `/p/<slug>/map` (ADR-0050). */
 export const graphRoutes = new Hono<WebEnv>();
 
 graphRoutes.get("/api/graph", async (c) => {
   const project = c.req.query("project") ?? "";
-  // Lo consume `/p/<slug>/map`: misma política, respuesta JSON.
+  // Consumed by `/p/<slug>/map`: the same policy, a JSON response.
   if (project) {
     const access = await checkProjectAccess(c.get("user")?.email ?? null, { name: project });
     if (access.status === "not_found") return c.json({ error: "project not found" }, 404);

@@ -2,18 +2,18 @@ import { backfillSessions, readCortexLink, useProjectServer, type CapturePlatfor
 import { requireCompatibleServer } from "../compat.js";
 
 /**
- * Backfill retroactivo: mete en la memoria las sesiones que ya tenías de un agente en este
- * repositorio. El cliente condensa cada transcript y el servidor lo destila (ADR-0025), así
- * que aquí no hace falta ninguna clave de modelo.
+ * Retroactive backfill: it pulls into the memory the sessions you already had with an agent in
+ * this repository. The client condenses each transcript and the server distills it (ADR-0025),
+ * so no model key is needed here.
  *
- * Lo normal es ejecutarlo **dentro del repositorio**, sin argumentos: el proyecto sale del
- * `.cortex.json` y la carpeta es el cwd. Pedir las dos cosas a mano era redundante —la
- * carpeta ya sabe a qué proyecto pertenece— y además invitaba a equivocarse escribiendo el
- * slug de otro proyecto.
+ * The normal way is to run it **inside the repository**, with no arguments: the project comes
+ * from `.cortex.json` and the folder is the cwd. Asking for both by hand was redundant -- the
+ * folder already knows which project it belongs to -- and it invited typing another project's
+ * slug by mistake.
  *
- *   cortex connect-sessions                      este repo, su proyecto, Claude Code
- *   cortex connect-sessions --platform pi        otro agente
- *   cortex connect-sessions <slug> <ruta> [ag]   forma explícita, para backfillear otra carpeta
+ *   cortex connect-sessions                       this repo, its project, Claude Code
+ *   cortex connect-sessions --platform pi         another agent
+ *   cortex connect-sessions <slug> <path> [agent] the explicit form, to backfill another folder
  */
 const PLATAFORMAS = ["claude", "codex", "opencode", "hermes", "pi"] as const;
 
@@ -28,9 +28,9 @@ export async function run(args: string[]): Promise<void> {
   const explicito = posicionales.length >= 2;
 
   const repoPath = explicito ? posicionales[1]! : process.env.INIT_CWD || process.cwd();
-  // El servidor sale de la CARPETA, no del por defecto (ADR-0033). Sin esto, un backfill en
-  // un repo que apunta a otro Cortex mandaría sus sesiones al servidor equivocado, que es
-  // exactamente lo que ese ADR existe para impedir.
+  // The server comes from the FOLDER, not from the default (ADR-0033). Without this, a
+  // backfill in a repo pointing at another Cortex would send its sessions to the wrong server,
+  // which is exactly what that ADR exists to prevent.
   const link = useProjectServer(repoPath) ?? readCortexLink(repoPath);
 
   const slug = explicito ? posicionales[0]! : link?.slug;

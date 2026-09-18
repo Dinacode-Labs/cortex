@@ -1,62 +1,62 @@
-# Desplegar Cortex
+# Deploying Cortex
 
-Un solo host con Docker. Caddy delante (TLS automático), y detrás la API, la UI, el MCP,
-Postgres, un worker de mantenimiento y copias de seguridad diarias.
+A single host with Docker. Caddy in front (automatic TLS), and behind it the API, the UI, the
+MCP, Postgres, a maintenance worker and daily backups.
 
 ```
-https://<dominio>/            → UI web
-https://<dominio>/api/*       → API (Caddy recorta el prefijo)
-https://<dominio>/mcp         → MCP por HTTP
-https://<dominio>/install.sh  → instalador del CLI
+https://<domain>/            → the web UI
+https://<domain>/api/*       → the API (Caddy strips the prefix)
+https://<domain>/mcp         → MCP over HTTP
+https://<domain>/install.sh  → the CLI installer
 ```
 
-Solo Caddy publica puertos. Postgres no se asoma a internet.
+Only Caddy publishes ports. Postgres never faces the internet.
 
-## Requisitos
+## Requirements
 
-- Docker ≥ 24 con Compose v2.
-- Un dominio apuntando al host (registro A/AAAA) y los puertos 80 y 443 abiertos. Caddy
-  necesita el 80 para validar el certificado, no solo el 443.
-- Acceso a la imagen: `docker login ghcr.io` si el paquete es privado.
+- Docker >= 24 with Compose v2.
+- A domain pointing at the host (an A/AAAA record) and ports 80 and 443 open. Caddy needs 80 to
+  validate the certificate, not just 443.
+- Access to the image: `docker login ghcr.io` when the package is private.
 
-## Primer despliegue
+## First deployment
 
 ```bash
 cp deploy/.env.example deploy/.env
-chmod 600 deploy/.env          # lleva la contraseña de Postgres y las claves del proveedor
-$EDITOR deploy/.env            # dominio, contraseñas, email, proveedores
+chmod 600 deploy/.env          # it holds Postgres's password and the providers' keys
+$EDITOR deploy/.env            # domain, passwords, email, providers
 
 docker compose -f deploy/docker-compose.yml pull
 docker compose -f deploy/docker-compose.yml up -d
-docker compose -f deploy/docker-compose.yml ps      # todo debe salir healthy
+docker compose -f deploy/docker-compose.yml ps      # everything must come up healthy
 ```
 
-Comprueba que responde:
+Check that it answers:
 
 ```bash
-curl -s https://<dominio>/api/health     # {"ok":true,"service":"cortex-server","db":"ok"}
-curl -s https://<dominio>/health         # la UI
-curl -si https://<dominio>/mcp | head -1 # 401: está vivo y pidiendo autenticación
+curl -s https://<domain>/api/health     # {"ok":true,"service":"cortex-server","db":"ok"}
+curl -s https://<domain>/health         # the UI
+curl -si https://<domain>/mcp | head -1 # 401: it is alive and asking for authentication
 ```
 
-Y desde el portátil de alguien:
+And from somebody's laptop:
 
 ```bash
-curl -fsSL https://<dominio>/install.sh | sh
-cortex link --create "Mi Proyecto"
+curl -fsSL https://<domain>/install.sh | sh
+cortex link --create "My Project"
 cortex doctor
 ```
 
-Lo que hay que revisar antes de dar por bueno el despliegue:
+What to check before calling the deployment good:
 
-- `CORTEX_AUTH_DOMAIN` no está vacío. Vacío significa que cualquier email del mundo puede
-  registrarse. El servidor lo avisa al arrancar; búscalo en los logs.
-- `CORTEX_EMAIL_PROVIDER` no es `log`. Con `log` el código de acceso solo se imprime en los
-  logs del servidor y nadie puede entrar.
-- `CORTEX_VERSION` es una versión concreta, no `latest`. Con `latest`, un reinicio puede
-  cambiar de versión sin que nadie lo haya decidido.
+- `CORTEX_AUTH_DOMAIN` is not empty. Empty means any email address in the world can register.
+  The server warns about it on startup; look for it in the logs.
+- `CORTEX_EMAIL_PROVIDER` is not `log`. With `log`, the sign-in code is only printed to the
+  server's logs and nobody can get in.
+- `CORTEX_VERSION` is a specific version, not `latest`. With `latest`, a restart can change
+  version without anybody having decided to.
 
-## Actualizar
+## Updating
 
 ```bash
 $EDITOR deploy/.env    # CORTEX_VERSION=0.2.0
@@ -64,66 +64,66 @@ docker compose -f deploy/docker-compose.yml pull
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-Las migraciones se aplican solas: el servicio `migrate` corre antes que los demás y estos
-esperan a que termine bien.
+The migrations apply themselves: the `migrate` service runs before the others and they wait for
+it to finish successfully.
 
-**Volver atrás no es simétrico.** Las migraciones solo van hacia delante, así que bajar la
-versión de la imagen funciona mientras la versión nueva no haya migrado el esquema. Si migró,
-hay que restaurar la copia anterior. Por eso conviene una copia manual antes de una
-actualización grande: `./deploy/backup-now.sh`.
+**Going back is not symmetric.** Migrations only move forward, so lowering the image's version
+works as long as the newer version has not migrated the schema. If it did, the previous backup
+has to be restored. That is why a manual backup before a large update is worth it:
+`./deploy/backup-now.sh`.
 
-## Copias de seguridad
+## Backups
 
-Diarias y automáticas, con retención de 7 días, 4 semanas y 6 meses, en el volumen
-`cortex-deploy_cortex-backups`.
-
-```bash
-./deploy/backup-now.sh     # una copia ahora mismo
-docker compose -f deploy/docker-compose.yml cp backup:/backups ./backups-copia
-```
-
-**Sácalas del host.** Una copia que vive en la misma máquina que la base de datos no protege
-del caso que más importa, que es perder la máquina.
-
-## Restaurar
+Daily and automatic, with a retention of 7 days, 4 weeks and 6 months, in the
+`cortex-deploy_cortex-backups` volume.
 
 ```bash
-./deploy/restore.sh <backup.sql.gz>                                # reemplaza la base real
-./deploy/restore.sh <backup.sql.gz> --target-db cortex_prueba      # simulacro, sin tocar nada
+./deploy/backup-now.sh     # a backup right now
+docker compose -f deploy/docker-compose.yml cp backup:/backups ./backups-copy
 ```
 
-**Haz el simulacro todos los meses.** Una copia que nunca se ha restaurado no es una copia,
-es un fichero. El simulacro restaura a una base aparte y cuenta las entradas.
+**Get them off the host.** A backup that lives on the same machine as the database does not
+protect against the case that matters most, which is losing the machine.
 
-## Rotar credenciales
+## Restoring
 
-- **Claves de LLM, embeddings y SMTP**: cámbialas en `deploy/.env` y
-  `docker compose -f deploy/docker-compose.yml up -d`. No hace falta migrar nada.
-- **Contraseña de Postgres**: cámbiala primero en la base
-  (`ALTER USER cortex WITH PASSWORD '…'`), y después en `POSTGRES_PASSWORD` y en
-  `DATABASE_URL`, que tienen que coincidir. Si solo cambias el `.env`, los servicios dejan de
-  conectar.
-- **Tokens de usuario**: se invalidan todos borrando la tabla de sesiones. Es lo que hay que
-  hacer si se filtra un token o se va alguien del equipo.
+```bash
+./deploy/restore.sh <backup.sql.gz>                             # replaces the real database
+./deploy/restore.sh <backup.sql.gz> --target-db cortex_drill    # a drill, touching nothing
+```
+
+**Run the drill every month.** A backup that has never been restored is not a backup, it is a
+file. The drill restores into a separate database and counts the entries.
+
+## Rotating credentials
+
+- **LLM, embedding and SMTP keys**: change them in `deploy/.env` and
+  `docker compose -f deploy/docker-compose.yml up -d`. Nothing needs migrating.
+- **Postgres's password**: change it in the database first
+  (`ALTER USER cortex WITH PASSWORD '…'`), and afterwards in `POSTGRES_PASSWORD` and in
+  `DATABASE_URL`, which have to match. If you only change the `.env`, the services stop
+  connecting.
+- **User tokens**: all of them are invalidated by clearing the sessions table. That is what to
+  do when a token leaks or somebody leaves the team.
 
 ## Logs
 
 ```bash
 docker compose -f deploy/docker-compose.yml logs -f server
-docker compose -f deploy/docker-compose.yml logs -f caddy   # certificados y peticiones
+docker compose -f deploy/docker-compose.yml logs -f caddy   # certificates and requests
 ```
 
-## Seguridad
+## Security
 
-- Solo Caddy publica puertos; Postgres y las apps viven en la red interna.
-- Con `NODE_ENV=production` la cookie de sesión es `secure`, así que la UI **solo** funciona
-  por HTTPS.
-- Cabeceras de seguridad puestas por las tres apps, y HSTS por Caddy.
-- Los contenedores corren como usuario `node`, no como root.
-- `deploy/.env` lleva secretos: `chmod 600` y nunca al repositorio.
+- Only Caddy publishes ports; Postgres and the apps live on the internal network.
+- With `NODE_ENV=production` the session cookie is `secure`, so the UI works **only** over
+  HTTPS.
+- Security headers set by all three apps, and HSTS by Caddy.
+- The containers run as the `node` user, not as root.
+- `deploy/.env` holds secrets: `chmod 600` and never into the repository.
 
-## Desarrollo
+## Development
 
-Esto es el despliegue. Para trabajar en el código, `pnpm db:up` levanta solo Postgres en el
-puerto 5433 y todo lo demás corre en local. Los dos composes están aislados a propósito: sus
-volúmenes no se tocan, y un `down -v` en uno no se lleva los datos del otro.
+This is the deployment. To work on the code, `pnpm db:up` brings up Postgres alone on port 5433
+and everything else runs locally. The two composes are deliberately isolated: their volumes
+never touch, and a `down -v` in one does not take the other's data with it.

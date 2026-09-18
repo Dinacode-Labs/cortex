@@ -4,17 +4,18 @@ import { canonicalize } from "./text.js";
 import { rowToEntity, type Row } from "./map.js";
 
 /**
- * Busca o crea una entidad por (tipo, nombre canónico). Base de la resolución de
- * entidades (§12.4): distintas grafías del mismo nombre convergen al canónico.
+ * Finds or creates an entity by (type, canonical name). The basis of entity resolution
+ * (section 12.4): different spellings of the same name converge on the canonical one.
  */
 export async function resolveEntity(
   sql: Sql,
   name: string,
   type: EntityType,
 ): Promise<Entity> {
-  // Un proyecto no se «resuelve»: se crea con slug y dueño en `createProject`. Por aquí
-  // nacían los fantasmas de #135 (26 en una instalación real), y la base ya no los admite.
-  if (type === "project") throw new Error(`resolveEntity: "${name}" es un proyecto; usa createProject.`);
+  // A project is not "resolved": it is created with a slug and an owner in `createProject`.
+  // The ghosts of #135 were born here (26 in one real installation), and the database no
+  // longer accepts them.
+  if (type === "project") throw new Error(`resolveEntity: "${name}" is a project; use createProject.`);
   const canonical = canonicalize(name);
   const rows = (await sql`
     INSERT INTO entities (name, canonical_name, type)
@@ -25,7 +26,7 @@ export async function resolveEntity(
   return rowToEntity(rows[0]!);
 }
 
-/** Enlaza una entrada de contexto con una entidad que menciona. */
+/** Links a context entry with an entity it mentions. */
 export async function linkEntryToEntity(
   sql: Sql,
   contextEntryId: string,
@@ -39,10 +40,10 @@ export async function linkEntryToEntity(
 }
 
 /**
- * Crea una relación entre dos entidades/entradas si no existe una equivalente
- * vigente. Atómico y sin race TOCTOU: se apoya en el índice UNIQUE parcial
+ * Creates a relation between two entities/entries unless an equivalent current one exists.
+ * Atomic and free of a TOCTOU race: it leans on the partial UNIQUE index
  * `relations_active_unique` (source_id, target_id, relation_type) WHERE valid_to IS NULL.
- * El ON CONFLICT debe replicar ese mismo predicado parcial para casar con el índice.
+ * The ON CONFLICT must repeat that same partial predicate to match the index.
  */
 export async function relate(
   sql: Sql,

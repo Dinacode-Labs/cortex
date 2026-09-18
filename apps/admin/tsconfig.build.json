@@ -1,5 +1,5 @@
 {
-  "$comment": "Build real (tsc -b). El tsconfig.json de al lado sigue siendo solo typecheck.",
+  "$comment": "The real build (tsc -b). The tsconfig.json next to it stays typecheck-only.",
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "composite": true,

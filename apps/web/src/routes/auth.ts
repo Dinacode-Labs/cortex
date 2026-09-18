@@ -3,13 +3,13 @@ import { deleteCookie, setCookie } from "hono/cookie";
 import { redeemUiTicket } from "@cortex/core";
 import { loginPage, type WebEnv } from "../middleware/session.js";
 
-const WEB_COOKIE_TTL = 60 * 60 * 24 * 30; // 30 días
+const WEB_COOKIE_TTL = 60 * 60 * 24 * 30; // 30 days
 
-/** Rutas EXENTAS del gate de sesión (se montan antes que él en app.ts). */
+/** Routes EXEMPT from the session gate (mounted before it in app.ts). */
 export const authRoutes = new Hono<WebEnv>();
 
-// Handshake CLI → cookie de sesión. `cortex ui` abre /auth/cli?ticket=… (un solo uso):
-// el ticket se canjea por una sesión web nueva (el token de CLI nunca viaja en la URL).
+// CLI handshake -> session cookie. `cortex ui` opens /auth/cli?ticket=... (single use): the
+// ticket is exchanged for a fresh web session (the CLI token never travels in the URL).
 authRoutes.get("/auth/cli", async (c) => {
   const ticket = c.req.query("ticket");
   const session = ticket ? ((await redeemUiTicket(ticket))?.token ?? null) : null;
@@ -19,7 +19,7 @@ authRoutes.get("/auth/cli", async (c) => {
     sameSite: "Lax",
     path: "/",
     maxAge: WEB_COOKIE_TTL,
-    secure: process.env.NODE_ENV === "production", // en producción la cookie solo viaja por HTTPS
+    secure: process.env.NODE_ENV === "production", // in production the cookie only travels over HTTPS
   });
   return c.redirect("/");
 });

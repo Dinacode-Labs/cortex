@@ -5,11 +5,11 @@ import { layout, type Html } from "../views/layout.js";
 import type { WebEnv } from "../middleware/session.js";
 
 /**
- * Coste / uso de IA: tokens y coste por operación/modelo + trazas (ADR-0016).
+ * AI cost / usage: tokens and cost per operation/model, plus traces (ADR-0016).
  *
- * Vive bajo `/admin` y **solo lo ven los admins** (ADR-0050). Es una cifra de toda la
- * instalación, sin filtrar por proyecto: lo que gasta la empresa en inferencia no es asunto de
- * cada developer que entra a revisar una decisión, y antes lo era.
+ * It lives under `/admin` and **only admins see it** (ADR-0050). It is a figure for the whole
+ * installation, unfiltered by project: what the company spends on inference is not the business
+ * of every developer who drops in to review a decision, and it used to be.
  */
 export const usageRoutes = new Hono<WebEnv>();
 
@@ -25,8 +25,8 @@ usageRoutes.get("/admin/usage", async (c) => {
   const traces = await getRecentTraces(12);
   const num = (n: number) => n.toLocaleString("en-US");
   const money = (n: number) => (n > 0 ? `$${n.toFixed(4)}` : "—");
-  // raw(): fragmentos de ATRIBUTOS literales de este fichero (estilos de tabla
-  // repetidos); no contienen datos de usuario/BD.
+  // raw(): literal ATTRIBUTE fragments from this file (repeated table styles); they contain no
+  // user or database data.
   const th = raw('style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted)"');
   const td = raw('style="padding:6px 10px;border-bottom:1px solid var(--color-border)"');
   const tdr = raw('style="padding:6px 10px;border-bottom:1px solid var(--color-border);text-align:right;font-variant-numeric:tabular-nums"');
@@ -79,5 +79,5 @@ usageRoutes.get("/admin/usage", async (c) => {
     <div class="panel"><h2>Latest calls</h2>${table(html`<tr><th ${th}>Date</th><th ${th}>Operation</th><th ${th}>Model</th><th ${th} style="text-align:right">Tokens</th><th ${th} style="text-align:right">Cost</th></tr>`, recentRows)}</div>
     <h2 style="margin-top:28px">Recent traces <span class="sub">· AI tracing, as a span tree</span></h2>
     ${tracesHtml}`;
-  return c.html(layout("AI cost", body, { user, activo: "admin" }));
+  return c.html(layout("AI cost", body, { user, active: "admin" }));
 });

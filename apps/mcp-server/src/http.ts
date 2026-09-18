@@ -5,16 +5,15 @@ import { wireLlm } from "@cortex/agents";
 import { createMcpHttpApp } from "./http-app.js";
 
 /**
- * Entrypoint fino del MCP por HTTP: entorno + LLM + servidor. La app (sesiones,
- * auth y rutas) vive en `http-app.ts` sin side effects. El CLI (`cortex mcp-http`)
- * importa ESTE fichero por ruta: importarlo arranca el servidor (side effect
- * deliberado del entrypoint).
+ * Thin entrypoint for MCP over HTTP: environment + LLM + server. The app (sessions, auth and
+ * routes) lives in `http-app.ts` with no side effects. The CLI (`cortex mcp-http`) imports
+ * THIS file by path: importing it starts the server (the entrypoint's deliberate side effect).
  */
 loadEnv();
 wireLlm();
 
 const app = createMcpHttpApp();
-const requireAuth = process.env.CORTEX_MCP_AUTH !== "off"; // solo para el log (la app lo lee al construirse)
+const requireAuth = process.env.CORTEX_MCP_AUTH !== "off"; // for the log only (the app reads it when it is built)
 const port = Number(process.env.CORTEX_MCP_PORT ?? "8788");
 const hostname = process.env.CORTEX_BIND_HOST ?? "127.0.0.1";
 serve({ fetch: app.fetch, port, hostname }, (info) => {

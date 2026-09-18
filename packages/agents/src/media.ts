@@ -10,19 +10,19 @@ import type { MediaExtractorHooks } from "@cortex/core";
 const execFileAsync = promisify(execFile);
 
 /**
- * Extractor multimodal (capa LLM): caption de imágenes y OCR de PDF escaneado con un
- * modelo de VISIÓN (getVisionConfig: mismo proveedor de chat, modelo propio vía
- * CORTEX_VISION_MODEL), y transcripción de audio/vídeo con un STT (getSttConfig:
- * endpoint PROPIO, OpenAI/whisper por defecto — OpenRouter no sirve STT). Se inyecta en
- * @cortex/core vía setMediaExtractor (cableado en wireLlm), manteniendo core determinista.
- * Ver research/multimodal-ingestion.md y ADR-0023. Cada capacidad se ofrece solo si su
- * config existe (visión y STT son independientes). */
+ * Multimodal extractor (the LLM layer): image captioning and scanned-PDF OCR with a VISION
+ * model (getVisionConfig: the same chat provider, its own model through CORTEX_VISION_MODEL),
+ * and audio/video transcription with an STT (getSttConfig: its OWN endpoint, OpenAI/whisper by
+ * default -- OpenRouter does not serve STT). It is injected into @cortex/core through
+ * setMediaExtractor (wired in wireLlm), which keeps core deterministic.
+ * See research/multimodal-ingestion.md and ADR-0023. Each capability is only offered when its
+ * config exists (vision and STT are independent). */
 
-// Formatos que el endpoint whisper acepta directamente; el resto (opus de WhatsApp,
-// amr, vídeo…) se transcodifican con ffmpeg a mp3 mono 16 kHz antes de transcribir.
+// Formats the whisper endpoint accepts directly; everything else (WhatsApp opus, amr, video)
+// is transcoded with ffmpeg to mono 16 kHz mp3 before transcribing.
 const WHISPER_OK = new Set(["mp3", "m4a", "wav", "ogg", "oga", "flac", "mpga", "webm", "mp4", "mpeg"]);
 
-/** Llamada de visión (imagen → texto) genérica, con reintentos en 429/5xx. */
+/** A generic vision call (image -> text), with retries on 429/5xx. */
 async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cfg: LlmConfig): Promise<string | null> {
   const body = JSON.stringify({
     model: cfg.model,
@@ -30,8 +30,8 @@ async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cf
     messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }],
   });
   const headers = { authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json", "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
-  // Ocupa un slot del proveedor durante toda la llamada, reintentos incluidos: la visión
-  // compite por el mismo límite de concurrencia por API key que el chat y los embeddings.
+  // It holds a provider slot for the whole call, retries included: vision competes for the
+  // same per-API-key concurrency limit as chat and embeddings.
   return withLlmSlot(async () => {
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
@@ -42,7 +42,7 @@ async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cf
         }
         if (res.status !== 429 && res.status < 500) return null;
       } catch {
-        /* red */
+        /* network */
       }
       await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
     }
@@ -51,12 +51,12 @@ async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cf
 }
 
 const CAPTION_PROMPT =
-  "Describe en español el contenido de esta imagen para indexarla en una memoria de proyecto software: qué muestra, textos/etiquetas/campos visibles, y si es un diagrama o captura, su propósito. Conciso (2-4 frases). Si es decorativa o un icono sin información, responde solo: IRRELEVANTE.";
+  "Describe this image's content in Spanish, so it can be indexed in a software project's memory: what it shows, any visible text/labels/fields, and, if it is a diagram or a screenshot, its purpose. Be concise (2-4 sentences). If it is decorative or an icon carrying no information, answer only: IRRELEVANT.";
 const OCR_PROMPT =
-  "Transcribe TODO el texto visible de esta página de documento, en orden de lectura y en su idioma original. Devuelve solo el texto (sin comentarios). Si no hay texto legible, responde solo: SIN_TEXTO.";
+  "Transcribe ALL the visible text on this document page, in reading order and in its original language. Return the text only (no commentary). If there is no legible text, answer only: NO_TEXT.";
 
-// Cache de captions por content-hash (durante el proceso): no llamamos al modelo de
-// visión dos veces para la misma imagen (frecuente en exports con imágenes repetidas).
+// Caption cache keyed by content hash (for the lifetime of the process): the vision model is
+// never called twice for the same image (common in exports with repeated images).
 const captionCache = new Map<string, string | null>();
 
 async function captionImage(path: string, ext: string, cfg: LlmConfig): Promise<string | null> {
@@ -65,20 +65,20 @@ async function captionImage(path: string, ext: string, cfg: LlmConfig): Promise<
   if (captionCache.has(hash)) return captionCache.get(hash)!; // imagen ya vista → reusar
   const mime = ext === "jpg" ? "jpeg" : ext;
   const c = await visionCall(`data:image/${mime};base64,${bytes.toString("base64")}`, CAPTION_PROMPT, 240, cfg);
-  const v = c && !/^IRRELEVANTE/i.test(c) ? c : null;
+  const v = c && !/^IRRELEVANT/i.test(c) ? c : null;
   captionCache.set(hash, v);
   return v;
 }
 
-/** OCR de una imagen (página renderizada) vía el modelo de visión. */
+/** OCR of an image (a rendered page) through the vision model. */
 async function ocrImage(path: string, cfg: LlmConfig): Promise<string | null> {
   const t = await visionCall(`data:image/png;base64,${readFileSync(path).toString("base64")}`, OCR_PROMPT, 1500, cfg);
-  return t && !/^SIN_TEXTO/i.test(t) ? t : null;
+  return t && !/^NO_TEXT/i.test(t) ? t : null;
 }
 
 const MAX_OCR_PAGES = getEnvNum("CORTEX_OCR_MAX_PAGES", 10);
 
-/** OCR de un PDF escaneado: renderiza páginas con pdftoppm (poppler) y las pasa por visión. */
+/** OCR of a scanned PDF: it renders pages with pdftoppm (poppler) and runs them through vision. */
 async function ocrPdf(path: string, cfg: LlmConfig): Promise<string | null> {
   const dir = mkdtempSync(join(tmpdir(), "cortex-ocr-"));
   try {
@@ -91,7 +91,7 @@ async function ocrPdf(path: string, cfg: LlmConfig): Promise<string | null> {
     }
     return parts.join("\n\n").trim() || null;
   } catch {
-    return null; // pdftoppm no disponible o fallo
+    return null; // pdftoppm unavailable, or it failed
   } finally {
     try {
       rmSync(dir, { recursive: true, force: true });
@@ -102,16 +102,16 @@ async function ocrPdf(path: string, cfg: LlmConfig): Promise<string | null> {
 }
 
 let tmpCounter = 0;
-const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // límite del endpoint whisper
+const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // the whisper endpoint's limit
 const SEGMENT_SEC = getEnvNum("CORTEX_AUDIO_SEGMENT_SEC", 600); // 10 min (mono 16k 64k ≈ 5 MB/chunk)
 
-/** POST de un buffer de audio a whisper, con reintentos en 429/5xx. */
+/** POSTs an audio buffer to whisper, with retries on 429/5xx. */
 async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> {
   const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
   return withLlmSlot(async () => {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const fd = new FormData(); // se reconstruye en cada intento (el body se consume)
+        const fd = new FormData(); // rebuilt on every attempt (the body gets consumed)
         fd.append("file", new Blob([buf]), "audio.mp3");
         fd.append("model", cfg.model);
         fd.append("response_format", "json");
@@ -123,7 +123,7 @@ async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> 
         }
         if (res.status !== 429 && res.status < 500) return null;
       } catch {
-        /* red */
+        /* network */
       }
       await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     }
@@ -131,9 +131,9 @@ async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> 
   });
 }
 
-/** Transcribe audio/vídeo con whisper. Vídeo y formatos no soportados (opus de WhatsApp,
- * amr…) se transcodifican con ffmpeg a mp3 mono 16 kHz. Los audios largos (> límite de
- * whisper) se TROCEAN con ffmpeg en segmentos y se transcriben por partes. */
+/** Transcribes audio/video with whisper. Video and unsupported formats (WhatsApp opus, amr)
+ * are transcoded with ffmpeg to mono 16 kHz mp3. Long audio (over whisper's limit) is SPLIT
+ * with ffmpeg into segments and transcribed piece by piece. */
 async function transcribe(path: string, ext: string, kind: "audio" | "video", cfg: SttConfig): Promise<string | null> {
   let audioPath = path;
   let temp: string | null = null;
@@ -143,7 +143,7 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
       await execFileAsync("ffmpeg", ["-i", path, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", "-y", temp], { maxBuffer: 1 << 26 });
       audioPath = temp;
     } catch {
-      return null; // ffmpeg no disponible o fichero ilegible
+      return null; // ffmpeg unavailable, or an unreadable file
     }
   }
   let segDir: string | null = null;
@@ -151,7 +151,7 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
     if (statSync(audioPath).size <= MAX_AUDIO_BYTES) {
       return await postWhisper(readFileSync(audioPath), cfg);
     }
-    // Largo: trocear en segmentos mono 16 kHz mp3 y transcribir cada uno.
+    // Long: split into mono 16 kHz mp3 segments and transcribe each one.
     segDir = mkdtempSync(join(tmpdir(), "cortex-seg-"));
     try {
       await execFileAsync(
@@ -187,8 +187,8 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
   }
 }
 
-/** Factoría del extractor multimodal. Visión y STT son independientes: se ofrece cada
- * capacidad solo si su config existe. Null si no hay ninguna. */
+/** Factory for the multimodal extractor. Vision and STT are independent: each capability is
+ * only offered when its config exists. Null when there is neither. */
 export function createMediaExtractor(): MediaExtractorHooks | null {
   const vision = getVisionConfig();
   const stt = getSttConfig();

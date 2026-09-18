@@ -6,20 +6,20 @@ export type Sql = postgres.Sql;
 let client: Sql | undefined;
 
 /**
- * Cliente Postgres compartido (postgres.js). Singleton perezoso para que importar
- * este módulo no abra conexiones hasta que se use.
+ * Shared Postgres client (postgres.js). A lazy singleton, so importing this module opens no
+ * connections until it is actually used.
  */
 export function getSql(): Sql {
   if (!client) {
     client = postgres(getDatabaseUrl(), {
-      // pgvector viaja como texto ('[1,2,3]'); lo formateamos/parseamos a mano.
+      // pgvector travels as text ('[1,2,3]'); we format/parse it by hand.
       transform: { undefined: null },
     });
   }
   return client;
 }
 
-/** Cierra la conexión. Útil en scripts puntuales (migrate, seed). */
+/** Closes the connection. Useful in one-off scripts (migrate, seed). */
 export async function closeSql(): Promise<void> {
   if (client) {
     await client.end();
@@ -27,14 +27,14 @@ export async function closeSql(): Promise<void> {
   }
 }
 
-/** Serializa un vector JS al literal que entiende pgvector: '[1,2,3]'. */
+/** Serialises a JS vector into the literal pgvector understands: '[1,2,3]'. */
 export function toVectorLiteral(vec: readonly number[]): string {
   return `[${vec.join(",")}]`;
 }
 
 /**
- * ¿Responde la base de datos? Con tope de tiempo, porque un `/health` que se queda colgado
- * es peor que uno que devuelve 503: el orquestador no reinicia nada y nadie se entera.
+ * Is the database answering? With a time cap, because a `/health` that hangs is worse than
+ * one returning 503: the orchestrator restarts nothing and nobody finds out.
  */
 export async function pingDatabase(timeoutMs = 2000): Promise<boolean> {
   try {

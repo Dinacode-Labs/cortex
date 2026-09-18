@@ -1,6 +1,6 @@
-/* Mapa del conocimiento (sección `/p/<slug>/map`): pinta /api/graph con vis-network.
-   El proyecto y el filtro los deja el servidor en data-* del contenedor — sin
-   interpolación del servidor dentro del <script>, y sin depender de la URL. */
+/* The knowledge map (the `/p/<slug>/map` section): it paints /api/graph with vis-network.
+   The project and the filter are left by the server in the container's data-* attributes --
+   no server interpolation inside the <script>, and no dependence on the URL. */
 const COLORS = {
   client:"#cf222e", project:"#8250df", service:"#0969da", integration:"#1f883d",
   vendor:"#bf3989", technology:"#9a6700", module:"#bc4c00", person:"#57606a",
@@ -34,12 +34,12 @@ function colorFor(group){
     dashes: e.kind==="mention",
   }));
   const data={nodes:new vis.DataSet(nodes), edges:new vis.DataSet(edges)};
-  const red=new vis.Network(document.getElementById("net"), data, {
+  const network=new vis.Network(document.getElementById("net"), data, {
     physics:{barnesHut:{gravitationalConstant:-8000, springLength:120, springConstant:0.03}, stabilization:{iterations:200}},
     interaction:{hover:true, tooltipDelay:120},
     nodes:{borderWidth:1},
   });
-  red.on("click", p => {
+  network.on("click", p => {
     if(!p.nodes.length) return;
     const n = data.nodes.get(p.nodes[0]);
     if(n && n._kind==="entry") window.location = "/entry/"+n.id;
@@ -48,5 +48,5 @@ function colorFor(group){
   document.getElementById("legend").innerHTML =
     "Nodes: "+g.nodes.length+" · Edges: "+g.edges.length+" &nbsp; | &nbsp; " +
     types.map(t=>'<span style="color:'+colorFor(t)+'">●</span> '+t).join(" &nbsp; ") +
-    ' &nbsp; <span style="color:'+entryColor+'">▦</span> entrada';
+    ' &nbsp; <span style="color:'+entryColor+'">▦</span> entry';
 })();

@@ -9,8 +9,8 @@ import { piAdapter } from "./pi.js";
 import { AGENT_IDS, emptyReport, type AgentAdapter, type AgentId, type SetupCtx, type SetupReport } from "./types.js";
 
 /**
- * Orquestador de `cortex setup`: elige adaptadores, los ejecuta y limpia el legado una sola
- * vez al final (el shim viejo no es de ningún agente en concreto).
+ * `cortex setup`'s orchestrator: it picks adapters, runs them and cleans up the legacy install
+ * once at the end (the old shim belongs to no agent in particular).
  */
 
 const ADAPTERS: Partial<Record<AgentId, AgentAdapter>> = {
@@ -21,7 +21,7 @@ const ADAPTERS: Partial<Record<AgentId, AgentAdapter>> = {
   pi: piAdapter,
 };
 
-/** Binario que delata a cada agente, también para los que aún no tienen adaptador. */
+/** The binary that gives each agent away, including those with no adapter yet. */
 const AGENT_BINS: Record<AgentId, string> = {
   "claude-code": "claude",
   opencode: "opencode",
@@ -55,7 +55,7 @@ export function getAdapter(id: AgentId): AgentAdapter | undefined {
   return ADAPTERS[id];
 }
 
-/** Agentes presentes en la máquina, tengan adaptador o no. */
+/** Agents present on the machine, adapter or not. */
 export function detectAgents(ctx: SetupCtx): AgentId[] {
   return AGENT_IDS.filter((id) => ctx.detect(AGENT_BINS[id]));
 }
@@ -65,7 +65,7 @@ export function agentBin(id: AgentId): string {
 }
 
 export interface RunResult {
-  /** El agente, o «sistema» para lo que no pertenece a ninguno (el shim antiguo). */
+  /** The agent, or "system" for what belongs to none of them (the old shim). */
   id: AgentId | "sistema";
   report: SetupReport;
 }
@@ -82,7 +82,7 @@ export async function runSetup(agents: AgentId[], ctx: SetupCtx): Promise<RunRes
     }
     out.push({ id, report: ctx.remove ? await adapter.remove(ctx) : await adapter.apply(ctx) });
   }
-  // El legado es del sistema, no de un agente: se limpia una vez y solo al instalar.
+  // The legacy install belongs to the system, not to an agent: cleaned once, and only on install.
   if (!ctx.remove) {
     const report = emptyReport();
     cleanLegacy(ctx, report);

@@ -3,24 +3,25 @@ import { MARKETPLACE, MARKETPLACE_SOURCE, PLUGIN } from "./claude-code.js";
 import { emptyReport, type AgentAdapter, type AgentStatus, type SetupCtx, type SetupReport } from "./types.js";
 
 /**
- * Codex. Resulta que lee **el mismo marketplace** que Claude Code —el
- * `.claude-plugin/marketplace.json` de este repo— y acepta el mismo plugin: se instala con
- * `codex plugin add` y copia hooks, skill y comando. Comprobado con `codex plugin list`
- * contra el repo local.
+ * Codex. As it turns out, it reads **the same marketplace** as Claude Code -- this repo's
+ * `.claude-plugin/marketplace.json` -- and accepts the same plugin: it is installed with
+ * `codex plugin add` and copies hooks, skill and command. Verified with `codex plugin list`
+ * against the local repo.
  *
- * Lo único que no coge del plugin es el MCP, que se registra aparte con `codex mcp add`.
+ * The only thing it does not take from the plugin is the MCP, registered separately with
+ * `codex mcp add`.
  *
- * Sus eventos de hook son los mismos que los de Claude (SessionStart, SessionEnd,
- * PreCompact…), y por eso el hook de captura no lleva el agente cableado: lo deduce de la
- * ruta del transcript. Un solo plugin para los dos.
+ * Its hook events are the same as Claude's (SessionStart, SessionEnd, PreCompact...), which is
+ * why the capture hook does not have the agent hardcoded: it derives it from the transcript's
+ * path. One plugin for both.
  *
- * Queda el legado de `cortex sync`, que escribía a mano en `config.toml` un
- * `[[hooks.SessionStart]]` y un `[mcp_servers.cortex]` apuntando al repo clonado.
+ * What remains is `cortex sync`'s legacy, which wrote a `[[hooks.SessionStart]]` and a
+ * `[mcp_servers.cortex]` into `config.toml` by hand, pointing at the cloned repo.
  */
 
 const CONFIG = (ctx: SetupCtx): string => homeFile(ctx, ".codex/config.toml");
 
-/** ¿Está el MCP `cortex` registrado y apuntando al CLI (y no al repo clonado)? */
+/** Is the `cortex` MCP registered and pointing at the CLI (rather than the cloned repo)? */
 function mcpState(ctx: SetupCtx): "missing" | "ok" | "legacy" {
   try {
     const out = ctx.exec("codex", ["mcp", "get", "cortex"]);
@@ -31,26 +32,26 @@ function mcpState(ctx: SetupCtx): "missing" | "ok" | "legacy" {
 }
 
 /**
- * Quita del `config.toml` los bloques que escribió `cortex sync`: el `[mcp_servers.cortex]`
- * que apuntaba al repo clonado y el `[[hooks.SessionStart]]` con el comando viejo.
+ * Removes from `config.toml` the blocks `cortex sync` wrote: the `[mcp_servers.cortex]` that
+ * pointed at the cloned repo and the `[[hooks.SessionStart]]` with the old command.
  *
- * Se hace partiendo el fichero en bloques por línea en vez de con una expresión regular:
- * los valores TOML llevan corchetes (`args = [ ... ]`) y cualquier patrón que busque «hasta
- * el siguiente [» se corta a mitad de un array. Un parser de TOML completo, para borrar dos
- * bloques, no compensa.
+ * It is done by splitting the file into blocks line by line rather than with a regular
+ * expression: TOML values contain brackets (`args = [ ... ]`) and any pattern looking for
+ * "up to the next [" cuts through the middle of an array. A full TOML parser, to delete two
+ * blocks, is not worth it.
  */
 function stripLegacyToml(ctx: SetupCtx, report: SetupReport): void {
   const file = CONFIG(ctx);
   const raw = readText(file);
   if (raw === null) return;
 
-  // Un bloque = su encabezado y todo lo que hay hasta el siguiente encabezado.
+  // A block = its header plus everything up to the next header.
   const blocks: string[][] = [];
   let head: string[] = [];
   for (const line of raw.split("\n")) {
     if (/^\[/.test(line)) blocks.push((head = [line]));
     else if (blocks.length) head.push(line);
-    else (blocks[0] ??= head).push(line); // preámbulo sin encabezado
+    else (blocks[0] ??= head).push(line); // preamble with no header
   }
 
   const isCortexMcp = (b: string[]): boolean => /^\[mcp_servers\.cortex\]/.test(b[0]!) && b.join("\n").includes("@cortex/mcp-server");
@@ -60,8 +61,8 @@ function stripLegacyToml(ctx: SetupCtx, report: SetupReport): void {
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]!;
     if (isCortexMcp(b)) continue;
-    // Un hook es `[[hooks.Evento]]` seguido de sus `[[hooks.Evento.hooks]]`: el comando está
-    // en el segundo, así que si sobra el hijo, sobra también su encabezado.
+    // A hook is `[[hooks.Event]]` followed by its `[[hooks.Event.hooks]]`: the command is in
+    // the second one, so when the child is redundant so is its header.
     if (/^\[\[hooks\.[A-Za-z]+\]\]/.test(b[0]!)) {
       const grupo = [b];
       let j = i + 1;
@@ -92,7 +93,7 @@ function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
     try {
       ctx.exec("codex", ["mcp", "remove", "cortex"]);
     } catch {
-      /* lo dirá el add */
+      /* the add will say so */
     }
   }
   try {
@@ -147,7 +148,7 @@ export const codexAdapter: AgentAdapter = {
           ctx.exec("codex", args);
           report.changed.push(`codex ${args.join(" ")}`);
         } catch {
-          /* lo que no estuviera, no hay que quitarlo */
+          /* whatever was not there does not need removing */
         }
       }
     } else report.changed.push(`plugin ${PLUGIN} and MCP — would remove`);

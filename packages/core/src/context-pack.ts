@@ -11,7 +11,7 @@ import { vectorSearch, type SearchHit } from "./vectors.js";
 
 // --- validate_context_entry --------------------------------------------------
 
-/** Cambia el estado de validación de una entrada. §15.4. */
+/** Changes an entry's validation status. Section 15.4. */
 export async function validateEntry(
   id: string,
   status: Extract<ContextEntryStatus, "validated" | "rejected" | "obsolete">,
@@ -26,96 +26,97 @@ export async function validateEntry(
 // --- get_project_context_pack ------------------------------------------------
 
 /**
- * Qué tipos de conocimiento entran en el pack, en qué orden y con cuánto peso.
+ * Which knowledge types go into the pack, in what order and with how much weight.
  *
- * Esta lista es la razón de ser de este fichero, así que conviene leerla despacio. Antes el
- * pack solo llevaba cinco tipos —decisiones, restricciones, riesgos, deuda y convenciones—
- * porque eran cinco campos escritos a mano en la interfaz. Los otros nueve existían, se
- * guardaban y se contaban… y no llegaban nunca a un agente. Medido en un proyecto real: **172
- * de 348 entradas vigentes, el 51 %**, de tipos que el pack no renderizaba. Entre ellas 38
- * incidencias, mientras el lint del mismo proyecto avisaba de «incidencias sin decisión».
+ * This list is the reason this file exists, so it is worth reading slowly. The pack used to
+ * carry only five types -- decisions, constraints, risks, debt and conventions -- because they
+ * were five fields hand-written into the interface. The other nine existed, were stored and
+ * were counted... and never reached an agent. Measured in a real project: **172 of 348 current
+ * entries, 51%**, of types the pack did not render. Among them 38 incidents, while the same
+ * project's lint warned about "incidents with no decision".
  *
- * Fuera se quedan, a propósito, los tres tipos que son **registro de un suceso** y no estado
- * del proyecto: resúmenes de reunión, de PR y de ticket. Un agente que abre sesión necesita
- * saber cómo está el proyecto, no qué pasó en una reunión de marzo; eso se busca cuando hace
- * falta. Es una decisión, no un olvido — que era justo el problema de antes.
+ * Left out on purpose are the three types that are a **record of an event** rather than the
+ * project's state: meeting, PR and ticket summaries. An agent opening a session needs to know
+ * how the project stands, not what happened in a meeting back in March; that gets searched for
+ * when needed. It is a decision, not an oversight -- which was exactly the earlier problem.
  *
- * El peso reparte el presupuesto: lo que gobierna el trabajo de hoy pesa el doble que lo que
- * lo acompaña. Ver ADR-0054.
+ * The weight splits the budget: what governs today's work weighs twice what merely accompanies
+ * it. See ADR-0054.
  */
-export const PACK_SECTIONS: { type: ContextEntryType; titulo: string; peso: number }[] = [
-  { type: "decision", titulo: "Decisions in force", peso: 2 },
-  { type: "constraint", titulo: "Active constraints", peso: 2 },
-  { type: "risk", titulo: "Known risks", peso: 2 },
-  { type: "technical_debt", titulo: "Technical debt", peso: 2 },
-  { type: "convention", titulo: "Conventions", peso: 2 },
-  { type: "architecture", titulo: "Architecture", peso: 2 },
-  { type: "business_rule", titulo: "Business rules", peso: 2 },
-  { type: "incident", titulo: "Past incidents", peso: 1 },
-  { type: "integration_note", titulo: "Integrations", peso: 1 },
-  { type: "module_note", titulo: "Module notes", peso: 1 },
-  { type: "how_to", titulo: "How to", peso: 1 },
+export const PACK_SECTIONS: { type: ContextEntryType; title: string; weight: number }[] = [
+  { type: "decision", title: "Decisions in force", weight: 2 },
+  { type: "constraint", title: "Active constraints", weight: 2 },
+  { type: "risk", title: "Known risks", weight: 2 },
+  { type: "technical_debt", title: "Technical debt", weight: 2 },
+  { type: "convention", title: "Conventions", weight: 2 },
+  { type: "architecture", title: "Architecture", weight: 2 },
+  { type: "business_rule", title: "Business rules", weight: 2 },
+  { type: "incident", title: "Past incidents", weight: 1 },
+  { type: "integration_note", title: "Integrations", weight: 1 },
+  { type: "module_note", title: "Module notes", weight: 1 },
+  { type: "how_to", title: "How to", weight: 1 },
 ];
 
 export interface PackSection {
   type: ContextEntryType;
-  titulo: string;
-  peso: number;
+  title: string;
+  weight: number;
   entries: ContextEntry[];
 }
 
 export interface ContextPack {
   project: string;
   generatedAt: Date;
-  /** Una por tipo de `PACK_SECTIONS` que tenga entradas. */
+  /** One per `PACK_SECTIONS` type that actually has entries. */
   sections: PackSection[];
   sensitiveModules: string[];
   relevantToArea: SearchHit[];
   totalEntries: number;
   /**
-   * Pares de entradas del pack que se contradicen entre sí.
+   * Pairs of pack entries that contradict each other.
    *
-   * No se invalida ninguna: cuál sobra es un juicio que no se puede hacer en automático sin
-   * arriesgarse a borrar la buena. Pero callarlo es peor, porque el pack entrega las dos como
-   * vigentes y el agente decide a ciegas. Visto en pruebas reales: dos agentes distintos lo
-   * detectaron solos y lo dijeron, que es señal de que el aviso les hacía falta.
+   * Neither is invalidated: which one is redundant is a judgement that cannot be made
+   * automatically without risking deleting the good one. But keeping quiet is worse, because
+   * the pack hands over both as current and the agent decides blind. Seen in real trials: two
+   * different agents spotted it on their own and said so, which is a sign the warning was
+   * needed.
    */
   conflicts: EntryConflict[];
 }
 
 export interface EntryConflict {
-  /** La entrada del pack que recibe el aviso. */
+  /** The pack entry that receives the warning. */
   entryId: string;
-  /** Choque directo con otra entrada: ahí sí se sabe quién contra quién. */
+  /** A direct clash with another entry: there we do know who against whom. */
   entries: { label: string; recordedLater: boolean }[];
   /**
-   * Zonas que esta entrada toca y que están en disputa. Se dice así, y no "esta entrada
-   * contradice a X", porque no es verdad: la entrada está colgada de una entidad que
-   * contradice a X, que es bastante menos. Afirmar el par concreto daba avisos absurdos —una
-   * decisión sobre el backoff "contradiciendo" la conciliación diaria— y un aviso que miente
-   * enseña a ignorar todos los avisos.
+   * Areas this entry touches that are under dispute. It is phrased that way, rather than "this
+   * entry contradicts X", because that is not true: the entry hangs off an entity that
+   * contradicts X, which is considerably less. Asserting the concrete pair produced absurd
+   * warnings -- a decision about backoff "contradicting" the daily reconciliation -- and a
+   * warning that lies teaches people to ignore every warning.
    */
   areas: { entity: string; against: string[] }[];
 }
 
 /**
- * Genera un paquete de contexto para herramientas de IA (Claude Code/Codex).
- * §12.10, §15.3. Por defecto solo hechos VIGENTES; `asOf` para point-in-time.
+ * Builds a context pack for AI tools (Claude Code/Codex). Sections 12.10 and 15.3. By default
+ * only CURRENT facts; `asOf` gives a point-in-time view.
  */
 export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
   const sql = getSql();
-  // Se resuelve por slug o nombre (#136); el pack lleva el NOMBRE del proyecto, no lo que se
-  // tecleó, para que la cabecera no diga «acme-portal» cuando el proyecto se llama Acme Portal.
+  // Resolved by slug or by name (#136); the pack carries the project's NAME, not whatever was
+  // typed, so the header does not say "acme-portal" when the project is called Acme Portal.
   const resolved = await findProjectByName(project);
   const projectId = resolved?.id;
   if (!resolved || !projectId) {
-    throw new Error(`Proyecto no encontrado: "${project}".`);
+    throw new Error(`Project not found: "${project}".`);
   }
 
-  // Herencia: el pack incluye el conocimiento del proyecto + el de sus ancestros (padre).
+  // Inheritance: the pack includes the project's knowledge plus its ancestors' (the parent's).
   const ids = await projectIdsWithAncestors(projectId);
-  const porTipo = await Promise.all(PACK_SECTIONS.map((s) => entriesByType(sql, ids, s.type, asOf)));
-  const sections: PackSection[] = PACK_SECTIONS.map((s, i) => ({ ...s, entries: porTipo[i]! })).filter(
+  const byType = await Promise.all(PACK_SECTIONS.map((s) => entriesByType(sql, ids, s.type, asOf)));
+  const sections: PackSection[] = PACK_SECTIONS.map((s, i) => ({ ...s, entries: byType[i]! })).filter(
     (s) => s.entries.length > 0,
   );
 
@@ -158,15 +159,15 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
 }
 
 /**
- * Contradicciones que afectan a las entradas VIGENTES del pack.
+ * Contradictions affecting the pack's CURRENT entries.
  *
- * Llegan por dos caminos y se cuentan distinto. La reconciliación relaciona ENTRADA con
- * ENTRADA cuando lo nuevo contradice algo curado: ahí se sabe quién contra quién y se dice.
- * El enriquecido del grafo de `maintain` relaciona ENTIDADES entre sí ("README" contradice
- * "src/webhook.js"), que es el caso frecuente; ahí solo se puede decir que la zona está en
- * disputa, porque una entrada colgada de "README" no contradice necesariamente nada.
+ * They arrive by two paths and are reported differently. Reconciliation relates ENTRY to ENTRY
+ * when something new contradicts something curated: there we know who against whom, and we say
+ * it. The graph enrichment in `maintain` relates ENTITIES to each other ("README" contradicts
+ * "src/webhook.js"), which is the frequent case; there all we can say is that the area is
+ * disputed, because an entry hanging off "README" does not necessarily contradict anything.
  */
-/** Un lado de un choque entrada ↔ entrada, con su proyecto: quién lo dice importa. */
+/** One side of an entry-to-entry clash, with its project: who says it matters. */
 export interface ContradictingSide {
   id: string;
   title: string;
@@ -175,12 +176,12 @@ export interface ContradictingSide {
 }
 
 /**
- * Los pares de entradas VIGENTES relacionadas con `contradicts` dentro de unos proyectos.
+ * The pairs of CURRENT entries related by `contradicts` within a set of projects.
  *
- * Es la consulta base de todas las contradicciones del producto, y vive en un solo sitio a
- * propósito: el pack la usa para avisar a cada entrada de con qué choca, y la vista de cliente
- * para enseñar los choques ENTRE proyectos del mismo subárbol. Dos consultas parecidas sobre
- * `relations` acabarían diciendo cosas distintas sobre los mismos datos.
+ * It is the base query behind every contradiction in the product, and it lives in one place on
+ * purpose: the pack uses it to tell each entry what it clashes with, and the client view uses
+ * it to show the clashes BETWEEN projects of the same subtree. Two similar queries over
+ * `relations` would end up saying different things about the same data.
  */
 export async function contradictingEntryPairs(
   sql: Sql,
@@ -204,52 +205,53 @@ export async function contradictingEntryPairs(
 }
 
 async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConflict[]> {
-  const directos = new Map<string, { label: string; recordedLater: boolean }[]>();
-  const zonas = new Map<string, Map<string, Set<string>>>();
+  const direct = new Map<string, { label: string; recordedLater: boolean }[]>();
+  const areas = new Map<string, Map<string, Set<string>>>();
 
-  // 1) Entrada ↔ entrada: además de con qué choca, cuál se registró antes.
-  const entreEntradas = await contradictingEntryPairs(sql, projectIds);
-  const anotaDirecto = (id: string, label: string, recordedLater: boolean): void => {
-    const lista = directos.get(id) ?? [];
-    if (!lista.some((x) => x.label === label)) lista.push({ label, recordedLater });
-    directos.set(id, lista);
+  // 1) Entry-to-entry: besides what it clashes with, which one was recorded first.
+  const betweenEntries = await contradictingEntryPairs(sql, projectIds);
+  const noteDirect = (id: string, label: string, recordedLater: boolean): void => {
+    const list = direct.get(id) ?? [];
+    if (!list.some((x) => x.label === label)) list.push({ label, recordedLater });
+    direct.set(id, list);
   };
-  for (const { a, b } of entreEntradas) {
-    const aNueva = a.createdAt >= b.createdAt;
-    anotaDirecto(a.id, b.title, !aNueva);
-    anotaDirecto(b.id, a.title, aNueva);
+  for (const { a, b } of betweenEntries) {
+    const aIsNewer = a.createdAt >= b.createdAt;
+    noteDirect(a.id, b.title, !aIsNewer);
+    noteDirect(b.id, a.title, aIsNewer);
   }
 
-  // 2) Entidades en disputa. Se excluyen las entradas colgadas de AMBOS lados: esas no están
-  //    en medio de la discusión, son la discusión, y avisarlas de sí mismas no dice nada.
-  const conEntidades = (await sql`
-    SELECT ce.id AS entry_id, mia.name AS zona, otra.name AS contra
+  // 2) Disputed entities. Entries hanging off BOTH sides are excluded: those are not caught in
+  //    the middle of the argument, they are the argument, and warning them about themselves
+  //    says nothing.
+  const withEntities = (await sql`
+    SELECT ce.id AS entry_id, mine.name AS area, other.name AS against
     FROM relations r
-    JOIN entities mia  ON mia.id  IN (r.source_id, r.target_id)
-    JOIN entities otra ON otra.id IN (r.source_id, r.target_id) AND otra.id <> mia.id
-    JOIN context_entry_entities cee ON cee.entity_id = mia.id
+    JOIN entities mine  ON mine.id  IN (r.source_id, r.target_id)
+    JOIN entities other ON other.id IN (r.source_id, r.target_id) AND other.id <> mine.id
+    JOIN context_entry_entities cee ON cee.entity_id = mine.id
     JOIN context_entries ce ON ce.id = cee.context_entry_id
       AND ce.valid_to IS NULL AND ce.project_id = ANY(${projectIds})
-    WHERE r.relation_type = 'contradicts' AND mia.type <> 'project' AND otra.type <> 'project'
+    WHERE r.relation_type = 'contradicts' AND mine.type <> 'project' AND other.type <> 'project'
       AND NOT EXISTS (
-        SELECT 1 FROM context_entry_entities x WHERE x.context_entry_id = ce.id AND x.entity_id = otra.id
+        SELECT 1 FROM context_entry_entities x WHERE x.context_entry_id = ce.id AND x.entity_id = other.id
       )
     LIMIT 200
   `) as unknown as Row[];
-  for (const r of conEntidades) {
-    const porZona = zonas.get(r.entry_id as string) ?? new Map<string, Set<string>>();
-    const contra = porZona.get(r.zona as string) ?? new Set<string>();
-    contra.add(r.contra as string);
-    porZona.set(r.zona as string, contra);
-    zonas.set(r.entry_id as string, porZona);
+  for (const r of withEntities) {
+    const byArea = areas.get(r.entry_id as string) ?? new Map<string, Set<string>>();
+    const against = byArea.get(r.area as string) ?? new Set<string>();
+    against.add(r.against as string);
+    byArea.set(r.area as string, against);
+    areas.set(r.entry_id as string, byArea);
   }
 
-  // Topes: un aviso con más de esto ya no se lee, se salta.
-  const ids = new Set([...directos.keys(), ...zonas.keys()]);
+  // Caps: a warning longer than this stops being read and starts being skipped.
+  const ids = new Set([...direct.keys(), ...areas.keys()]);
   return [...ids].map((entryId) => ({
     entryId,
-    entries: (directos.get(entryId) ?? []).slice(0, 3),
-    areas: [...(zonas.get(entryId) ?? new Map())].slice(0, 2).map(([entity, against]) => ({
+    entries: (direct.get(entryId) ?? []).slice(0, 3),
+    areas: [...(areas.get(entryId) ?? new Map())].slice(0, 2).map(([entity, against]) => ({
       entity,
       against: [...against].slice(0, 3),
     })),
@@ -258,7 +260,7 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
 
 // --- helpers -----------------------------------------------------------------
 
-/** IDs del proyecto + todos sus ancestros (jerarquía padre). Para herencia de contexto. */
+/** The project's id plus all its ancestors' (parent hierarchy). For context inheritance. */
 
 async function entriesByType(
   sql: Sql,

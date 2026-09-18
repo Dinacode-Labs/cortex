@@ -1,92 +1,96 @@
-# Conjunto de evaluación de retrieval
+# Retrieval evaluation set
 
-Un corpus fijo y un juego de preguntas con la evidencia anotada, para poder responder a la
-única pregunta que importa cuando se toca el troceado, el rerank o los embeddings: **¿ha
-mejorado o ha empeorado?**
+A fixed corpus and a set of questions with annotated evidence, so the only question that
+matters when chunking, the rerank or the embeddings get touched can be answered: **did it get
+better or worse?**
 
-## Por qué un corpus inventado y no la memoria real
+## Why an invented corpus and not the real memory
 
-Porque un eval sirve para comparar ejecuciones, y la memoria real cambia todos los días: el
-mismo cambio de código daría números distintos según qué se hubiera capturado esa semana.
-Además, así lo puede ejecutar cualquiera que clone el repo, sin acceso a ningún servidor.
+Because an eval exists to compare runs, and the real memory changes every day: the same code
+change would give different numbers depending on what had been captured that week. It also
+means anyone who clones the repo can run it, with no access to any server.
 
-El corpus imita lo que Cortex acumula de verdad —decisiones con su porqué, restricciones,
-incidencias, convenciones, deuda— sobre un proyecto ficticio: **Nébula**, un servicio que
-recibe documentos, los procesa y los factura.
+The corpus imitates what Cortex really accumulates -- decisions with their reasoning,
+constraints, incidents, conventions, debt -- about a fictional project: **Nébula**, a service
+that receives documents, processes them and bills for them.
 
-## Cómo se ejecuta
+> **The corpus and the questions are in Spanish on purpose.** They are data, not our prose:
+> they mirror the language of the corpus Cortex actually ingests, which is what the baseline
+> below was measured against. Translating them would change the numbers and would stop this
+> measuring what it exists to measure.
+
+## How to run it
 
 ```bash
-pnpm admin eval                    # corpus fijo, proyecto temporal, lo borra al acabar
-pnpm admin eval --keep             # deja el proyecto para inspeccionarlo
-pnpm admin eval --project "X"      # contra un proyecto real, con tus propias preguntas
+pnpm admin eval                    # the fixed corpus, a temporary project, deleted afterwards
+pnpm admin eval --keep             # keeps the project so it can be inspected
+pnpm admin eval --project "X"      # against a real project, with your own questions
 ```
 
-**Hace falta un proveedor de embeddings de verdad.** Con `EMBEDDINGS_PROVIDER=local` los
-números no significan nada: es un hash de palabras, no entiende que «cuánto aguanta un
-documento» y «límite de tamaño de subida» son lo mismo. El comando avisa y sigue, porque ver
-el desastre también enseña.
+**A real embedding provider is required.** With `EMBEDDINGS_PROVIDER=local` the numbers mean
+nothing: it is a word hash, it does not understand that "how much can a document weigh" and
+"upload size limit" are the same thing. The command warns and carries on, because seeing the
+wreckage teaches something too.
 
-## Qué se mide
+## What is measured
 
-- **recall@5**: de las entradas que responden a la pregunta, qué fracción aparece en los 5
-  primeros resultados. Con varias evidencias, acertar una sola no es acertar.
-- **MRR**: 1 partido por la posición de la primera evidencia correcta. Mide si lo bueno sale
-  arriba o hay que bajar a mirar.
+- **recall@5**: of the entries that answer the question, what fraction appears in the first 5
+  results. With several pieces of evidence, getting one right is not getting it right.
+- **MRR**: 1 divided by the position of the first correct piece of evidence. It measures
+  whether the good stuff comes out on top or you have to scroll down.
 
-Las preguntas están etiquetadas por tipo para poder leer los números por separado: una caída
-solo en las parafraseadas señala a los embeddings; solo en las repartidas, al troceado.
+The questions are labelled by type so the numbers can be read separately: a drop only in the
+paraphrased ones points at the embeddings; only in the spread-out ones, at the chunking.
 
-## Línea base (2026-09-12)
+## Baseline (2026-09-12)
 
-> **Actualizada el mismo día**: al deducir el tipo de la pregunta (ver abajo) pasa a
-> recall@5 **0.987** y MRR **0.928**. La tabla de aquí es la de antes de ese cambio, que es
-> contra lo que se comparó.
+> **Updated the same day**: once the question's type is inferred (see below) it moves to
+> recall@5 **0.987** and MRR **0.928**. The table here is from before that change, which is
+> what it was compared against.
 
+With `qwen3-embedding` (4096 dim), hybrid search, no LLM rerank:
 
-Con `qwen3-embedding` (4096 dim), búsqueda híbrida, sin rerank LLM:
-
-| tipo | n | recall@5 | MRR |
+| type | n | recall@5 | MRR |
 | --- | --- | --- | --- |
-| directa | 8 | 1.000 | 1.000 |
-| parafraseada | 15 | 1.000 | 0.850 |
-| razonada | 5 | 1.000 | 1.000 |
+| direct | 8 | 1.000 | 1.000 |
+| paraphrased | 15 | 1.000 | 0.850 |
+| reasoned | 5 | 1.000 | 1.000 |
 | multiple | 10 | 0.850 | 0.850 |
 | **TOTAL** | **38** | **0.961** | **0.901** |
 
-Las dos preguntas sin respuesta en el corpus puntúan 0.472 y 0.370 en su mejor resultado, muy
-por debajo de lo que sale cuando la respuesta sí está. Eso es buena señal: la memoria no
-aparenta saber lo que no sabe.
+The two questions with no answer in the corpus score 0.472 and 0.370 on their best result, far
+below what comes out when the answer is there. That is a good sign: the memory does not pretend
+to know what it does not know.
 
-### Lo que ya dice esta línea base
+### What this baseline already says
 
-Lo parafraseado se recupera entero (recall 1.000): los embeddings hacen su trabajo y no hay
-indicio de pérdida de contexto por troceado. **Eso es justamente lo que aplazaba Contextual
-Retrieval, y este número dice que sigue sin hacer falta.**
+Paraphrased content is retrieved in full (recall 1.000): the embeddings do their job and there
+is no sign of context loss from chunking. **That is exactly what Contextual Retrieval was being
+deferred over, and this number says it is still not needed.**
 
-Donde se cae es en las preguntas repartidas, y una falla del todo:
+Where it falls down is the spread-out questions, and one fails entirely:
 
-> «¿Qué deuda técnica hay alrededor de la facturación?» → 0 de 2
+> "¿Qué deuda técnica hay alrededor de la facturación?" → 0 out of 2
 
-Los cinco resultados hablan de facturación y **ninguno es del tipo `technical_debt`**. La
-similitud semántica se come el tipo: cuando la pregunta nombra una categoría del dominio
-—«deuda técnica», «qué decidimos», «qué restricciones hay»— la búsqueda la ignora y devuelve lo
-más parecido por tema. La API ya acepta filtrar por tipo; nadie lo deduce de la pregunta.
+All five results are about billing and **none is of type `technical_debt`**. Semantic similarity
+swallows the type: when the question names a domain category -- "technical debt", "what did we
+decide", "what constraints are there" -- the search ignores it and returns whatever is closest
+by topic. The API already accepts filtering by type; nobody infers it from the question.
 
-Ese hilo ya se ha tirado, midiendo: la búsqueda **deduce el tipo de la pregunta** cuando esta
-nombra una categoría, y empuja ese tipo hacia arriba sin filtrar por él —filtrar perdería la
-respuesta cuando está guardada con otro tipo—. Resultado:
+That thread has since been pulled, with measurements: the search **infers the question's type**
+when it names a category, and nudges that type upwards without filtering by it -- filtering
+would lose the answer when it is stored under another type. Result:
 
-| | recall@5 | MRR | repartidas (recall) |
+| | recall@5 | MRR | spread-out (recall) |
 | --- | --- | --- | --- |
-| antes | 0.961 | 0.901 | 0.850 |
-| después | **0.987** | **0.928** | **0.950** |
+| before | 0.961 | 0.901 | 0.850 |
+| after | **0.987** | **0.928** | **0.950** |
 
-Sin tocar lo demás: directas, parafraseadas y razonadas siguen en 1.000, y las preguntas sin
-respuesta se mueven menos de una milésima (0.472 → 0.473), así que el empujón no hace que la
-memoria aparente saber lo que no sabe.
+Without touching anything else: direct, paraphrased and reasoned stay at 1.000, and the
+questions with no answer move by less than a thousandth (0.472 → 0.473), so the nudge does not
+make the memory pretend to know what it does not.
 
-El tamaño del empujón (`CORTEX_SEARCH_TYPE_BOOST`) se eligió midiendo, no a ojo: entre 0.12 y
-0.20 el resultado es idéntico y es el mejor; por debajo se queda corto y desde 0.30 el recall
-vuelve a caer, porque empieza a colar entradas del tipo correcto pero de otro asunto. Está en
-0.15, el centro de esa meseta.
+The size of the nudge (`CORTEX_SEARCH_TYPE_BOOST`) was chosen by measuring, not by eye: between
+0.12 and 0.20 the result is identical and it is the best; below that it falls short, and from
+0.30 recall drops again, because it starts letting in entries of the right type but the wrong
+subject. It sits at 0.15, the centre of that plateau.

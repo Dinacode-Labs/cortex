@@ -5,10 +5,10 @@ import { resolve } from "node:path";
 import { parse as yamlParse } from "yaml";
 
 /**
- * El despliegue no se puede levantar en CI, así que lo que se comprueba aquí son las cosas
- * que, si se rompen, se descubren en producción: que la base de datos no quede expuesta, que
- * los scripts sean POSIX válidos, que la imagen no corra como root y que el compose no pierda
- * un healthcheck. Todo esto se verificó además a mano levantando el stack completo.
+ * The deployment cannot be stood up in CI, so what is checked here are the things that, when
+ * they break, get discovered in production: that the database is not exposed, that the scripts
+ * are valid POSIX, that the image does not run as root and that the compose does not lose a
+ * healthcheck. All of this was also verified by hand by standing up the whole stack.
  */
 const root = resolve(import.meta.dirname, "..");
 const read = (rel: string): string => readFileSync(resolve(root, rel), "utf8");
@@ -21,22 +21,22 @@ const compose = yamlParse(read("deploy/docker-compose.yml")) as Compose;
 const local = yamlParse(read("deploy/local.yml")) as Compose;
 
 describe("docker-compose de despliegue", () => {
-  it("solo Caddy publica puertos: nada más se asoma a internet", () => {
+  it("only Caddy publishes ports: nothing else faces the internet", () => {
     const conPuertos = Object.entries(compose.services)
       .filter(([, s]) => (s.ports?.length ?? 0) > 0)
       .map(([name]) => name);
     expect(conPuertos).toEqual(["caddy"]);
   });
 
-  it("Postgres no publica puertos ni pierde su volumen", () => {
+  it("Postgres publishes no ports and does not lose its volume", () => {
     expect(compose.services.postgres!.ports).toBeUndefined();
     expect(Object.keys(compose.volumes)).toContain("cortex-pgdata");
     expect(Object.keys(compose.volumes)).toContain("cortex-backups");
   });
 
-  it("cada servicio de la aplicación tiene su healthcheck", () => {
-    // server, web y mcp lo heredan del HEALTHCHECK de la imagen vía HEALTH_PORT; el worker,
-    // que no escucha en ningún puerto, necesita el suyo por fichero de latido.
+  it("every application service has its healthcheck", () => {
+    // server, web and mcp inherit it from the image's HEALTHCHECK through HEALTH_PORT; the
+    // worker, which listens on no port, needs its own through a heartbeat file.
     expect(compose.services.worker!.healthcheck).toBeDefined();
     expect(compose.services.postgres!.healthcheck).toBeDefined();
     for (const s of ["server", "web", "mcp"]) {
@@ -44,13 +44,13 @@ describe("docker-compose de despliegue", () => {
     }
   });
 
-  it("migrate corre y sale, no se reinicia en bucle", () => {
+  it("migrate runs and exits, it does not restart in a loop", () => {
     const migrate = compose.services.migrate as { restart?: string; command?: string };
     expect(migrate.restart).toBe("no");
     expect(migrate.command).toContain("migrate-cli.js");
   });
 
-  it("los servicios ejecutan dist, nunca las fuentes con tsx", () => {
+  it("the services run dist, never the sources through tsx", () => {
     for (const [name, s] of Object.entries(compose.services)) {
       if (!s.command) continue;
       expect(s.command, name).not.toContain("tsx");
@@ -62,15 +62,15 @@ describe("docker-compose de despliegue", () => {
 describe("Caddyfile", () => {
   const caddy = read("deploy/Caddyfile");
 
-  it("recorta el prefijo /api: el servidor no sabe que vive bajo él", () => {
+  it("strips the /api prefix: the server does not know it lives under it", () => {
     expect(caddy).toContain("handle_path /api/*");
   });
 
-  it("el MCP va sin buffering, porque habla por streaming", () => {
+  it("the MCP goes unbuffered, because it speaks by streaming", () => {
     expect(caddy).toMatch(/handle \/mcp\*[\s\S]*flush_interval -1/);
   });
 
-  it("pone HSTS y quita la cabecera Server", () => {
+  it("sets HSTS and removes the Server header", () => {
     expect(caddy).toContain("Strict-Transport-Security");
     expect(caddy).toContain("-Server");
   });
@@ -79,49 +79,49 @@ describe("Caddyfile", () => {
 describe("Dockerfile", () => {
   const df = read("Dockerfile");
 
-  it("es multi-etapa y la final no corre como root", () => {
+  it("is multi-stage and the final stage does not run as root", () => {
     expect(df).toContain("AS deps");
     expect(df).toContain("AS build");
     expect(df).toContain("AS runtime");
     expect(df).toContain("USER node");
   });
 
-  it("no usa `pnpm prune --prod`, que rompe los enlaces del workspace", () => {
-    // Se llevaba por delante @cortex/shared y la imagen no arrancaba. Puede aparecer en un
-    // comentario explicándolo; lo que no puede es ejecutarse.
+  it("does not use `pnpm prune --prod`, which breaks the workspace links", () => {
+    // It took @cortex/shared down with it and the image would not start. It may appear in a
+    // comment explaining that; what it may not do is run.
     const ejecuta = df.split("\n").filter((l) => !l.trimStart().startsWith("#") && l.includes("pnpm prune"));
     expect(ejecuta).toEqual([]);
     expect(df).toContain("pnpm install --prod");
   });
 
-  it("copia los ficheros de datos que las apps resuelven en ejecución", () => {
+  it("copies the data files the apps resolve at runtime", () => {
     expect(df).toContain("scripts/install.sh");
     expect(df).toContain("config/toolbelt.json");
   });
 
-  it("tiene HEALTHCHECK con puerto configurable (la imagen sirve a tres servicios)", () => {
+  it("has a HEALTHCHECK with a configurable port (the image serves three services)", () => {
     expect(df).toContain("HEALTHCHECK");
     expect(df).toContain("HEALTH_PORT");
   });
 });
 
-describe("scripts de operación", () => {
+describe("operation scripts", () => {
   for (const s of ["deploy/restore.sh", "deploy/backup-now.sh"]) {
-    it(`${s} es POSIX válido y ejecutable`, () => {
+    it(`${s} is valid POSIX and executable`, () => {
       execFileSync("sh", ["-n", resolve(root, s)]);
       expect(statSync(resolve(root, s)).mode & 0o111).toBeGreaterThan(0);
     });
   }
 
-  it("restore.sh pide confirmación literal antes de destruir la base real", () => {
+  it("restore.sh asks for a literal confirmation before destroying the real database", () => {
     const sh = read("deploy/restore.sh");
     expect(sh).toContain('"$ANSWER" = "restore"');
-    // Y crea la extensión antes de cargar: sin ella, las columnas vector fallan.
-    expect(sh).toMatch(/CREATE EXTENSION IF NOT EXISTS vector[\s\S]*Cargando el volcado/);
+    // And it creates the extension before loading: without it, the vector columns fail.
+    expect(sh).toMatch(/CREATE EXTENSION IF NOT EXISTS vector[\s\S]*Loading the dump/);
   });
 
-  it("restore.sh no hace `source` del .env: hay valores con espacios sin comillas", () => {
-    // La expresión cron del worker reventaba el script entero bajo `set -e`.
+  it("restore.sh does not `source` the .env: there are unquoted values with spaces", () => {
+    // The worker's cron expression blew up the whole script under `set -e`.
     expect(read("deploy/restore.sh")).not.toMatch(/^\s*\.\s+\.\/\.env/m);
   });
 });
@@ -129,12 +129,12 @@ describe("scripts de operación", () => {
 describe("deploy/.env.example", () => {
   const env = read("deploy/.env.example");
 
-  it("no lleva valores de ninguna empresa concreta", () => {
+  it("carries no values from any one company", () => {
     expect(env.toLowerCase()).not.toContain("dinacode.com");
     expect(env).toContain("example.com");
   });
 
-  it("documenta lo que hay que fijar sí o sí", () => {
+  it("documents what absolutely must be set", () => {
     for (const k of ["CORTEX_DOMAIN", "CORTEX_ACME_EMAIL", "POSTGRES_PASSWORD", "CORTEX_AUTH_DOMAIN", "EMBEDDINGS_DIM"]) {
       expect(env, k).toContain(k);
     }
@@ -142,37 +142,37 @@ describe("deploy/.env.example", () => {
 });
 
 /**
- * El compose local es lo primero que ejecuta alguien que se acerca a Cortex, y corre en la
- * máquina de esa persona. Lo que hay que garantizar es que no le abre nada a la red y que no
- * le pide credenciales para empezar: si al primer comando le falta una variable, se va.
+ * The local compose is the first thing somebody approaching Cortex runs, and it runs on that
+ * person's machine. What has to be guaranteed is that it opens nothing to the network and asks
+ * for no credentials to get started: if the first command is missing a variable, they leave.
  */
-describe("compose local (probarlo en tu máquina)", () => {
-  it("no publica nada fuera de 127.0.0.1", () => {
+describe("local compose (trying it on your machine)", () => {
+  it("publishes nothing outside 127.0.0.1", () => {
     const publicados = Object.values(local.services).flatMap((s) => s.ports ?? []);
     expect(publicados.length).toBeGreaterThan(0);
     for (const p of publicados) expect(p).toMatch(/^127\.0\.0\.1:/);
   });
 
-  it("Postgres no se publica ni siquiera en local", () => {
-    // El puerto 5432 del host suele estar ocupado por otra cosa, y no hace falta para nada.
+  it("Postgres is not published, not even locally", () => {
+    // The host's 5432 is usually taken by something else, and it is not needed at all.
     expect(local.services.postgres!.ports).toBeUndefined();
   });
 
-  it("arranca sin pedir una sola variable de entorno", () => {
-    // `${VAR:?mensaje}` aborta el compose si falta. Aquí no puede haber ninguno.
+  it("starts without asking for a single environment variable", () => {
+    // `${VAR:?message}` aborts the compose when it is missing. There can be none here.
     expect(read("deploy/local.yml")).not.toMatch(/\$\{[A-Z_]+:\?/);
   });
 
-  it("no trae ni TLS ni copias: eso es el compose de producción", () => {
+  it("brings neither TLS nor backups: that is the production compose", () => {
     expect(Object.keys(local.services).sort()).toEqual(["mcp", "migrate", "postgres", "server", "web"]);
   });
 
-  it("los datos sobreviven a un reinicio, que es de lo que va una memoria", () => {
+  it("the data survives a restart, which is rather the point of a memory", () => {
     expect(Object.keys(local.volumes)).toContain("cortex-local-pgdata");
   });
 
-  it("no comparte volumen ni proyecto con el despliegue de producción", () => {
-    // Un `down -v` en la prueba local no puede llevarse los datos de nadie.
+  it("shares neither volume nor project with the production deployment", () => {
+    // A `down -v` in the local trial must not take anybody's data with it.
     expect(read("deploy/local.yml")).toContain("name: cortex-local");
     expect(Object.keys(local.volumes)).not.toContain("cortex-pgdata");
   });

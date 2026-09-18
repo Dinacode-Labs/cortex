@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml/badge.svg)](https://github.com/Dinacode-Labs/cortex/actions/workflows/ci.yml)
 
+*En español: [`README.es.md`](./README.es.md).*
+
 **Project memory for software teams.** Cortex captures the knowledge that gets scattered
 across a project, the decisions, constraints, incidents, conventions, pull requests,
 conversations, docs and code, structures it in a hybrid layer that is at once documental,

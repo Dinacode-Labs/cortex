@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Hono } from "hono";
 
-/** Instalador (curl -fsSL <servidor>/install.sh | sh). Inyecta la URL del servidor. */
+/** The installer (curl -fsSL <server>/install.sh | sh). It injects the server's URL. */
 export const installRoutes = new Hono();
 
-// Ruta ABSOLUTA al script, relativa a ESTE fichero (apps/server/src/routes → raíz del repo).
+// ABSOLUTE path to the script, relative to THIS file (apps/server/src/routes -> repo root).
 const INSTALL_SH = resolve(import.meta.dirname, "../../../../scripts/install.sh");
 
 installRoutes.get("/install.sh", (c) => {

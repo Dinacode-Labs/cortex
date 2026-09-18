@@ -1,7 +1,7 @@
--- Grafo bi-temporal (patrón Zep/Graphiti): cada hecho/relación lleva ventana de
--- validez. valid_to NULL = vigente. observed_at = cuándo lo afirmó la fuente.
--- created_at ya actúa como recorded_at (cuándo lo ingirió el sistema).
--- Invalidar = cerrar la ventana (valid_to), nunca borrar → consultas point-in-time.
+-- Bi-temporal graph (the Zep/Graphiti pattern): every fact/relation carries a validity
+-- window. valid_to NULL = still current. observed_at = when the source asserted it.
+-- created_at already acts as recorded_at (when the system ingested it).
+-- Invalidating = closing the window (valid_to), never deleting -> point-in-time queries.
 
 ALTER TABLE context_entries
   ADD COLUMN valid_from  timestamptz NOT NULL DEFAULT now(),

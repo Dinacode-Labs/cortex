@@ -10,11 +10,11 @@ import {
 } from "@cortex/client";
 
 /**
- * Cómo encuentra el CLI el MCP del servidor y con qué credenciales habla.
+ * How the CLI finds the server's MCP and which credentials it talks with.
  *
- * El orden importa: preguntárselo al servidor (`/client-config`) es lo correcto, porque en
- * producción la API y el MCP pueden colgar del mismo host tras un proxy, y deducir la URL
- * cambiando el puerto solo funciona en desarrollo.
+ * The order matters: asking the server (`/client-config`) is the right thing, because in
+ * production the API and the MCP may hang off the same host behind a proxy, and deriving the
+ * URL by changing the port only works in development.
  */
 
 export interface UpstreamTarget {
@@ -22,7 +22,7 @@ export interface UpstreamTarget {
   token: string;
 }
 
-/** Fallback para servidores viejos o sin red: el puerto del MCP en el compose de dev. */
+/** Fallback for old servers or no network: the MCP's port in the dev compose. */
 function guessFromServer(server: string): string {
   try {
     const u = new URL(server);
@@ -34,18 +34,18 @@ function guessFromServer(server: string): string {
 }
 
 /**
- * Resuelve a qué MCP conectarse y con qué token. `null` si no hay sesión.
+ * Resolves which MCP to connect to and with which token. `null` when there is no session.
  *
- * El agente lanza este proceso desde la carpeta en la que se está trabajando, así que el
- * `.cortex.json` de ese repo es quien decide el servidor (ADR-0033). Fuera de un repo
- * vinculado se cae al de por defecto: las tools siguen pidiendo el proyecto por nombre y los
- * permisos siguen aplicando, así que como mucho es una consulta a la memoria equivocada.
+ * The agent launches this process from the folder being worked in, so that repo's
+ * `.cortex.json` is what decides the server (ADR-0033). Outside a linked repo it falls back to
+ * the default: the tools still ask for the project by name and permissions still apply, so at
+ * worst it is a query against the wrong memory.
  */
 export async function resolveUpstream(cwd = process.cwd()): Promise<UpstreamTarget | null> {
   useProjectServer(cwd);
   const buscado = apiBase();
   const creds = readCredentials(buscado);
-  if (!creds?.token) throw new SinSesionError(buscado, cwd);
+  if (!creds?.token) throw new NoSessionError(buscado, cwd);
   const override = process.env.CORTEX_MCP_URL?.trim();
   if (override) return { url: override, token: creds.token };
   const cfg = await getClientConfig(creds.server);
@@ -53,34 +53,35 @@ export async function resolveUpstream(cwd = process.cwd()): Promise<UpstreamTarg
 }
 
 /**
- * No hay sesión **para este servidor**, que no es lo mismo que no haber iniciado sesión.
+ * There is no session **for this server**, which is not the same as not being signed in.
  *
- * El mensaje anterior decía «no has iniciado sesión o tu token ha caducado» en los dos casos, y
- * eso manda a quien lo lee a hacer un `cortex auth login` que ya había hecho. El caso real es
- * otro: la carpeta apunta a un servidor —por su `.cortex.json` o por `CORTEX_SERVER_URL`— del
- * que no hay credenciales, mientras sí las hay de otro. Un error que dirige mal cuesta más que
- * uno que no dice nada, porque parece que sabe.
+ * The previous message said "you are not signed in, or your token expired" in both cases, and
+ * that sends whoever reads it to run a `cortex auth login` they had already run. The real case
+ * is different: the folder points at a server -- through its `.cortex.json` or through
+ * `CORTEX_SERVER_URL` -- there are no credentials for, while there are credentials for another.
+ * An error that misdirects costs more than one that says nothing, because it looks like it
+ * knows.
  */
-export class SinSesionError extends Error {
+export class NoSessionError extends Error {
   constructor(
-    readonly servidor: string,
+    readonly server: string,
     readonly cwd: string,
   ) {
-    const sesiones = listCredentials();
-    const tengo = sesiones.length
-      ? `Signed in to: ${sesiones.map((c) => `${c.server} (${c.email})`).join(", ")}.`
+    const sessions = listCredentials();
+    const have = sessions.length
+      ? `Signed in to: ${sessions.map((c) => `${c.server} (${c.email})`).join(", ")}.`
       : "There are no sessions on this machine.";
-    const arreglo = sesiones.some((c) => c.server !== servidor)
-      ? `If "${servidor}" is not where this project lives, fix the "server" field in .cortex.json ` +
+    const fix = sessions.some((c) => c.server !== server)
+      ? `If "${server}" is not where this project lives, fix the "server" field in .cortex.json ` +
         "(or unset CORTEX_SERVER_URL). If it is, sign in to it: " +
-        `cortex auth login --server ${servidor}`
-      : `Run: cortex auth login --server ${servidor}`;
-    super(`No session for ${servidor} (resolved from ${cwd}). ${tengo} ${arreglo}`);
-    this.name = "SinSesionError";
+        `cortex auth login --server ${server}`
+      : `Run: cortex auth login --server ${server}`;
+    super(`No session for ${server} (resolved from ${cwd}). ${have} ${fix}`);
+    this.name = "NoSessionError";
   }
 }
 
-/** Transporte HTTP autenticado. El SDK gestiona el `mcp-session-id` por dentro. */
+/** Authenticated HTTP transport. The SDK handles the `mcp-session-id` internally. */
 export function httpTransport(target: UpstreamTarget): Transport {
   return new StreamableHTTPClientTransport(new URL(target.url), {
     requestInit: { headers: { authorization: `Bearer ${target.token}` } },

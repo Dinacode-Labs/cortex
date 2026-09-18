@@ -1,21 +1,21 @@
 /**
- * Borrado de secretos (best-effort, amplio). Función PURA y sin I/O: vive en `shared`
- * para que la usen las tres capas que la necesitan —agents (antes de mandar nada al LLM),
- * core (antes de persistir) y los conectores— sin duplicar patrones.
+ * Secret scrubbing (best-effort, deliberately broad). A PURE function with no I/O: it lives
+ * in `shared` so the three layers that need it -- agents (before anything reaches the LLM),
+ * core (before persisting) and the connectors -- can use it without duplicating patterns.
  *
- * Principio: es un filtro de última línea, no una garantía. Prefiere redactar de más
- * (algún falso positivo) a dejar escapar una credencial. Complementa, no sustituye, a
- * no meter secretos en el contexto.
+ * Principle: this is a last-line filter, not a guarantee. It prefers over-redacting (the
+ * odd false positive) to letting a credential through. It complements, and does not
+ * replace, keeping secrets out of the context in the first place.
  */
 
-/** Borra secretos de un texto antes de mandarlo al LLM o de guardarlo. */
+/** Strips secrets from a text before sending it to the LLM or storing it. */
 export function scrub(s: string): string {
   return (
     s
-      // --- Bloques y tokens con formato propio ---
+      // --- Blocks and tokens with their own format ---
       .replace(/-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+PRIVATE KEY-----/g, "[REDACTED_KEY]")
       .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{6,}/g, "[REDACTED_JWT]")
-      // --- Claves de proveedor por prefijo ---
+      // --- Provider keys, matched by prefix ---
       .replace(/sk-ant-[A-Za-z0-9_-]{20,}/g, "[REDACTED]")
       .replace(/sk-[A-Za-z0-9_-]{12,}/g, "[REDACTED]")
       .replace(/\b(?:sk|rk|pk)_(?:live|test)_[A-Za-z0-9]{16,}/g, "[REDACTED]")
@@ -25,17 +25,17 @@ export function scrub(s: string): string {
       .replace(/AKIA[0-9A-Z]{16}/g, "[REDACTED]")
       .replace(/GOCSPX-[A-Za-z0-9_-]{10,}/g, "[REDACTED]")
       .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
-      // --- Credenciales embebidas en connection strings (usuario:PASS@host) ---
+      // --- Credentials embedded in connection strings (user:PASS@host) ---
       .replace(
         /\b((?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|amqp|amqps|mssql|ftp|ssh):\/\/[^:\s/@]+:)[^@\s/]+@/gi,
         "$1[REDACTED]@",
       )
-      // --- Cabeceras HTTP (volcados de curl -v, logs de request) ---
+      // --- HTTP headers (curl -v dumps, request logs) ---
       .replace(/\bBearer\s+[A-Za-z0-9._-]{16,}/g, "Bearer [REDACTED]")
       .replace(/\bBasic\s+[A-Za-z0-9+/=]{16,}/g, "Basic [REDACTED]")
-      // Solo al principio de línea: evita comerse prosa que mencione "cookies".
+      // Start of line only: keeps it from eating prose that merely mentions "cookies".
       .replace(/^[ \t>-]*(cookie|set-cookie)[ \t]*:[ \t]*\S.{7,}$/gim, "$1: [REDACTED]")
-      // --- Asignaciones genéricas (api_key=..., password: ..., token = ...) ---
+      // --- Generic assignments (api_key=..., password: ..., token = ...) ---
       .replace(
         /\b(api[_-]?key|apikey|token|secret|password|passwd|pwd|access[_-]?token)\b\s*[:=]\s*["']?[A-Za-z0-9._\-/+]{12,}["']?/gi,
         "$1=[REDACTED]",

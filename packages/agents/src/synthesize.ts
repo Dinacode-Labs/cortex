@@ -1,9 +1,8 @@
 import { getAgent, runAgent } from "./mastra.js";
 
 /**
- * Agente de recuperación (§7): sintetiza una respuesta en prosa fundamentada en
- * el contexto recuperado de Cortex. Implementado como Agent de Mastra (rol
- * "retriever", ver mastra.ts).
+ * Retrieval agent (section 7): it synthesises a prose answer grounded in the context retrieved
+ * from Cortex. Implemented as a Mastra Agent (role "retriever", see mastra.ts).
  */
 
 export interface ContextSnippet {
@@ -12,7 +11,7 @@ export interface ContextSnippet {
   type: string;
 }
 
-/** Sintetiza una respuesta a partir de fragmentos de contexto. null si no hay LLM. */
+/** Synthesises an answer from context fragments. null when there is no LLM. */
 export async function synthesizeContextAnswer(
   question: string,
   snippets: ContextSnippet[],
@@ -22,18 +21,18 @@ export async function synthesizeContextAnswer(
   const context = snippets
     .map((s, i) => `${i + 1}. [${s.type}] ${s.title}: ${s.summary}`)
     .join("\n");
-  const prompt = `Pregunta del developer: ${question}
+  const prompt = `The developer's question: ${question}
 
-Contexto recuperado de Cortex:
+Context retrieved from Cortex:
 ${context}
 
-Responde a la pregunta basándote únicamente en el contexto anterior. Resalta riesgos,
-decisiones vigentes y restricciones si son relevantes. Si falta información, indícalo.`;
+Answer the question based only on the context above. Highlight risks, decisions in force and
+constraints when they are relevant. When information is missing, say so.`;
 
   try {
     return await runAgent("retriever", prompt, { maxOutputTokens: 900 });
   } catch (e) {
-    console.error("[agents] synthesizeContextAnswer falló:", (e as Error).message);
+    console.error("[agents] synthesizeContextAnswer failed:", (e as Error).message);
     return null;
   }
 }

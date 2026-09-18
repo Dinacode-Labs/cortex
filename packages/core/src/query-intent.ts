@@ -1,24 +1,27 @@
 import type { ContextEntryType } from "@cortex/shared";
 
 /**
- * Cuando la pregunta nombra una categoría del dominio, deducirla.
+ * When the question names a domain category, infer it.
  *
- * Lo sacó el eval: «¿Qué deuda técnica hay alrededor de la facturación?» recuperaba 0 de 2, y
- * los cinco resultados hablaban de facturación sin que ninguno fuera deuda técnica. La
- * similitud semántica se come el tipo, porque «deuda técnica» aporta muchísimo menos al
- * embedding que «facturación».
+ * The eval surfaced this: "what technical debt is there around billing?" retrieved 0 out of 2,
+ * and all five results were about billing without any of them being technical debt. Semantic
+ * similarity swallows the type, because "technical debt" contributes far less to the embedding
+ * than "billing" does.
  *
- * Se usa como EMPUJÓN, no como filtro (ver `searchContext`). Filtrar sería peor que no hacer
- * nada: quien pregunta «¿qué decidimos sobre los reintentos?» puede tener la respuesta
- * guardada como restricción, y un filtro la haría desaparecer. Empujar solo cambia el orden
- * cuando hay empate de tema, que es exactamente el caso que falla.
+ * It is used as a NUDGE, not as a filter (see `searchContext`). Filtering would be worse than
+ * doing nothing: someone asking "what did we decide about retries?" may have the answer stored
+ * as a constraint, and a filter would make it vanish. A nudge only changes the order when the
+ * topic ties, which is exactly the failing case.
  *
- * Los patrones son deliberadamente cortos y explícitos: solo nombres de categoría. Se probó
- * incluir «cómo…» para `how_to` y hacía daño, porque media pregunta en español empieza así.
- * `core` no usa LLM (ADR-0002), así que esto es una tabla, no un clasificador.
+ * The patterns are deliberately short and explicit: category names only. Including "how..."
+ * for `how_to` was tried and did harm, because half the questions start that way. `core` uses
+ * no LLM (ADR-0002), so this is a table, not a classifier.
+ *
+ * The Spanish alternatives are there because the corpus is Spanish; they match what users
+ * type, not the language of this file.
  */
 
-const PATRONES: [RegExp, ContextEntryType][] = [
+const PATTERNS: [RegExp, ContextEntryType][] = [
   [/\bdeuda[s]?\s+t[eé]cnica[s]?\b|\btechnical\s+debt\b/i, "technical_debt"],
   [/\bregla[s]?\s+de\s+negocio\b|\bbusiness\s+rule[s]?\b/i, "business_rule"],
   [/\bdecisi[oó]n(es)?\b|\bdecision[s]?\b/i, "decision"],
@@ -30,11 +33,11 @@ const PATRONES: [RegExp, ContextEntryType][] = [
 ];
 
 /**
- * El tipo que la pregunta nombra, o `null` si no nombra ninguno —que es lo normal—.
- * El primer patrón que casa gana: van de más específico a menos, porque «deuda técnica»
- * también contiene palabras que podrían sonar a otra cosa.
+ * The type the question names, or `null` when it names none -- which is the normal case.
+ * The first matching pattern wins: they run from most specific to least, because "technical
+ * debt" also contains words that could sound like something else.
  */
 export function inferTypeFromQuery(query: string): ContextEntryType | null {
-  for (const [patron, tipo] of PATRONES) if (patron.test(query)) return tipo;
+  for (const [pattern, type] of PATTERNS) if (pattern.test(query)) return type;
   return null;
 }
