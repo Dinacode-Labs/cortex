@@ -40,10 +40,11 @@ const keywordsOf = (g: GoldWindow): string[][] => [
 ];
 
 describe("the distillation fixture", () => {
-  it("there is at least one set, and each one is a language of its own", () => {
-    // The whole point of the layout: no set without a language, and no language without a set.
-    expect(LANGUAGES.length).toBeGreaterThan(0);
-    expect(LANGUAGES).toContain("es");
+  it("the sets that are documented are the sets that are there", () => {
+    // The layout's whole point: no set without a language of its own. Both are named because
+    // the command defaults to one of them and the other is the language of the corpus; losing
+    // either would leave `--lang` pointing at nothing.
+    expect(LANGUAGES).toEqual(expect.arrayContaining(["en", "es"]));
   });
 
   /** A window with no entry is never evaluated, and an entry with no window aborts the run. */
@@ -61,7 +62,7 @@ describe("the distillation fixture", () => {
 
   /** The runs are read side by side; if the cases drift apart there is nothing to compare. */
   it("every language covers the same cases", () => {
-    const reference = windowsOf("es");
+    const reference = windowsOf(LANGUAGES[0]!);
     const drifted = LANGUAGES.filter((l) => JSON.stringify(windowsOf(l)) !== JSON.stringify(reference));
     expect(drifted).toEqual([]);
   });
@@ -129,10 +130,14 @@ describe("the distillation fixture", () => {
 
   /**
    * The distiller answers in Spanish whatever it is fed (`OUTPUT_LANGUAGE` in
-   * `packages/agents/src/mastra.ts`), so any set that is not the Spanish one can only be
-   * annotated with keywords that survive the translation: names, identifiers and stems. A
-   * Spanish spelling in another language's gold means somebody annotated the output language
-   * rather than the subject, and that window would then measure translation, not judgement.
+   * `packages/agents/src/mastra.ts`), so `es` is the only set whose gold may carry words of its
+   * own language: everywhere else the answer comes back translated, and only names, identifiers
+   * and stems survive the crossing. A Spanish spelling in another language's gold means somebody
+   * annotated the output language rather than the subject, and that window would then be
+   * measuring the translation instead of the judgement.
+   *
+   * Note this does not follow the command's default, which is a different decision: it follows
+   * whichever language the agents answer in.
    */
   it("the other languages are annotated with language-invariant keywords", () => {
     const spanish: string[] = [];

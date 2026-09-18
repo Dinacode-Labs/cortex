@@ -8,8 +8,8 @@ touched: **did it get better or worse?**
 ```
 retrieval/        corpus.json · questions.json
 distill/
-  es/             windows/ · gold.json     the language of the corpus, and the default
-  en/             windows/ · gold.json     the same eight cases as English sessions
+  en/             windows/ · gold.json     the default
+  es/             windows/ · gold.json     the same eight cases in the language of the corpus
 ```
 
 One directory per set, and inside distillation one per language, each carrying its own windows
@@ -143,8 +143,8 @@ one, because what reads it is an agent that cannot tell which is which.
 ### How to run it
 
 ```bash
-pnpm admin eval-distill                       # es, the language of the corpus
-pnpm admin eval-distill --lang en             # the same eight cases as English sessions
+pnpm admin eval-distill                       # en, the default
+pnpm admin eval-distill --lang es             # the same eight cases in the corpus's language
 pnpm admin eval-distill --verbose             # plus every item: type · title · first 120 chars
 pnpm admin eval-distill --windows <dir> --gold <file>   # a fixture from outside the repo
 ```
@@ -178,28 +178,32 @@ often names the alternative it rejected, and that is knowledge, not a leak. That
 `b-confirm-reject.txt` forbids only the idea nobody answered, and why what the window is really
 for is read with `--verbose`.
 
-### The same exam in other languages
+### One set per language
 
-`distill/en/` holds the same eight cases as English sessions. Each language is a directory of
-its own with its **own windows and its own gold**, because the two are useless apart, and
-adding a third is copying a directory rather than editing anything. They are run
-**separately, with their own mark**: mixed into one total, a gain in one language would hide a
-loss in the other and the number would stop saying what happened.
+The same eight cases exist in English and in Spanish. Each language is a directory of its own
+with its **own windows and its own gold**, because the two are useless apart, and adding a third
+is copying a directory rather than editing anything. They are run **separately, with their own
+mark**: mixed into one total, a gain in one language would hide a loss in the other and the
+number would stop saying what happened.
 
-What they measure is not "does it distil in English". The distiller answers in Spanish whatever
-it is fed -- `OUTPUT_LANGUAGE` in `packages/agents/src/mastra.ts` is fixed, and changing it is a
-product decision, not a translation -- so an English window measures whether it understands an
-English session as well as a Spanish one, and whether the judgement survives the crossing.
+There is an asymmetry worth knowing before reading either number. **The distiller answers in
+Spanish whatever it is fed** -- `OUTPUT_LANGUAGE` in `packages/agents/src/mastra.ts` is fixed,
+and changing it is a product decision, not a translation. So:
 
-That is also why the English key is annotated only with **language-invariant keywords**: names
-and identifiers (`ULID`, `UTC`, `Redis`, `Kafka`, `OOM`, `ocr.ts`) and stems (`idempot`,
-`retroactiv`, `memor`). Annotate it with Spanish words and the window would be measuring the
-translation instead of the judgement, which is a different question and one nobody asked. There
-is a test for it (`tests/eval-distill-fixture.test.ts`), along with the rest of what breaks in
-silence here: a window with no entry in the key, a keyword that is nowhere in its own window, a
-type that is not in the domain.
+- **`es`** is the session and the corpus in the same language: it measures the judgement alone.
+- **`en`** is a session that crosses into another language on the way out. It measures whether
+  the judgement survives that crossing, which is the situation a public repository actually
+  meets, and it is the default.
 
-The two sets are deliberately the **same eight cases**. Compared side by side they answer the
+That crossing is also why the English key is annotated only with **language-invariant
+keywords**: names and identifiers (`ULID`, `UTC`, `Redis`, `Kafka`, `OOM`, `ocr.ts`) and stems
+(`idempot`, `retroactiv`, `memor`). Annotate it with Spanish words and the window would be
+measuring the translation rather than the judgement, which is a different question and one
+nobody asked. There is a test for it (`tests/eval-distill-fixture.test.ts`), along with the rest
+of what breaks in silence here: a window with no entry in the key, a keyword that is nowhere in
+its own window, a type that is not in the domain.
+
+The sets are deliberately the **same eight cases**, so that read side by side they answer the
 question worth asking: does the distiller lose anything when the session is not in the language
 of the corpus?
 

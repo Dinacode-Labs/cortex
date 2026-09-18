@@ -447,8 +447,8 @@ pnpm admin maintain-worker    # scheduled maintenance
   `pnpm admin eval` measures **retrieval**: recall@5 and MRR over a fixed corpus with annotated
   evidence. `pnpm admin eval-distill` measures the **distiller** over a set of session windows
   with an annotated expectation each -- what it keeps, what it drops and what it files under the
-  wrong type -- in Spanish, the language of the corpus, or in English with `--lang en`, each
-  with its own mark; `--verbose` prints every item it emitted. Both need a real provider, and
+  wrong type -- in English, or in the corpus's own language with `--lang es`, each set with its
+  own mark; `--verbose` prints every item it emitted. Both need a real provider, and
   `eval-distill` refuses to run without an LLM, because the distiller *is* the model and with no
   model every window comes back empty. What each set contains and what the numbers mean:
   [`tests/fixtures/eval/README.md`](./tests/fixtures/eval/README.md).

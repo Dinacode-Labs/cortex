@@ -20,12 +20,13 @@ fixes things.
   would read as a perfect zero. What each window tests and what the numbers mean:
   `tests/fixtures/eval/README.md`.
 
-  The same eight cases also exist as **English sessions** (`distill/en/`), run
-  separately and with their own mark: mixed into one total, a gain in one language would hide a
-  loss in the other. Since the agents answer in Spanish whatever they are fed
-  (`OUTPUT_LANGUAGE`), what the English set measures is whether the judgement survives a session
-  that is not in the language of the corpus, and it is annotated only with keywords that survive
-  translation.
+  The eight cases exist **in English and in Spanish**, one directory per language
+  (`distill/en/`, `distill/es/`), run separately and each with its own mark: mixed into one
+  total, a gain in one language would hide a loss in the other. English is what `eval-distill`
+  runs with no arguments and `--lang es` gets the other. Since the agents answer in Spanish
+  whatever they are fed (`OUTPUT_LANGUAGE`), the English set measures whether the judgement
+  survives a session that is not in the language of the corpus, and it is annotated only with
+  keywords that survive translation.
 
 ### Changed
 - **How to build an eval is written down**, in `.claude/rules/evals.md`: when a mark on a model

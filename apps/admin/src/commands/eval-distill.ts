@@ -17,8 +17,8 @@ import { matchDistillItems, summarizeDistillMatches, type DistillItem, type Gold
  * language, each holding its own windows and its own gold: the two are useless apart, and
  * adding a language has to be copying a directory rather than editing this file.
  *
- *   cortex-admin eval-distill                    the Spanish set, the language of the corpus
- *   cortex-admin eval-distill --lang en          another language of the same eight cases
+ *   cortex-admin eval-distill                    the English set
+ *   cortex-admin eval-distill --lang es          the same eight cases in the corpus's language
  *   cortex-admin eval-distill --verbose          plus every item emitted
  *   cortex-admin eval-distill --windows <dir> --gold <file>    a fixture from outside the repo
  */
@@ -27,11 +27,15 @@ import { matchDistillItems, summarizeDistillMatches, type DistillItem, type Gold
 const PROJECT = "Nébula";
 
 /**
- * The language of the corpus Cortex actually ingests, and the one the baseline was measured
- * against. It is explicit in the path rather than being the directory with no suffix: the first
- * language in is not the implicit one, or the second arrives as an afterthought.
+ * The repository is public and English (ADR-0064), so that is what somebody who clones it and
+ * runs this without arguments gets. It is still explicit in the path rather than being the
+ * directory with no suffix: no language is the implicit one, whichever goes first.
+ *
+ * Worth knowing when reading its numbers: the agents answer in Spanish whatever they are fed
+ * (`OUTPUT_LANGUAGE`), so the default set measures a session that is NOT in the language of the
+ * corpus. `--lang es` is the one that measures the two matching.
  */
-const DEFAULT_LANGUAGE = "es";
+const DEFAULT_LANGUAGE = "en";
 
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
