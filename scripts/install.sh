@@ -1,59 +1,60 @@
 #!/usr/bin/env sh
-# Instalador de Cortex (macOS / Linux / WSL):
+# Cortex installer (macOS / Linux / WSL):
 #
-#   curl -fsSL <servidor>/install.sh | sh
+#   curl -fsSL <server>/install.sh | sh
 #
-# Instala el CLI desde npm, inicia sesión (email + código) y configura tus agentes.
-# No clona nada ni deja claves en tu equipo: la destilación corre en el servidor.
+# It installs the CLI from npm, signs you in (email + code) and configures your agents.
+# It clones nothing and leaves no keys on your machine: distillation runs on the server.
 #
-# Variables: CORTEX_SERVER_URL (a qué servidor), CORTEX_NPM_PACKAGE (paquete a instalar),
-# CORTEX_SKIP_SETUP=1 (no tocar la configuración de los agentes).
+# Variables: CORTEX_SERVER_URL (which server), CORTEX_NPM_PACKAGE (package to install),
+# CORTEX_SKIP_SETUP=1 (do not touch the agents' configuration).
 set -e
 
 SERVER_URL="${CORTEX_SERVER_URL:-__CORTEX_SERVER_URL__}"
-# Se usa tal cual: así CORTEX_NPM_PACKAGE puede ser otra versión, un tag o un tarball local.
+# Used as is: that way CORTEX_NPM_PACKAGE can be another version, a tag or a local tarball.
 PKG="${CORTEX_NPM_PACKAGE:-@dinacodelabs/cortex@latest}"
 
 say()  { printf '\033[36m→ %s\033[0m\n' "$1"; }
 fail() { printf '\033[31m✗ %s\033[0m\n' "$1" >&2; exit 1; }
 
 # --- Node --------------------------------------------------------------------
-# No lo instalamos por ti: meter una versión de Node en el equipo de alguien por detrás es
-# la clase de cosa que rompe otros proyectos suyos.
+# We do not install it for you: putting a version of Node on somebody's machine behind their
+# back is the kind of thing that breaks their other projects.
 need_node() {
-  printf '\033[31m✗ Cortex necesita Node.js 20 o superior.\033[0m\n' >&2
-  echo "  Instálalo de una de estas formas y vuelve a ejecutar esto:" >&2
+  printf '\033[31m✗ Cortex needs Node.js 20 or newer.\033[0m\n' >&2
+  echo "  Install it one of these ways and run this again:" >&2
   echo "    brew install node          (macOS)" >&2
-  echo "    fnm install --lts          (o nvm, si ya lo usas)" >&2
+  echo "    fnm install --lts          (or nvm, if that is what you use)" >&2
   echo "    https://nodejs.org/" >&2
   exit 1
 }
 command -v node >/dev/null 2>&1 || need_node
 MAJOR=$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)
 [ "$MAJOR" -ge 20 ] 2>/dev/null || need_node
-command -v npm >/dev/null 2>&1 || fail "Tienes Node pero no npm. Reinstala Node e inténtalo otra vez."
+command -v npm >/dev/null 2>&1 || fail "You have Node but not npm. Reinstall Node and try again."
 
 # --- CLI ---------------------------------------------------------------------
-say "Instalando $PKG"
-# La salida de npm se guarda en vez de tirarse: antes se silenciaba y se culpaba siempre a los
-# permisos, así que un paquete inexistente o un registro caído mandaban a la gente a
-# reconfigurar su npm para nada. El error de npm dice cuál de las tres es.
+say "Installing $PKG"
+# npm's output is kept rather than thrown away: it used to be silenced and permissions always
+# blamed, so a non-existent package or a registry outage sent people off to reconfigure their
+# npm for nothing. npm's error says which of the three it is.
 LOG_NPM="$(mktemp)"
 if ! npm install -g "$PKG" >"$LOG_NPM" 2>&1; then
-  printf '\033[31m✗ npm no ha podido instalar %s.\033[0m\n' "$PKG" >&2
+  printf '\033[31m✗ npm could not install %s.\033[0m\n' "$PKG" >&2
   if grep -qE "E404|404 Not Found" "$LOG_NPM"; then
-    echo "  El registro dice que ese paquete no existe." >&2
-    echo "  Si Cortex aún no está publicado, pide a quien lleve el servidor la forma de instalarlo" >&2
-    echo "  mientras tanto. Si estás probando otro paquete, pásalo con CORTEX_NPM_PACKAGE." >&2
+    echo "  The registry says that package does not exist." >&2
+    echo "  If Cortex is not published yet, ask whoever runs the server how to install it" >&2
+    echo "  in the meantime. If you are testing another package, pass it in CORTEX_NPM_PACKAGE." >&2
   elif grep -qE "EACCES|EPERM|permission denied" "$LOG_NPM"; then
-    echo "  Es cosa de permisos. Lo habitual es instalar en tu carpeta y no en el sistema:" >&2
+    echo "  This is a permissions problem. The usual fix is installing into your own folder" >&2
+    echo "  rather than the system:" >&2
     echo "    npm config set prefix ~/.npm-global" >&2
-    echo '    export PATH="$HOME/.npm-global/bin:$PATH"   # añádelo a tu ~/.zshrc o ~/.bashrc' >&2
-    echo "  Y repite este mismo comando." >&2
+    echo '    export PATH="$HOME/.npm-global/bin:$PATH"   # add it to your ~/.zshrc or ~/.bashrc' >&2
+    echo "  Then run this same command again." >&2
   elif grep -qE "ENOTFOUND|ETIMEDOUT|ECONNREFUSED|network" "$LOG_NPM"; then
-    echo "  No se ha podido llegar al registro de npm. ¿Estás conectado? ¿Hay un proxy por medio?" >&2
+    echo "  The npm registry could not be reached. Are you online? Is there a proxy in the way?" >&2
   else
-    echo "  Esto es lo que ha dicho npm:" >&2
+    echo "  This is what npm said:" >&2
     tail -n 6 "$LOG_NPM" | sed 's/^/    /' >&2
   fi
   rm -f "$LOG_NPM"
@@ -63,33 +64,33 @@ rm -f "$LOG_NPM"
 
 if ! command -v cortex >/dev/null 2>&1; then
   BIN="$(npm prefix -g 2>/dev/null)/bin"
-  printf '\033[31m✗ `cortex` no está en tu PATH.\033[0m\n' >&2
-  echo "  Se ha instalado en $BIN. Añádelo:" >&2
-  echo "    export PATH=\"$BIN:\$PATH\"   # añádelo a tu ~/.zshrc o ~/.bashrc" >&2
+  printf '\033[31m✗ `cortex` is not on your PATH.\033[0m\n' >&2
+  echo "  It was installed in $BIN. Add it:" >&2
+  echo "    export PATH=\"$BIN:\$PATH\"   # add it to your ~/.zshrc or ~/.bashrc" >&2
   exit 1
 fi
 say "CLI: $(cortex --version)"
 
-# --- Sesión ------------------------------------------------------------------
-# `curl | sh` no deja stdin libre para escribir el código: se lee de la terminal. Que
-# /dev/tty exista no basta (en CI y en contenedores está pero no se puede abrir), así que se
-# intenta abrir de verdad antes de pedirle nada al usuario.
+# --- Session -----------------------------------------------------------------
+# `curl | sh` leaves no free stdin for typing the code: it is read from the terminal. /dev/tty
+# existing is not enough (in CI and in containers it is there but cannot be opened), so we
+# really try to open it before asking the user for anything.
 if (exec 3</dev/tty) 2>/dev/null; then
-  say "Inicia sesión (email de trabajo + código que te llegará por correo)"
+  say "Sign in (work email + the code you will get by email)"
   cortex auth login --server "$SERVER_URL" < /dev/tty || true
 else
-  say "Sin terminal interactiva: inicia sesión luego con  cortex auth login --server $SERVER_URL"
+  say "No interactive terminal: sign in later with  cortex auth login --server $SERVER_URL"
 fi
 
-# --- Agentes -----------------------------------------------------------------
+# --- Agents ------------------------------------------------------------------
 if [ "${CORTEX_SKIP_SETUP:-}" = "1" ]; then
-  say "Configuración de agentes omitida (CORTEX_SKIP_SETUP=1)"
+  say "Agent configuration skipped (CORTEX_SKIP_SETUP=1)"
 else
-  say "Configurando tus agentes"
+  say "Configuring your agents"
   cortex setup --all || true
 fi
 
-printf '\033[32m✓ Cortex instalado.\033[0m\n'
-echo "  cortex link --create \"Mi Proyecto\"  vincular esta carpeta a un proyecto"
-echo "  cortex doctor                       comprobar que todo está en su sitio"
-echo "  cortex --help                       todos los comandos"
+printf '\033[32m✓ Cortex installed.\033[0m\n'
+echo "  cortex link --create \"My Project\"   link this folder to a project"
+echo "  cortex doctor                       check that everything is in place"
+echo "  cortex --help                       every command"

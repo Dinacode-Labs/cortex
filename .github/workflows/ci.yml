@@ -23,13 +23,13 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 15
 
     env:
-      # BD de test (el service expone 5432 en el 5433 del host); embeddings local / LLM none.
+      # Test database (the service maps 5432 to the host's 5433); local embeddings / LLM none.
       CORTEX_TEST_DATABASE_URL: postgres://cortex:cortex@localhost:5433/cortex_test
 
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6 # lee packageManager del package.json
+      - uses: pnpm/action-setup@v6 # reads packageManager from package.json
 
       - uses: actions/setup-node@v7
         with:
@@ -44,16 +44,16 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      - name: Integration tests (Postgres real)
+      - name: Integration tests (real Postgres)
         run: pnpm test:integration
 
       - name: Build (tsc -b)
         run: pnpm build
 
-      # Que compile no basta: hay que comprobar que el JS de dist ARRANCA. Los fallos
-      # típicos aquí son rutas a ficheros de datos (migraciones, estáticos) que resolvían
-      # bien desde src y no desde dist, y no los detecta ni el typecheck ni los tests.
-      - name: Smoke del build
+      # Compiling is not enough: the JS in dist has to actually START. The typical failures
+      # here are paths to data files (migrations, static assets) that resolved fine from src
+      # and not from dist, and neither typecheck nor the tests catch them.
+      - name: Build smoke test
         run: |
           node -e "
             const { existsSync } = require('node:fs');
@@ -65,23 +65,23 @@ jobs:
               'apps/web/dist/index.js',
               'apps/mcp-server/dist/http.js',
             ];
-            for (const f of must) if (!existsSync(f)) { console.error('falta', f); process.exit(1); }
-            // Ficheros de datos que se resuelven relativos al compilado.
+            for (const f of must) if (!existsSync(f)) { console.error('missing', f); process.exit(1); }
+            // Data files resolved relative to the compiled output.
             const paths = [
-              ['migraciones', resolve('packages/database/dist', '../migrations')],
-              ['estáticos web', resolve('apps/web/dist', '../public')],
+              ['migrations', resolve('packages/database/dist', '../migrations')],
+              ['web static assets', resolve('apps/web/dist', '../public')],
               ['install.sh', resolve('apps/server/dist/routes', '../../../../scripts/install.sh')],
             ];
-            for (const [name, p] of paths) if (!existsSync(p)) { console.error('no resuelve desde dist:', name, p); process.exit(1); }
-            console.log('dist completo y rutas de datos correctas');
+            for (const [name, p] of paths) if (!existsSync(p)) { console.error('does not resolve from dist:', name, p); process.exit(1); }
+            console.log('dist complete and data paths correct');
           "
-          node -e "import('./apps/server/dist/app.js').then(m => { if (typeof m.createApp !== 'function') { console.error('createApp no exportado'); process.exit(1); } console.log('la app compilada carga'); })"
+          node -e "import('./apps/server/dist/app.js').then(m => { if (typeof m.createApp !== 'function') { console.error('createApp not exported'); process.exit(1); } console.log('the compiled app loads'); })"
 
-      # El CLI se publica en npm como un bundle, no con `tsc`, así que su build es aparte.
-      # Lo que se comprueba es lo que rompe una publicación: que arranca, que no se ha colado
-      # `import.meta.dirname` (el bundle es plano y no resuelve rutas del repo), que no ha
-      # entrado Postgres ni Mastra por un import descuidado, y que `npm pack` no se queja.
-      - name: Empaquetado del CLI
+      # The CLI ships to npm as a bundle, not through `tsc`, so its build is separate. What
+      # gets checked is what breaks a publish: that it starts, that no `import.meta.dirname`
+      # slipped in (the bundle is flat and does not resolve repo paths), that neither Postgres
+      # nor Mastra came along through a careless import, and that `npm pack` does not complain.
+      - name: CLI bundle
         run: |
           pnpm --filter @dinacodelabs/cortex build
           node apps/cli/dist/cortex.js --help > /dev/null
@@ -92,18 +92,18 @@ jobs:
             const { statSync } = require('node:fs');
             const kb = statSync('apps/cli/dist/cortex.js').size / 1024;
             console.log('bundle: ' + kb.toFixed(0) + ' KB');
-            if (kb > 1024) { console.error('el bundle ha pasado de 1 MB: algo pesado se ha colado'); process.exit(1); }
+            if (kb > 1024) { console.error('the bundle went past 1 MB: something heavy slipped in'); process.exit(1); }
           "
           cd apps/cli && npm pack --dry-run
 
-      # La imagen es la que se despliega: que compile aquí evita descubrir en el servidor
-      # que falta un fichero de datos o que una etapa del multi-stage se quedó atrás.
-      # La caché de GitHub Actions solo funciona con el driver docker-container, que es lo
-      # que instala setup-buildx-action; sin esto, buildx falla con "Cache export is not
+      # The image is what gets deployed: building it here avoids finding out on the server
+      # that a data file is missing or that one multi-stage step was left behind. The GitHub
+      # Actions cache only works with the docker-container driver, which is what
+      # setup-buildx-action installs; without it, buildx fails with "Cache export is not
       # supported for the docker driver".
       - uses: docker/setup-buildx-action@v3
 
-      - name: Imagen Docker
+      - name: Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -111,9 +111,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Informativo a propósito, no bloqueante: hoy hay vulnerabilidades altas TRANSITIVAS
-      # en mammoth, el SDK de MCP y Mastra que no podemos arreglar hasta que publiquen. Un
-      # gate que falla desde el primer día se acaba desactivando y deja de aportar nada;
-      # esto lo deja visible en cada build y Dependabot abre los PRs. Ver SECURITY.md.
-      - name: Auditoría de dependencias (informativa)
+      # Informational on purpose, not blocking: today there are high TRANSITIVE
+      # vulnerabilities in mammoth, the MCP SDK and Mastra that we cannot fix until they
+      # publish. A gate that fails from day one ends up being switched off and stops meaning
+      # anything; this keeps it visible on every build and Dependabot opens the PRs. See
+      # SECURITY.md.
+      - name: Dependency audit (informational)
         run: pnpm audit --prod --audit-level=high || true

@@ -17,17 +17,17 @@ import { currentUser } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
 /**
- * Rutas de contexto autenticadas (sustituyen el acceso directo a BD de
- * hooks/conectores): la escritura se atribuye al usuario (created_by = email)
- * y respeta permisos. Los errores no controlados suben al onError de app.ts.
+ * Authenticated context routes (they replace the direct database access hooks and connectors
+ * used to have): writes are attributed to the user (created_by = email) and respect
+ * permissions. Unhandled errors bubble up to app.ts's onError.
  */
 export const contextRoutes = new Hono();
 
-// --- Schemas de REQUEST (zod v3) ----------------------------------------------
-// Los enums vienen de @cortex/shared: los valores que envían los conectores reales
-// (document, github_pr/github_issue, notion_doc, meeting_transcript, agent_session;
-// pr_summary/ticket_resolution/incident; belongs_to) están todos dentro del enum.
-// Los campos antes tolerados como opcionales siguen opcionales.
+// --- REQUEST schemas (zod v3) -------------------------------------------------
+// The enums come from @cortex/shared: the values the real connectors send (document,
+// github_pr/github_issue, notion_doc, meeting_transcript, agent_session;
+// pr_summary/ticket_resolution/incident; belongs_to) are all inside the enum.
+// Fields previously tolerated as optional remain optional.
 
 const captureSchema = z.object({
   slug: z.string().min(1),
@@ -37,10 +37,10 @@ const captureSchema = z.object({
   confidence: confidenceLevel.optional(),
   sourceType: sourceType.optional(),
   sourceReference: z.string().optional(),
-  metadata: z.record(z.unknown()).optional(), // Record abierto, como hasta ahora
+  metadata: z.record(z.unknown()).optional(), // an open record, as it has always been
 });
 
-// Mismo shape que BatchItem de @cortex/core (allí tipado como strings laxos).
+// The same shape as @cortex/core's BatchItem (typed there as loose strings).
 const batchItemSchema = z.object({
   title: z.string().optional(),
   content: z.string().min(1),
@@ -62,9 +62,9 @@ const relateSchema = z.object({
   relationType: relationType,
 });
 
-// --- Rutas ---------------------------------------------------------------------
+// --- Routes --------------------------------------------------------------------
 
-/** Inyección de contexto (hook SessionStart): pack del proyecto vinculado, con acceso. */
+/** Context injection (the SessionStart hook): the linked project's pack, access permitting. */
 contextRoutes.get("/context-pack", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
@@ -75,26 +75,26 @@ contextRoutes.get("/context-pack", async (c) => {
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
   try {
-    // Quien consume dice cuánto le cabe; recortar aquí reparte el hueco entre secciones en
-    // vez de cortar el pack por donde toque. Acotado, para que nadie pida un pack absurdo.
-    const pedido = Number(c.req.query("maxChars") ?? "");
-    const maxChars = Number.isFinite(pedido) && pedido > 0 ? Math.min(pedido, 200_000) : undefined;
+    // The consumer says how much fits; trimming here shares the room out between sections
+    // instead of cutting the pack wherever it lands. Bounded, so nobody asks for an absurd pack.
+    const asked = Number(c.req.query("maxChars") ?? "");
+    const maxChars = Number.isFinite(asked) && asked > 0 ? Math.min(asked, 200_000) : undefined;
     const text = renderContextPack(await getContextPack(project.name), { maxChars });
     return c.json({ project: project.name, text });
   } catch (e) {
-    // SOLO la carrera guard→consulta: el proyecto puede desaparecer/renombrarse entre
-    // checkProjectAccess y getContextPack ("Proyecto no encontrado: ..."). En ese caso
-    // conservamos el contrato del hook (pack vacío, la sesión no se rompe). Cualquier
-    // otro error sube al onError de app.ts (antes se tragaba TODO aquí).
-    if (e instanceof Error && e.message.startsWith("Proyecto no encontrado")) {
+    // ONLY the guard-to-query race: the project can disappear or be renamed between
+    // checkProjectAccess and getContextPack ("Project not found: ..."). In that case we keep
+    // the hook's contract (an empty pack, the session does not break). Any other error bubbles
+    // up to app.ts's onError (this used to swallow EVERYTHING).
+    if (e instanceof Error && e.message.startsWith("Project not found")) {
       return c.json({ project: project.name, text: "" });
     }
     throw e;
   }
 });
 
-/** Captura autenticada (hook SessionEnd / conectores): guarda con reconciliación y
- *  atribución (created_by = email). Respeta permisos del proyecto. */
+/** Authenticated capture (the SessionEnd hook / connectors): it stores with reconciliation
+ *  and attribution (created_by = email). It respects the project's permissions. */
 contextRoutes.post("/capture", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
@@ -104,8 +104,8 @@ contextRoutes.post("/capture", async (c) => {
   if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
-  // Sin try/catch: un fallo interno sube al onError (500 genérico; el mensaje
-  // interno ya no se filtra al cliente — los conectores solo miran r.ok).
+  // No try/catch: an internal failure bubbles up to onError (a generic 500; the internal
+  // message no longer leaks to the client -- the connectors only look at r.ok).
   const r = await saveWithReconciliation(
     {
       content: body.content,
@@ -115,7 +115,7 @@ contextRoutes.post("/capture", async (c) => {
       confidence: body.confidence ?? "low",
       sourceType: body.sourceType ?? "manual",
       sourceReference: body.sourceReference,
-      createdBy: user.email, // ATRIBUCIÓN: quién metió el dato
+      createdBy: user.email, // ATTRIBUTION: who put the data in
       metadata: body.metadata,
     },
     { useClassifier: false, detectImprovements: false, skipEmbedding: false },
@@ -123,7 +123,7 @@ contextRoutes.post("/capture", async (c) => {
   return c.json(r);
 });
 
-/** Captura por LOTES (conectores): N items, embedding por lotes, atribución. */
+/** BATCH capture (connectors): N items, batched embedding, attribution. */
 contextRoutes.post("/capture/batch", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
@@ -137,14 +137,14 @@ contextRoutes.post("/capture/batch", async (c) => {
   return c.json({ results });
 });
 
-/** Relación entre entradas (p.ej. adjunto belongs_to su página). Autenticado. */
+/** A relation between entries (e.g. an attachment belongs_to its page). Authenticated. */
 contextRoutes.post("/relate", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const body = await parseBody(c, relateSchema);
   if (body instanceof Response) return body;
-  // Permiso por entrada (no por nombre de proyecto): hay que poder acceder a AMBAS.
-  // Entrada sin proyecto → se permite (no hay permisos que aplicar).
+  // Permission per entry (not by project name): BOTH must be accessible.
+  // An entry with no project is allowed (there are no permissions to apply).
   for (const eid of [body.sourceId, body.targetId]) {
     const access = await checkEntryAccess(user.email, eid);
     if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
@@ -154,19 +154,19 @@ contextRoutes.post("/relate", async (c) => {
   return c.json({ ok: true });
 });
 
-// --- Lectura: búsqueda y acceso por id -------------------------------------------------
+// --- Reading: search and access by id --------------------------------------------------
 
 /**
- * Los ids son UUID y llegan de fuera (un agente los inventa antes que preguntarlos). Sin esta
- * comprobación, un id mal formado llega a Postgres y sale un 500: es entrada de usuario, no un
- * fallo del servidor, así que se responde lo mismo que a un id que no existe.
+ * The ids are UUIDs and arrive from outside (an agent will invent one before asking). Without
+ * this check, a malformed id reaches Postgres and comes back as a 500: it is user input, not a
+ * server fault, so the answer is the same as for an id that does not exist.
  */
 const ES_UUID = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
 //
-// La API sabía escribir pero no leer: buscar solo existía por MCP, contra la base de datos.
-// Eso dejaba fuera al CLI y a las tools de memoria que Cortex registra en Pi (ADR-0034).
+// The API could write but not read: search only existed over MCP, against the database. That
+// left out the CLI and the memory tools Cortex registers in Pi (ADR-0034).
 
-/** Búsqueda híbrida. Sin `slug`, en todo lo que el usuario puede ver; con `slug`, en ese proyecto. */
+/** Hybrid search. Without `slug`, over everything the user can see; with one, in that project. */
 contextRoutes.get("/search", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
@@ -186,8 +186,8 @@ contextRoutes.get("/search", async (c) => {
     project = access.project.name;
   }
 
-  // Sin proyecto concreto hay que acotar a lo accesible: si no, la búsqueda global sería una
-  // vía para leer proyectos privados de otros.
+  // With no concrete project it must be scoped to what is accessible: otherwise global search
+  // would be a way to read other people's private projects.
   const hits = await searchContext(
     { query: q, project, type: tipo.success ? tipo.data : undefined, limit },
     project ? undefined : { restrictToAccessibleOf: user.email },
@@ -207,7 +207,7 @@ contextRoutes.get("/search", async (c) => {
   });
 });
 
-/** Una entrada concreta, con su trazabilidad. Permiso POR ENTRADA, no por nombre de proyecto. */
+/** One entry, with its provenance. Permission PER ENTRY, not by project name. */
 contextRoutes.get("/entries/:id", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
@@ -217,11 +217,11 @@ contextRoutes.get("/entries/:id", async (c) => {
   if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const detail = await getEntryDetail(id);
-  if (!detail) return c.json({ error: "Entry not found." }, 404); // carrera guard→consulta
+  if (!detail) return c.json({ error: "Entry not found." }, 404); // a race between the guard and the query
   return c.json(detail);
 });
 
-/** Corrección de una entrada (título y/o contenido). Es como un agente arregla lo que guardó mal. */
+/** Correcting an entry (title and/or content). It is how an agent fixes what it stored badly. */
 contextRoutes.patch("/entries/:id", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);

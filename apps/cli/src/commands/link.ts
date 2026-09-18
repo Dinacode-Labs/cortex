@@ -15,25 +15,25 @@ import {
 import { requireCompatibleServer } from "../compat.js";
 
 /**
- * `cortex link`: vincula la carpeta actual a un proyecto de Cortex escribiendo
- * `.cortex.json`. Es el acto DELIBERADO que conecta un repo (gate inverso: sin vínculo no
- * se inyecta ni se captura nada). Crear ≠ vincular: `--create` crea el proyecto y vincula.
+ * `cortex link`: links the current folder to a Cortex project by writing `.cortex.json`. It is
+ * the DELIBERATE act that connects a repo (an inverse gate: with no link nothing is injected
+ * and nothing is captured). Creating is not linking: `--create` creates the project and links.
  *
- *   cortex link <slug>                 vincular a un proyecto EXISTENTE
- *   cortex link --create "<Nombre>"    crear el proyecto y vincular
- *   cortex link --ignore               opt-out: este repo NO usa Cortex
- *   cortex link                        ver el vínculo actual y los proyectos disponibles
+ *   cortex link <slug>                 link to an EXISTING project
+ *   cortex link --create "<Name>"      create the project and link
+ *   cortex link --ignore               opt out: this repo does NOT use Cortex
+ *   cortex link                        see the current link and the available projects
  *
- * Con `--server` se vincula a un Cortex que no es el de por defecto, y el `.cortex.json` se
- * lo queda (ADR-0033). Con varios servidores configurados, `--create` EXIGE decir cuál: es
- * el único punto del flujo donde alguien podría crear el proyecto de un cliente en el
- * servidor de otro, y de ahí en adelante ya no habría forma de darse cuenta.
+ * With `--server` it links to a Cortex other than the default, and the `.cortex.json` keeps it
+ * (ADR-0033). With several servers configured, `--create` REQUIRES saying which: it is the one
+ * point in the flow where somebody could create a client's project on another's server, and
+ * from then on there would be no way to notice.
  *
- * Va por la API y no por la base de datos (ADR-0025): era el último comando del CLI que
- * necesitaba Postgres, y mientras lo necesitara no se podía distribuir un cliente ligero.
+ * It goes through the API rather than the database (ADR-0025): it was the last CLI command that
+ * needed Postgres, and while it needed it no lightweight client could be shipped.
  */
 
-// `pnpm --filter` cambia el cwd al paquete; INIT_CWD conserva el del usuario.
+// `pnpm --filter` changes the cwd to the package; INIT_CWD keeps the user's.
 const TARGET_CWD = process.env.INIT_CWD || process.cwd();
 
 function write(link: CortexLink, msg: string): void {
@@ -55,9 +55,9 @@ function flagValue(args: string[], name: string): string | undefined {
 }
 
 /**
- * A qué servidor va esta operación: lo que diga `--server`, si no lo que ya dijera el repo,
- * si no el de por defecto. Devuelve también si fue explícito, que es lo que decide si el
- * `.cortex.json` se guarda el servidor o se queda con el de por defecto.
+ * Which server this operation goes to: whatever `--server` says, failing that whatever the repo
+ * already said, failing that the default. It also returns whether it was explicit, which is
+ * what decides whether the `.cortex.json` stores the server or stays on the default.
  */
 function resolveServer(args: string[]): { server: string | undefined; explicit: boolean } {
   const explicito = flagValue(args, "server");
@@ -70,25 +70,25 @@ function resolveServer(args: string[]): { server: string | undefined; explicit: 
   return { server: link?.server, explicit: false };
 }
 
-/** Con varias sesiones, crear sin decir dónde es el error caro. Se corta antes. */
+/** With several sessions, creating without saying where is the expensive mistake. It stops first. */
 function requireExplicitServerToCreate(server: string | undefined): boolean {
-  const sesiones = listCredentials();
-  if (server || sesiones.length <= 1) return true;
+  const sessions = listCredentials();
+  if (server || sessions.length <= 1) return true;
   console.error("✗ You are signed in to more than one Cortex. Say which one should hold this project:\n");
-  for (const c of sesiones) console.error(`    cortex link --create "<Name>" --server ${c.server}${c.server === defaultServer() ? "   (default)" : ""}`);
+  for (const c of sessions) console.error(`    cortex link --create "<Name>" --server ${c.server}${c.server === defaultServer() ? "   (default)" : ""}`);
   console.error("\n  Nothing was created. Creating it on the wrong server is not something you would notice later.");
   process.exitCode = 1;
   return false;
 }
 
-/** Mensaje de "existe pero es privado", con los admins a los que pedir acceso. */
+/** The "it exists but is private" message, with the admins to ask for access. */
 function askAccess(name: string, admins?: string[]): string {
   const quien = admins?.length ? ` (${admins.join(", ")})` : "";
   return `✗ The project "${name}" exists but is private and you do not have access.\n  Ask an administrator${quien} for access. Nothing was created.`;
 }
 
 export async function run(args: string[]): Promise<void> {
-  // Los valores de --server y --parent no son nombres de proyecto.
+  // The values of --server and --parent are not project names.
   const consumidos = new Set<string>();
   for (const f of ["--server", "--parent"]) {
     const i = args.indexOf(f);
@@ -96,7 +96,7 @@ export async function run(args: string[]): Promise<void> {
   }
   const positional = args.filter((a) => !a.startsWith("--") && !consumidos.has(a));
   const { server, explicit } = resolveServer(args);
-  /** El servidor solo se guarda en el .cortex.json si NO es el de por defecto. */
+  /** The server is only stored in .cortex.json when it is NOT the default one. */
   const serverField = (): { server?: string } => (server && server !== defaultServer() ? { server } : {});
 
   if (args.includes("--ignore")) {
@@ -113,7 +113,7 @@ export async function run(args: string[]): Promise<void> {
     }
     if (!requireExplicitServerToCreate(explicit ? server : undefined)) return;
     if (!requireSession()) return;
-    await requireCompatibleServer(); // crear un proyecto es escribir (ADR-0062)
+    await requireCompatibleServer(); // creating a project is a write (ADR-0062)
     const pi = args.indexOf("--parent");
     const res = await createProject({
       name,
@@ -166,7 +166,7 @@ export async function run(args: string[]): Promise<void> {
     return;
   }
 
-  // Sin argumentos: estado actual + qué proyectos hay disponibles.
+  // With no arguments: the current state plus which projects are available.
   const link = useProjectServer(TARGET_CWD);
   if (!link) console.log("This folder is NOT linked to any project (there is no .cortex.json).");
   else if (link.ignore) console.log("This folder is marked as IGNORED for Cortex.");
@@ -187,8 +187,8 @@ export async function run(args: string[]): Promise<void> {
     return;
   }
   console.log("\nProjects you can access:");
-  // Un proyecto puede no tener slug: los creados antes de que el slug existiera siguen ahí.
-  // Sin esto, `cortex link` revienta entero por un dato viejo en vez de listar lo demás.
+  // A project may have no slug: the ones created before slugs existed are still there.
+  // Without this, `cortex link` blows up entirely over one old row instead of listing the rest.
   const slugOf = (p: { slug?: string | null }): string => p.slug ?? "(no slug)";
   const w = Math.max(...projects.map((p) => slugOf(p).length));
   for (const p of projects) console.log(`  ${slugOf(p).padEnd(w)}  ${p.name}${p.visibility === "private" ? " (private)" : ""}`);

@@ -1,23 +1,23 @@
 import { planLintActions } from "@cortex/core";
 
-/** Plan de acciones (dry-run) a partir del lint: abrir tareas, consolidar duplicados. */
+/** An action plan (dry run) derived from the lint: open tasks, consolidate duplicates. */
 export async function run(args: string[]): Promise<void> {
   const project = args[0];
   if (!project) {
-    console.error('Uso: cortex lint-act "<Proyecto>"');
+    console.error('Usage: cortex-admin lint-act "<Project>"');
     process.exitCode = 1;
     return;
   }
   const actions = await planLintActions(project);
-  console.log(`# Plan de acciones de Lint — ${project} (dry-run)\n`);
+  console.log(`# Lint action plan — ${project} (dry run)\n`);
   const tasks = actions.filter((a) => a.kind === "open_task");
   const cons = actions.filter((a) => a.kind === "consolidate");
-  console.log(`## Abrir tarea en el gestor (${tasks.length})`);
+  console.log(`## Open a task in the tracker (${tasks.length})`);
   for (const a of tasks) console.log(`- [ ] ${a.title}\n      ${a.detail}`);
-  console.log(`\n## Consolidar duplicados (${cons.length})`);
+  console.log(`\n## Consolidate duplicates (${cons.length})`);
   for (const a of cons) console.log(`- [ ] ${a.title}\n      ${a.detail}`);
   console.log(
-    `\n(${actions.length} acciones propuestas. Dry-run: no se ha escrito nada. ` +
-      `Para crear las tareas en Plane, ejecútalo de forma supervisada con la skill plane-api.)`,
+    `\n(${actions.length} actions proposed. Dry run: nothing was written. ` +
+      `To create the tasks in Plane, run it supervised with the plane-api skill.)`,
   );
 }

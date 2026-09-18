@@ -3,14 +3,14 @@ import { dirname, join } from "node:path";
 import { GENERATED_MARKER, type SetupCtx } from "./types.js";
 
 /**
- * Escritura de ficheros de configuración ajenos.
+ * Writing other people's configuration files.
  *
- * `cortex setup` toca configuraciones que el usuario ha escrito a mano y que valen dinero si
- * se pierden, así que: copia de seguridad ANTES del primer cambio de cada fichero, y solo se
- * borra lo que llevamos nuestra marca.
+ * `cortex setup` touches configurations the user wrote by hand and that cost money if lost, so:
+ * a backup BEFORE the first change to each file, and nothing is deleted unless it carries our
+ * marker.
  */
 
-/** Ficheros ya respaldados en esta ejecución (una copia por ejecución, no por escritura). */
+/** Files already backed up in this run (one copy per run, not per write). */
 const backedUp = new WeakMap<SetupCtx, Set<string>>();
 
 function stamp(d: Date): string {
@@ -19,9 +19,9 @@ function stamp(d: Date): string {
 }
 
 /**
- * Copia `file` a `file.bak-<fecha>` la primera vez que se escribe en él. Los ficheros que
- * generamos nosotros no se respaldan: la copia solo tiene valor si lo que hay dentro lo
- * escribió una persona.
+ * Copies `file` to `file.bak-<date>` the first time it is written to. Files we generate
+ * ourselves are not backed up: the copy is only worth anything when a person wrote what is
+ * inside.
  */
 export function backupOnce(ctx: SetupCtx, file: string): string | null {
   if (!existsSync(file)) return null;
@@ -44,9 +44,8 @@ export function readText(file: string): string | null {
 }
 
 /**
- * Escribe solo si el contenido cambia. `cortex setup` está pensado para ejecutarse muchas
- * veces, y reescribir un fichero idéntico ensucia el informe y deja copias de seguridad que
- * no protegen de nada.
+ * Writes only when the content changes. `cortex setup` is meant to be run many times, and
+ * rewriting an identical file pollutes the report and leaves backups that protect nothing.
  */
 export function writeIfChanged(ctx: SetupCtx, file: string, content: string): boolean {
   if (readText(file) === content) return false;
@@ -58,25 +57,25 @@ export function writeText(ctx: SetupCtx, file: string, content: string): void {
   backupOnce(ctx, file);
   if (ctx.dryRun) return;
   mkdirSync(dirname(file), { recursive: true });
-  // La instalación anterior dejaba symlinks al repo clonado. Escribir a través de uno
-  // fallaría si está roto (ENOENT al abrir el destino) y, si NO lo está, sería peor: se
-  // escribiría dentro del repo de otro. Se quita el enlace y se escribe un fichero de verdad.
+  // The previous installation left symlinks into the cloned repo. Writing through one would
+  // fail if it is broken (ENOENT opening the target) and, if it is NOT broken, would be worse:
+  // it would write inside somebody else's repo. The link is removed and a real file written.
   try {
     if (lstatSync(file).isSymbolicLink()) rmSync(file, { force: true });
   } catch {
-    /* no existe: nada que deshacer */
+    /* it does not exist: nothing to undo */
   }
   writeFileSync(file, content);
 }
 
-/** JSON de configuración ajena. Si no parsea devuelve `null`: nunca se sobreescribe a ciegas. */
+/** Somebody else's configuration JSON. When it does not parse it returns `null`: it is never overwritten blind. */
 export function readJson<T = Record<string, unknown>>(file: string): T | null | undefined {
   const raw = readText(file);
   if (raw === null) return undefined; // no existe
   try {
     return JSON.parse(raw) as T;
   } catch {
-    return null; // existe pero está roto
+    return null; // it exists but is broken
   }
 }
 
@@ -84,7 +83,7 @@ export function writeJson(ctx: SetupCtx, file: string, value: unknown): void {
   writeText(ctx, file, JSON.stringify(value, null, 2) + "\n");
 }
 
-/** Borra un fichero solo si lo generamos nosotros (lleva la marca). */
+/** Deletes a file only when we generated it (it carries the marker). */
 export function removeIfGenerated(ctx: SetupCtx, file: string): boolean {
   const raw = readText(file);
   if (raw === null || !raw.includes(GENERATED_MARKER)) return false;
@@ -92,7 +91,7 @@ export function removeIfGenerated(ctx: SetupCtx, file: string): boolean {
   return true;
 }
 
-/** `~/algo` para los mensajes: las rutas absolutas del HOME no aportan nada. */
+/** `~/something` for the messages: absolute HOME paths add nothing. */
 export function tilde(ctx: SetupCtx, file: string): string {
   return file.startsWith(ctx.home) ? `~${file.slice(ctx.home.length)}` : file;
 }

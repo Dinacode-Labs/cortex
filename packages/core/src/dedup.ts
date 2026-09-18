@@ -7,13 +7,13 @@ import { findProjectIdByName } from "./projects.js";
 import { relate } from "./entities.js";
 
 /**
- * Reconciliación de escritura (estilo mem0: ADD / UPDATE / NOOP). Antes de guardar
- * conocimiento auto-capturado, se busca lo más similar ya existente en el proyecto y se
- * decide: añadir (nuevo), fusionar (refina algo existente) o nada (redundante). Evita el
- * "context rot" / distractores (ver research/memory-capture-policy.md).
+ * Write reconciliation (mem0 style: ADD / UPDATE / NOOP). Before storing auto-captured
+ * knowledge, the most similar existing entry in the project is looked up and a decision is
+ * made: add (new), merge (it refines something existing) or nothing (redundant). It avoids
+ * "context rot" / distractors (see research/memory-capture-policy.md).
  *
- * Umbrales calibrados con qwen3-embedding (exacto ~0.99, paráfrasis ~0.84, distinto
- * ~0.67): por encima de UPDATE se reconcilia; por encima de NOOP es casi idéntico.
+ * Thresholds calibrated with qwen3-embedding (exact ~0.99, paraphrase ~0.84, different
+ * ~0.67): above UPDATE it reconciles; above NOOP it is near-identical.
  */
 export const UPDATE_THRESHOLD = getEnvNum("CORTEX_DEDUP_THRESHOLD", 0.82);
 export const NOOP_THRESHOLD = getEnvNum("CORTEX_DEDUP_NOOP", 0.95);
@@ -26,7 +26,7 @@ export interface NearestEntry {
   sourceType: string;
 }
 
-/** Entrada más similar del proyecto al texto dado (o null). */
+/** The project's entry most similar to the given text (or null). */
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
   const pid = await findProjectIdByName(getSql(), project);
   if (!pid) return null;
@@ -45,7 +45,7 @@ export async function isNearDuplicate(project: string, text: string, threshold =
   return n !== null && n.score >= threshold;
 }
 
-/** UPDATE: reemplaza el contenido de una entrada (resultado del merge) y re-embebe. */
+/** UPDATE: replaces an entry's content (the result of the merge) and re-embeds it. */
 export async function updateEntryContent(entryId: string, content: string): Promise<void> {
   const sql = getSql();
   await sql`UPDATE context_entries SET content = ${content}, updated_at = now() WHERE id = ${entryId}`;
@@ -53,13 +53,13 @@ export async function updateEntryContent(entryId: string, content: string): Prom
 }
 
 /**
- * Corrección puntual de una entrada: título, contenido o los dos. La usa `PATCH /entries/:id`,
- * que es como un agente arregla algo que él mismo guardó mal.
+ * A one-off correction to an entry: title, content or both. Used by `PATCH /entries/:id`,
+ * which is how an agent fixes something it stored badly itself.
  *
- * Solo esos dos campos: el tipo, la confianza y la vigencia los decide la reconciliación o el
- * lint a partir de la evidencia, no quien llama por la API. Y si cambia el contenido se vuelve
- * a calcular el embedding, porque una entrada corregida que ya no se encuentra es peor que la
- * entrada sin corregir.
+ * Only those two fields: type, confidence and validity are decided by reconciliation or by the
+ * lint from the evidence, not by whoever calls the API. And when the content changes the
+ * embedding is recomputed, because a corrected entry that can no longer be found is worse than
+ * the uncorrected one.
  */
 export async function updateEntryFields(
   entryId: string,
@@ -68,7 +68,7 @@ export async function updateEntryFields(
   const { title, content } = fields;
   if (title === undefined && content === undefined) return false;
   const sql = getSql();
-  const filas = (await sql`
+  const rows = (await sql`
     UPDATE context_entries
        SET title = COALESCE(${title ?? null}, title),
            content = COALESCE(${content ?? null}, content),
@@ -76,13 +76,13 @@ export async function updateEntryFields(
      WHERE id = ${entryId}
      RETURNING id
   `) as unknown as { id: string }[];
-  if (filas.length === 0) return false;
+  if (rows.length === 0) return false;
   if (content !== undefined) await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
   return true;
 }
 
-/** DELETE bi-temporal (§5.5: invalidar ≠ borrar): marca la entrada como histórica y
- * superada por otra. Mismo patrón que la invalidación temporal. */
+/** Bi-temporal DELETE (section 5.5: invalidating is not deleting): marks the entry as
+ * historical and superseded by another. The same pattern as temporal invalidation. */
 export async function invalidateEntry(entryId: string, supersededById: string): Promise<void> {
   await getSql()`
     UPDATE context_entries
@@ -91,10 +91,10 @@ export async function invalidateEntry(entryId: string, supersededById: string): 
   `;
 }
 
-// --- Reconciliación de escritura reutilizable (sesiones + conectores) --------
+// --- Reusable write reconciliation (sessions + connectors) -------------------
 
-/** Reconciliador LLM inyectable (lo provee @cortex/agents vía setReconciler). Sin él, la
- * reconciliación es determinista: solo dedup de near-idénticos (sin merge/supersede). */
+/** Injectable LLM reconciler (provided by @cortex/agents through setReconciler). Without it,
+ * reconciliation is deterministic: near-identical dedup only (no merge/supersede). */
 export interface ReconcilerHooks {
   decide: (existing: string, incoming: string) => Promise<"noop" | "update" | "supersede">;
   merge: (existing: string, incoming: string) => Promise<string>;
@@ -107,26 +107,26 @@ export function setReconciler(hooks: ReconcilerHooks | null): void {
 export type ReconcileAction = "add" | "update" | "supersede" | "contradict" | "noop";
 export interface ReconcileResult {
   action: ReconcileAction;
-  /** Id de la entrada resultante: la nueva (add/supersede/contradict) o la existente
-   * (noop/update). Siempre presente → los conectores pueden enlazar relaciones a él. */
+  /** Id of the resulting entry: the new one (add/supersede/contradict) or the existing one
+   * (noop/update). Always present -> connectors can attach relations to it. */
   entryId: string;
 }
 
 /**
- * Guarda una pieza reconciliando contra lo existente (estilo mem0):
- *  - NOOP si ya hay algo near-idéntico (≥ NOOP_THRESHOLD), **venga de donde venga**. Dedup
- *    determinista, sin LLM. Reconocer que ya lo sabemos no toca nada, así que no hace falta
- *    exigir el mismo origen.
- *  - Con reconciliador inyectado, similitud 0.82–0.95 **y el mismo `sourceType`**: UPDATE
- *    (fusiona, solo lo auto-capturado), SUPERSEDE (invalida lo viejo auto-capturado; si es
- *    fuente o curado solo se marca `contradicts`) o NOOP. Aquí sí se exige el mismo origen,
- *    porque estas ramas MODIFICAN lo que ya había.
- *  - ADD en cualquier otro caso. NUNCA reescribe ni invalida conocimiento de fuente o curado.
+ * Stores a piece while reconciling against what exists (mem0 style):
+ *  - NOOP when something near-identical already exists (>= NOOP_THRESHOLD), **whatever its
+ *    origin**. Deterministic dedup, no LLM. Acknowledging that we already know it touches
+ *    nothing, so there is no need to demand the same origin.
+ *  - With a reconciler injected, similarity 0.82-0.95 **and the same `sourceType`**: UPDATE
+ *    (merge, auto-captured only), SUPERSEDE (invalidate the old auto-captured one; if it is
+ *    sourced or curated it is only marked `contradicts`) or NOOP. Here the same origin IS
+ *    required, because these branches MODIFY what was already there.
+ *  - ADD in every other case. It NEVER rewrites or invalidates sourced or curated knowledge.
  *
- * Queda un caso conocido: una PARÁFRASIS (~0.84) de algo capturado a mano se añade en vez de
- * fusionarse, porque cae en la banda de UPDATE y ahí sí manda el origen. Es deliberado —
- * fusionar automáticamente sobre lo que ha escrito una persona es peor— pero significa que
- * `lint` es quien tiene que sacar esos casi-duplicados a la luz.
+ * One known case remains: a PARAPHRASE (~0.84) of something captured by hand is added rather
+ * than merged, because it lands in the UPDATE band where origin rules. That is deliberate --
+ * automatically merging over what a person wrote is worse -- but it means `lint` is what has
+ * to bring those near-duplicates to light.
  */
 export async function saveWithReconciliation(
   input: Parameters<typeof saveContext>[0],
@@ -135,25 +135,25 @@ export async function saveWithReconciliation(
   const near = input.project ? await findNearest(input.project, input.content) : null;
   const sameKind = !!near && near.sourceType === input.sourceType;
 
-  // Casi idéntico: ya lo sabemos, venga de donde venga. RECONOCERLO es seguro siempre; lo
-  // que no lo sería es MODIFICAR conocimiento curado, y de eso se encargan las ramas de
-  // abajo, que sí exigen el mismo origen.
+  // Near-identical: we already know it, whatever its origin. ACKNOWLEDGING it is always safe;
+  // what would not be is MODIFYING curated knowledge, and the branches below handle that --
+  // they do require the same origin.
   //
-  // Antes esto también exigía el mismo `sourceType`, y el efecto se veía usándolo: un agente
-  // repite en su respuesta lo que la memoria le acaba de contar, la captura lo destila, y
-  // como viene de "agent_session" nunca se compara con la entrada "manual" original. La
-  // memoria se iba llenando de ecos de sí misma.
+  // This used to demand the same `sourceType` too, and the effect showed up in use: an agent
+  // repeats in its answer what the memory just told it, capture distills that, and since it
+  // comes from "agent_session" it is never compared against the original "manual" entry. The
+  // memory kept filling up with echoes of itself.
   if (near && near.score >= NOOP_THRESHOLD) return { action: "noop", entryId: near.id };
 
-  // El mismo conocimiento por DOS vías: el agente lo guarda con la tool y, al cerrar la
-  // sesión, la destilación lo vuelve a guardar. Llegan con `sourceType` distinto ("manual" y
-  // "agent_session"), así que las ramas de abajo —que exigen el mismo origen para no reescribir
-  // conocimiento curado— ni lo miran, y el 0.95 de arriba no llega: medido sobre un proyecto
-  // con varios agentes trabajando, este eco puntúa 0.86–0.88.
+  // The same knowledge by TWO routes: the agent stores it with the tool and, on closing the
+  // session, distillation stores it again. They arrive with different `sourceType`s ("manual"
+  // and "agent_session"), so the branches below -- which require the same origin so as not to
+  // rewrite curated knowledge -- never look at it, and the 0.95 above is not reached: measured
+  // on a project with several agents at work, this echo scores 0.86-0.88.
   //
-  // Así que se pregunta al reconciliador, pero SOLO para no escribir. Entre orígenes distintos
-  // nunca se modifica ni se invalida nada: lo peor que puede pasar es que la entrada no se
-  // añada porque ya la sabíamos, que es justo lo que se quiere.
+  // So the reconciler is asked, but ONLY in order not to write. Across different origins
+  // nothing is ever modified or invalidated: the worst that can happen is that the entry is not
+  // added because we already knew it, which is exactly what is wanted.
   if (near && !sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
     if ((await reconciler.decide(near.content, input.content)) === "noop") {
       return { action: "noop", entryId: near.id };
@@ -164,16 +164,16 @@ export async function saveWithReconciliation(
     const decision = await reconciler.decide(near.content, input.content);
     if (decision === "noop") return { action: "noop", entryId: near.id };
     if (decision === "supersede") {
-      const { entry } = await saveContext(input, opts); // la nueva pasa a ser vigente
+      const { entry } = await saveContext(input, opts); // the new one becomes the current one
       if (near.sourceType === "agent_session") {
         await invalidateEntry(near.id, entry.id);
         return { action: "supersede", entryId: entry.id };
       }
-      // Conocimiento de fuente/curado: no se invalida en automático, solo se marca.
+      // Sourced/curated knowledge: never invalidated automatically, only flagged.
       await relate(getSql(), { sourceId: entry.id, sourceType: "context_entry", targetId: near.id, targetType: "context_entry", relationType: "contradicts" });
       return { action: "contradict", entryId: entry.id };
     }
-    // update: solo fusionamos entradas auto-capturadas (no reescribimos fuentes/curado)
+    // update: only auto-captured entries are merged (sourced/curated is never rewritten)
     if (near.sourceType === "agent_session") {
       await updateEntryContent(near.id, await reconciler.merge(near.content, input.content));
       return { action: "update", entryId: near.id };
@@ -185,14 +185,14 @@ export async function saveWithReconciliation(
 }
 
 /**
- * Reconciliación a posteriori (en `maintain`): dedup de entradas near-idénticas del MISMO
- * proyecto y `source_type`, reusando los embeddings ya calculados (sin coste de LLM ni
- * de re-embeber). Así los conectores (que embeben por lotes y no pueden inyectar el
- * reconciliador LLM) también se benefician. Mantiene la más antigua como canónica e
- * invalida (§5.5) las duplicadas (`superseded_by` la canónica). Reversible.
+ * After-the-fact reconciliation (inside `maintain`): dedup of near-identical entries from the
+ * SAME project and `source_type`, reusing the embeddings already computed (no LLM cost and no
+ * re-embedding). That way the connectors (which embed in batches and cannot inject the LLM
+ * reconciler) benefit too. It keeps the oldest as canonical and invalidates (section 5.5) the
+ * duplicates (`superseded_by` the canonical one). Reversible.
  */
-// Formatos cuyo embedding NO es su identidad sino una descripción generada (caption de
-// visión): captions genéricos agrupan imágenes DISTINTAS → nunca deduplicar por embedding.
+// Formats whose embedding is NOT their identity but a generated description (a vision
+// caption): generic captions group DIFFERENT images together -> never dedup them by embedding.
 const NON_DEDUP_FORMATS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "tif", "tiff"];
 
 export async function reconcileProject(project: string, maxDistance = getEnvNum("CORTEX_DEDUP_MAX_DIST", 0.05)): Promise<{ deduped: number }> {
@@ -220,7 +220,7 @@ export async function reconcileProject(project: string, maxDistance = getEnvNum(
   const dropped = new Set<string>();
   let deduped = 0;
   for (const p of pairs) {
-    if (dropped.has(p.drop) || dropped.has(p.keep)) continue; // ya tratado / la canónica fue invalidada
+    if (dropped.has(p.drop) || dropped.has(p.keep)) continue; // already handled / the canonical one was invalidated
     await invalidateEntry(p.drop, p.keep);
     dropped.add(p.drop);
     deduped++;

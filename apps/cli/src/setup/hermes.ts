@@ -4,16 +4,16 @@ import { backupOnce, homeFile, readText, tilde, writeText } from "./fs.js";
 import { emptyReport, type AgentAdapter, type AgentStatus, type SetupCtx, type SetupReport } from "./types.js";
 
 /**
- * Hermes (Nous Research). Todo vive en un único `~/.hermes/config.yaml`: el MCP en
- * `mcp_servers` y los hooks en `hooks`, con un array por evento.
+ * Hermes (Nous Research). Everything lives in a single `~/.hermes/config.yaml`: the MCP under
+ * `mcp_servers` and the hooks under `hooks`, with one array per event.
  *
- * Dos avisos que no podemos resolver por él y por eso se dicen en voz alta: Hermes pide
- * consentimiento explícito para ejecutar shell hooks (hay que aceptarlo dentro de Hermes, no
- * se escribe su allowlist desde fuera), y leer sus sesiones necesita `node:sqlite`, es decir
- * Node ≥ 22.5.
+ * Two warnings we cannot resolve on the user's behalf, which is why they are said out loud:
+ * Hermes asks for explicit consent to run shell hooks (it has to be accepted inside Hermes, its
+ * allowlist cannot be written from outside), and reading its sessions needs `node:sqlite`, that
+ * is Node >= 22.5.
  *
- * Se conserva el `pre_llm_call` como evento de inyección porque es el que Hermes tiene para
- * eso; lo que se retira es la versión antigua del comando, la que apuntaba al repo clonado.
+ * `pre_llm_call` is kept as the injection event because it is the one Hermes has for that; what
+ * is retired is the old version of the command, the one pointing at the cloned repo.
  */
 
 const CONFIG = (ctx: SetupCtx): string => homeFile(ctx, ".hermes/config.yaml");
@@ -27,7 +27,7 @@ interface HermesConfig {
   [k: string]: unknown;
 }
 
-/** `null` = existe pero no parsea (no se toca); `{}` = no existe todavía. */
+/** `null` = it exists but does not parse (leave it alone); `{}` = it does not exist yet. */
 function read(ctx: SetupCtx): HermesConfig | null {
   const raw = readText(CONFIG(ctx));
   if (raw === null) return {};
@@ -45,7 +45,7 @@ function write(ctx: SetupCtx, cfg: HermesConfig): void {
 
 const isCortex = (cmd: unknown): boolean => typeof cmd === "string" && /hook[-:](context|capture)/.test(cmd);
 
-/** Instala o actualiza un hook de Cortex en un evento, sin duplicarlo ni tocar los ajenos. */
+/** Installs or updates a Cortex hook on an event, without duplicating it or touching others. */
 function upsertHook(cfg: HermesConfig, event: string, command: string): string | null {
   cfg.hooks ??= {};
   const arr = (cfg.hooks[event] ??= []);

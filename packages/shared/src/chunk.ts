@@ -1,42 +1,42 @@
 /**
- * Chunking estructural de documentos para RAG (ADR-0023, Fase 1). Trocea un documento
- * largo en fragmentos de tamaño acotado respetando fronteras naturales (headings de
- * Markdown → párrafos → frases), con un pequeño solape para no partir una idea entre dos
- * chunks. Determinista y sin LLM.
+ * Structural document chunking for RAG (ADR-0023, phase 1). Splits a long document into
+ * bounded fragments while respecting natural boundaries (Markdown headings -> paragraphs ->
+ * sentences), with a small overlap so an idea is not cut across two chunks. Deterministic
+ * and LLM-free.
  *
- * Motivación: antes cada documento entraba como UNA entrada truncada (1 vector por doc),
- * así que un PDF largo perdía casi todo y se recuperaba mal. Ahora un doc largo produce N
- * chunks, cada uno embebido por separado y referido a su documento padre.
+ * Rationale: each document used to enter as ONE truncated entry (1 vector per doc), so a
+ * long PDF lost almost everything and retrieved poorly. A long doc now yields N chunks,
+ * each embedded separately and pointing back to its parent document.
  *
- * El prefijo de contexto por chunk (Contextual Retrieval, Anthropic) es una fase
- * POSTERIOR (necesita LLM); aquí solo estructura + `section` (heading vigente) para que
- * los consumidores puedan construir título/metadata y ubicar el fragmento.
+ * The per-chunk context prefix (Contextual Retrieval, Anthropic) is a LATER phase (it needs
+ * an LLM); here there is only structure plus `section` (the heading in force) so consumers
+ * can build a title/metadata and locate the fragment.
  */
 
 export interface DocChunk {
-  /** Texto del fragmento (con solape del anterior si aplica). */
+  /** The fragment's text (including the overlap from the previous one, when it applies). */
   content: string;
-  /** Heading de Markdown vigente al inicio del chunk, si lo hay. */
+  /** The Markdown heading in force at the start of the chunk, if any. */
   section: string | null;
-  /** Índice del chunk (0-based) dentro del documento. */
+  /** The chunk's index (0-based) within the document. */
   index: number;
-  /** Nº total de chunks del documento. */
+  /** Total number of chunks in the document. */
   total: number;
 }
 
 export interface ChunkOptions {
-  /** Tamaño objetivo por chunk en caracteres (~4 chars/token). Default 4000 (~1000 tokens). */
+  /** Target size per chunk in characters (~4 chars/token). Defaults to 4000 (~1000 tokens). */
   targetChars?: number;
-  /** Tope duro por chunk. Default 5000 (~1250 tokens). */
+  /** Hard cap per chunk. Defaults to 5000 (~1250 tokens). */
   maxChars?: number;
-  /** Caracteres de solape que se copian del final del chunk anterior. Default 400. */
+  /** Overlap characters copied from the end of the previous chunk. Defaults to 400. */
   overlapChars?: number;
 }
 
 const isHeading = (line: string): boolean => /^#{1,6}\s+\S/.test(line.trim());
 
-/** Parte un bloque demasiado grande (un párrafo enorme) por frases, respetando `max`.
- * Una frase que aún supere `max` (sin puntuación, p.ej. una tabla o base64) se corta duro. */
+/** Splits an oversized block (a huge paragraph) by sentences, respecting `max`.
+ * A sentence still above `max` (no punctuation, e.g. a table or base64) is hard-cut. */
 function splitOversized(text: string, max: number): string[] {
   const pieces = text.match(/[^.!?\n]+[.!?]*\s*|\n+/g) ?? [text];
   const out: string[] = [];
@@ -57,8 +57,8 @@ function splitOversized(text: string, max: number): string[] {
 interface Unit { text: string; heading: string | null }
 
 /**
- * Trocea `raw` en chunks estructurales. Devuelve [] si el texto está vacío. Para
- * documentos cortos (≤ target) devuelve un único chunk (sin solape). Idempotente.
+ * Splits `raw` into structural chunks. Returns [] when the text is empty. For short
+ * documents (<= target) it returns a single chunk (no overlap). Idempotent.
  */
 export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] {
   const target = opts.targetChars ?? 4000;
@@ -67,8 +67,8 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
   const text = raw.replace(/\r\n?/g, "\n").trim();
   if (!text) return [];
 
-  // 1) Párrafos (separados por línea en blanco), rastreando el heading vigente. Un
-  //    párrafo cuya primera línea es un heading actualiza la sección.
+  // 1) Paragraphs (blank-line separated), tracking the heading in force. A paragraph
+  //    whose first line is a heading updates the section.
   const paras: Unit[] = [];
   let heading: string | null = null;
   for (const block of text.split(/\n\s*\n+/)) {
@@ -79,12 +79,12 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
     paras.push({ text: b, heading });
   }
 
-  // 2) Explotar párrafos que superen el tope en unidades más pequeñas (frases).
+  // 2) Explode paragraphs above the cap into smaller units (sentences).
   const units: Unit[] = paras.flatMap((p) =>
     p.text.length <= max ? [p] : splitOversized(p.text, max).map((t) => ({ text: t, heading: p.heading })),
   );
 
-  // 3) Empaquetado greedy hasta `target` sin pasar de `max`.
+  // 3) Greedy packing up to `target` without going over `max`.
   const groups: Unit[] = [];
   let buf = "";
   let bufHeading: string | null = null;
@@ -107,8 +107,8 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
   }
   flush();
 
-  // 4) Solape: anteponer la cola del chunk previo, recortada a frontera de palabra
-  //    (no en el primero). Da continuidad sin duplicar contenido de forma neta.
+  // 4) Overlap: prepend the tail of the previous chunk, trimmed to a word boundary
+  //    (not on the first one). Gives continuity without net content duplication.
   const out: DocChunk[] = [];
   let prevText = "";
   groups.forEach((g, index) => {
@@ -127,8 +127,8 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
 
 
 /**
- * Directorios que ningún conector debe recorrer. Apuntar un conector a la raíz de un repo sin
- * este filtro arrastra `vendor/` y `node_modules/` enteros a la memoria del proyecto.
+ * Directories no connector should ever walk. Pointing a connector at a repo root without
+ * this filter drags all of `vendor/` and `node_modules/` into the project's memory.
  */
 export const IGNORE_DIRS = new Set([
   "node_modules", "vendor", "dist", "build", "out", "target", "coverage", ".git", ".next",
@@ -137,15 +137,14 @@ export const IGNORE_DIRS = new Set([
 ]);
 
 /**
- * Qué hace falta para sacarle texto a un fichero.
+ * What it takes to get text out of a file.
  *
- * `texto` solo necesita leerlo: lo puede hacer el CLI que se instala con npm. `pesado` necesita
- * mammoth/xlsx/unpdf, o un modelo de visión o de transcripción — unos 95 MB de dependencias y,
- * en algunos casos, claves. Eso vive en la imagen del servidor, no en el portátil de nadie
- * (ADR-0025), así que el CLI los detecta, los cuenta y dice qué hacer con ellos en vez de
- * fingir que no existen.
+ * `text` only needs reading: the npm-installed CLI can do it. `heavy` needs mammoth/xlsx/unpdf,
+ * or a vision or transcription model -- some 95 MB of dependencies and, in some cases, keys.
+ * That lives in the server image, not on anyone's laptop (ADR-0025), so the CLI detects them,
+ * counts them and says what to do with them instead of pretending they do not exist.
  */
-export type ExtractionKind = "texto" | "pesado" | "no-soportado";
+export type ExtractionKind = "text" | "heavy" | "unsupported";
 
 export const PLAIN_TEXT_EXTS = ["md", "markdown", "txt", "text"];
 const HEAVY_EXTS = [
@@ -160,7 +159,7 @@ export const SUPPORTED_EXTS = new Set([...PLAIN_TEXT_EXTS, ...HEAVY_EXTS]);
 
 export function extractionKind(fileName: string): ExtractionKind {
   const ext = fileName.slice(fileName.lastIndexOf(".") + 1).toLowerCase();
-  if (PLAIN_TEXT_EXTS.includes(ext)) return "texto";
-  if (HEAVY_EXTS.includes(ext)) return "pesado";
-  return "no-soportado";
+  if (PLAIN_TEXT_EXTS.includes(ext)) return "text";
+  if (HEAVY_EXTS.includes(ext)) return "heavy";
+  return "unsupported";
 }

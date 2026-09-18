@@ -13,14 +13,14 @@ import { inferTypeFromQuery } from "./query-intent.js";
 
 export type { SearchHit } from "./vectors.js";
 
-// --- Hook de rerank opcional (capa LLM) --------------------------------------
+// --- Optional rerank hook (the LLM layer) ------------------------------------
 
-/** Reranker opcional de 2ª etapa (p.ej. LLM). Reordena los hits por relevancia. */
+/** Optional second-stage reranker (e.g. an LLM). It reorders the hits by relevance. */
 export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]>;
 
 let reranker: Reranker | null = null;
 
-/** Registra (o desregistra con null) un reranker. Lo cablean los entrypoints. */
+/** Registers (or, with null, unregisters) a reranker. Wired by the entrypoints. */
 export function setReranker(fn: Reranker | null): void {
   reranker = fn;
 }
@@ -28,22 +28,22 @@ export function setReranker(fn: Reranker | null): void {
 // --- search_project_context --------------------------------------------------
 
 /**
- * Búsqueda híbrida (vector + FTS + RRF) con rerank opcional. §15.6.
+ * Hybrid search (vector + FTS + RRF) with optional rerank. Section 15.6.
  *
- * SCOPING DE SEGURIDAD (P0): sin `input.project`, por defecto se busca en TODOS los
- * proyectos (comportamiento confiable local, p.ej. stdio MCP). Los callers expuestos
- * a red (MCP autenticado, web) deben pasar `opts.restrictToAccessibleOf` con el email
- * del usuario (o null) para restringir la búsqueda a los proyectos accesibles y no
- * filtrar contenido de proyectos privados ajenos. Con `input.project` concreto el
- * comportamiento es intacto (el guard del caller ya controla el acceso a ese proyecto).
+ * SECURITY SCOPING (P0): without `input.project`, the default is to search across ALL
+ * projects (trusted local behaviour, e.g. stdio MCP). Network-exposed callers (authenticated
+ * MCP, web) must pass `opts.restrictToAccessibleOf` with the user's email (or null) to limit
+ * the search to accessible projects and avoid leaking content from other people's private
+ * projects. With a concrete `input.project` the behaviour is unchanged (the caller's guard
+ * already controls access to that project).
  */
 /**
- * Cuánto se empuja una entrada cuyo tipo coincide con el que nombra la pregunta.
+ * How hard an entry is nudged when its type matches the one the question names.
  *
- * Medido con `admin eval`, no elegido a ojo. Entre 0.12 y 0.20 el resultado es el mismo y es
- * el mejor (recall@5 0.987, MRR 0.928); por debajo se queda corto y a partir de 0.30 el recall
- * vuelve a caer, porque empieza a colar entradas del tipo correcto pero de otro asunto. Se usa
- * el centro de esa meseta: es lo más lejos posible de los dos bordes.
+ * Measured with `admin eval`, not picked by eye. Between 0.12 and 0.20 the result is the same
+ * and it is the best (recall@5 0.987, MRR 0.928); below that it falls short, and from 0.30
+ * recall drops again, because it starts letting in entries of the right type but the wrong
+ * subject. The centre of that plateau is used: it is as far as possible from both edges.
  */
 const TYPE_BOOST = getEnvNum("CORTEX_SEARCH_TYPE_BOOST", 0.15);
 
@@ -52,11 +52,11 @@ export async function searchContext(
   opts?: {
     restrictToAccessibleOf?: string | null;
     /**
-     * Proyectos EXTRA a incluir además del pedido y sus ancestros. Es cómo se busca hacia
-     * abajo desde un padre (ADR-0063): una operación deliberada, no la herencia, que sube. El
-     * caller es responsable de haber filtrado esos ids por permisos —en la web salen de
-     * `listChildProjects`, que ya lo hace— porque aquí no hay forma de distinguir un id
-     * legítimo de uno inventado.
+     * EXTRA projects to include besides the one asked for and its ancestors. This is how one
+     * searches downwards from a parent (ADR-0063): a deliberate operation, not inheritance,
+     * which goes up. The caller is responsible for having filtered those ids by permissions --
+     * in the web they come from `listChildProjects`, which already does -- because there is no
+     * way here to tell a legitimate id from an invented one.
      */
     alsoProjectIds?: string[];
   },
@@ -64,36 +64,36 @@ export async function searchContext(
   const parsed = searchContextInput.parse(input);
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const proyectoPedido = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
-  // Buscar dentro de un hijo mira también lo del cliente: el context pack ya heredaba de sus
-  // ancestros y la búsqueda no, así que lo transversal —contratos, convenciones, con quién se
-  // habla— estaba guardado en el padre y no se encontraba desde el repo donde hacía falta.
-  // Subir es seguro: `canAccessProject` restringe el hijo si cualquier ancestro es privado, de
-  // modo que tener acceso al hijo implica tenerlo a toda la cadena.
+  const askedProject = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
+  // Searching inside a child also looks at the client's knowledge: the context pack already
+  // inherited from its ancestors and search did not, so the cross-cutting things -- contracts,
+  // conventions, who to talk to -- were stored in the parent and could not be found from the
+  // repo where they were needed. Going up is safe: `canAccessProject` restricts the child when
+  // any ancestor is private, so having access to the child implies having it to the whole chain.
   const extra = opts?.alsoProjectIds?.length ? opts.alsoProjectIds : [];
-  const cadena = proyectoPedido ? [...new Set([...(await projectIdsWithAncestors(proyectoPedido)), ...extra])] : null;
-  const projectId = cadena && cadena.length === 1 ? proyectoPedido : null;
+  const chain = askedProject ? [...new Set([...(await projectIdsWithAncestors(askedProject)), ...extra])] : null;
+  const projectId = chain && chain.length === 1 ? askedProject : null;
 
-  // Scoping por accesibles: solo cuando NO hay proyecto concreto Y el caller ha pedido
-  // restringir (distinguimos "opts ausente" = llamada confiable, de "restrictToAccessibleOf:
-  // null" = usuario anónimo → solo proyectos públicos).
+  // Scoping by accessible projects: only when there is NO concrete project AND the caller asked
+  // to restrict (we distinguish "opts absent" = trusted call from "restrictToAccessibleOf:
+  // null" = anonymous user -> public projects only).
   let projectIds: string[] | null | undefined;
-  if (cadena && cadena.length > 1) projectIds = cadena;
-  else if (!proyectoPedido && opts && "restrictToAccessibleOf" in opts) {
+  if (chain && chain.length > 1) projectIds = chain;
+  else if (!askedProject && opts && "restrictToAccessibleOf" in opts) {
     const accessible = await listAccessibleProjects(opts.restrictToAccessibleOf ?? null);
-    projectIds = accessible.map((p) => p.id); // array vacío permitido → cero resultados
+    projectIds = accessible.map((p) => p.id); // an empty array is allowed -> zero results
   }
 
-  // Si la pregunta nombra una categoría ("¿qué deuda técnica hay…?"), se usa para empujar ese
-  // tipo hacia arriba. NO para filtrar: quien pregunta por decisiones puede tener la respuesta
-  // guardada como restricción, y un filtro la haría desaparecer. Solo cuando el caller no ha
-  // pedido un tipo explícito, que entonces manda él.
-  const tipoDeducido = parsed.type ? null : inferTypeFromQuery(parsed.query);
+  // When the question names a category ("what technical debt is there...?"), it is used to nudge
+  // that type upwards. NOT to filter: someone asking about decisions may have the answer stored
+  // as a constraint, and a filter would make it vanish. Only when the caller did not ask for an
+  // explicit type, in which case theirs wins.
+  const inferredType = parsed.type ? null : inferTypeFromQuery(parsed.query);
 
-  // Con reranker o con tipo deducido, sobre-recuperamos para reordenar un pool mayor: empujar
-  // dentro de los 5 que ya salieron no serviría de nada si lo bueno estaba en el 7º. El filtro
-  // por projectIds se aplica en hybridSearch (antes de reordenar), no después.
-  const overFetch = reranker || tipoDeducido ? Math.min(parsed.limit * 3, 30) : parsed.limit;
+  // With a reranker or an inferred type, over-fetch so a larger pool can be reordered: nudging
+  // within the 5 that already came out would be useless if the good one was 7th. The projectIds
+  // filter is applied in hybridSearch (before reordering), not after.
+  const overFetch = reranker || inferredType ? Math.min(parsed.limit * 3, 30) : parsed.limit;
   const hits = await hybridSearch(sql, provider, {
     queryText: parsed.query,
     projectId,
@@ -102,23 +102,23 @@ export async function searchContext(
     limit: overFetch,
   });
 
-  // El empujón va en el ORDEN, no en el `score`: la puntuación que se devuelve sigue siendo la
-  // similitud de verdad, porque hay quien la enseña y quien la compara con un umbral.
-  const ordenados = tipoDeducido
+  // The nudge goes into the ORDER, not into the `score`: the score returned is still the real
+  // similarity, because some callers display it and others compare it against a threshold.
+  const ordered = inferredType
     ? [...hits].sort(
         (a, b) =>
-          b.score + (b.entry.type === tipoDeducido ? TYPE_BOOST : 0) - (a.score + (a.entry.type === tipoDeducido ? TYPE_BOOST : 0)),
+          b.score + (b.entry.type === inferredType ? TYPE_BOOST : 0) - (a.score + (a.entry.type === inferredType ? TYPE_BOOST : 0)),
       )
     : hits;
 
-  if (!reranker) return ordenados.slice(0, parsed.limit);
-  const reranked = await reranker(parsed.query, ordenados).catch(() => ordenados);
+  if (!reranker) return ordered.slice(0, parsed.limit);
+  const reranked = await reranker(parsed.query, ordered).catch(() => ordered);
   return reranked.slice(0, parsed.limit);
 }
 
 // --- list_project_decisions --------------------------------------------------
 
-/** Lista las decisiones técnicas de un proyecto. */
+/** Lists a project's technical decisions. */
 export async function listDecisions(project: string, limit = 20): Promise<ContextEntry[]> {
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, project);

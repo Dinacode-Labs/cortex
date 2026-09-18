@@ -1,15 +1,15 @@
 import { contextEntryType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
-// extractJson compartido: además del recorte por llaves (comportamiento previo de
-// distill), ahora entiende bloques cercados ```json — mejora estricta, no regresión:
-// el fence es un superconjunto del recorte simple que hacíamos aquí.
+// Shared extractJson: on top of the brace trimming (distill's previous behaviour) it now
+// understands ```json fenced blocks -- a strict improvement, not a regression: the fence is a
+// superset of the simple trimming we used to do here.
 import { extractJson } from "./llm-json.js";
 
 /**
- * Destilación LLM de un fragmento de transcript de sesión → conocimiento TIPADO
- * (decisiones/restricciones/incidencias/convenciones…). No ingiere el transcript crudo:
- * extrae solo lo DURADERO y reutilizable, descartando ruido. Es la parte "inteligente"
- * del pipeline de captura de sesiones.
+ * LLM distillation of a session transcript window into TYPED knowledge
+ * (decisions/constraints/incidents/conventions...). It does not ingest the raw transcript: it
+ * extracts only what is DURABLE and reusable, discarding noise. It is the "intelligent" part
+ * of the session capture pipeline.
  */
 
 const TYPES = contextEntryType.options as readonly string[];
@@ -17,27 +17,27 @@ const TYPES = contextEntryType.options as readonly string[];
 export interface Item { type: string; title: string; content: string }
 
 /**
- * ¿El proveedor nos está rechazando? Se distingue de un fallo de ventana porque NO es
- * recuperable: con la clave mal, todas las ventanas de todas las sesiones fallarán igual.
+ * Is the provider rejecting us? This is told apart from a per-window failure because it is NOT
+ * recoverable: with a bad key, every window of every session will fail the same way.
  *
- * Importa porque tragarse esto en silencio deja la captura produciendo cero para siempre
- * mientras los contadores dicen que todo va bien. Pasó al desplegar: una clave equivocada
- * devolvía `saved: 0, failed: 0`, que es indistinguible de «esta sesión no tenía nada».
+ * It matters because swallowing this silently leaves capture producing zero forever while the
+ * counters say everything is fine. It happened on a deploy: a wrong key returned
+ * `saved: 0, failed: 0`, which is indistinguishable from "this session had nothing in it".
  */
-function esRechazoDelProveedor(e: unknown): boolean {
+function isProviderRejection(e: unknown): boolean {
   const err = e as { statusCode?: unknown; status?: unknown; message?: unknown };
   if (err?.statusCode === 401 || err?.statusCode === 403 || err?.status === 401 || err?.status === 403) return true;
   return /invalid api key|unauthorized|\b401\b|\b403\b/i.test(String(err?.message ?? e ?? ""));
 }
 
 export async function distill(project: string, window: string): Promise<Item[]> {
-  const prompt = `Proyecto: "${project}". Fragmento de transcript de una sesión de un agente de IA trabajando en este proyecto:
+  const prompt = `Project: "${project}". A transcript window from an AI agent session working on this project:
 """
 ${window}
 """
-Extrae SOLO el conocimiento DURADERO y reutilizable como JSON:
-{"items":[{"type": uno de [${TYPES.join(", ")}], "title": "título corto", "content": "el conocimiento en 1-3 frases"}]}
-Incluye decisiones técnicas, restricciones, incidencias y su resolución, convenciones, deuda técnica, riesgos y how-tos. DESCARTA ruido (llamadas a herramientas, volcados de ficheros, narración, saludos, intentos abandonados). NUNCA incluyas secretos/claves. Si no hay nada que valga, devuelve {"items":[]}.`;
+Extract ONLY the DURABLE, reusable knowledge as JSON:
+{"items":[{"type": one of [${TYPES.join(", ")}], "title": "a short title", "content": "the knowledge in 1-3 sentences"}]}
+Include technical decisions, constraints, incidents and how they were resolved, conventions, technical debt, risks and how-tos. DISCARD noise (tool calls, file dumps, narration, greetings, abandoned attempts). NEVER include secrets or keys. When nothing is worth keeping, return {"items":[]}.`;
   try {
     const raw = await runAgent("distiller", prompt, { maxOutputTokens: 1500 });
     const parsed = JSON.parse(extractJson(raw)) as { items?: { type?: string; title?: string; content?: string }[] };
@@ -45,11 +45,12 @@ Incluye decisiones técnicas, restricciones, incidencias y su resolución, conve
       .filter((i): i is Item => Boolean(i?.title && i?.content))
       .map((i) => ({ type: TYPES.includes(i.type ?? "") ? (i.type as string) : "module_note", title: i.title.trim().slice(0, 160), content: i.content.trim() }));
   } catch (e) {
-    // Sin LLM configurado no hay fallo: es un estado deliberado y core cae a heurísticas.
-    if (esRechazoDelProveedor(e)) {
-      throw new Error(`el proveedor de inferencia rechaza la clave: ${(e as Error).message}`);
+    // With no LLM configured there is no failure: that is a deliberate state and core falls
+    // back to heuristics.
+    if (isProviderRejection(e)) {
+      throw new Error(`the inference provider is rejecting the key: ${(e as Error).message}`);
     }
-    console.error(`  ✗ destilación falló en una ventana: ${(e as Error).message}`);
+    console.error(`  ✗ distillation failed on one window: ${(e as Error).message}`);
     return [];
   }
 }

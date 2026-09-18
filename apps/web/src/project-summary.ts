@@ -3,19 +3,19 @@ import { lintProject } from "@cortex/core";
 import type { Html } from "./views/layout.js";
 
 /**
- * Estado de salud resumido de un proyecto, para no tener que entrar a ver si hay algo que
- * mirar. Acompaña siempre a la tarjeta del proyecto, y la tarjeta sale en dos sitios —la
- * portada y la lista de repos de un cliente—, así que el resumen vive fuera de las dos.
+ * A project's health at a glance, so nobody has to go in just to find out whether there is
+ * anything to look at. It always accompanies the project card, and the card shows up in two
+ * places -- the home page and a client's repo list -- so the summary lives outside both.
  *
- * Si el lint falla, la tarjeta se pinta sin él: no saber si está sano no es motivo para no
- * poder elegir el proyecto.
+ * When the lint fails, the card is painted without it: not knowing whether it is healthy is no
+ * reason to be unable to pick the project.
  */
-export async function saludDelProyecto(nombre: string): Promise<Html> {
+export async function projectHealth(name: string): Promise<Html> {
   try {
-    const r = await lintProject(nombre);
-    const avisos = r.contradictions.length + r.duplicates.length;
-    if (avisos === 0) return html`<span class="health ok">✓ healthy</span>`;
-    return html`<span class="health warn">${avisos} to review</span>`;
+    const r = await lintProject(name);
+    const warnings = r.contradictions.length + r.duplicates.length;
+    if (warnings === 0) return html`<span class="health ok">✓ healthy</span>`;
+    return html`<span class="health warn">${warnings} to review</span>`;
   } catch {
     return html``;
   }

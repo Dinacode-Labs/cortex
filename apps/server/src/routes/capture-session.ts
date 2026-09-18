@@ -14,12 +14,12 @@ import { parseBody } from "../validate.js";
 import type { CaptureQueue } from "../capture-queue.js";
 
 /**
- * `POST /capture/session` — el cliente manda el transcript **condensado** y el servidor lo
- * destila (ADR-0025).
+ * `POST /capture/session` -- the client sends the **condensed** transcript and the server
+ * distills it (ADR-0025).
  *
- * El reparto de trabajo es el punto: condensar y escrubar es barato y puede hacerlo el
- * cliente; destilar necesita credenciales de LLM y control de concurrencia, así que lo hace
- * quien las tiene. Así ningún portátil necesita una clave.
+ * The division of labour is the whole point: condensing and scrubbing is cheap and the client
+ * can do it; distilling needs LLM credentials and concurrency control, so whoever holds them
+ * does it. That way no laptop needs a key.
  */
 
 export interface CaptureJob {
@@ -42,11 +42,11 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
     const body = await parseBody(c, captureSessionRequest);
     if (body instanceof Response) return body;
 
-    // Un transcript desmedido no es un caso legítimo: o es un error del cliente o alguien
-    // intentando que el servidor queme cuota. Se corta antes de tocar la BD.
+    // An outsized transcript is not a legitimate case: it is either a client bug or somebody
+    // trying to make the server burn quota. It is cut off before touching the database.
     const maxChars = getEnvNum("CORTEX_CAPTURE_SESSION_MAX_CHARS", 150_000);
     if (body.condensed.length > maxChars) {
-      return c.json({ error: `Transcript demasiado grande (${body.condensed.length} > ${maxChars} caracteres).` }, 413);
+      return c.json({ error: `Transcript too large (${body.condensed.length} > ${maxChars} characters).` }, 413);
     }
 
     const access = await checkProjectAccess(user.email, { slug: body.slug });
@@ -57,19 +57,19 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
     const hash = hashCondensed(body.condensed);
     const previous = await findSessionCapture(project.id, body.platform, body.sessionId);
 
-    // Mismo contenido ya destilado: no se vuelve a pagar. Es el caso frecuente, porque los
-    // hooks de fin de sesión y de pre-compactación disparan sobre la misma sesión.
+    // The same content already distilled: it is not paid for twice. This is the frequent case,
+    // because the end-of-session and pre-compaction hooks fire over the same session.
     if (previous?.status === "done" && previous.condensedHash === hash) {
       const res: CaptureSessionResponse = { id: previous.id, status: "duplicate", counters: previous.counters as never };
       return c.json(res, 200);
     }
-    // Ya hay trabajo en marcha para esta sesión: no se encola otro.
+    // There is already work in flight for this session: no second job is queued.
     if (previous && (previous.status === "queued" || previous.status === "running")) {
       return c.json({ id: previous.id, status: previous.status } satisfies CaptureSessionResponse, 202);
     }
 
-    // Si la sesión creció, se destila SOLO la cola nueva: el condensado es determinista y
-    // append-only, así que el prefijo ya procesado no aporta nada y sí cuesta dinero.
+    // If the session grew, only the NEW tail is distilled: the condensed form is deterministic
+    // and append-only, so the already-processed prefix adds nothing and does cost money.
     const delta =
       previous?.status === "done" && body.condensed.length > previous.condensedChars
         ? body.condensed.slice(previous.condensedChars)
@@ -94,8 +94,8 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
       sourceType: body.sourceType,
     });
 
-    // Por defecto no se espera: el hook de fin de sesión tiene un timeout corto y destilar
-    // tarda. `?wait=1` es para los conectores por lotes, que sí quieren los contadores.
+    // By default it does not wait: the end-of-session hook has a short timeout and distilling
+    // takes a while. `?wait=1` is for the batch connectors, which do want the counters.
     if (c.req.query("wait") !== "1") {
       return c.json({ id, status: "queued" } satisfies CaptureSessionResponse, 202);
     }
@@ -107,7 +107,7 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
       new Promise<typeof timedOut>((r) => setTimeout(() => r(timedOut), waitMs)),
     ]);
     if (outcome === timedOut) {
-      // El trabajo sigue vivo; solo dejamos de esperarlo. El cliente puede consultar el id.
+      // The job stays alive; we merely stop waiting for it. The client can poll the id.
       return c.json({ id, status: "running" } satisfies CaptureSessionResponse, 202);
     }
     const finished = await getSessionCaptureById(id);
@@ -135,7 +135,7 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
   return routes;
 }
 
-/** Ejecuta un trabajo de la cola y deja el resultado registrado. */
+/** Runs one job from the queue and leaves the result recorded. */
 export function makeCaptureRunner(distill: DistillSessionFn) {
   return async (job: CaptureJob): Promise<void> => {
     await markSessionCapture(job.captureId, "running");

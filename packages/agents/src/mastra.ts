@@ -7,57 +7,65 @@ import { getLlmConfig, type LlmConfig, withLlmSlot } from "@cortex/shared";
 import { CortexTraceExporter } from "./trace-exporter.js";
 
 /**
- * Agentes de Mastra de Cortex (§7). Un Agent por rol del pipeline de inteligencia:
- *   - classifier : ingesta/clasificación (tipo, título, resumen, entidades)
- *   - graph      : extracción de grafo (entidades + relaciones)
- *   - reranker   : reordenado de candidatos de retrieval
- *   - retriever  : síntesis de respuestas fundamentadas
+ * Cortex's Mastra agents (section 7). One Agent per role of the intelligence pipeline:
+ *   - classifier : ingestion/classification (type, title, summary, entities)
+ *   - graph      : graph extraction (entities + relations)
+ *   - reranker   : reordering of retrieval candidates
+ *   - retriever  : synthesis of grounded answers
  *
- * Todos hablan con el LLM por un provider OpenAI-compatible (nan/OpenRouter). Los
- * roles que devuelven JSON usan un `fetch` que fuerza `response_format:json_object`
- * (qwen3.6 no respeta `structuredOutput` de Mastra de forma fiable, pero con
- * json_object es rápido y válido — ver ADR-0006/0015). El retriever usa texto libre.
+ * They all talk to the LLM through an OpenAI-compatible provider. The roles that return JSON
+ * use a `fetch` that forces `response_format:json_object` (some models do not honour Mastra's
+ * `structuredOutput` reliably, but with json_object they are fast and valid -- see
+ * ADR-0006/0015). The retriever uses free text.
+ *
+ * The instructions below are in English; the **output language** stays Spanish on purpose.
+ * What these agents produce is not source code: it is knowledge entries that get stored next
+ * to a corpus that is already Spanish, and answers read by a Spanish-speaking team. Changing
+ * the prompt language is a translation; changing the output language is a product decision.
  */
 
 export type AgentRole = "classifier" | "graph" | "reranker" | "retriever" | "distiller" | "merger" | "reconciler";
 
+const OUTPUT_LANGUAGE = "Spanish";
+
 const INSTRUCTIONS: Record<AgentRole, string> = {
   classifier:
-    "Eres el agente de ingesta de Cortex, una memoria de contexto de " +
-    "proyectos software. Clasificas piezas de conocimiento y extraes entidades. " +
-    "Respondes SIEMPRE en español y SOLO con JSON válido.",
+    "You are Cortex's ingestion agent. Cortex is a context memory for software projects. " +
+    "You classify pieces of knowledge and extract entities. " +
+    `You ALWAYS answer in ${OUTPUT_LANGUAGE} and ONLY with valid JSON.`,
   graph:
-    "Eres el agente de grafo de conocimiento de Cortex. Extraes entidades " +
-    "de dominio y relaciones de piezas de conocimiento de proyectos software. " +
-    "Respondes SIEMPRE en español y SOLO con JSON válido.",
-  reranker: "Eres un reranker de búsqueda de Cortex. Respondes solo con JSON válido.",
+    "You are Cortex's knowledge-graph agent. You extract domain entities and relations from " +
+    "pieces of knowledge about software projects. " +
+    `You ALWAYS answer in ${OUTPUT_LANGUAGE} and ONLY with valid JSON.`,
+  reranker: "You are a search reranker for Cortex. You answer only with valid JSON.",
   retriever:
-    "Eres el agente de recuperación de Cortex. Respondes preguntas de " +
-    "developers sobre proyectos software basándote ÚNICAMENTE en el contexto " +
-    "recuperado. Eres conciso, en español, y si el contexto no basta lo dices.",
+    "You are Cortex's retrieval agent. You answer developers' questions about software " +
+    "projects based ONLY on the retrieved context. You are concise, you write in " +
+    `${OUTPUT_LANGUAGE}, and when the context is not enough you say so.`,
   distiller:
-    "Eres el agente de destilación de Cortex. De transcripts de sesiones de " +
-    "agentes de IA trabajando en un proyecto, extraes SOLO el conocimiento DURADERO y " +
-    "reutilizable (decisiones técnicas, restricciones, incidencias y su resolución, " +
-    "convenciones, deuda técnica, riesgos, how-tos). Descartas el ruido (llamadas a " +
-    "herramientas, volcados de ficheros, narración, saludos, intentos abandonados) y " +
-    "NUNCA incluyes secretos. Respondes SIEMPRE en español y SOLO con JSON válido.",
+    "You are Cortex's distillation agent. From transcripts of AI agents working on a " +
+    "project, you extract ONLY the DURABLE, reusable knowledge (technical decisions, " +
+    "constraints, incidents and how they were resolved, conventions, technical debt, risks, " +
+    "how-tos). You discard the noise (tool calls, file dumps, narration, greetings, abandoned " +
+    "attempts) and you NEVER include secrets. " +
+    `You ALWAYS answer in ${OUTPUT_LANGUAGE} and ONLY with valid JSON.`,
   merger:
-    "Eres el agente de consolidación de Cortex. Fusionas dos piezas de " +
-    "conocimiento sobre lo mismo en UNA sola, conservando todo lo relevante de ambas, " +
-    "sin redundancia, concisa y en español. Devuelves SOLO el texto consolidado (sin " +
-    "preámbulos), con un título corto en la primera línea.",
+    "You are Cortex's consolidation agent. You merge two pieces of knowledge about the same " +
+    "thing into ONE, keeping everything relevant from both, without redundancy, concise and " +
+    `in ${OUTPUT_LANGUAGE}. You return ONLY the consolidated text (no preamble), with a short ` +
+    "title on the first line.",
   reconciler:
-    "Eres el agente de reconciliación de Cortex. Dadas una pieza EXISTENTE y " +
-    "una NUEVA sobre el mismo tema, decides su relación y respondes SOLO JSON " +
-    '{"decision": uno de [noop, update, supersede]}: "noop" = la nueva no aporta nada; ' +
-    '"update" = la nueva refina/añade detalle SIN contradecir; "supersede" = la nueva ' +
-    "CONTRADICE o reemplaza/invalida a la existente (la existente ya NO es válida).",
+    "You are Cortex's reconciliation agent. Given an EXISTING piece and a NEW one about the " +
+    "same subject, you decide their relationship and answer ONLY with JSON " +
+    '{"decision": one of [noop, update, supersede]}: "noop" = the new one adds nothing; ' +
+    '"update" = the new one refines/adds detail WITHOUT contradicting; "supersede" = the new ' +
+    "one CONTRADICTS or replaces/invalidates the existing one (the existing one is NO longer " +
+    "valid).",
 };
 
 const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller", "reconciler"]);
 
-/** fetch que fuerza response_format json_object en cada request OpenAI-compatible. */
+/** A fetch that forces response_format json_object on every OpenAI-compatible request. */
 const jsonFetch: typeof fetch = async (url, init) => {
   if (init?.body && typeof init.body === "string") {
     try {
@@ -65,7 +73,7 @@ const jsonFetch: typeof fetch = async (url, init) => {
       b.response_format = { type: "json_object" };
       init = { ...init, body: JSON.stringify(b) };
     } catch {
-      /* cuerpo no-JSON: lo dejamos tal cual */
+      /* non-JSON body: leave it as it is */
     }
   }
   return fetch(url as Parameters<typeof fetch>[0], init);
@@ -75,9 +83,9 @@ let mastra: Mastra | null | undefined;
 
 function build(): Mastra | null {
   if (!getLlmConfig()) return null;
-  // Un modelo POR ROL: getLlmConfig(role) resuelve CORTEX_MODEL_<ROLE> (ADR-0023), así
-  // que roles distintos pueden usar modelos distintos (barato para lo mecánico, potente
-  // para el juicio). Mismo endpoint OpenAI-compatible; solo cambia el id de modelo.
+  // One model PER ROLE: getLlmConfig(role) resolves CORTEX_MODEL_<ROLE> (ADR-0023), so
+  // different roles can use different models (cheap for the mechanical work, powerful for the
+  // judgement). Same OpenAI-compatible endpoint; only the model id changes.
   const buildModel = (cfg: LlmConfig, json: boolean) =>
     createOpenAICompatible({
       name: cfg.provider,
@@ -86,7 +94,7 @@ function build(): Mastra | null {
       ...(json ? { fetch: jsonFetch } : {}),
     })(cfg.model);
   const mk = (role: AgentRole) => {
-    const cfg = getLlmConfig(role)!; // no null: getLlmConfig() ya validó arriba
+    const cfg = getLlmConfig(role)!; // not null: getLlmConfig() validated above
     return new Agent({
       id: `cortex-${role}`,
       name: `cortex-${role}`,
@@ -94,9 +102,9 @@ function build(): Mastra | null {
       model: buildModel(cfg, JSON_ROLES.has(role)),
     });
   };
-  // Instancia Mastra: agentes registrados + observabilidad (AI tracing) hacia
-  // nuestro exporter (ADR-0016 parte B). Los agentes se sirven desde aquí para
-  // que `generate()` emita spans.
+  // The Mastra instance: registered agents plus observability (AI tracing) into our own
+  // exporter (ADR-0016, part B). The agents are served from here so that `generate()` emits
+  // spans.
   return new Mastra({
     agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever"), distiller: mk("distiller"), merger: mk("merger"), reconciler: mk("reconciler") },
     observability: new Observability({
@@ -105,13 +113,13 @@ function build(): Mastra | null {
   } as ConstructorParameters<typeof Mastra>[0]);
 }
 
-/** Devuelve el Agent del rol, o null si no hay LLM configurado. */
+/** Returns the role's Agent, or null when no LLM is configured. */
 export function getAgent(role: AgentRole): Agent | null {
   if (mastra === undefined) mastra = build();
   return mastra ? (mastra.getAgent(role) as Agent) : null;
 }
 
-/** Flushea/cierra la observabilidad (para CLIs que terminan con process.exit). */
+/** Flushes/closes observability (for CLIs that end with process.exit). */
 export async function shutdownObservability(): Promise<void> {
   if (mastra) {
     try {
@@ -122,19 +130,19 @@ export async function shutdownObservability(): Promise<void> {
   }
 }
 
-/** Ejecuta el agente del rol y devuelve su texto. Lanza si no hay LLM. */
+/** Runs the role's agent and returns its text. Throws when there is no LLM. */
 export async function runAgent(
   role: AgentRole,
   prompt: string,
   opts: { maxOutputTokens?: number; maxRetries?: number } = {},
 ): Promise<string> {
   const agent = getAgent(role);
-  if (!agent) throw new Error("LLM no habilitado (LLM_PROVIDER / API key).");
+  if (!agent) throw new Error("LLM not enabled (LLM_PROVIDER / API key).");
   const options: Record<string, unknown> = { maxRetries: opts.maxRetries ?? 6 };
   if (opts.maxOutputTokens) options.maxOutputTokens = opts.maxOutputTokens;
   const t0 = Date.now();
-  // Un slot por llamada: el proveedor limita peticiones concurrentes por API key, y el
-  // enrich/maintain lanza varias en paralelo (CORTEX_ENRICH_CONCURRENCY).
+  // One slot per call: the provider caps concurrent requests per API key, and
+  // enrich/maintain fires several in parallel (CORTEX_ENRICH_CONCURRENCY).
   const res = (await withLlmSlot(() => agent.generate(prompt, options as never))) as {
     text?: string;
     usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number };
@@ -143,9 +151,9 @@ export async function runAgent(
   const cfg = getLlmConfig(role);
   const u = res.usage ?? {};
   if (cfg) {
-    // Registramos el modelo SERVIDO (res.response.modelId) si viene, no el pedido: detecta
-    // routing de OpenRouter y degradación silenciosa del proveedor (ADR-0023 §6.3). Fallback
-    // al modelo pedido por rol.
+    // We record the SERVED model (res.response.modelId) when it arrives, not the requested
+    // one: that catches OpenRouter routing and silent provider degradation (ADR-0023, section
+    // 6.3). It falls back to the model requested for the role.
     const servedModel = res.response?.modelId?.trim() || cfg.model;
     await recordUsage({
       operation: role,

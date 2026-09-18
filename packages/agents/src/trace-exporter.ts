@@ -1,14 +1,14 @@
 import { getSql } from "@cortex/database";
 
 /**
- * Exporter de observabilidad propio (ADR-0016, parte B): recibe los eventos de
- * tracing de los Agents de Mastra y persiste cada span (cuando termina) en la tabla
- * `ai_traces` de nuestra Postgres. Así tenemos el árbol de spans (agent_run →
- * model_generation → model_inference…) con latencia, jerarquía, modelo y tokens,
- * sin depender del storage propio de Mastra. Best-effort: nunca rompe el agente.
+ * Our own observability exporter (ADR-0016, part B): it receives the tracing events from the
+ * Mastra Agents and persists every span (once it finishes) into the `ai_traces` table of our
+ * Postgres. That gives us the span tree (agent_run -> model_generation -> model_inference...)
+ * with latency, hierarchy, model and tokens, without depending on Mastra's own storage.
+ * Best-effort: it never breaks the agent.
  *
- * Inserta de forma inmediata por span (sin buffer) → fiable también en CLIs que
- * terminan con process.exit.
+ * It inserts immediately, per span (no buffer) -> reliable even in CLIs that end with
+ * process.exit.
  */
 export class CortexTraceExporter {
   readonly name = "cortex-traces";

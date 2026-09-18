@@ -4,31 +4,31 @@ paths:
   - "apps/web/public/**"
 ---
 
-# UI web
+# Web UI
 
-**Lee `docs/design.md` antes de tocar nada aquí.** Dice para qué existe la interfaz y para qué no,
-y evita volver a meter pantallas que no se pueden usar.
+**Read `docs/design.md` before touching anything here.** It says what the interface exists for and
+what it does not, and it is what stops unusable screens from coming back.
 
-La tesis, en una línea: **los agentes escriben y las personas revisan**. La UI es donde alguien
-audita y repara una memoria escrita por máquinas — no es una herramienta de alta de datos, ni un
-dashboard, ni la forma principal de usar Cortex.
+The thesis, in one line: **agents write and people check**. The UI is where a human audits and
+repairs a memory written by machines — it is not a data-entry tool, not a dashboard, and not the
+main way anyone uses Cortex.
 
-## Reglas
+## Rules
 
-- **Server-rendered, sin build** (ADR-0042). Hono + `hono/html`, que autoescapa cada
-  interpolación. `raw()` **solo** sobre SVG de configuración o literales del propio fichero,
-  **jamás** sobre datos.
-- **La web habla con `core` directamente**, nunca con la API HTTP: no añadas un `fetch("/api/…")`
-  desde un handler.
-- **Componentes, no HTML suelto**: los ladrillos están en `views/components.ts` y las rutas
-  componen (ADR-0053). Si un componente no encaja, arregla el componente.
-- **Tokens, no valores a pelo**: una hoja de estilos es el sistema de diseño. Si el número que
-  necesitas no está en la escala, la escala está mal o el diseño está mal.
-- **Todo cuelga del proyecto** (`/p/<slug>/…`, ADR-0050), y las URLs viejas redirigen: un enlace
-  que alguien pegó en un chat hace tres semanas sigue funcionando.
-- **Nada de pantallas que enseñan un problema y no dejan arreglarlo**: enseñan a ignorarlo.
-- **Nombre del producto, jamás en el markup**: la marca es configuración (`getBrandName()`).
-- El acceso lo decide `checkProjectAccess`, y «no puedes verlo» se pinta como «no existe».
-- La herencia **sube**: un hijo lee lo de su cliente, nunca lo de un hermano. Cruzar hacia abajo es
-  un acto deliberado y filtrado por permisos (ADR-0063).
-- Textos en **inglés**.
+- **Server-rendered, no build step** (ADR-0042). Hono + `hono/html`, which autoescapes every
+  interpolation. `raw()` **only** over configuration SVG or literals from the file itself, **never**
+  over data.
+- **The web talks to `core` directly**, never to the HTTP API: do not add a `fetch("/api/…")` from
+  a handler.
+- **Components, not loose HTML**: the building blocks are in `views/components.ts` and routes
+  compose them (ADR-0053). If a component does not fit, fix the component.
+- **Tokens, not hardcoded values**: one stylesheet is the design system. If the number you need is
+  not in the scale, either the scale is wrong or the design is.
+- **Everything hangs off the project** (`/p/<slug>/…`, ADR-0050), and old URLs redirect: a link
+  somebody pasted in a chat three weeks ago still works.
+- **No screen that shows a problem and offers no way to fix it**: it teaches people to ignore it.
+- **The product name never appears in the markup**: branding is configuration (`getBrandName()`).
+- Access is decided by `checkProjectAccess`, and "you cannot see it" renders as "it does not
+  exist".
+- Inheritance goes **up**: a child reads what its client knows, never what a sibling knows.
+  Crossing downwards is a deliberate act, filtered by access (ADR-0063).

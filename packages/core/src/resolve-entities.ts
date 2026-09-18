@@ -3,22 +3,22 @@ import type { Row } from "./map.js";
 import { canonicalize } from "./text.js";
 
 /**
- * Loop de resolución de entidades (§12.4): fusiona variantes de una misma entidad
- * (p.ej. "Acme"/"Acme Corp"/"acme.com") en una canónica, re-apuntando enlaces
- * (context_entry_entities) y relaciones, y deduplicando. Solo BD, sin LLM.
+ * The entity resolution loop (section 12.4): merges variants of the same entity
+ * (e.g. "Acme"/"Acme Corp"/"acme.com") into a canonical one, re-pointing links
+ * (context_entry_entities) and relations, and deduplicating. Database only, no LLM.
  *
- * Agrupa por TIPO + nombre normalizado (sin acentos/puntuación, minúsculas), excluyendo
- * `project` (nunca se fusiona/borra un proyecto). El tipo forma parte de la clave a
- * propósito: dos entidades homónimas de tipos distintos son cosas distintas (el `vendor`
- * "Stripe" y el `service` "Stripe" no deben colapsar en una sola).
+ * It groups by TYPE + normalised name (no accents/punctuation, lowercase), excluding
+ * `project` (a project is never merged or deleted). The type is part of the key on purpose:
+ * two same-named entities of different types are different things (the `vendor` "Stripe" and
+ * the `service` "Stripe" must not collapse into one).
  *
- * La canónica es la entidad con más enlaces; desempates: nombre más descriptivo (más
- * largo) y, si aún empatan, el `id` menor — para que el resultado sea DETERMINISTA y no
- * dependa del orden en que Postgres devuelva las filas.
+ * The canonical one is the entity with the most links; tie-breaks: the more descriptive
+ * (longer) name and, still tied, the lower `id` -- so the result is DETERMINISTIC and does
+ * not depend on the order Postgres happens to return rows in.
  */
 
-// Normalización sobre la base canónica compartida (NFD + sin diacríticos +
-// minúsculas + trim + colapsa espacios) y además quita todo lo no alfanumérico.
+// Normalisation on top of the shared canonical base (NFD + diacritics stripped + lowercase +
+// trim + collapsed whitespace), also removing everything non-alphanumeric.
 function norm(s: string): string {
   return canonicalize(s).replace(/[^a-z0-9]+/g, "");
 }
@@ -37,7 +37,7 @@ export async function resolveEntities(): Promise<ResolveResult> {
     linkCounts.set(r.entity_id, Number(r.n));
   }
 
-  // Agrupar por tipo + nombre normalizado.
+  // Group by type + normalised name.
   const groups = new Map<string, Row[]>();
   for (const e of entities) {
     const normalized = norm(e.name);
@@ -55,9 +55,9 @@ export async function resolveEntities(): Promise<ResolveResult> {
   let groupsMerged = 0;
   for (const [, group] of groups) {
     if (group.length < 2) continue;
-    // Canónica: más enlaces; desempates por nombre más largo (más descriptivo) y, en
-    // último término, por id — sin este último el ganador depende del orden de filas
-    // que devuelva Postgres y la fusión deja de ser reproducible.
+    // Canonical: most links; tie-break by longer (more descriptive) name and, as a last
+    // resort, by id -- without that last one the winner depends on the row order Postgres
+    // returns, and the merge stops being reproducible.
     group.sort((a, b) => {
       const byLinks = (linkCounts.get(b.id) ?? 0) - (linkCounts.get(a.id) ?? 0);
       if (byLinks !== 0) return byLinks;
@@ -70,7 +70,7 @@ export async function resolveEntities(): Promise<ResolveResult> {
 
     await sql.begin(async (tx) => {
       for (const x of losers) {
-        // Re-apuntar enlaces sin violar PK (entry, entity).
+        // Re-point links without violating the (entry, entity) PK.
         await tx`
           UPDATE context_entry_entities cee SET entity_id = ${canonical.id}
           WHERE cee.entity_id = ${x.id}
@@ -79,14 +79,14 @@ export async function resolveEntities(): Promise<ResolveResult> {
               WHERE c2.context_entry_id = cee.context_entry_id AND c2.entity_id = ${canonical.id})
         `;
         await tx`DELETE FROM context_entry_entities WHERE entity_id = ${x.id}`;
-        // Re-apuntar relaciones sin violar el UNIQUE parcial `relations_active_unique`
-        // (source_id, target_id, relation_type) WHERE valid_to IS NULL. Cada UPDATE re-apunta
-        // SOLO las aristas del loser que, tras mover el extremo a `canonical`, NO colisionarían
-        // con una arista ya vigente; el DELETE posterior elimina las que sí habrían chocado.
-        // Hay que tratar source_id y target_id por separado: una arista del loser puede colisionar
-        // por cualquiera de los dos extremos según cuál se re-apunte.
+        // Re-point relations without violating the partial UNIQUE `relations_active_unique`
+        // (source_id, target_id, relation_type) WHERE valid_to IS NULL. Each UPDATE re-points
+        // ONLY the loser's edges that, once the endpoint moves to `canonical`, would NOT
+        // collide with an already-current edge; the DELETE afterwards removes the ones that
+        // would have. source_id and target_id must be handled separately: a loser's edge can
+        // collide through either endpoint depending on which one is re-pointed.
 
-        // (a) Re-apuntar source_id: la arista (x.id, target, type) pasa a (canonical.id, target, type).
+        // (a) Re-point source_id: edge (x.id, target, type) becomes (canonical.id, target, type).
         await tx`
           UPDATE relations r SET source_id = ${canonical.id}
           WHERE r.source_id = ${x.id}
@@ -97,7 +97,7 @@ export async function resolveEntities(): Promise<ResolveResult> {
         `;
         await tx`DELETE FROM relations WHERE source_id = ${x.id}`;
 
-        // (b) Re-apuntar target_id: la arista (source, x.id, type) pasa a (source, canonical.id, type).
+        // (b) Re-point target_id: edge (source, x.id, type) becomes (source, canonical.id, type).
         await tx`
           UPDATE relations r SET target_id = ${canonical.id}
           WHERE r.target_id = ${x.id}
@@ -115,7 +115,7 @@ export async function resolveEntities(): Promise<ResolveResult> {
     groupsMerged++;
   }
 
-  // Dedup de relaciones y eliminación de auto-relaciones tras la fusión.
+  // Deduplicate relations and drop self-relations after the merge.
   await sql`DELETE FROM relations WHERE source_id = target_id`;
   await sql`
     DELETE FROM relations a USING relations b

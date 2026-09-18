@@ -5,53 +5,54 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
 /**
- * Proxy MCP: expone por **stdio** las tools que sirve el MCP **HTTP** del servidor.
+ * The MCP proxy: it exposes over **stdio** the tools the server's **HTTP** MCP serves.
  *
- * Los agentes (Claude Code, Codex, OpenCode…) lanzan servidores MCP como procesos locales
- * por stdio. El servidor de Cortex, en cambio, sirve el MCP por HTTP con autenticación
- * Bearer, porque las tools consultan la base de datos y aplican permisos por usuario. Este
- * proxy es el puente: el agente habla stdio con un proceso local que no sabe nada de
- * Postgres, y ese proceso reenvía todo al servidor con el token de `cortex auth login`.
+ * Agents (Claude Code, Codex, OpenCode...) launch MCP servers as local stdio processes.
+ * Cortex's server, by contrast, serves MCP over HTTP with Bearer authentication, because the
+ * tools query the database and apply per-user permissions. This proxy is the bridge: the agent
+ * speaks stdio to a local process that knows nothing about Postgres, and that process forwards
+ * everything to the server with `cortex auth login`'s token.
  *
- * Antes, la alternativa era registrar el MCP stdio del repo clonado, que hablaba con la
- * base de datos directamente **y sin guards de permisos** (ADR-0025).
+ * The alternative used to be registering the cloned repo's stdio MCP, which talked to the
+ * database directly **and with no permission guards** (ADR-0025).
  *
- * Nada aquí tiene side effects: el comando (`commands/mcp.ts`) es quien conecta el stdio.
+ * Nothing here has side effects: the command (`commands/mcp.ts`) is what connects the stdio.
  */
 
 export interface ProxyOptions {
-  /** Abre el transporte hacia el servidor. Se llama de nuevo si hay que reconectar. */
+  /** Opens the transport towards the server. Called again when a reconnect is needed. */
   connect: () => Promise<Transport>;
   serverInfo?: { name: string; version: string };
-  /** Los logs van a stderr: stdout es el canal del protocolo. */
+  /** Logs go to stderr: stdout is the protocol's channel. */
   log?: (msg: string) => void;
 }
 
-/** ¿Es un fallo de autenticación? El SDK no lo tipa, así que se mira por código y texto. */
+/** Is this an authentication failure? The SDK does not type it, so code and text are checked. */
 export function isAuthError(e: unknown): boolean {
   const err = e as { code?: unknown; message?: unknown };
   if (err?.code === 401) return true;
-  if ((e as { name?: string })?.name === "SinSesionError") return true;
+  if ((e as { name?: string })?.name === "NoSessionError") return true;
   const msg = String(err?.message ?? e ?? "");
-  return /\b401\b|unauthorized|no autenticado|No session for/i.test(msg);
+  return /\b401\b|unauthorized|not authenticated|No session for/i.test(msg);
 }
 
-/** ¿Se cayó la conexión con el servidor? Entonces merece la pena reintentar una vez. */
+/** Did the connection to the server drop? Then it is worth retrying once. */
 function isConnectionError(e: unknown): boolean {
   const msg = String((e as { message?: unknown })?.message ?? e ?? "");
   return /connection closed|not connected|socket hang up|ECONNRESET|ECONNREFUSED|fetch failed|session/i.test(msg);
 }
 
 /**
- * Lo que se le enseña a la persona cuando no se puede autenticar.
+ * What the person is shown when authentication is not possible.
  *
- * Se usa el mensaje del error si lo trae, porque `resolveUpstream` sabe **qué servidor** buscó
- * y qué sesiones hay, y eso es lo que resuelve el problema. El texto genérico solo queda para
- * el caso en que el fallo venga del otro lado (un token caducado de verdad).
+ * The error's message is used when it carries one, because `resolveUpstream` knows **which
+ * server** it looked for and which sessions exist, and that is what solves the problem. The
+ * generic text remains only for the case where the failure comes from the other side (a token
+ * that really has expired).
  */
 function authHint(e: unknown): string {
   const propio = (e as { name?: string; message?: string } | undefined);
-  if (propio?.name === "SinSesionError" && propio.message) return `${getBrandName()}: ${propio.message}`;
+  if (propio?.name === "NoSessionError" && propio.message) return `${getBrandName()}: ${propio.message}`;
   return `${getBrandName()}: your session is not valid for this server. Run \`cortex doctor\` to see which one this folder points at, then \`cortex auth login --server <it>\`, and restart your agent.`;
 }
 
@@ -63,13 +64,13 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
   let client: Client | null = null;
   let connecting: Promise<Client> | null = null;
 
-  /** Cliente hacia el servidor, creado a demanda y reutilizado. */
+  /** The client towards the server, created on demand and reused. */
   async function upstream(): Promise<Client> {
     if (client) return client;
     connecting ??= (async () => {
       const c = new Client({ name: "cortex-cli-proxy", version: info.version }, { capabilities: {} });
       c.onclose = () => {
-        // La próxima llamada reconecta sola en vez de fallar para siempre.
+        // The next call reconnects on its own instead of failing forever.
         if (client === c) client = null;
       };
       await c.connect(await opts.connect());
@@ -85,7 +86,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
     }
   }
 
-  /** Ejecuta contra el servidor y reintenta UNA vez si la conexión se había caído. */
+  /** Runs against the server and retries ONCE if the connection had dropped. */
   async function withRetry<T>(fn: (c: Client) => Promise<T>): Promise<T> {
     try {
       return await fn(await upstream());
@@ -99,13 +100,13 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
 
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     try {
-      // El `inputSchema` viaja como JSON Schema y se reenvía tal cual: no hace falta
-      // reconstruirlo con zod ni conocer las tools de antemano.
+      // The `inputSchema` travels as JSON Schema and is forwarded as is: there is no need to
+      // rebuild it with zod nor to know the tools in advance.
       return await withRetry((c) => c.listTools());
     } catch (e) {
-      // Devolver una lista vacía en vez de fallar: así el agente ARRANCA aunque el
-      // servidor esté caído o el token haya caducado, y el usuario ve el aviso en el log
-      // en lugar de un error de inicialización.
+      // Return an empty list rather than fail: that way the agent STARTS even when the server
+      // is down or the token has expired, and the user sees the warning in the log instead of
+      // an initialisation error.
       log(isAuthError(e) ? authHint(e) : `could not list the tools: ${(e as Error).message}`);
       return { tools: [] };
     }
@@ -115,8 +116,8 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
     try {
       return await withRetry((c) => c.callTool(request.params));
     } catch (e) {
-      // Un error de tool se responde como resultado con `isError`, no como excepción de
-      // protocolo: el agente lo enseña al usuario y sigue trabajando.
+      // A tool error is answered as a result with `isError`, not as a protocol exception: the
+      // agent shows it to the user and carries on working.
       const text = isAuthError(e) ? authHint(e) : `${getBrandName()}: the tool failed (${(e as Error).message}).`;
       log(text);
       return { content: [{ type: "text", text }], isError: true };

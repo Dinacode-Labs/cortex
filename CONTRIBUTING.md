@@ -3,6 +3,8 @@
 Fixes, improvements and new capabilities arrive as **pull requests**. This guide explains how
 the repository is put together and where each thing lives.
 
+*En español: [`CONTRIBUTING.es.md`](./CONTRIBUTING.es.md).*
+
 > **Nothing corporate in here.** Named clients, people as owners of work, internal tooling and
 > brand material do **not** belong in this repository: they live in a separate private one
 > (ADR-0026). In the docs a client is "a real project" or "Acme", and a task has no owner.
@@ -87,11 +89,24 @@ are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
 
 ## Conventions
 
-- **Language.** Anything an outsider reads is in **English**: the README, this guide, the
-  security policy, CLI output, MCP tool descriptions, the web UI, and the code itself. The
-  team's working record stays in **Spanish**: code comments, the decision records, the roadmap
-  and the research notes. The prompts the LLM agents use are Spanish too, because the corpus
-  they process is.
+- **Language** ([ADR-0064](./docs/decisions.md#adr-0064))**.** The repository is in
+  **English** — all of it: the README, this guide, the
+  security policy, CLI output, MCP tool descriptions, the web UI, the code and its comments,
+  the decision records, the roadmap, the research notes and the agents' prompts. A public
+  repository that switches language halfway is a repository half of which nobody outside can
+  read, including the comments that explain the decisions worth reading.
+
+  Two things stay in Spanish, and both are **data rather than prose we wrote**: the patterns
+  that match the corpus (the classification rules in `packages/core/src/text.ts`, the
+  deictics in `domain.ts`, the eval fixtures) and the **output language** of the LLM agents
+  (`OUTPUT_LANGUAGE` in `packages/agents/src/mastra.ts`), because what they produce is stored
+  next to a corpus that is already Spanish. Each of those carries an English comment saying
+  why. Translating a prompt is a translation; changing the output language is a product
+  decision.
+
+  Being Spanish speakers, the two entry points are also kept in Spanish —
+  [`README.es.md`](./README.es.md) and [`CONTRIBUTING.es.md`](./CONTRIBUTING.es.md) — and
+  English is the version that must be current when they disagree.
 - **No secrets in the repository.** `.env` is ignored; use `.env.example`. Secrets are
   scrubbed before anything reaches an LLM and again before it is stored.
 - **Traceability.** Every unit of knowledge keeps its source, date, author, confidence, status
@@ -135,11 +150,11 @@ Documentation is part of the work, not an extra:
 - **`docs/research/`** — the investigation behind decisions.
 - **`CLAUDE.md`** — the guide for AI agents working on this repository. Keep it current, and
   prune it now and then so it does not drift into noise.
-- **`.claude/rules/`** — one file per subject: architecture, style, tests, documentation, and one
-  per area of the tree (HTTP and MCP, CLI, web, the LLM layer). They are
-  written for a coding agent, which loads them automatically, but they hold for anyone
-  ([ADR-0064](./docs/decisions.md#adr-0064)). A convention that changes is changed there — and a
-  rule that can be checked belongs in a test instead.
+- **`.claude/rules/`** — one file per subject: architecture, language, tests and documentation,
+  plus one per area of the tree (TypeScript style, HTTP and MCP, CLI, web, the LLM layer), those
+  scoped by a `paths:` header. They are written for a coding agent, which loads them
+  automatically, but they hold for anyone ([ADR-0065](./docs/decisions.md#adr-0065)). A convention
+  that changes is changed there — and a rule that can be checked belongs in a test instead.
 
 ## Publishing a release
 

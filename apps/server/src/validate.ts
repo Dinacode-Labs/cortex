@@ -2,18 +2,18 @@ import type { Context } from "hono";
 import type { z } from "zod";
 
 /**
- * Validación de bodies JSON con zod (v3) en el borde HTTP. Sustituye el parseo
- * manual con casts `as never` que había en app.ts: cada router define su schema
- * de REQUEST y llama a `parseBody`.
+ * JSON body validation with zod (v3) at the HTTP edge. It replaces the manual parsing with
+ * `as never` casts that used to live in app.ts: each router defines its REQUEST schema and
+ * calls `parseBody`.
  */
 
 /**
- * Lee el body JSON y lo valida contra `schema`. Si no valida, devuelve la Response
- * 400 con `{ error, issues }` legible (path + mensaje); si valida, devuelve los
- * datos tipados. Uso en handlers: `if (body instanceof Response) return body;`
+ * Reads the JSON body and validates it against `schema`. When it does not validate, it returns
+ * a 400 Response with a readable `{ error, issues }` (path + message); when it does, it returns
+ * the typed data. Usage in handlers: `if (body instanceof Response) return body;`
  */
 export async function parseBody<S extends z.ZodTypeAny>(c: Context, schema: S): Promise<z.infer<S> | Response> {
-  // JSON inválido o body vacío → {} → los issues reportan los campos que faltan.
+  // Invalid JSON or an empty body -> {} -> the issues report the missing fields.
   const raw: unknown = await c.req.json().catch(() => ({}));
   const parsed = schema.safeParse(raw);
   if (!parsed.success) {

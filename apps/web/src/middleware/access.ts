@@ -13,7 +13,7 @@ import {
 import { layout, type Html } from "../views/layout.js";
 import type { WebEnv } from "./session.js";
 
-/** Página de denegación de acceso a un proyecto privado (403). */
+/** The access-denied page for a private project (403). */
 export const deniedPage = (user: AuthUser | null): Html =>
   layout(
     "No access",
@@ -22,7 +22,7 @@ export const deniedPage = (user: AuthUser | null): Html =>
     user,
   );
 
-const noEncontrado = (c: Context<WebEnv>) =>
+const notFound = (c: Context<WebEnv>) =>
   c.html(
     layout(
       "Not found",
@@ -32,55 +32,55 @@ const noEncontrado = (c: Context<WebEnv>) =>
     404,
   );
 
-/** Gate de acceso por NOMBRE de proyecto (política única, `checkProjectAccess`). */
+/** Access gate by project NAME (the single policy, `checkProjectAccess`). */
 export async function requireProject(c: Context<WebEnv>, name: string | undefined | null): Promise<Response | null> {
   if (!name) return null;
   const access = await checkProjectAccess(c.get("user")?.email ?? null, { name });
-  if (access.status === "not_found") return noEncontrado(c);
+  if (access.status === "not_found") return notFound(c);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   return null;
 }
 
-export interface ProyectoDeLaPagina {
+export interface ProjectPage {
   project: AccessibleProject;
-  /** Si quien mira puede cambiar visibilidad, dueño y miembros (ADR-0051). */
-  gestor: boolean;
-  /** De la raíz al padre directo, para la miga de pan y para decir de dónde hereda cada cosa. */
-  ancestros: ProjectRef[];
+  /** Whether the viewer can change visibility, owner and members (ADR-0051). */
+  manager: boolean;
+  /** From the root to the direct parent, for the breadcrumb and for saying what inherits what. */
+  ancestors: ProjectRef[];
   /**
-   * Los hijos que QUIEN MIRA puede ver, no todos: un repo privado del que no es miembro no
-   * aparece por ver al padre. Sale de la misma lista de accesibles que ya se consulta aquí,
-   * así que no cuesta una consulta más, y con él se decide si este proyecto es un cliente —
-   * la pestaña «Across this client» y la lista de repos existen solo si tiene alguno.
+   * The children THE VIEWER can see, not all of them: a private repo they are not a member of
+   * does not appear just because they can see the parent. It comes from the same accessible
+   * list already queried here, so it costs no extra query, and it decides whether this project
+   * is a client -- the "Across this client" tab and the repo list only exist when it has some.
    */
-  hijos: AccessibleProject[];
+  children: AccessibleProject[];
 }
 
 /**
- * Resuelve el proyecto de una URL `/p/<slug>/…` aplicando la política, y de paso dice si
- * quien mira puede gestionarlo.
+ * Resolves the project behind a `/p/<slug>/...` URL while applying the policy, and along the
+ * way says whether the viewer can manage it.
  *
- * Devuelve `Response` cuando hay que cortar (404 o 403) y el proyecto cuando se puede seguir.
- * El slug pasa a ser la dirección del proyecto en la web (ADR-0050), así que este gate corre
- * en todas las secciones y es el único sitio donde se decide.
+ * It returns a `Response` when the request must be stopped (404 or 403) and the project when it
+ * may continue. The slug is the project's address on the web (ADR-0050), so this gate runs in
+ * every section and is the only place where the decision is made.
  */
 export async function requireProjectPage(
   c: Context<WebEnv>,
   slug: string,
-): Promise<ProyectoDeLaPagina | Response> {
+): Promise<ProjectPage | Response> {
   const email = c.get("user")?.email ?? null;
   const access = await checkProjectAccess(email, { slug });
-  if (access.status === "not_found") return noEncontrado(c);
+  if (access.status === "not_found") return notFound(c);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
-  // `listAccessibleProjects` trae el recuento de entradas de una sola consulta agregada; usar
-  // esa lista evita una query extra solo para el número de la cabecera.
-  const accesibles = await listAccessibleProjects(email);
-  const conCuenta = accesibles.find((p) => p.slug === slug);
-  const base = conCuenta ?? { ...(await findProjectBySlug(slug))!, entryCount: 0 };
+  // `listAccessibleProjects` brings the entry count from a single aggregate query; using that
+  // list avoids an extra query just for the number in the header.
+  const accessible = await listAccessibleProjects(email);
+  const withCount = accessible.find((p) => p.slug === slug);
+  const base = withCount ?? { ...(await findProjectBySlug(slug))!, entryCount: 0 };
   return {
     project: base,
-    gestor: await canManageProject(email, slug),
-    ancestros: base.parentId ? await listProjectAncestors(base.id) : [],
-    hijos: accesibles.filter((p) => p.parentId === base.id),
+    manager: await canManageProject(email, slug),
+    ancestors: base.parentId ? await listProjectAncestors(base.id) : [],
+    children: accessible.filter((p) => p.parentId === base.id),
   };
 }

@@ -1,5 +1,5 @@
 {
-  "$comment": "Orquesta el build de todo el monorepo: pnpm build == tsc -b tsconfig.build.json. apps/cli queda fuera a prop\u00f3sito (se empaqueta con un bundler).",
+  "$comment": "Drives the build of the whole monorepo: pnpm build == tsc -b tsconfig.build.json. apps/cli is left out on purpose (it ships through a bundler).",
   "files": [],
   "references": [
     {

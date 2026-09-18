@@ -4,33 +4,33 @@ paths:
   - "apps/mcp-server/**/*.ts"
 ---
 
-# API HTTP y MCP
+# HTTP API and MCP
 
-## Una ruta HTTP
+## An HTTP route
 
-1. Un router por recurso en `routes/<recurso>.ts`, montado en `createApp()`. `createApp()` solo
-   compone y no tiene efectos: los tests la ejercitan con `app.request()` sin abrir un puerto, y
-   lo caro se le inyecta (`AppDeps.distill`).
-2. **Valida el body en el borde** con zod: `const body = await parseBody(c, schema);` y
-   `if (body instanceof Response) return body;`. Los schemas que comparten cliente y servidor
-   viven en `packages/shared/src/api-contract.ts`, para que no se desincronicen en silencio.
-3. **Autentica y autoriza antes de tocar nada**: `currentUser(c)` → `checkProjectAccess(...)`. Es
-   la política **única** de acceso (ADR-0046); `forbidden` se le cuenta al de fuera como «not
-   found», y nadie inventa su propia regla.
-4. Respuestas y errores en **inglés**. Los errores no controlados **no** se capturan aquí: suben
-   al `onError`, que registra el detalle en el servidor y devuelve algo genérico.
-5. `core` vuelve a validar y a escrubar lo que recibe. Es deliberado: el servidor no confía en que
-   el cliente lo haya hecho.
+1. One router per resource in `routes/<resource>.ts`, mounted in `createApp()`. `createApp()` only
+   composes and has no side effects: the tests exercise it with `app.request()` without opening a
+   port, and anything expensive is injected (`AppDeps.distill`).
+2. **Validate the body at the edge** with zod: `const body = await parseBody(c, schema);` then
+   `if (body instanceof Response) return body;`. The schemas shared by client and server live in
+   `packages/shared/src/api-contract.ts`, so they cannot drift apart silently.
+3. **Authenticate and authorise before touching anything**: `currentUser(c)` →
+   `checkProjectAccess(...)`. It is the **single** access policy (ADR-0046); `forbidden` is told to
+   an outsider as "not found", and nobody invents their own rule.
+4. Responses and errors in English. Uncaught errors are **not** caught here: they rise to
+   `onError`, which logs the detail on the server and returns something generic.
+5. `core` validates and scrubs again what it receives. That is deliberate: the server does not
+   trust the client to have done it.
 
-Añadir un endpoint o un campo es un cambio de contrato: quien lo lee tolera su ausencia
-(ADR-0062), porque enfrente puede haber un CLI de hace meses.
+Adding an endpoint or a field is a contract change: whoever reads it tolerates its absence
+(ADR-0062), because on the other side there may be a CLI from months ago.
 
-## Una tool MCP
+## An MCP tool
 
-- Se registran en `apps/mcp-server/src/server.ts`, con `inputSchema` tomado del schema de dominio
-  (`saveContextInput.shape`), no reescrito a mano.
-- Título y descripción **en inglés**: los lee un modelo que puede estar trabajando en cualquier
-  idioma.
-- Con `user` (HTTP autenticado) se atribuye la escritura (`createdBy`) y se aplican permisos con el
-  mismo `guard`; sin `user` (stdio local) no hay guard.
-- Un fallo se devuelve como `isError` con un texto que el agente pueda usar, nunca como excepción.
+- They are registered in `apps/mcp-server/src/server.ts`, with `inputSchema` taken from the domain
+  schema (`saveContextInput.shape`), not rewritten by hand.
+- The title and description are read by a model that may be working in any language: keep them
+  short and unambiguous.
+- With `user` (authenticated HTTP) the write is attributed (`createdBy`) and permissions apply
+  through the same `guard`; without `user` (local stdio) there is no guard.
+- A failure comes back as `isError` with text the agent can act on, never as an exception.

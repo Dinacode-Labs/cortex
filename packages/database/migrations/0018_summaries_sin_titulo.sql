@@ -1,14 +1,17 @@
--- Quitar el título repetido de los resúmenes que ya estaban guardados (ADR-0054).
+-- Strip the repeated title from summaries that were already stored (ADR-0054).
 --
--- El destilador escribe el contenido como «Título. Cuerpo…» y el resumen son sus primeros
--- caracteres, así que el resumen empezaba repitiendo el título: en un proyecto real, 355 de
--- 355 entradas. El pack pinta título y resumen uno debajo del otro, con títulos de ~47
--- caracteres sobre resúmenes de ~206, así que era casi una cuarta parte de cada entrada
--- diciendo dos veces lo mismo — y el presupuesto del hook se paga en entradas que no caben.
+-- The distiller writes content as "Title. Body..." and the summary is its first characters, so
+-- summaries began by repeating the title: in one real project, 355 entries out of 355. The
+-- pack renders title and summary one under the other, with ~47-character titles above
+-- ~206-character summaries, so nearly a quarter of every entry said the same thing twice --
+-- and the hook's budget is paid in entries that do not fit.
 --
--- El arreglo en `saveContext` solo actúa al guardar, así que sin esto la memoria que ya
--- existe tarda meses en beneficiarse. Se aplica aquí la misma regla que en el código: quitar
--- solo si el resumen empieza de verdad por el título y queda un resumen que merezca la pena.
+-- The fix in `saveContext` only acts on write, so without this the memory that already exists
+-- takes months to benefit. The same rule as in the code applies here: strip only when the
+-- summary really does start with the title and what is left is still a worthwhile summary.
+--
+-- The filename keeps its Spanish word on purpose: it is the primary key in
+-- `schema_migrations`, so renaming it would re-run the migration on every existing install.
 
 UPDATE context_entries
    SET summary = trim(leading ' .:;,-' from substr(summary, length(title) + 1))

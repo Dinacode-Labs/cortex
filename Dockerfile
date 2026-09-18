@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.7
-# Imagen única para todos los servicios de Cortex (server / web / mcp / worker / migrate).
-# Cada uno se distingue por su comando; el default es la API.
+# A single image for every Cortex service (server / web / mcp / worker / migrate). Each one
+# is told apart by its command; the default is the API.
 #
-# Tres etapas por dos razones concretas: que las dependencias no se reinstalen cuando solo
-# cambia el código (se copian antes los package.json y nada más), y que la imagen final no
-# lleve ni las devDependencies ni las fuentes TypeScript.
+# Three stages for two concrete reasons: so dependencies are not reinstalled when only the
+# code changes (the package.json files are copied first, and nothing else), and so the final
+# image carries neither the devDependencies nor the TypeScript sources.
 ARG NODE_VERSION=22
 
 FROM node:${NODE_VERSION}-slim AS base
@@ -12,7 +12,7 @@ ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH COREPACK_ENABLE_DOWNLOAD_PROMPT=0 CI=true
 RUN corepack enable
 WORKDIR /app
 
-# --- deps: solo los manifiestos, para aprovechar la caché de capas --------------------
+# --- deps: manifests only, to make the layer cache work -------------------------------
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared/package.json     packages/shared/
@@ -28,18 +28,18 @@ COPY apps/admin/package.json          apps/admin/
 COPY apps/cli/package.json            apps/cli/
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 
-# --- build: compila y se queda solo con lo que hace falta para ejecutar ---------------
+# --- build: compile and keep only what is needed to run -------------------------------
 FROM deps AS build
 COPY tsconfig.base.json tsconfig.build.json ./
 COPY packages ./packages
 COPY apps ./apps
 RUN pnpm build
-# Fuera devDependencies, fuentes y artefactos de compilación: en producción no se
-# transpila nada, y cada MB que sobra es un MB que hay que auditar.
+# Out go the devDependencies, the sources and the build artefacts: nothing is transpiled in
+# production, and every spare MB is an MB somebody has to audit.
 #
-# `pnpm prune --prod` NO sirve aquí: en un workspace se lleva por delante también los enlaces
-# entre paquetes internos, y la imagen arranca con "Cannot find package '@cortex/shared'".
-# Reinstalar sin devDependencies los reconstruye.
+# `pnpm prune --prod` does NOT work here: in a workspace it also takes the links between
+# internal packages with it, and the image starts up with "Cannot find package
+# '@cortex/shared'". Reinstalling without devDependencies rebuilds them.
 RUN rm -rf node_modules packages/*/node_modules apps/*/node_modules
 RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --prod --frozen-lockfile --ignore-scripts
 RUN find /app/packages /app/apps -type d -name src -prune -exec rm -rf {} + \
@@ -49,13 +49,13 @@ RUN find /app/packages /app/apps -type d -name src -prune -exec rm -rf {} + \
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build --chown=node:node /app /app
-# Ficheros de datos que las apps resuelven en ejecución (el instalador que sirve el server).
+# Data files the apps resolve at runtime (the installer the server hands out).
 COPY --chown=node:node scripts/install.sh /app/scripts/install.sh
 COPY --chown=node:node config/toolbelt.json /app/config/toolbelt.json
 USER node
 EXPOSE 8787 8080 8788
 
-# El puerto se ajusta por servicio (HEALTH_PORT) porque la imagen es la misma para los tres.
+# The port is set per service (HEALTH_PORT) because the image is the same for all three.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.HEALTH_PORT||'8787')+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 

@@ -1,22 +1,21 @@
 /**
- * Cola en memoria para las destilaciones de sesión.
+ * In-memory queue for session distillations.
  *
- * Destilar es caro y lento (varias llamadas al modelo por sesión), así que el endpoint
- * responde `202` y el trabajo se hace por detrás. La concurrencia se limita porque el
- * proveedor de inferencia acota peticiones por clave: sin cola, diez devs cerrando sesión a
- * la vez producirían una ráfaga de 429 y el backoff acabaría costando más que hacerlo en
- * fila.
+ * Distilling is expensive and slow (several model calls per session), so the endpoint answers
+ * `202` and the work happens behind it. Concurrency is capped because the inference provider
+ * limits requests per key: with no queue, ten devs closing a session at once would produce a
+ * burst of 429s and the backoff would end up costing more than doing them in a line.
  *
- * Es una cola **de proceso**, no persistente: si el servidor cae, lo encolado se pierde.
- * Se asume a conciencia para no meter una tabla de trabajos y un worker en esta fase; el
- * daño está acotado porque los hooks vuelven a mandar la sesión la próxima vez y
- * `session_captures` marca como fallidos los trabajos que quedaron a medias.
+ * It is a **per-process** queue, not a persistent one: if the server goes down, what is queued
+ * is lost. That is accepted deliberately so as not to add a jobs table and a worker at this
+ * stage; the damage is bounded because the hooks send the session again next time and
+ * `session_captures` marks half-finished jobs as failed.
  */
 
 export interface CaptureQueue<T> {
-  /** Encola y devuelve una promesa que resuelve cuando ESE trabajo termina. */
+  /** Enqueues, and returns a promise that resolves when THAT job finishes. */
   enqueue(job: T): Promise<void>;
-  /** Trabajos pendientes de empezar (sin contar los que están corriendo). */
+  /** Jobs still waiting to start (not counting those already running). */
   size(): number;
   inFlight(): number;
 }
@@ -36,9 +35,9 @@ export function createCaptureQueue<T>(opts: {
       void opts
         .run(next.job)
         .catch((e: unknown) => {
-          // `run` ya registra el fallo en la BD; aquí solo evitamos un unhandled rejection
-          // que tumbaría el proceso.
-          console.error("[capture-queue] trabajo fallido:", (e as Error).message);
+          // `run` already records the failure in the database; here we only avoid an
+          // unhandled rejection that would bring the process down.
+          console.error("[capture-queue] job failed:", (e as Error).message);
         })
         .finally(() => {
           running--;

@@ -59,13 +59,14 @@ system, a component layer, and no framework ([0053](#adr-0053)).
 **Living with several clocks — 16 September 2026** ([0059](#adr-0059), [0062](#adr-0062)). The
 repository went public and the CLI went to npm, and both brought the same lesson: what is
 right for one team is not right for every clone. The link file belongs to each clone, and the
-CLI and the server are two clocks that are compared, not tied.
+CLI and the server are two clocks that are compared, not tied. The same lesson closes the
+phase ([0064](#adr-0064)): a repository that switches language halfway is one whose
+explanations only its authors can read.
 
-**Writing down what had only been imitated — 17 September 2026** ([0064](#adr-0064)). The rules
-an agent works by moved out of one long document and into a file per subject, and two conventions
-that the tree had followed without ever stating them — formatting, and where `any` is allowed —
-were finally given an answer. A third, which language the code itself is written in, was left open
-on purpose.
+**Writing down what had only been imitated — 18 September 2026** ([0065](#adr-0065)). The rules
+an agent works by moved out of one long document and into a file per subject, some of which load
+only when the part of the tree they cover is opened, and two conventions that had been followed
+without ever being stated — formatting, and where `any` is allowed — were finally given an answer.
 
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
@@ -1844,59 +1845,120 @@ on purpose.
 
 <a id="adr-0064"></a>
 
-## ADR-0064 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
+## ADR-0064 · The whole repository is in English; what stays in Spanish is data, not prose
 
-- **Status:** accepted (2026-09-17).
+- **Status:** accepted (2026-09-18). Supersedes the language convention set out in
+  [0031](#adr-0031)'s wake and stated until now in `CONTRIBUTING.md` and `CLAUDE.md`.
+- **Context:** the repository was deliberately bilingual. Everything an outsider *opened* was in
+  English — the README, `SECURITY.md`, the CLI, the MCP tool descriptions, the web UI, the API
+  errors — and everything that was the team's **working record** stayed in Spanish: code
+  comments, the ADRs, the roadmap, the research notes, test names and the LLM agents' prompts.
+  The reasoning was that the working record blocks nobody, and writing it in the language the
+  team thinks in is faster and more precise.
+
+  It does block somebody. Once the repository went public ([0029](#adr-0029),
+  [0059](#adr-0059)), the half a reader cannot parse turned out to be the half that explains
+  **why** things are the way they are. This log is the clearest case: it is cited from 67 files
+  and was already written in English precisely because outsiders read it — but the comment above
+  the function an outsider is actually reading, the one that says which bug a workaround exists
+  for, was not. A comment that saves an hour is worth nothing to somebody who cannot read it,
+  and a test name is the first description of a behaviour anyone meets.
+
+  Measured before the change: ~2,800 lines of comment, ~460 test names, 14 documents under
+  `docs/`, the CHANGELOG, the deployment files and the CI workflows.
+- **Decision:** the repository is in English, all of it. **Two** things stay in Spanish, and the
+  rule that separates them is that they are **data rather than prose we wrote**:
+
+  1. **Patterns that match the corpus**, which is Spanish: `CLASSIFY_RULES`, `MODULE_KEYWORDS`
+     and `polarityTags` in `packages/core/src/text.ts`, the deictics regex in
+     `packages/shared/src/domain.ts`, and the eval fixtures in `tests/fixtures/eval/` — the
+     recall@5 0.987 / MRR 0.928 baseline was measured against them, so translating them would
+     silently invalidate every comparison the eval exists to make. They match what users write,
+     not the language of the file they live in.
+  2. The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in
+     `packages/agents/src/mastra.ts`). The prompts themselves are now English; what the agents
+     *produce* is knowledge entries stored next to a corpus that is already Spanish. Translating
+     a prompt is a translation; changing the output language is a product decision, and it would
+     split every existing memory in two.
+
+  Values an external system owns keep their own spelling for the same reason — Plane's
+  `'Histórico'`, Notion's property names, the migration filenames, which are primary keys in
+  `schema_migrations` and would re-run every migration on every installation if renamed.
+
+  Each exception carries an English comment saying why, and `tests/docs.test.ts` holds the list:
+  it scans `packages/*/src`, `apps/*/src`, `tests/` and the docs, checks every exempted path
+  still exists, and checks each one explains itself. **An exception that is not written down is
+  indistinguishable from an oversight**, which is how the previous convention decayed.
+
+  Because the team is Spanish-speaking, two entry points are kept in Spanish as well —
+  `README.es.md` and `CONTRIBUTING.es.md` — deliberately *not* as line-by-line translations,
+  which drift and then lie. They cover the essentials and point at the English version, which is
+  the one that must be current when the two disagree; a test checks the links both ways.
+- **Alternatives:** keep the split — it is cheaper right up to the moment somebody outside tries
+  to change something, which is the moment that matters for a public repository; translate the
+  agents' output too, for one language across the board — it would strand every entry already
+  stored and is a product decision, not a housekeeping one; full bilingual documentation — two
+  copies of 14 documents, where the second copy is wrong within a month and nobody notices.
+- **Consequences:** contributing no longer requires reading Spanish. The cost is real and paid
+  up front: a translation pass over ~290 files, and from now on the team writes its working
+  record in its second language, which is slower and slightly less precise. Two things were
+  found by reading every line: a latent bug where `apps/server/src/routes/context.ts` matched an
+  error by the text of a message defined in `packages/core` and the two had drifted apart
+  (`/context-pack` answered 500 instead of 404), and a real client name left in a migration
+  fixture, against [0026](#adr-0026).
+- **Revisit when:** the corpus stops being predominantly Spanish. That single premise holds up
+  both exceptions — the patterns and the output language — and nothing else about this decision
+  depends on anything that is likely to change.
+
+<a id="adr-0065"></a>
+
+## ADR-0065 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
+
+- **Status:** accepted (2026-09-18).
 - **Context:** `CLAUDE.md` was the only written guidance for an agent working in this repository,
   and it had grown to 11.6 KB while still leaving out most of what an agent actually needs to get
   right: how a route, a command or a screen is written here, when to throw and when to return,
-  what a comment is for. Two conventions that the tree follows consistently were also written down
-  nowhere at all, so anyone — human or model — had to infer them from whichever files they
-  happened to open:
+  what a comment is for. Two conventions the tree follows consistently were written down nowhere at
+  all, so anyone — human or model — had to infer them from whichever files they happened to open:
 
-  1. **Formatting.** There is no ESLint and no Prettier, yet the tree is uniform: double quotes
-     in all 613 imports, two spaces, lines up to about 120 columns. Uniform by imitation, with
-     nothing to imitate from when a file is new.
+  1. **Formatting.** There is no ESLint and no Prettier, yet the tree is uniform: double quotes in
+     all 613 imports, two spaces, lines up to about 120 columns. Uniform by imitation, with nothing
+     to imitate from when a file is new.
   2. **`any`.** Eighteen uses, every one of them at a boundary with a foreign format, and no rule
      saying that is the limit.
 
-  A third question came up while this was being written and is **deliberately left open**: which
-  language identifiers and process logs should be in. `CONTRIBUTING.md` says "the code itself" is
-  English; `CLAUDE.md` only ever mentioned comments; roughly 29 declarations carry Spanish names,
-  and server and admin logs are Spanish while CLI output is English. Whatever is decided creates
-  debt across the tree, so it is worth arguing out on its own rather than settling as a side
-  effect of writing rules down. Until then the rules stay silent on it, and the per-area rules
-  only restate what `CONTRIBUTING.md` already said about text a user reads.
+  A third question — which language all of this is written in — was open while this was being
+  drafted, and is settled on its own terms by [0064](#adr-0064).
 - **Decision:**
   1. Rules live in **`.claude/rules/*.md`**, one file per subject, picked up by the agent's own
      rule mechanism rather than imported from `CLAUDE.md` — an import would put the same text in
-     context twice. Three of them load in every session, because they hold for every change:
-     architecture, tests, documentation. Five carry a `paths:` header and load only when a file
-     they cover is opened: TypeScript style, HTTP and MCP, CLI, web, the LLM layer. `CLAUDE.md`
-     keeps what only it can say: what the product is, the stack, the tree, the commands. The files
-     are plain markdown, so an agent that does not know the convention can still be pointed at
-     them.
-  2. **No formatter and no linter.** Style is written instead: double quotes, two spaces, ~120
-     columns, no reformatting of code you are not touching.
-  3. **`any` only at a boundary with a foreign format that has no schema** — transcripts from
-     other agents, untyped APIs, SQL rows through `Row` — and it never crosses into the domain:
-     it is validated with zod or mapped first. `@ts-ignore` stays banned; there are zero today.
+     context twice. Four load in every session, because they hold for every change: architecture,
+     language, tests, documentation. Five carry a `paths:` header and load only when a file they
+     cover is opened: TypeScript style, HTTP and MCP, CLI, web, the LLM layer. `CLAUDE.md` keeps
+     what only it can say: what the product is, the stack, the tree, the commands. They are plain
+     markdown, so an agent that does not know the convention can still be pointed at them.
+  2. **No formatter and no linter.** Style is written down instead: double quotes, two spaces, ~120
+     columns, and no reformatting of code you are not touching.
+  3. **`any` only at a boundary with a foreign format that has no schema** — transcripts from other
+     agents, untyped APIs, SQL rows through `Row` — and it never crosses into the domain: it is
+     validated with zod or mapped first. `@ts-ignore` stays banned; there are zero today.
 - **Alternatives:** leave the conventions unwritten — they are decided in practice already, just
-  not anywhere a newcomer can read them, which is how drift starts; put everything in `CLAUDE.md`
-  — it doubles a file that already asks to be pruned, and makes every rule harder to cite; import
-  the rule files from `CLAUDE.md` instead — the same text would then load twice, once through the
-  import and once through the rule mechanism; skills loaded on demand — cheaper still, but they
-  may not fire when they are needed, and the three unconditional rules apply to every change;
-  adopt Prettier — a tree-wide reformat, and a noisy history, for a problem nobody has yet.
+  not anywhere a newcomer can read them, which is how drift starts; put everything in `CLAUDE.md` —
+  it doubles a file that already asks to be pruned, and makes every rule harder to cite; import the
+  rule files from `CLAUDE.md` instead — the same text would then load twice, once through the
+  import and once through the rule mechanism; skills loaded on demand — cheaper still, but they may
+  not fire when they are needed, and the four unconditional rules apply to every change; adopt
+  Prettier — a tree-wide reformat, and a noisy history, for a problem nobody has yet.
 - **Consequences:** a rule is now a thing you can point at, and `CLAUDE.md` came down from 11.6 KB
-  to 6.5 KB. What covers one corner of the tree costs nothing until that corner is opened, so the
-  detail can go where it was previously too expensive to write: how a route is written, how a
-  command is registered, why the web talks to `core` and not to the API. The trade is that the
-  three unconditional files load every session, so they have to stay short — and anything
-  checkable should become a test rather than a paragraph, which is what this repository already
-  does with the CLI weight, the configuration template and the documentation itself. There is now
-  one for the rules as well.
-- **Revisit when:** the language question above is settled, which adds a rule and a stretch of
-  bounded debt; or contributors from outside start arriving and style diverges in pull requests,
+  to under 7 KB. What covers one corner of the tree costs nothing until that corner is opened, so
+  the detail can go where it was previously too expensive to write: how a route is written, how a
+  command is registered, why the web talks to `core` and not to the API. The trade is that the four
+  unconditional files load every session, so they have to stay short — and anything checkable
+  should become a test rather than a paragraph, which is what this repository already does with the
+  CLI weight, the configuration template and the documentation itself. There is now one for the
+  rules as well: it fails if a rule is imported twice, or if a `paths:` header points at a
+  directory that no longer exists, which is the failure this mechanism has no other way of
+  reporting.
+- **Revisit when:** contributors from outside start arriving and style diverges in pull requests,
   at which point a formatter finally earns its cost; or the rules grow past what is worth loading
   in every session, at which point the rarely-needed ones move to skills.

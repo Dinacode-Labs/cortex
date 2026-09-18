@@ -4,18 +4,18 @@ import { hasCortexHooks, mergeHooks, removeHooks, type HookDef, type HooksHolder
 import { emptyReport, type AgentAdapter, type AgentStatus, type SetupCtx, type SetupReport } from "./types.js";
 
 /**
- * Claude Code. La vía preferente es el **plugin** (`plugin/claude-code/` en este mismo repo,
- * publicado como marketplace): trae hooks, MCP, skill y comando en un solo paquete, se
- * actualiza solo y el usuario lo ve y lo desactiva desde `/plugin`.
+ * Claude Code. The preferred route is the **plugin** (`plugin/claude-code/` in this very repo,
+ * published as a marketplace): it brings hooks, MCP, skill and command in a single package, it
+ * updates itself, and the user can see and disable it from `/plugin`.
  *
- * El plugin depende de que Claude pueda clonar el marketplace, y este repo es privado: si el
- * dev no tiene acceso por `gh`/SSH, la instalación falla. En ese caso no se aborta — se cae
- * al modo `settings.json`, que hace lo mismo escribiendo hooks a mano. Es también lo que
- * fuerza `--no-plugin`.
+ * The plugin depends on Claude being able to clone the marketplace, and this repo is private:
+ * if the dev has no access through `gh`/SSH, the installation fails. In that case it does not
+ * abort -- it falls back to `settings.json` mode, which does the same by writing hooks by hand.
+ * That is also what `--no-plugin` forces.
  *
- * En los dos modos se limpia el legado: hooks `pnpm -C <repo> cortex hook-*`, el MCP
- * registrado como `pnpm --filter @cortex/mcp-server` (hablaba con Postgres directamente y sin
- * permisos) y los symlinks de skill/comando que apuntaban al clon.
+ * In both modes the legacy is cleaned up: `pnpm -C <repo> cortex hook-*` hooks, the MCP
+ * registered as `pnpm --filter @cortex/mcp-server` (it talked to Postgres directly and with no
+ * permissions) and the skill/command symlinks that pointed at the clone.
  */
 
 export const MARKETPLACE = "dinacode-cortex";
@@ -30,7 +30,7 @@ const HOOK_DEFS: HookDef[] = [
 
 const settingsFile = (ctx: SetupCtx): string => homeFile(ctx, ".claude/settings.json");
 
-/** Estado del MCP `cortex` en Claude: sin registrar, registrado bien, o con el comando viejo. */
+/** The `cortex` MCP's state in Claude: unregistered, correctly registered, or on the old command. */
 function mcpState(ctx: SetupCtx): "missing" | "ok" | "legacy" {
   try {
     const out = ctx.exec("claude", ["mcp", "get", "cortex"]);
@@ -40,7 +40,7 @@ function mcpState(ctx: SetupCtx): "missing" | "ok" | "legacy" {
   }
 }
 
-/** Symlinks que dejaba `cortex sync` apuntando al clon del repo: los aporta ya el plugin. */
+/** Symlinks `cortex sync` left pointing at the repo clone: the plugin provides them now. */
 function dropLegacyLinks(ctx: SetupCtx, report: SetupReport): void {
   for (const rel of [".claude/skills/cortex-capture", ".claude/commands/cortex-save.md"]) {
     const file = homeFile(ctx, rel);
@@ -51,12 +51,12 @@ function dropLegacyLinks(ctx: SetupCtx, report: SetupReport): void {
       if (!ctx.dryRun) rmSync(file, { force: true });
       report.changed.push(`old symlink removed (${tilde(ctx, file)}): the plugin provides it`);
     } catch {
-      /* no existe: nada que limpiar */
+      /* it does not exist: nothing to clean */
     }
   }
 }
 
-/** Registra el MCP como `cortex mcp`, sustituyendo el registro viejo si lo hay. */
+/** Registers the MCP as `cortex mcp`, replacing the old registration when there is one. */
 function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
   const state = mcpState(ctx);
   if (state === "ok") {
@@ -69,7 +69,7 @@ function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
       try {
         ctx.exec("claude", ["mcp", "remove", "cortex", "-s", "user"]);
       } catch {
-        /* si no se puede quitar, el add de abajo dirá lo suyo */
+        /* if it cannot be removed, the add below will have its say */
       }
     }
   } else {
@@ -83,7 +83,7 @@ function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
   }
 }
 
-/** Escribe (o quita) los hooks de Cortex en ~/.claude/settings.json. */
+/** Writes (or removes) Cortex's hooks in ~/.claude/settings.json. */
 function writeHooks(ctx: SetupCtx, report: SetupReport, mode: "install" | "uninstall"): void {
   const file = settingsFile(ctx);
   const obj = readJson<HooksHolder>(file);
@@ -116,7 +116,7 @@ function pluginInstalled(ctx: SetupCtx): boolean {
   return Boolean(obj && obj.plugins && PLUGIN in obj.plugins);
 }
 
-/** Instala el plugin. Devuelve false si no se ha podido (repo privado sin acceso, CLI vieja…). */
+/** Installs the plugin. Returns false when it could not (private repo with no access, old CLI...). */
 function tryPlugin(ctx: SetupCtx, report: SetupReport): boolean {
   if (ctx.dryRun) {
     report.changed.push(`plugin ${PLUGIN} (marketplace ${MARKETPLACE_SOURCE}) — would install`);
@@ -126,7 +126,7 @@ function tryPlugin(ctx: SetupCtx, report: SetupReport): boolean {
     try {
       ctx.exec("claude", ["plugin", "marketplace", "add", MARKETPLACE_SOURCE]);
     } catch (e) {
-      // «already exists» es el caso normal en la segunda ejecución.
+      // "already exists" is the normal case on the second run.
       if (!/already exists|already added/i.test((e as Error).message)) throw e;
     }
     ctx.exec("claude", ["plugin", "install", PLUGIN, "--scope", "user", "--yes"]);
@@ -149,8 +149,8 @@ export const claudeCodeAdapter: AgentAdapter = {
     const viaPlugin = ctx.noPlugin ? false : tryPlugin(ctx, report);
 
     if (viaPlugin) {
-      // El plugin ya trae sus hooks y su MCP: dejarlos también en settings.json
-      // significaría inyectar el contexto dos veces y destilar la sesión dos veces.
+      // The plugin already brings its hooks and its MCP: leaving them in settings.json too
+      // would mean injecting the context twice and distilling the session twice.
       writeHooks(ctx, report, "uninstall");
       if (mcpState(ctx) !== "missing") {
         report.changed.push("user-level MCP `cortex` removed: the plugin provides it");
@@ -211,7 +211,7 @@ export const claudeCodeAdapter: AgentAdapter = {
   },
 };
 
-/** Existe solo para los tests: comprobar el plan de hooks sin pasar por el sistema de ficheros. */
+/** It exists only for the tests: checking the hook plan without going through the filesystem. */
 export const CLAUDE_HOOK_DEFS = HOOK_DEFS;
 
 export function claudeSettingsPath(ctx: SetupCtx): string {

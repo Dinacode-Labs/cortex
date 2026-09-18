@@ -6,34 +6,34 @@ import { validateEmailConfig } from "@cortex/core";
 import { createApp } from "./app.js";
 
 /**
- * Entrypoint fino de la API HTTP: entorno + LLM + servidor. Toda la app (auth +
- * endpoints de contexto) vive en `app.ts` sin side effects, para poder testearla
- * con `app.request()` sin arrancar un servidor.
+ * Thin entrypoint for the HTTP API: environment + LLM + server. The whole app (auth plus the
+ * context endpoints) lives in `app.ts` with no side effects, so it can be tested with
+ * `app.request()` without starting a server.
  */
 loadEnv();
-wireLlm(); // hooks LLM (reconciliación en /capture) + sink de uso de embeddings
+wireLlm(); // LLM hooks (reconciliation in /capture) plus the embedding usage sink
 
-// Falla pronto si el proveedor de email elegido no puede funcionar: descubrirlo cuando un
-// usuario se queda sin poder entrar es mucho peor que no arrancar.
+// Fail early when the chosen email provider cannot work: finding out when a user is locked out
+// is far worse than not starting.
 for (const w of validateEmailConfig()) console.warn(w);
 
-// Sin dominio permitido, cualquier email del mundo puede pedir un OTP y crearse una
-// cuenta. Es un default deliberado (el producto no conoce el dominio de quien lo
-// despliega), pero en producción es casi siempre un olvido: se avisa alto y claro.
+// With no allowed domain, any email address in the world can request an OTP and create an
+// account. It is a deliberate default (the product does not know its deployer's domain), but
+// in production it is almost always an oversight: the warning is loud and clear.
 if (!process.env.CORTEX_AUTH_DOMAIN?.trim()) {
   console.warn(
-    "[cortex-server] CORTEX_AUTH_DOMAIN está vacío: CUALQUIER email puede registrarse. " +
-      "Fíjalo en producción (p. ej. CORTEX_AUTH_DOMAIN=tu-dominio.com).",
+    "[cortex-server] CORTEX_AUTH_DOMAIN is empty: ANY email address can register. " +
+      "Set it in production (e.g. CORTEX_AUTH_DOMAIN=your-domain.com).",
   );
 }
 
 const app = createApp();
 const port = Number(process.env.CORTEX_SERVER_PORT ?? "8787");
-// Por defecto solo escucha en local: exponerse a la red es una decisión del que despliega,
-// no un default. En el contenedor se pone a 0.0.0.0 y quien publica puertos es Caddy.
+// By default it listens on localhost only: being exposed to the network is the deployer's
+// decision, not a default. In the container it is set to 0.0.0.0 and Caddy publishes the ports.
 const hostname = process.env.CORTEX_BIND_HOST ?? "127.0.0.1";
 const server = serve({ fetch: app.fetch, port, hostname }, (info) => {
-  console.log(`Cortex server escuchando en http://${hostname}:${info.port}`);
+  console.log(`Cortex server listening on http://${hostname}:${info.port}`);
 });
 
 async function shutdown(): Promise<void> {

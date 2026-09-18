@@ -2,13 +2,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * El registry del toolbelt: un JSON que declara qué MCPs, skills y comandos debe tener un
- * dev. Cortex ya no reparte los suyos por aquí —van en el plugin (ADR-0032)—, así que esto
- * sirve solo para el toolbelt de una organización, que vive en SU repo.
+ * The toolbelt registry: a JSON declaring which MCPs, skills and commands a dev should have.
+ * Cortex no longer ships its own through here -- they live in the plugin (ADR-0032) -- so this
+ * serves only an organisation's toolbelt, which lives in ITS repo.
  *
- * Se reparte configuración, nunca credenciales: cada entrada declara en `auth` qué tiene que
- * poner el dev, y las que dependan de variables sin exportar se omiten con un aviso.
- * Esquema y ejemplo en docs/toolbelt-registry.md.
+ * What is distributed is configuration, never credentials: each entry declares in `auth` what
+ * the dev has to set, and entries depending on unexported variables are skipped with a warning.
+ * Schema and example in docs/toolbelt-registry.md.
  */
 
 export interface McpDef {
@@ -16,10 +16,10 @@ export interface McpDef {
   command?: string;
   args?: string[];
   url?: string;
-  /** Variables que el MCP necesita. Sin ellas, la entrada se omite (no se inventa nada). */
+  /** Variables the MCP needs. Without them the entry is skipped (nothing is invented). */
   env?: string[];
   auth?: string;
-  /** Agentes a los que aplica. Sin esto, a todos. */
+  /** The agents it applies to. Without this, all of them. */
   agents?: string[];
 }
 
@@ -40,17 +40,17 @@ function normalize(raw: unknown): Manifest {
   };
 }
 
-/** Carga el registry de una ruta local o de una URL. Lanza con un mensaje legible. */
+/** Loads the registry from a local path or a URL. Throws with a readable message. */
 export async function loadRegistry(source: string): Promise<Manifest> {
   if (/^https?:\/\//i.test(source)) {
     const res = await fetch(source, { signal: AbortSignal.timeout(15_000) });
-    if (!res.ok) throw new Error(`no se pudo descargar el registry (HTTP ${res.status}): ${source}`);
+    if (!res.ok) throw new Error(`could not download the registry (HTTP ${res.status}): ${source}`);
     return normalize(await res.json());
   }
   try {
     return normalize(JSON.parse(readFileSync(resolve(source), "utf8")));
   } catch (e) {
-    throw new Error(`no se pudo leer el registry ${source}: ${(e as Error).message}`);
+    throw new Error(`could not read the registry ${source}: ${(e as Error).message}`);
   }
 }
 
@@ -58,7 +58,7 @@ export function emptyManifest(): Manifest {
   return structuredClone(EMPTY);
 }
 
-/** Sustituye `{REPO}` en los args. Sin `--repo`, la entrada no se puede instalar. */
+/** Substitutes `{REPO}` in the args. Without `--repo`, the entry cannot be installed. */
 export function resolveArgs(args: string[] | undefined, repo: string | null): string[] | null {
   const out = args ?? [];
   if (!out.some((a) => a.includes("{REPO}"))) return out;
@@ -66,7 +66,7 @@ export function resolveArgs(args: string[] | undefined, repo: string | null): st
   return out.map((a) => a.replaceAll("{REPO}", repo));
 }
 
-/** Variables declaradas que NO están exportadas. */
+/** Declared variables that are NOT exported. */
 export function missingEnv(d: McpDef): string[] {
   return (d.env ?? []).filter((k) => !process.env[k]);
 }

@@ -12,19 +12,19 @@ import {
 import { createApp as createServerApp } from "../../apps/server/src/app.js";
 
 /**
- * ADR-0051: un proyecto tiene vida después de crearse.
+ * ADR-0051: a project has a life after being created.
  *
- * Hasta ahora la visibilidad se fijaba al crear y no había forma de cambiarla —ni UI, ni API,
- * ni CLI, ni función de dominio—, los miembros solo los tocaba un admin global, y lo que creaba
- * un `save` nacía sin slug, sin dueño y público: imposible de vincular, de adoptar y de cerrar.
+ * Until now visibility was fixed at creation with no way to change it -- no UI, no API, no CLI,
+ * no domain function -- members were only touched by a global admin, and whatever a `save`
+ * created was born with no slug, no owner and public: impossible to link, to adopt or to close.
  */
 const RID = Math.random().toString(36).slice(2, 8);
 const OWNER = `owner-${RID}@example.com`;
 const OTRO = `otro-${RID}@example.com`;
 
 async function tokenDe(email: string): Promise<string> {
-  // El código se busca en la línea de ESTE email: varios ficheros de integración interceptan
-  // `console.log` a la vez, y coger el primer número de seis cifras se lleva el de otro.
+  // The code is looked for on THIS email's line: several integration files intercept
+  // `console.log` at once, and taking the first six-digit number takes somebody else's.
   let cap = "";
   const orig = console.log;
   console.log = ((...a: unknown[]) => {
@@ -37,26 +37,26 @@ async function tokenDe(email: string): Promise<string> {
   }
   const linea = cap.split("\n").find((l) => l.includes(email));
   const code = linea?.match(/(\d{6})/)?.[1];
-  if (!code) throw new Error(`no se capturo el OTP de ${email}`);
+  if (!code) throw new Error(`the OTP for ${email} was not captured`);
   return (await verifyOtp(email, code)).token;
 }
 
 
 let tokOwner: string;
 let tokOtro: string;
-let proyecto: ProjectRef;
+let project_: ProjectRef;
 
 beforeAll(async () => {
   tokOwner = await tokenDe(OWNER);
   tokOtro = await tokenDe(OTRO);
-  proyecto = await createProject(`Lifecycle ${RID}`, { ownerEmail: OWNER });
+  project_ = await createProject(`Lifecycle ${RID}`, { ownerEmail: OWNER });
 }, 60_000);
 
-describe("vida de un proyecto (ADR-0051)", () => {
-  it("el dueño cambia la visibilidad; quien no gestiona, no", async () => {
+describe("the life of a project_ (ADR-0051)", () => {
+  it("the owner changes visibility; whoever cannot manage, cannot", async () => {
     const srv = createServerApp();
     const patch = (token: string, body: unknown) =>
-      srv.request(`/projects/${proyecto.slug}`, {
+      srv.request(`/projects/${project_.slug}`, {
         method: "PATCH",
         headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify(body),
@@ -64,59 +64,59 @@ describe("vida de un proyecto (ADR-0051)", () => {
 
     const ajeno = await patch(tokOtro, { visibility: "private" });
     expect(ajeno.status).toBe(403);
-    expect((await findProjectBySlug(proyecto.slug!))!.visibility).toBe("public"); // no tocó nada
+    expect((await findProjectBySlug(project_.slug!))!.visibility).toBe("public"); // it touched nothing
 
     const propio = await patch(tokOwner, { visibility: "private" });
     expect(propio.status).toBe(200);
-    expect((await findProjectBySlug(proyecto.slug!))!.visibility).toBe("private");
+    expect((await findProjectBySlug(project_.slug!))!.visibility).toBe("private");
   });
 
-  it("volverlo privado cierra el acceso en el acto, sin tocar las entradas", async () => {
-    const p = (await findProjectBySlug(proyecto.slug!))!;
+  it("turning it private closes access at once, without touching the entries", async () => {
+    const p = (await findProjectBySlug(project_.slug!))!;
     expect(await canAccessProject(p, OTRO)).toBe(false);
     expect(await canAccessProject(p, OWNER)).toBe(true);
 
-    // Y volver a abrirlo lo deshace.
+    // And opening it again undoes that.
     const srv = createServerApp();
-    await srv.request(`/projects/${proyecto.slug}`, {
+    await srv.request(`/projects/${project_.slug}`, {
       method: "PATCH",
       headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
       body: JSON.stringify({ visibility: "public" }),
     });
-    expect(await canAccessProject((await findProjectBySlug(proyecto.slug!))!, OTRO)).toBe(true);
+    expect(await canAccessProject((await findProjectBySlug(project_.slug!))!, OTRO)).toBe(true);
   });
 
-  it("el dueño gestiona sus miembros sin ser admin global", async () => {
+  it("the owner manages their members without being a global admin", async () => {
     const srv = createServerApp();
-    const res = await srv.request(`/projects/${proyecto.slug}/members`, {
+    const res = await srv.request(`/projects/${project_.slug}/members`, {
       method: "POST",
       headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
       body: JSON.stringify({ email: OTRO }),
     });
     expect(res.status).toBe(200);
-    expect(await listProjectMembers(proyecto.slug!)).toContain(OTRO);
+    expect(await listProjectMembers(project_.slug!)).toContain(OTRO);
 
-    const quita = await srv.request(`/projects/${proyecto.slug}/members`, {
+    const remove_ = await srv.request(`/projects/${project_.slug}/members`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${tokOtro}`, "content-type": "application/json" },
       body: JSON.stringify({ email: OTRO }),
     });
-    expect(quita.status, "un miembro no es un gestor").toBe(403);
+    expect(remove_.status, "a member is not a manager").toBe(403);
   });
 
-  it("un proyecto creado por `save` nace con slug y con dueño", async () => {
-    const nombre = `Nacido De Save ${RID}`;
-    await saveContext({ content: `Una decisión cualquiera ${RID}.`, project: nombre, createdBy: OWNER });
+  it("a project created by `save` is born with a slug and an owner", async () => {
+    const name_ = `Nacido De Save ${RID}`;
+    await saveContext({ content: `Some decision or other ${RID}.`, project: name_, createdBy: OWNER });
     const p = await findProjectBySlug("nacido-de-save-" + RID.toLowerCase());
-    expect(p, "debería tener slug, que es lo que lo hace vinculable").toBeTruthy();
+    expect(p, "it should have a slug, which is what makes it linkable").toBeTruthy();
     expect(p!.ownerEmail).toBe(OWNER);
   }, 60_000);
 
-  it("un proyecto se puede colgar de un padre DESPUÉS de crearlo", async () => {
-    // El caso real: un cliente con varios repos que no son monorepo, y alguien del equipo crea
-    // uno de los hijos sin `--parent`. Sin esto no había arreglo: ni reengancharlo ni recrearlo,
-    // porque el slug ya estaba cogido.
-    const padre = await createProject(`Cliente ${RID}`, { ownerEmail: OWNER });
+  it("a project can be hung under a parent AFTER it was created", async () => {
+    // The real case: a client with several repos that are not a monorepo, and somebody on the
+    // team creates one of the children without `--parent`. Without this there was no fix:
+    // neither re-attaching nor recreating, because the slug was already taken.
+    const parent_ = await createProject(`Cliente ${RID}`, { ownerEmail: OWNER });
     const huerfano = await createProject(`Repo Suelto ${RID}`, { ownerEmail: OWNER });
     expect(huerfano.parentId).toBeNull();
 
@@ -124,13 +124,13 @@ describe("vida de un proyecto (ADR-0051)", () => {
     const res = await srv.request(`/projects/${huerfano.slug}`, {
       method: "PATCH",
       headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
-      body: JSON.stringify({ parentSlug: padre.slug }),
+      body: JSON.stringify({ parentSlug: parent_.slug }),
     });
     expect(res.status).toBe(200);
-    expect((await findProjectBySlug(huerfano.slug!))!.parentId).toBe(padre.id);
+    expect((await findProjectBySlug(huerfano.slug!))!.parentId).toBe(parent_.id);
 
-    // Y el hijo hereda el acceso del padre: volver privado el padre cierra los dos.
-    await srv.request(`/projects/${padre.slug}`, {
+    // And the child inherits the parent's access: turning the parent private closes both.
+    await srv.request(`/projects/${parent_.slug}`, {
       method: "PATCH",
       headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
       body: JSON.stringify({ visibility: "private" }),
@@ -138,7 +138,7 @@ describe("vida de un proyecto (ADR-0051)", () => {
     expect(await canAccessProject((await findProjectBySlug(huerfano.slug!))!, OTRO)).toBe(false);
   }, 60_000);
 
-  it("no se puede montar un ciclo de padres, que dejaría los permisos dando vueltas", async () => {
+  it("a parent cycle cannot be built, which would leave the permissions going round", async () => {
     const a = await createProject(`Ciclo A ${RID}`, { ownerEmail: OWNER });
     const b = await createProject(`Ciclo B ${RID}`, { ownerEmail: OWNER, parentSlug: a.slug! });
     const srv = createServerApp();
@@ -148,44 +148,44 @@ describe("vida de un proyecto (ADR-0051)", () => {
       body: JSON.stringify({ parentSlug: b.slug }),
     });
     expect(res.status).toBe(400);
-    expect((await findProjectBySlug(a.slug!))!.parentId).toBeNull(); // no tocó nada
+    expect((await findProjectBySlug(a.slug!))!.parentId).toBeNull(); // it touched nothing
   }, 60_000);
 
-  it("un proyecto vacío se puede borrar: deshacer un `link --create` equivocado", async () => {
-    const error = await createProject(`Nombre Equivocado ${RID}`, { ownerEmail: OWNER });
+  it("an empty project can be deleted: undoing a mistaken `link --create`", async () => {
+    const error_ = await createProject(`Nombre Equivocado ${RID}`, { ownerEmail: OWNER });
     const srv = createServerApp();
-    const res = await srv.request(`/projects/${error.slug}`, {
+    const res = await srv.request(`/projects/${error_.slug}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${tokOwner}` },
     });
     expect(res.status).toBe(200);
-    expect(await findProjectBySlug(error.slug!)).toBeNull();
+    expect(await findProjectBySlug(error_.slug!)).toBeNull();
   }, 60_000);
 
-  it("uno CON memoria dentro no: invalidar no es borrar, y eso no puede estar a un clic", async () => {
-    const conMemoria = await createProject(`Con Memoria ${RID}`, { ownerEmail: OWNER });
-    await saveContext({ content: `Una decisión que no queremos perder ${RID}.`, project: conMemoria.name, createdBy: OWNER });
+  it("one WITH memory inside cannot: invalidating is not deleting, and that cannot be one click away", async () => {
+    const withMemory = await createProject(`Con Memoria ${RID}`, { ownerEmail: OWNER });
+    await saveContext({ content: `A decision we do not want to lose ${RID}.`, project: withMemory.name, createdBy: OWNER });
     const srv = createServerApp();
-    const res = await srv.request(`/projects/${conMemoria.slug}`, {
+    const res = await srv.request(`/projects/${withMemory.slug}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${tokOwner}` },
     });
     expect(res.status).toBe(409);
-    expect(await findProjectBySlug(conMemoria.slug!), "sigue ahí").toBeTruthy();
+    expect(await findProjectBySlug(withMemory.slug!), "it is still there").toBeTruthy();
   }, 60_000);
 
-  it("uno con hijos tampoco, que dejaría a los hijos colgando", async () => {
-    const padre = await createProject(`Padre Con Hijos ${RID}`, { ownerEmail: OWNER });
-    await createProject(`Hijo De ${RID}`, { ownerEmail: OWNER, parentSlug: padre.slug! });
+  it("nor can one with children, which would leave the children dangling", async () => {
+    const parent_ = await createProject(`Padre Con Hijos ${RID}`, { ownerEmail: OWNER });
+    await createProject(`Hijo De ${RID}`, { ownerEmail: OWNER, parentSlug: parent_.slug! });
     const srv = createServerApp();
-    const res = await srv.request(`/projects/${padre.slug}`, {
+    const res = await srv.request(`/projects/${parent_.slug}`, {
       method: "DELETE",
       headers: { authorization: `Bearer ${tokOwner}` },
     });
     expect(res.status).toBe(409);
   }, 60_000);
 
-  it("y quien no lo gestiona no puede borrarlo aunque esté vacío", async () => {
+  it("and whoever cannot manage it cannot delete it even when empty", async () => {
     const mio = await createProject(`Solo Mio ${RID}`, { ownerEmail: OWNER });
     const srv = createServerApp();
     const res = await srv.request(`/projects/${mio.slug}`, {
@@ -196,7 +196,7 @@ describe("vida de un proyecto (ADR-0051)", () => {
     expect(await findProjectBySlug(mio.slug!)).toBeTruthy();
   }, 60_000);
 
-  it("un proyecto que no puedes ver responde 404 al intentar gestionarlo, no 403", async () => {
+  it("a project_ you cannot see answers 404 when you try to manage it, not 403", async () => {
     const privado = await createProject(`Privado Ajeno ${RID}`, { visibility: "private", ownerEmail: OWNER });
     const srv = createServerApp();
     const res = await srv.request(`/projects/${privado.slug}`, {
@@ -204,6 +204,6 @@ describe("vida de un proyecto (ADR-0051)", () => {
       headers: { authorization: `Bearer ${tokOtro}`, "content-type": "application/json" },
       body: JSON.stringify({ visibility: "public" }),
     });
-    expect(res.status).toBe(404); // un 403 confirmaría que existe
+    expect(res.status).toBe(404); // a 403 would confirm it exists
   });
 });

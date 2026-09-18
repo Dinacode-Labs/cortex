@@ -6,18 +6,18 @@ import { extractFileText, SUPPORTED_EXTS, type BatchItem } from "@cortex/core";
 import { wireLlm } from "@cortex/agents";
 
 /**
- * Conector de export de Notion (Markdown + ADJUNTOS), **consciente del contenido**:
- * ingiere la página (notion_doc) y parsea/RAGea sus adjuntos (vía la capa `extract`
- * multimodal), enlazándolos a la página (`belongs_to`). Escribe a través de la API
- * autenticada de Cortex (`POST /capture/batch` + `/relate`): atribución (created_by=email)
- * + permisos + embedding por lotes server-side. Incremental por sourceReference.
+ * The Notion export connector (Markdown + ATTACHMENTS), **content aware**: it ingests the page
+ * (notion_doc) and parses/RAGs its attachments (through the multimodal `extract` layer),
+ * linking them to the page (`belongs_to`). It writes through Cortex's authenticated API
+ * (`POST /capture/batch` + `/relate`): attribution (created_by=email) plus permissions plus
+ * server-side batch embedding. Incremental by sourceReference.
  *
- * Uso: cortex connect-notion "<slug>" <ruta-export>
- * Requiere `cortex auth login` y el servidor en marcha. Env: CORTEX_DRY=1.
+ * Usage: cortex-admin connect-notion "<slug>" <export-path>
+ * It needs `cortex auth login` and a running server. Env: CORTEX_DRY=1.
  */
-// Comparte la palanca de concurrencia de ingesta con `cortex ingest` (misma env,
-// mismo default 8). El conector sube por la API autenticada; si se quiere más
-// conservador con Notion, baja CORTEX_INGEST_CONCURRENCY en el entorno.
+// It shares the ingestion concurrency lever with `cortex-admin ingest` (same env var, same
+// default of 8). The connector uploads through the authenticated API; to be more conservative
+// with Notion, lower CORTEX_INGEST_CONCURRENCY in the environment.
 const PHASE1_CONCURRENCY = getEnvNum("CORTEX_INGEST_CONCURRENCY", 8);
 const CHUNK = Number(process.env.CORTEX_CAPTURE_CHUNK ?? "50");
 const MIN_BODY = Number(process.env.CORTEX_NOTION_MIN_BODY ?? "40");
@@ -49,6 +49,9 @@ function walkMd(dir: string): string[] {
   return out;
 }
 
+// Notion's own property names, as they appear in the exports being ingested. They stay in the
+// language of the workspace they came from: these are data, not our text. Add the ones your
+// workspace uses.
 const PROP_KEYS =
   "Status|Revisado|Created time|Last edited time|Last edited by|ID|Parent item|Sub-item|Priority|Responsable|Labels|Secci[oó]n|Fecha|Fecha limite|ORDEN RESOLUCI[OÓ]N|Review in|Resumen Estado|REPORTADO POR USUARIO|Tasks|Owner|Assignee";
 const PROP_LINE = new RegExp(`^(?:${PROP_KEYS}):\\s*.*$`, "gim");
@@ -90,35 +93,35 @@ interface BatchResult { ref: string | null; id: string; action: string }
 async function postBatch(slug: string, items: BatchItem[]): Promise<BatchResult[]> {
   const r = await apiPost<{ results?: BatchResult[]; error?: string }>("/capture/batch", { slug, items });
   if (!r.ok) {
-    console.error(`✗ Captura fallida (${r.status}): ${r.data.error ?? "¿cortex auth login / servidor en marcha?"}`);
+    console.error(`✗ Capture failed (${r.status}): ${r.data.error ?? "is the server running, and are you signed in (cortex auth login)?"}`);
     process.exit(1);
   }
   return r.data.results ?? [];
 }
 
 export async function run(args: string[]): Promise<void> {
-  wireLlm(); // extract multimodal: caption/OCR/whisper vía setMediaExtractor
+  wireLlm(); // multimodal extract: caption/OCR/whisper through setMediaExtractor
   const slug = args[0];
   const dir = args[1];
   if (!slug || !dir) {
-    console.error('Uso: cortex connect-notion "<slug>" <ruta-export>');
+    console.error('Usage: cortex-admin connect-notion "<slug>" <export-path>');
     process.exitCode = 1;
     return;
   }
   const files = walkMd(resolve(dir));
-  console.log(`Encontradas ${files.length} páginas .md. Extrayendo para "${slug}"...`);
+  console.log(`Found ${files.length} .md pages. Extracting for "${slug}"...`);
 
   if (process.env.CORTEX_DRY === "1") {
     for (const f of files.slice(0, 4)) {
       const p = parsePage(f);
       const folder = attachmentDir(f);
       const att = folder ? readdirSync(folder).filter((n) => SUPPORTED_EXTS.has(extname(n).slice(1).toLowerCase())) : [];
-      console.log(`\n--- ${p.title} [ref=${p.ref} body=${p.bodyLen}] adjuntos: ${att.join(", ") || "-"}`);
+      console.log(`\n--- ${p.title} [ref=${p.ref} body=${p.bodyLen}] attachments: ${att.join(", ") || "-"}`);
     }
     return;
   }
 
-  // Fase 1 (local): parsea páginas + extrae adjuntos (concurrencia limitada por el VLM/whisper).
+  // Phase 1 (local): parse pages + extract attachments (concurrency capped by the VLM/whisper).
   const pageItems: BatchItem[] = [];
   const attItems: AttItem[] = [];
   let cursor = 0;
@@ -146,7 +149,7 @@ export async function run(args: string[]): Promise<void> {
             });
           }
         }
-        // Página: con cuerpo, o stub si solo tiene adjuntos (para colgarlos).
+        // The page: with a body, or a stub when it only has attachments (to hang them off).
         if (pg.bodyLen >= MIN_BODY) {
           pageItems.push({ content: pg.content, title: pg.title, sourceType: "notion_doc", sourceReference: pg.ref, metadata: { notionId: pg.notionId, status: pg.status } });
         } else if (myAtts.length) {
@@ -160,9 +163,9 @@ export async function run(args: string[]): Promise<void> {
     }
   }
   await Promise.all(Array.from({ length: PHASE1_CONCURRENCY }, () => worker()));
-  console.log(`Extraído: ${pageItems.length} páginas, ${attItems.length} adjuntos (${failed} fallos). Subiendo vía API...`);
+  console.log(`Extracted: ${pageItems.length} pages, ${attItems.length} attachments (${failed} failed). Uploading through the API...`);
 
-  // Fase 2: subir páginas (ref→id), luego adjuntos, luego enlazar.
+  // Phase 2: upload the pages (ref -> id), then the attachments, then link them.
   const pageId = new Map<string, string>();
   for (let i = 0; i < pageItems.length; i += CHUNK) {
     for (const x of await postBatch(slug, pageItems.slice(i, i + CHUNK))) if (x.ref) pageId.set(x.ref, x.id);
@@ -180,7 +183,7 @@ export async function run(args: string[]): Promise<void> {
     const rr = await apiPost("/relate", { sourceId: attId, targetId: pid, relationType: "belongs_to" });
     if (rr.ok) related++;
   }
-  console.log(`Notion: ${pageId.size} páginas, ${toRelate.length} adjuntos nuevos (${related} enlazados a su página).`);
+  console.log(`Notion: ${pageId.size} pages, ${toRelate.length} new attachments (${related} linked to their page).`);
 }
 
 

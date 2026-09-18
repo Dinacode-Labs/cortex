@@ -1,39 +1,41 @@
 # Tests
 
-`pnpm typecheck` y `pnpm test` en verde, siempre. `pnpm test:integration` si tocas `core`,
-`database` o las apps HTTP.
+`pnpm typecheck` and `pnpm test` green, always. `pnpm test:integration` when you touch `core`,
+`database` or the HTTP apps.
 
-## Dónde va cada uno
+## Where each one goes
 
-- **Unit** (`tests/*.test.ts`, `pnpm test`): lógica pura y determinista — schemas, permisos,
-  slugs, parsers de sesión, compatibilidad de versiones. Sin base de datos y sin red.
-- **Integración** (`tests/integration/*.test.ts`, `pnpm test:integration`): contra Postgres real
-  (`cortex_test`), embeddings `local` y `LLM_PROVIDER=none`. Herméticos: sin red y sin claves.
-  Cubren persistencia y búsqueda, jerarquía y herencia, permisos y cascadas, captura por lotes y
-  auth. Necesitan `pnpm db:up`; el `globalSetup` crea y migra la base.
-- Comparten base, así que van en serie y cada test se aísla con un sufijo único (`RID`).
+- **Unit** (`tests/*.test.ts`, `pnpm test`): pure, deterministic logic — schemas, permissions,
+  slugs, session parsers, version compatibility. No database, no network.
+- **Integration** (`tests/integration/*.test.ts`, `pnpm test:integration`): against a real Postgres
+  (`cortex_test`), `local` embeddings and `LLM_PROVIDER=none`. Hermetic: no network, no keys. They
+  cover persistence and search, hierarchy and inheritance, permissions and cascades, batch capture
+  and auth. They need `pnpm db:up`; the `globalSetup` creates and migrates the database.
+- They share one database, so they run serially and each test isolates itself with a unique suffix
+  (`RID`).
 
-## La regla que distingue a este repo
+## The rule that sets this repo apart
 
-> **Toda regla que se pueda romper sin darse cuenta se convierte en test.**
+> **Any rule that can be broken without noticing becomes a test.**
 
-No es retórica, es lo que ya hay: que el CLI no engorde (`client-package.test.ts`), que
-`.env.example` no mienta (`env-example.test.ts`), que no haya enlaces rotos ni ADR fantasma ni
-material corporativo (`docs.test.ts`), que toda clase CSS emitida tenga una regla detrás
-(`web-styles.test.ts`), que el `dist/` arranque de verdad (el smoke de CI).
+That is not rhetoric, it is what is already there: that the CLI does not put on weight
+(`client-package.test.ts`), that `.env.example` does not lie (`env-example.test.ts`), that there
+are no broken links, ghost ADRs, corporate material or Spanish left in the tree
+(`docs.test.ts`), that every CSS class emitted has a rule behind it (`web-styles.test.ts`), that
+the `dist/` actually starts (the CI smoke test).
 
-Antes de escribir un párrafo pidiendo que alguien se acuerde de algo, pregúntate si puede ser un
-test. Si puede, que sea un test.
+Before writing a paragraph asking somebody to remember something, ask whether it can be a test. If
+it can, make it a test.
 
-## Cómo se escriben
+## How they are written
 
-- `describe` e `it` **en español**, y describiendo el **comportamiento**, no el nombre de la
-  función: `it("el OTP se busca en la línea de SU email, no el primer número que pase")`.
-- Encima del test, un comentario de bloque con **qué incidente evita**. Un test sin ese porqué
-  acaba borrado por el primero que lo vea fallar.
-- **Inyecta en vez de mockear** lo que la app ya deja inyectar (`createApp({ distill })`); ejercita
-  las rutas con `app.request()`, sin levantar un puerto.
-- Un `expect` que enseña **todos** los infractores, no los tres primeros: con tres, arreglas tres
-  y el cuarto sigue ahí.
+- `describe` and `it` describe the **behaviour**, not the function's name:
+  `it("the OTP is looked up on the line with THAT email, not the first number that turns up")`.
+- Above the test, a block comment with **which incident it prevents**. A test without that why gets
+  deleted by the first person who sees it fail.
+- **Inject rather than mock** whatever the app already lets you inject (`createApp({ distill })`);
+  exercise routes with `app.request()`, without standing up a port.
+- An `expect` that shows **every** offender, not the first three: with three, you fix three and the
+  fourth stays.
 
-Añade tests con tu PR siempre que toques lógica testeable.
+Add tests with your PR whenever you touch testable logic.

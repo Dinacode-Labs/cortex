@@ -5,41 +5,40 @@ paths:
   - "packages/client/**/*.ts"
 ---
 
-# CLI y cliente
+# CLI and client
 
-## Dónde va un comando
+## Where a command belongs
 
-`cortex` es el CLI de **developer** y se instala con `npm i -g`: solo puede depender de `client` y
-`shared`. Si el comando necesita la base de datos, el modelo o levantar un servicio, va en
-`cortex-admin`, que vive en la imagen (ADR-0025). Lo vigila `tests/client-package.test.ts`.
+`cortex` is the **developer** CLI and installs through `npm i -g`: it may depend only on `client`
+and `shared`. If the command needs the database, the model or to stand up a service, it belongs in
+`cortex-admin`, which lives in the image (ADR-0025). `tests/client-package.test.ts` watches this.
 
-## Cómo se escribe
+## How one is written
 
-- `apps/cli/src/commands/<cmd>.ts` exportando `run(args: string[]): Promise<void>`.
-- **Sin `process.exit` y sin efectos al importar**: el dispatcher es el dueño del ciclo de vida.
-- Regístralo en `COMMANDS` (`apps/cli/src/index.ts`) con su línea de ayuda **en inglés**. La carga
-  es perezosa y con ruta literal: `cortex --help` no debe pagar el coste de cargar nada.
-- Toda la salida, en inglés.
+- `apps/cli/src/commands/<cmd>.ts` exporting `run(args: string[]): Promise<void>`.
+- **No `process.exit` and no side effects at import time**: the dispatcher owns the lifecycle.
+- Register it in `COMMANDS` (`apps/cli/src/index.ts`) with its help line. Loading is lazy and by
+  literal path: `cortex --help` must not pay the cost of loading anything.
 
-## Varios servidores, un cliente
+## Several servers, one client
 
-El servidor sale del `.cortex.json` del repo, no de una variable global (ADR-0033): pasa por
-`useProjectServer(cwd)` antes de llamar a la API, y busca el token **por servidor** —
-`readCredentials()` sin argumento no tiene por qué ser el correcto.
+The server comes from the repo's `.cortex.json`, not from a global variable (ADR-0033): go through
+`useProjectServer(cwd)` before calling the API, and look the token up **per server** —
+`readCredentials()` with no argument is not necessarily the right one.
 
-## Compatibilidad
+## Compatibility
 
-El CLI y el servidor no van en lockstep (ADR-0062): un 404 en un endpoint nuevo significa
-«servidor viejo» y se degrada; un campo nuevo se lee como opcional. Lo único que bloquea es
-`minClientVersion`, y solo escrituras (`apps/cli/src/compat.ts`).
+The CLI and the server are not in lockstep (ADR-0062): a 404 on a new endpoint means "old server"
+and degrades; a new field is read as optional. The only thing that blocks is `minClientVersion`,
+and only for writes (`apps/cli/src/compat.ts`, comparison in `apps/cli/src/version.ts`).
 
-## Hooks y `cortex mcp`
+## Hooks and `cortex mcp`
 
-Gestionan su propio ciclo de vida (`managed: false`) y **stdout es protocolo**: ni un byte de más,
-ni siquiera el aviso de versión. Hay test. Y están guardados para que la ausencia del CLI o del
-servidor nunca rompa la sesión del agente.
+They own their own lifecycle (`managed: false`) and **stdout is protocol**: not one byte more, not
+even the version notice. There is a test. They are also guarded so that a missing CLI or an
+unreachable server never breaks the agent's session.
 
-## Conectores
+## Connectors
 
-`connect-<x>.ts` exportando `run(args)`, reutilizando la capa `extract` de core y escribiendo por
-la API autenticada (`/capture/batch`). Incrementales por `sourceReference`.
+`connect-<x>.ts` exporting `run(args)`, reusing core's `extract` layer and writing through the
+authenticated API (`/capture/batch`). Incremental by `sourceReference`.
