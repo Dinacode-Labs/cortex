@@ -8,6 +8,8 @@ fixes things.
 
 ## [Unreleased]
 
+## [0.1.12] — 2026-09-18
+
 ### Added
 - **Cortex has a mark.** "Relay": two pieces that change places and a centre that stays —
   sessions change, knowledge stays. One 8×8 drawing renders the web header (with a one-shot
