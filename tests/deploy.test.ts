@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as yamlParse } from "yaml";
 
@@ -64,6 +64,17 @@ describe("Caddyfile", () => {
 
   it("strips the /api prefix: the server does not know it lives under it", () => {
     expect(caddy).toContain("handle_path /api/*");
+  });
+
+  it("no web route hangs off /api: that prefix belongs to the server", () => {
+    // `handle_path /api/*` takes those URLs to the API, so a web route under that prefix
+    // answers 404 in the deployment even though it works with `apps/web` run on its own. It
+    // happened with `/api/graph`, which left the map black without a single error on the page.
+    const dir = "apps/web/src/routes";
+    const offenders = readdirSync(resolve(root, dir)).filter((f) =>
+      /\.(get|post|put|patch|delete|all)\(\s*"\/api/.test(read(`${dir}/${f}`)),
+    );
+    expect(offenders).toEqual([]);
   });
 
   it("the MCP goes unbuffered, because it speaks by streaming", () => {

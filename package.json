@@ -1,6 +1,6 @@
 {
   "name": "cortex",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "private": true,
   "description": "Cortex: context memory for software projects (documental + vectorial + graph + bi-temporal), with an MCP for AI agents",
   "type": "module",

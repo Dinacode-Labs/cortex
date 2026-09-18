@@ -36,6 +36,8 @@ fixes things.
   matched the error by the text of a message defined in `packages/core`, and the two had drifted
   apart. Found while translating.
 
+## [0.1.11] — 2026-09-17
+
 ### Added
 - **"Across this client": a parent project can now be read, not just opened.** Inheritance goes
   UP — a repo sees its client's knowledge, never a sibling's — and that leaves unanswered
@@ -49,8 +51,6 @@ fixes things.
   **searching downwards**: an "include child projects" checkbox that only appears on the parent,
   off by default, which says which repo each result comes from. Everything that crosses
   downwards filters by permissions before looking at anything. ADR-0063.
-
-### Added
 - **The CLI says when it is falling behind, and refuses to write when it falls too far behind**
   (ADR-0062). Everyone updates the CLI themselves from npm and an operator updates the server:
   two different clocks, and it showed this week, with three deployments in a row and people
@@ -84,7 +84,25 @@ fixes things.
   What crosses downwards filters by permissions: a private child you are not a member of does
   not appear just because you can see the parent.
 
+### Changed
+- **This repository stops versioning its `.cortex.json`.** Being public, a committed link turns
+  *our* project into the one every clone in the world brings by default, and forces contributors
+  to edit a versioned file to use their own. The general rule, which is what somebody adopting
+  Cortex needs to know: **version it in a private organisation repo; ignore it in a public one.**
+  See ADR-0059.
+- **`.env.example` is a template again, not a document.** It had 336 lines of which **155 were
+  prose**: explanations of why something was decided, what it used to be called and what gets
+  retired in which version. That is ADR and CHANGELOG material, not material for a file you copy
+  to `.env`. It is now 167 lines, one per variable with what it does and its default, and the
+  deprecated names (`NAN_*`, `BREVO_SENDER*`) are no longer offered — they still work, with
+  their warning, but a template is what you should be writing today.
+
 ### Fixed
+- **A project's map paints again.** `/p/<slug>/map` stayed black on any deployment: it asked
+  for its data at `/api/graph`, and that whole prefix is taken by the API server, which does not
+  have that route. The endpoint moves to `/graph.json`. While there, the "Include entries"
+  checkbox could not be ticked again — the form sends two values and the first one was being
+  read — and with no entries the graph has not a single edge to paint.
 - **The classifier no longer manufactures projects.** It offered `project` among the entity
   types, so any proper noun the LLM took for a project — tickets, branches, files,
   microservices — ended up in `entities` with `type='project'`: the same row as a real project,
@@ -109,8 +127,6 @@ fixes things.
   safe: access to the child already requires access to the whole chain, so inheritance exposes
   nothing that could not be seen directly. And it does not go down: from the parent you do not
   see a child's knowledge.
-
-### Fixed
 - **"You are not signed in" was a lie most of the time.** When the MCP could not authenticate it
   said that and sent you to repeat a `cortex auth login` you had already done. The real case is
   another one: the folder points — through its `.cortex.json` or through `CORTEX_SERVER_URL` —
@@ -118,23 +134,6 @@ fixes things.
   now says **which server** it looked for, which folder it resolved that from, and **which
   sessions do exist**. An error that misdirects costs more than one that stays quiet, because it
   looks like it knows.
-
-### Changed
-- **This repository stops versioning its `.cortex.json`.** Being public, a committed link turns
-  *our* project into the one every clone in the world brings by default, and forces contributors
-  to edit a versioned file to use their own. The general rule, which is what somebody adopting
-  Cortex needs to know: **version it in a private organisation repo; ignore it in a public one.**
-  See ADR-0059.
-
-### Changed
-- **`.env.example` is a template again, not a document.** It had 336 lines of which **155 were
-  prose**: explanations of why something was decided, what it used to be called and what gets
-  retired in which version. That is ADR and CHANGELOG material, not material for a file you copy
-  to `.env`. It is now 167 lines, one per variable with what it does and its default, and the
-  deprecated names (`NAN_*`, `BREVO_SENDER*`) are no longer offered — they still work, with
-  their warning, but a template is what you should be writing today.
-
-### Fixed
 - Seven environment variables the code reads that appeared in no template
   (`CORTEX_BIND_HOST`, `CORTEX_ENV_FILE`, `CORTEX_NPM_PACKAGE`, `CORTEX_OPENCODE_DB`,
   `CORTEX_PI_DIR`, `CORTEX_SEARCH_TYPE_BOOST`, `CORTEX_WORKER_HEARTBEAT_FILE`). They existed,

@@ -403,8 +403,10 @@ projectRoutes.get("/p/:slug/map", async (c) => {
   if (res instanceof Response) return res;
   const { project } = res;
   // The checkbox sends "1" or nothing; reading it as `!== "0"` made it IMPOSSIBLE to untick
-  // from the UI. A hidden field with the default value before the checkbox fixes it without JS.
-  const includeEntries = (c.req.query("entries") ?? "1") !== "0";
+  // from the UI. A hidden field with the default value before the checkbox fixes it without JS,
+  // but then both arrive (`?entries=0&entries=1`) and `query()` returns the FIRST one: it has
+  // to keep the last, or the box can never be ticked again.
+  const includeEntries = (c.req.queries("entries")?.at(-1) ?? "1") !== "0";
 
   const body = html`
     ${projectHeader(res, "map")}

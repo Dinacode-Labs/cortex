@@ -1,4 +1,4 @@
-/* The knowledge map (the `/p/<slug>/map` section): it paints /api/graph with vis-network.
+/* The knowledge map (the `/p/<slug>/map` section): it paints /graph.json with vis-network.
    The project and the filter are left by the server in the container's data-* attributes --
    no server interpolation inside the <script>, and no dependence on the URL. */
 const COLORS = {
@@ -15,7 +15,7 @@ function colorFor(group){
   const net = document.getElementById("net");
   const project = net?.dataset.project || "";
   const entries = net?.dataset.entries === "0" ? 0 : 1;
-  const res = await fetch("/api/graph?project="+encodeURIComponent(project)+"&entries="+entries);
+  const res = await fetch("/graph.json?project="+encodeURIComponent(project)+"&entries="+entries);
   const g = await res.json();
   const deg = {};
   g.edges.forEach(e => { deg[e.from]=(deg[e.from]||0)+1; deg[e.to]=(deg[e.to]||0)+1; });
