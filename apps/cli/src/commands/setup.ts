@@ -2,14 +2,14 @@ import { getBrandName } from "@cortex/shared";
 import { AGENT_IDS, agentBin, defaultCtx, detectAgents, getAdapter, runSetup, type AgentId } from "../setup/index.js";
 
 /**
- * `cortex setup` — deja los agentes de este portátil hablando con Cortex.
+ * `cortex setup` -- leaves this laptop's agents talking to Cortex.
  *
- *   cortex setup <agente>|--all [--dry-run] [--remove] [--no-plugin]
+ *   cortex setup <agent>|--all [--dry-run] [--remove] [--no-plugin]
  *   cortex setup --status
  *
- * Instalar el CLI y configurar los agentes son cosas distintas a propósito: se puede volver a
- * ejecutar esto tantas veces como haga falta sin reinstalar nada. Es idempotente, hace copia
- * de los ficheros antes de tocarlos y `--dry-run` cuenta lo que haría sin escribir.
+ * Installing the CLI and configuring the agents are deliberately different things: this can be
+ * run again as many times as needed without reinstalling anything. It is idempotent, it backs
+ * the files up before touching them, and `--dry-run` reports what it would do without writing.
  */
 
 function usage(): void {
@@ -30,7 +30,7 @@ function printReports(results: { id: string; report: { changed: string[]; skippe
       nada = false;
     }
     for (const s of report.skipped) console.log(`  · ${s}`);
-    // Los avisos no cuentan como cambio: hay agentes que siempre tienen algo que recordar.
+    // Warnings do not count as a change: some agents always have something to remind you of.
     for (const w of report.warnings) console.log(`  ⚠️  ${w}`);
     if (!report.changed.length && !report.skipped.length && !report.warnings.length) console.log("  · nothing to do");
   }

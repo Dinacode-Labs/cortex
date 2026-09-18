@@ -1,26 +1,26 @@
 import { normalizeServer, readCredentials } from "./credentials.js";
 
 /**
- * Transporte HTTP hacia el servidor de Cortex, usado por el CLI, los hooks y los
- * conectores. Lee el token de `~/.cortex/credentials` y la URL base
- * (`CORTEX_SERVER_URL` > credenciales > default).
+ * HTTP transport towards the Cortex server, used by the CLI, the hooks and the connectors.
+ * It reads the token from `~/.cortex/credentials` and the base URL
+ * (`CORTEX_SERVER_URL` > credentials > default).
  *
- * **Degrada con elegancia a propósito**: sin sesión, sin servidor o con un 5xx devuelve
- * `ok: false` en vez de lanzar. Los hooks corren dentro de la sesión de un agente y no
- * pueden romperla porque el servidor esté caído; quien necesite distinguir el motivo tiene
- * `status` (0 = ni siquiera hubo respuesta).
+ * **It degrades gracefully on purpose**: with no session, no server or a 5xx it returns
+ * `ok: false` instead of throwing. The hooks run inside an agent's session and cannot break
+ * it just because the server is down; whoever needs to tell the reasons apart has `status`
+ * (0 = there was not even a response).
  */
 export const DEFAULT_SERVER_URL = "http://localhost:8787";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
- * Servidor activo de este proceso, fijado por el repo en el que se está trabajando
- * (`useProjectServer`). Es lo que permite tener un Cortex por cliente sin cambiar nada a
- * mano: el `.cortex.json` dice a cuál pertenece el repo, y todo lo demás va detrás.
+ * This process's active server, pinned by the repo being worked on (`useProjectServer`).
+ * It is what allows one Cortex per client with nothing to switch by hand: the `.cortex.json`
+ * says which one the repo belongs to, and everything else follows.
  */
 let activeServer: string | null = null;
 
-/** La fija el repo. `null` vuelve al servidor por defecto de las credenciales. */
+/** Pinned by the repo. `null` falls back to the credentials' default server. */
 export function setActiveServer(server: string | null): void {
   activeServer = server ? normalizeServer(server) : null;
 }
@@ -36,9 +36,9 @@ export interface ApiResult<T = unknown> {
 }
 
 export interface ApiRequestOptions {
-  /** `false` para endpoints públicos (`/client-config`, `/auth/request`). Def. true. */
+  /** `false` for public endpoints (`/client-config`, `/auth/request`). Defaults to true. */
   auth?: boolean;
-  /** Base alternativa: hace falta en el login, cuando aún no hay credenciales. */
+  /** Alternative base: needed during login, when there are no credentials yet. */
   baseUrl?: string;
   timeoutMs?: number;
 }
@@ -50,8 +50,8 @@ export async function apiRequest<T = unknown>(
   opts: ApiRequestOptions = {},
 ): Promise<ApiResult<T>> {
   const needsAuth = opts.auth !== false;
-  // El token se busca POR SERVIDOR: con varias sesiones, mandar el de otro es un 401
-  // desconcertante en el mejor caso, y en el peor una petición a quien no toca.
+  // The token is looked up PER SERVER: with several sessions, sending someone else's is a
+  // baffling 401 at best, and at worst a request to the wrong party.
   const base = opts.baseUrl ?? apiBase();
   const token = readCredentials(base)?.token;
   if (needsAuth && !token) {
@@ -71,18 +71,18 @@ export async function apiRequest<T = unknown>(
     const data = (await res.json().catch(() => ({}))) as T;
     return { ok: res.ok, status: res.status, data };
   } catch (e) {
-    // status 0 = no hubo respuesta (servidor caído, DNS, timeout).
+    // status 0 = there was no response at all (server down, DNS, timeout).
     return { ok: false, status: 0, data: { error: (e as Error).message } as T };
   }
 }
 
-/** GET que devuelve el cuerpo o `null`. Firma histórica, usada por hooks y conectores. */
+/** GET returning the body or `null`. A historical signature, used by hooks and connectors. */
 export async function apiGet<T = unknown>(path: string): Promise<T | null> {
   const res = await apiRequest<T>("GET", path);
   return res.ok ? res.data : null;
 }
 
-/** POST con el resultado completo. Firma histórica. */
+/** POST with the full result. A historical signature. */
 export function apiPost<T = unknown>(path: string, body: unknown): Promise<ApiResult<T>> {
   return apiRequest<T>("POST", path, body);
 }

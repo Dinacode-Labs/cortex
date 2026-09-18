@@ -1,25 +1,25 @@
 import { html } from "hono/html";
 import type { ProjectRef } from "@cortex/core";
-import type { ProyectoDeLaPagina } from "../middleware/access.js";
+import type { ProjectPage } from "../middleware/access.js";
 import type { Html } from "./layout.js";
 
 /**
- * Cabecera y pestañas de un proyecto.
+ * A project's header and tabs.
  *
- * Las etiquetas están escritas para quien las lee, no para el interior del sistema: **Health**
- * en vez de «Lint», **What agents see** en vez de «Context pack». Quien abre la web quiere
- * saber si su memoria está sana y qué se le está contando a su agente; «lint» y «pack» son
- * cómo lo llamamos nosotros (ADR-0050).
+ * The labels are written for whoever reads them, not for the system's insides: **Health**
+ * rather than "Lint", **What agents see** rather than "Context pack". Someone opening the web
+ * wants to know whether their memory is healthy and what their agent is being told; "lint" and
+ * "pack" are what we call it (ADR-0050).
  */
-export type Seccion = "memory" | "ask" | "agents" | "health" | "across" | "map" | "code" | "settings";
+export type Section = "memory" | "ask" | "agents" | "health" | "across" | "map" | "code" | "settings";
 
-const SECCIONES: { id: Seccion; etiqueta: string; sufijo: string }[] = [
-  { id: "memory", etiqueta: "Memory", sufijo: "" },
-  { id: "ask", etiqueta: "Ask", sufijo: "/ask" },
-  { id: "agents", etiqueta: "What agents see", sufijo: "/agents" },
-  { id: "health", etiqueta: "Health", sufijo: "/health" },
-  { id: "map", etiqueta: "Map", sufijo: "/map" },
-  { id: "code", etiqueta: "Code", sufijo: "/code" },
+const SECTIONS: { id: Section; label: string; suffix: string }[] = [
+  { id: "memory", label: "Memory", suffix: "" },
+  { id: "ask", label: "Ask", suffix: "/ask" },
+  { id: "agents", label: "What agents see", suffix: "/agents" },
+  { id: "health", label: "Health", suffix: "/health" },
+  { id: "map", label: "Map", suffix: "/map" },
+  { id: "code", label: "Code", suffix: "/code" },
 ];
 
 export function visibilityPill(v: "public" | "private"): Html {
@@ -29,57 +29,57 @@ export function visibilityPill(v: "public" | "private"): Html {
 }
 
 /**
- * Miga de pan hasta la raíz.
+ * Breadcrumbs up to the root.
  *
- * Un hijo no se entiende solo: «Acme Portal» es un repo de un cliente, y lo que el pack le
- * cuenta a un agente viene en parte de ese cliente. Se pintan TODOS los niveles, no solo el
- * padre, porque la jerarquía no tiene por qué ser de dos. Los ancestros son siempre visibles
- * para quien ve al hijo (`canAccessProject` mira la cadena entera), así que no hay nada que
- * filtrar aquí.
+ * A child does not make sense on its own: "Acme Portal" is a client's repo, and what the pack
+ * tells an agent comes partly from that client. EVERY level is painted, not just the parent,
+ * because the hierarchy need not be two deep. The ancestors are always visible to whoever can
+ * see the child (`canAccessProject` looks at the whole chain), so there is nothing to filter
+ * here.
  */
-function crumbs(ancestros: ProjectRef[], actual: string): Html {
-  if (ancestros.length === 0) return html``;
+function crumbs(ancestors: ProjectRef[], current: string): Html {
+  if (ancestors.length === 0) return html``;
   return html`<nav class="crumbs" aria-label="Breadcrumb">
-    ${ancestros.map(
+    ${ancestors.map(
       (a) => html`${a.slug ? html`<a href="/p/${a.slug}">${a.name}</a>` : html`<span>${a.name}</span>`}<span class="sep">›</span>`,
-    )}<span class="here">${actual}</span>
+    )}<span class="here">${current}</span>
   </nav>`;
 }
 
 /**
- * Cabecera del proyecto + pestañas.
+ * The project's header plus its tabs.
  *
- * Toma lo que el guard ya resolvió (`requireProjectPage`) en vez de cinco argumentos sueltos:
- * quién mira, de dónde cuelga y qué cuelga de él son lo que decide qué pestañas hay. `Settings`
- * sale solo para quien gestiona, y `Across this client` solo si hay hijos que mirar — una
- * pestaña que lleva a una pantalla vacía es peor que no tenerla.
+ * It takes what the guard already resolved (`requireProjectPage`) rather than five loose
+ * arguments: who is looking, what it hangs off and what hangs off it are what decide which tabs
+ * exist. `Settings` only shows for whoever manages it, and `Across this client` only when there
+ * are children to look at -- a tab leading to an empty screen is worse than no tab.
  */
-export function projectHeader(pagina: ProyectoDeLaPagina, activa: Seccion): Html {
-  const { project, gestor, ancestros, hijos } = pagina;
+export function projectHeader(page: ProjectPage, active: Section): Html {
+  const { project, manager, ancestors, children } = page;
   const base = `/p/${project.slug}`;
-  const tabs = [...SECCIONES];
-  // Va justo después de Health, no al final: es la misma pregunta —¿me puedo fiar de esto?—
-  // pero mirando al cliente entero, y leerlo seguido es como se entiende. Map y Code son otra
-  // cosa, y Settings cierra siempre.
-  if (hijos.length) {
+  const tabs = [...SECTIONS];
+  // It goes right after Health, not at the end: it is the same question -- can I trust this? --
+  // but looking at the whole client, and reading them together is how it makes sense. Map and
+  // Code are something else, and Settings always closes.
+  if (children.length) {
     tabs.splice(tabs.findIndex((t) => t.id === "health") + 1, 0, {
       id: "across",
-      etiqueta: "Across this client",
-      sufijo: "/across",
+      label: "Across this client",
+      suffix: "/across",
     });
   }
-  if (gestor) tabs.push({ id: "settings", etiqueta: "Settings", sufijo: "/settings" });
+  if (manager) tabs.push({ id: "settings", label: "Settings", suffix: "/settings" });
   const count = "entryCount" in project ? project.entryCount : null;
   return html`
     <div class="project-head">
-      ${crumbs(ancestros, project.name)}
+      ${crumbs(ancestors, project.name)}
       <div class="project-title">
         <h1>${project.name}</h1>
         ${visibilityPill(project.visibility)}
         ${count !== null ? html`<span class="sub">${count} ${count === 1 ? "entry" : "entries"}</span>` : ""}
       </div>
       <nav class="tabs">
-        ${tabs.map((t) => html`<a class="${t.id === activa ? "on" : ""}" href="${base}${t.sufijo}">${t.etiqueta}</a>`)}
+        ${tabs.map((t) => html`<a class="${t.id === active ? "on" : ""}" href="${base}${t.suffix}">${t.label}</a>`)}
       </nav>
     </div>`;
 }

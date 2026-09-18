@@ -1,41 +1,41 @@
 import { scrub, type CaptureSessionCounters, type SourceType } from "@cortex/shared";
-import { trocea } from "@cortex/client";
+import { sliceTranscript } from "@cortex/client";
 import { saveWithReconciliation } from "@cortex/core";
 import { distill } from "./distill.js";
 
 /**
- * Destilación de una sesión de agente **en el servidor** (ADR-0025).
+ * Distillation of an agent session **on the server** (ADR-0025).
  *
- * Antes esto corría en el portátil de cada dev: el hook leía el transcript, llamaba al
- * modelo con la clave del `.env` del repo clonado y luego posteaba cada pieza por HTTP. Eso
- * obligaba a repartir credenciales de LLM a todo el equipo y ponía N clientes a pegarle al
- * proveedor en paralelo. Ahora el cliente solo manda el transcript condensado y el servidor
- * —que ya tiene las credenciales y controla la concurrencia— hace el trabajo caro.
+ * This used to run on every dev's laptop: the hook read the transcript, called the model with
+ * the key from the cloned repo's `.env` and then posted each piece over HTTP. That forced LLM
+ * credentials to be handed out to the whole team and put N clients hammering the provider in
+ * parallel. The client now only sends the condensed transcript and the server -- which already
+ * holds the credentials and controls concurrency -- does the expensive work.
  *
- * Al estar dentro del servidor, guarda con `saveWithReconciliation` directamente en vez de
- * dar un rodeo por la API.
+ * Being inside the server, it stores with `saveWithReconciliation` directly rather than going
+ * the long way round through the API.
  */
 
 export interface DistillSessionInput {
-  /** Nombre del proyecto (lo que espera `saveContext`). */
+  /** The project's name (what `saveContext` expects). */
   projectName: string;
-  /** Transcript ya condensado. Se vuelve a escrubar aquí: no se confía en el cliente. */
+  /** The already-condensed transcript. It is scrubbed again here: the client is not trusted. */
   condensed: string;
   platform: string;
   sessionId: string;
-  /** Email autenticado: es la atribución de todo lo que salga de esta sesión. */
+  /** The authenticated email: the attribution for everything this session produces. */
   createdBy: string;
   sourceType?: SourceType;
 }
 
 export type DistillSessionFn = (input: DistillSessionInput) => Promise<CaptureSessionCounters>;
 
-/** Por debajo de esto no hay conversación de la que sacar nada útil. */
+/** Below this there is no conversation to get anything useful out of. */
 const MIN_CHARS = 200;
 
 export const distillSession: DistillSessionFn = async (input) => {
   const counters: CaptureSessionCounters = { saved: 0, updated: 0, superseded: 0, noop: 0, failed: 0, windows: 0 };
-  // Última línea de defensa: el cliente escruba, pero la API la puede llamar cualquiera.
+  // Last line of defence: the client scrubs, but anyone can call the API.
   const condensed = scrub(input.condensed);
   if (condensed.length < MIN_CHARS) return counters;
 
@@ -43,33 +43,33 @@ export const distillSession: DistillSessionFn = async (input) => {
   const sourceReference = `${input.platform}:${input.sessionId}`;
   const seen = new Set<string>();
 
-  const { ventanas, descartados } = trocea(condensed);
-  if (descartados > 0) {
-    // Que se note: una sesión recortada terminaba en `done` igual que una que cupo entera.
-    counters.droppedChars = descartados;
+  const { windows, dropped } = sliceTranscript(condensed);
+  if (dropped > 0) {
+    // Make it visible: a trimmed session used to end up `done` just like one that fitted whole.
+    counters.droppedChars = dropped;
     console.warn(
-      `[session-distill] ${sourceReference}: ${descartados} caracteres fuera del destilado ` +
-        `(${ventanas.length} ventanas repartidas a lo largo de la sesión). ` +
-        `Sube CORTEX_SESSIONS_MAX_WINDOWS si quieres cubrirla entera.`,
+      `[session-distill] ${sourceReference}: ${dropped} characters left out of the distillation ` +
+        `(${windows.length} windows spread across the session). ` +
+        `Raise CORTEX_SESSIONS_MAX_WINDOWS to cover it whole.`,
     );
   }
 
-  for (const window of ventanas) {
+  for (const window of windows) {
     counters.windows++;
     let items: Awaited<ReturnType<typeof distill>>;
     try {
       items = await distill(input.projectName, window);
     } catch (e) {
-      // Una ventana que falla (timeout, 429 tras los reintentos) no debe tirar la sesión
-      // entera: se cuenta y se sigue con las demás.
+      // A window that fails (timeout, 429 after the retries) must not bring the whole session
+      // down: it is counted and the rest carry on.
       counters.failed++;
-      console.error(`[session-distill] ventana fallida (${sourceReference}):`, (e as Error).message);
+      console.error(`[session-distill] window failed (${sourceReference}):`, (e as Error).message);
       continue;
     }
 
     for (const item of items) {
-      // Dedup barato dentro de la propia sesión: el mismo tema suele repetirse entre
-      // ventanas y no tiene sentido pagar la reconciliación para descubrirlo.
+      // Cheap dedup within the session itself: the same subject usually recurs across windows
+      // and there is no point paying for reconciliation to find that out.
       const key = item.title.toLowerCase().replace(/[^a-z0-9]+/g, "");
       if (key.length < 3 || seen.has(key)) continue;
       seen.add(key);
@@ -81,7 +81,7 @@ export const distillSession: DistillSessionFn = async (input) => {
             project: input.projectName,
             title: item.title,
             type: item.type,
-            confidence: "low", // lo destilado nace con poca confianza; `maintain` la sube si se corrobora
+            confidence: "low", // distilled knowledge is born low-confidence; `maintain` raises it once corroborated
             sourceType,
             sourceReference,
             createdBy: input.createdBy,
@@ -95,7 +95,7 @@ export const distillSession: DistillSessionFn = async (input) => {
         else counters.noop++;
       } catch (e) {
         counters.failed++;
-        console.error(`[session-distill] fallo al guardar "${item.title}":`, (e as Error).message);
+        console.error(`[session-distill] failed to store "${item.title}":`, (e as Error).message);
       }
     }
   }

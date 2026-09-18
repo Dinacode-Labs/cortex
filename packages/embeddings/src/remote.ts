@@ -2,8 +2,8 @@ import { withLlmSlot } from "@cortex/shared";
 import { type EmbeddingProvider } from "./provider.js";
 import { reportEmbeddingUsage } from "./usage-sink.js";
 
-/** POST con reintentos exponenciales en 429/5xx. El slot lo toma el llamador (`embed`),
- *  así que los reintentos NO liberan el cupo: reintentar es parte de la misma llamada. */
+/** POST with exponential retries on 429/5xx. The slot is held by the caller (`embed`), so
+ *  retries do NOT release the budget: retrying is part of the same call. */
 async function postWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
   const max = 6;
   for (let attempt = 0; attempt < max; attempt++) {
@@ -16,13 +16,12 @@ async function postWithRetry(url: string, init: RequestInit, label: string): Pro
     }
     throw new Error(`${label} error ${res.status}: ${await res.text()}`);
   }
-  throw new Error(`${label}: reintentos agotados`);
+  throw new Error(`${label}: retries exhausted`);
 }
 
 /**
- * Proveedor de embeddings para cualquier endpoint OpenAI-compatible
- * (/v1/embeddings): OpenAI, nan.builders, etc. Configurable por base URL, modelo
- * y dimensión.
+ * Embedding provider for any OpenAI-compatible endpoint (/v1/embeddings): OpenAI,
+ * nan.builders, and so on. Configurable by base URL, model and dimension.
  */
 export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
   readonly model: string;
@@ -46,8 +45,8 @@ export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
   }
 
   async embed(texts: string[]): Promise<number[][]> {
-    // Comparte cupo con el resto de llamadas al proveedor (chat, visión, STT): el límite
-    // de concurrencia es por API key, no por tipo de endpoint.
+    // Shares the budget with every other provider call (chat, vision, STT): the concurrency
+    // limit is per API key, not per endpoint type.
     const res = await withLlmSlot(() =>
       postWithRetry(
         `${this.baseURL}/embeddings`,

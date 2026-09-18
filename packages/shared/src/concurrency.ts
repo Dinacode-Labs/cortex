@@ -1,26 +1,26 @@
 import { getEnvNum } from "./env.js";
 
 /**
- * Semáforo para las llamadas al proveedor de inferencia. Chat, visión, transcripción y
- * embeddings comparten cupo porque comparten clave, y los proveedores suelen limitar por
- * clave y no por tipo de endpoint.
+ * Semaphore for calls to the inference provider. Chat, vision, transcription and embeddings
+ * share the same budget because they share the same key, and providers usually rate-limit
+ * per key rather than per endpoint type.
  *
- * **Por qué existe:** muchos proveedores limitan peticiones EN PARALELO, además de por
- * minuto. Sin esto, una tarea de mantenimiento o una ingesta lanzando ocho a la vez dispara
- * 429 en ráfaga, y el backoff acaba costando más tiempo del que ahorró el paralelismo.
- * Cuál es el número de cada proveedor no se documenta aquí: es configuración del operador
- * (ADR-0031), y va en `CORTEX_LLM_CONCURRENCY`.
+ * **Why it exists:** many providers cap requests IN PARALLEL, on top of per-minute quotas.
+ * Without this, a maintenance job or an ingest firing eight at once triggers a burst of
+ * 429s, and the backoff ends up costing more time than the parallelism saved. Each
+ * provider's number is not documented here: that is operator configuration (ADR-0031), and
+ * it goes in `CORTEX_LLM_CONCURRENCY`.
  *
- * **ES UN LÍMITE POR PROCESO.** Eso importa más de lo que parece: un despliegue típico
- * corre varios procesos que llaman al modelo —la API, el worker de mantenimiento, el MCP,
- * la web—, y cada uno tiene su propio contador. El techo real contra la clave es
- * `procesos × CORTEX_LLM_CONCURRENCY`, no el valor a secas. Quien lo configure tiene que
- * hacer esa división; está explicado en `.env.example` y en `deploy/README.md`.
+ * **THIS IS A PER-PROCESS LIMIT.** That matters more than it looks: a typical deployment
+ * runs several processes that call the model -- the API, the maintenance worker, the MCP,
+ * the web -- and each keeps its own counter. The real ceiling against the key is
+ * `processes x CORTEX_LLM_CONCURRENCY`, not the bare value. Whoever configures it has to do
+ * that division; it is spelled out in `.env.example` and in `deploy/README.md`.
  *
- * Un límite compartido de verdad exige estado compartido —y `shared` no puede depender de la
- * base de datos—, así que tendría que inyectarse desde los entrypoints, como el clasificador
- * o el reranker. Está anotado en el roadmap. Mientras no exista, lo que absorbe el exceso es
- * el reintento con backoff que ya tiene cada cliente.
+ * A genuinely shared limit needs shared state -- and `shared` cannot depend on the database
+ * -- so it would have to be injected from the entrypoints, like the classifier or the
+ * reranker. It is noted in the roadmap. Until it exists, what absorbs the overflow is the
+ * retry-with-backoff each client already has.
  */
 
 let inFlight = 0;
@@ -36,21 +36,21 @@ async function acquire(): Promise<void> {
     inFlight++;
     return;
   }
-  // El slot se HEREDA de quien libera (no se incrementa aquí): así dos `acquire`
-  // simultáneos no pueden colarse en el hueco entre el release y el despertar.
+  // The slot is INHERITED from whoever releases it (it is not incremented here): that way
+  // two simultaneous `acquire`s cannot slip into the gap between the release and the wake-up.
   await new Promise<void>((resolve) => waiters.push(resolve));
 }
 
 function release(): void {
   const next = waiters.shift();
   if (next) {
-    next(); // cede el slot sin decrementar
+    next(); // hands the slot over without decrementing
     return;
   }
   inFlight--;
 }
 
-/** Ejecuta `fn` ocupando un slot del proveedor de inferencia. */
+/** Runs `fn` while holding one inference-provider slot. */
 export async function withLlmSlot<T>(fn: () => Promise<T>): Promise<T> {
   await acquire();
   try {
@@ -60,7 +60,7 @@ export async function withLlmSlot<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-/** Llamadas en vuelo ahora mismo (solo para tests y diagnóstico). */
+/** Calls in flight right now (tests and diagnostics only). */
 export function llmSlotsInFlight(): number {
   return inFlight;
 }

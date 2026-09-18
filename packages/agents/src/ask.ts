@@ -2,14 +2,14 @@ import { searchContext, type SearchHit } from "@cortex/core";
 import { synthesizeContextAnswer } from "./synthesize.js";
 
 /**
- * Orquestación compartida de «preguntar al contexto» (§7): recupera los hits más
- * relevantes y sintetiza una respuesta fundamentada con el agente de recuperación.
- * La usan la web (GET /ask) y la tool MCP `ask_project_context` — ambas hacían
- * exactamente esto (limit 6, mismos snippets); cada consumidor renderiza lo suyo.
+ * Shared orchestration of "ask the context" (section 7): it retrieves the most relevant hits
+ * and synthesises a grounded answer with the retrieval agent. The web (GET /ask) and the
+ * `ask_project_context` MCP tool both use it -- both did exactly this (limit 6, the same
+ * snippets); each consumer renders its own output.
  */
 
 export interface AskResult {
-  /** null si no hay LLM configurado o la síntesis falla (el caller decide el fallback). */
+  /** null when no LLM is configured or synthesis fails (the caller decides the fallback). */
   answer: string | null;
   hits: SearchHit[];
 }
@@ -20,8 +20,8 @@ export async function askProjectContext(
   limit = 6,
   opts?: { restrictToAccessibleOf?: string | null },
 ): Promise<AskResult> {
-  // Scoping de seguridad: se propaga tal cual a searchContext (ver su doc). Sin `opts`
-  // = llamada confiable (busca en todo); con él = restringe a los proyectos accesibles.
+  // Security scoping: propagated as is to searchContext (see its docs). Without `opts` it is
+  // a trusted call (it searches everything); with it, it restricts to accessible projects.
   const hits = await searchContext({ query: question, project, limit }, opts);
   const answer = await synthesizeContextAnswer(
     question,

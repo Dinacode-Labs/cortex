@@ -2,16 +2,16 @@ import { describe, it, expect } from "vitest";
 import { createCaptureQueue } from "../apps/server/src/capture-queue";
 
 /**
- * La cola limita cuántas destilaciones corren a la vez porque el proveedor de inferencia
- * acota peticiones por clave: sin ella, diez devs cerrando sesión al mismo tiempo producen
- * una ráfaga de 429.
+ * The queue caps how many distillations run at once because the inference provider limits
+ * requests per key: without it, ten devs closing a session at the same time produce a burst
+ * of 429s.
  *
- * Lo que hay que garantizar: que no se supera el límite, que un trabajo que falla no
- * atasca la cola, y que la promesa de `enqueue` resuelve cuando termina ESE trabajo (de eso
- * depende el modo `?wait=1`).
+ * What has to be guaranteed: the limit is never exceeded, a failing job does not jam the
+ * queue, and `enqueue`'s promise resolves when THAT job finishes (the `?wait=1` mode depends
+ * on it).
  */
 describe("createCaptureQueue", () => {
-  it("no supera la concurrencia configurada", async () => {
+  it("does not exceed the configured concurrency", async () => {
     let activos = 0;
     let pico = 0;
     const queue = createCaptureQueue<number>({
@@ -29,7 +29,7 @@ describe("createCaptureQueue", () => {
     expect(queue.inFlight()).toBe(0);
   });
 
-  it("serializa con concurrencia 1 y respeta el orden de llegada", async () => {
+  it("serialises at concurrency 1 and respects arrival order", async () => {
     const orden: number[] = [];
     const queue = createCaptureQueue<number>({
       concurrency: 1,
@@ -42,22 +42,22 @@ describe("createCaptureQueue", () => {
     expect(orden).toEqual([1, 2, 3]);
   });
 
-  it("un trabajo que falla no atasca la cola ni tumba el proceso", async () => {
+  it("a failing job neither jams the queue nor brings the process down", async () => {
     const hechos: number[] = [];
     const queue = createCaptureQueue<number>({
       concurrency: 1,
       run: async (n) => {
-        if (n === 2) throw new Error("destilación fallida");
+        if (n === 2) throw new Error("distillation failed");
         hechos.push(n);
       },
     });
-    // `enqueue` no rechaza: el fallo se registra en la BD, no se propaga al llamador.
+    // `enqueue` does not reject: the failure is recorded in the database, not propagated.
     await Promise.all([queue.enqueue(1), queue.enqueue(2), queue.enqueue(3)]);
     expect(hechos).toEqual([1, 3]);
     expect(queue.inFlight()).toBe(0);
   });
 
-  it("la promesa de enqueue resuelve al terminar ESE trabajo (base del ?wait=1)", async () => {
+  it("enqueue's promise resolves when THAT job finishes (the basis of ?wait=1)", async () => {
     let terminado = false;
     const queue = createCaptureQueue<string>({
       concurrency: 1,

@@ -1,241 +1,249 @@
-# Panorama competitivo y análisis de huecos — Cortex
+# Competitive landscape and gap analysis — Cortex
 
-> Investigación realizada con 4 agentes en paralelo (junio 2026) sobre proyectos
-> de memoria/contexto para agentes de IA, comparados con Cortex. Cada afirmación
-> se apoya en fuentes citadas al final; las incertidumbres se marcan como *(?)*.
+> Research carried out in June 2026 on memory/context projects for AI agents,
+> compared against Cortex. Every claim rests on a source cited at the end;
+> uncertainties are marked *(?)*.
 >
-> **Objetivo:** ver qué hacen otros que nosotros no, y proponer cómo hacerlo bien
-> para nuestro nicho: **memoria de contexto para una consultora de software,
-> por cliente/proyecto, con sus propias vías de comunicación, consumida por
-> agentes de desarrollo (Claude Code/Codex) vía MCP.**
+> **Goal:** see what others do that we do not, and propose how to do it well for
+> our niche: **context memory for a software consultancy, per client/project, with
+> its own communication channels, consumed by development agents (Claude
+> Code/Codex) over MCP.**
 
 ---
 
 ## 0. TL;DR
 
-- **Tenemos un gemelo arquitectónico: `gbrain` (Garry Tan).** Postgres+pgvector +
-  BM25 + grafo de entidades/relaciones + MCP + síntesis con citas. Es la
-  referencia #1 a estudiar — valida nuestras decisiones y nos adelanta features.
-- **Nuestra tesis ya tiene nombre: el "LLM Wiki" de Karpathy** (ingest → query →
-  **lint**). El paso **lint** (detectar contradicciones, info obsoleta, entidades
-  huérfanas, huecos) es justo el "curado" que tenemos verde y que **casi nadie
-  implementa**: es un diferenciador de calidad.
-- **El grafo entities/relations es ya _commodity_** (MCP oficial, basic-memory,
-  Cognee, Graphiti…). Nuestro foso NO es el grafo, sino: **scoping multi-cliente +
-  ingesta de calidad de Plane/Chat/repos + lint/curado + síntesis con citas**.
-- **No existe un producto vertical** de "memoria para consultora de software
-  multi-cliente con canales propios" → hueco de mercado real.
-- **Huecos técnicos más claros frente al mercado:** (1) **híbrido + rerank** (hoy
-  solo vector denso), (2) **grafo bi-temporal con invalidación** de hechos,
-  (3) **resolución de entidades** robusta (tenemos un primer pase), (4) **indexar
-  el código** de cada cliente (no solo el proyecto), (5) **permisos por
-  cliente/usuario** (ACLs), (6) **eval de fundamentación** (anti-alucinación).
+- **We have an architectural twin: `gbrain` (Garry Tan).** Postgres+pgvector +
+  BM25 + entity/relation graph + MCP + synthesis with citations. It is reference
+  #1 to study — it validates our decisions and is ahead of us on features.
+- **Our thesis already has a name: Karpathy's "LLM Wiki"** (ingest → query →
+  **lint**). The **lint** step (spotting contradictions, stale information,
+  orphan entities, gaps) is exactly the "curation" we have green and that
+  **almost nobody implements**: it is a quality differentiator.
+- **The entities/relations graph is already a _commodity_** (official MCP,
+  basic-memory, Cognee, Graphiti…). Our moat is NOT the graph, it is:
+  **multi-client scoping + quality ingestion from Plane/Chat/repos + lint/curation
+  + synthesis with citations**.
+- **No vertical product exists** for "memory for a multi-client software
+  consultancy with its own channels" → a real market gap.
+- **Clearest technical gaps against the market:** (1) **hybrid + rerank** (today
+  dense vector only), (2) **bi-temporal graph with invalidation** of facts,
+  (3) robust **entity resolution** (we have a first pass), (4) **indexing each
+  client's code** (not just the project), (5) **per client/user permissions**
+  (ACLs), (6) **groundedness eval** (anti-hallucination).
 
 ---
 
-## 1. El mapa del panorama
+## 1. The map of the landscape
 
-Cuatro familias, con los proyectos más relevantes:
+Four families, with the most relevant projects in each:
 
-| Familia | Proyectos clave | Qué aportan |
+| Family | Key projects | What they bring |
 |---|---|---|
-| **Memoria de agente / KG** | **gbrain**, Zep+**Graphiti**, **Cognee**, Mem0, Letta, Memary, Memobase, txtai, MemOS | Modelo de memoria (vector/grafo/temporal), extracción de entidades/relaciones, curado, olvido |
-| **Contexto de código para IDEs/agentes** | Cursor, Augment, Continue, Aider, **Serena**, Cody, Tabnine, Qodo, Greptile, Sourcebot | Indexar y razonar sobre **código** (chunking, símbolos, code-graph) |
-| **Conocimiento corporativo / RAG** | **Glean**, **Onyx** (ex-Danswer), Dust, RAGFlow, Morphik, Khoj, Quivr, Verba, Elastic, Vectara, MS 365 Copilot | Conectores SaaS, **permisos/ACL**, **híbrido + rerank**, eval de calidad |
-| **Docs/MCP & patrones** | **Context7**, GitMCP, DeepWiki, Memory MCP oficial, basic-memory, **LLM Wiki (Karpathy)** | Patrones de consumo (MCP), auto-wiki, conocimiento pre-compilado |
+| **Agent memory / KG** | **gbrain**, Zep+**Graphiti**, **Cognee**, Mem0, Letta, Memary, Memobase, txtai, MemOS | Memory model (vector/graph/temporal), entity/relation extraction, curation, forgetting |
+| **Code context for IDEs/agents** | Cursor, Augment, Continue, Aider, **Serena**, Cody, Tabnine, Qodo, Greptile, Sourcebot | Indexing and reasoning over **code** (chunking, symbols, code-graph) |
+| **Enterprise knowledge / RAG** | **Glean**, **Onyx** (ex-Danswer), Dust, RAGFlow, Morphik, Khoj, Quivr, Verba, Elastic, Vectara, MS 365 Copilot | SaaS connectors, **permissions/ACL**, **hybrid + rerank**, quality eval |
+| **Docs/MCP & patterns** | **Context7**, GitMCP, DeepWiki, official Memory MCP, basic-memory, **LLM Wiki (Karpathy)** | Consumption patterns (MCP), auto-wiki, pre-compiled knowledge |
 
-### Identificación de los que nombró el usuario
-- **Context7** (Upstash, MIT): MCP que inyecta **docs de librerías** versionadas. No
-  es memoria de proyecto — es contexto público efímero. Útil como **complemento**
-  (Cortex = contexto privado del cliente; Context7 = docs del stack) y como patrón
-  de UX (`use context7`). https://github.com/upstash/context7
-- **gbrain** (Garry Tan, MIT): **el más parecido a Cortex.** pgvector + BM25 +
-  grafo (edges tipados extraídos **sin LLM**) + 30+ tools MCP + `gbrain think`
-  (respuesta con **citas y análisis de huecos**) + "schema packs". Doble storage
-  PGLite/Postgres. https://github.com/garrytan/gbrain
-- **Hermes** (Nous Research, MIT): agente autónomo multi-canal con memoria
-  **auto-curada en markdown** (`user.md` + `MEMORY.md`, el agente decide qué
-  guardar). *(detalles de 3 capas no 100% verificados)*
-- **OpenClaw** (OSS): asistente personal multi-canal con memoria persistente
-  (vía **Hindsight** de Vectorize: extracción de hechos estructurados + retrieval
-  semántico, y el plugin **Claude-Mem**). Ojo: "OpenClaude" ≠ "OpenClaw" (el
-  primero es un tutorial de memoria para Claude Code, no el agente).
-
----
-
-## 2. Las dos referencias que más nos importan
-
-### 2.1. `gbrain` — el gemelo arquitectónico (estudiar a fondo)
-Confirma casi todas nuestras decisiones y nos marca el siguiente nivel:
-- **Grafo auto-cableado en ingesta sin llamadas a LLM** (extrae edges tipados del
-  contenido) → barato y rápido; combinado con pgvector. *Nosotros usamos LLM para
-  el grafo: más rico pero más caro/frágil (lo hemos sufrido con los 429/cortes).*
-- **Retrieval híbrido vector + BM25 + traversal de grafo** (nosotros: solo vector).
-- **`think`: síntesis con citas + "lo que NO sé aún"** (gap analysis). Para una
-  consultora, respuestas auditables (ticket Plane X, mensaje Chat Y) son oro.
-- **"Schema packs"** = ontologías por dominio (en Cortex: por tipo de cliente).
-
-### 2.2. El "LLM Wiki" de Karpathy — nuestra tesis, nombrada
-Patrón en 3 capas + 3 operaciones (gist real, abr 2026):
-- Capas: **Raw sources** (inmutable) → **Wiki** (markdown generado por el LLM:
-  páginas de entidad, resúmenes, cross-refs) → **Schema** (un `CLAUDE.md` que
-  explica al LLM cómo está organizada).
-- Operaciones: **Ingest** (fuente → toca 10-15 páginas), **Query** (responde
-  leyendo la wiki, no los raw), **Lint** (health-check: contradicciones, stale,
-  huérfanas, cross-refs faltantes, huecos).
-- **Cortex ≈ "LLM Wiki + Postgres/pgvector + grafo + multi-cliente + ingesta
-  automática (Plane/Chat)".** El **Lint** es la pieza diferencial que debemos
-  formalizar (es nuestro "curado" del §12).
+### Identifying the ones the user named
+- **Context7** (Upstash, MIT): an MCP that injects versioned **library docs**. Not
+  project memory — it is ephemeral public context. Useful as a **complement**
+  (Cortex = the client's private context; Context7 = the stack's docs) and as a UX
+  pattern (`use context7`). https://github.com/upstash/context7
+- **gbrain** (Garry Tan, MIT): **the closest thing to Cortex.** pgvector + BM25 +
+  graph (typed edges extracted **without an LLM**) + 30-odd MCP tools + `gbrain
+  think` (an answer with **citations and gap analysis**) + "schema packs". Dual
+  storage, PGLite/Postgres. https://github.com/garrytan/gbrain
+- **Hermes** (Nous Research, MIT): an autonomous multi-channel agent with memory
+  **self-curated in markdown** (`user.md` + `MEMORY.md`, the agent decides what to
+  keep). *(the 3-layer detail is not 100% verified)*
+- **OpenClaw** (OSS): a multi-channel personal assistant with persistent memory
+  (through Vectorize's **Hindsight**: structured fact extraction + semantic
+  retrieval, and the **Claude-Mem** plugin). Careful: "OpenClaude" ≠ "OpenClaw"
+  (the former is a memory tutorial for Claude Code, not the agent).
 
 ---
 
-## 3. Qué hacen que Cortex NO hace (análisis de huecos)
+## 2. The two references that matter most to us
 
-Cortex ya acierta en: **organización por proyecto/cliente, capa
-documental+vectorial+relacional en Postgres, MCP propio (save/search/context-pack/
-ask), agentes de clasificación/síntesis/grafo, ingesta de Plane y Google Chat, y
-primeros loops (dedup, contradicciones, resolución de entidades)**. Eso último es
-genuinamente más avanzado que la mayoría de RAG del mercado. Huecos:
+### 2.1. `gbrain` — the architectural twin (study it closely)
+It confirms nearly every decision we made and points at the next level:
+- **Graph wired at ingestion with no LLM calls** (it extracts typed edges from the
+  content) → cheap and fast, combined with pgvector. *We use an LLM for the graph:
+  richer, but pricier and more fragile (we have suffered the 429s and cutoffs).*
+- **Hybrid retrieval, vector + BM25 + graph traversal** (us: vector only).
+- **`think`: synthesis with citations + "what I do NOT know yet"** (gap analysis).
+  For a consultancy, auditable answers (Plane ticket X, Chat message Y) are gold.
+- **"Schema packs"** = per-domain ontologies (in Cortex: per kind of client).
 
-### A. Retrieval: híbrido + rerank (alto impacto, bajo coste)
-- **Búsqueda híbrida (BM25 + vector con RRF).** Glean, Onyx (Vespa), RAGFlow,
-  Elastic (BM25+ELSER+RRF), gbrain. El léxico gana con **nombres propios, IDs,
-  códigos de ticket, jerga** — frecuentísimos en consultoría. Hoy usamos solo
-  pgvector denso.
-- **Reranking de 2ª etapa** (cross-encoder / Cohere Rerank / Vectara Slingshot):
-  casi todos lo añaden tras el retrieval. Nosotros no.
+### 2.2. Karpathy's "LLM Wiki" — our thesis, named
+A 3-layer + 3-operation pattern (the actual gist, Apr 2026):
+- Layers: **Raw sources** (immutable) → **Wiki** (markdown generated by the LLM:
+  entity pages, summaries, cross-refs) → **Schema** (a `CLAUDE.md` that explains to
+  the LLM how it is all organised).
+- Operations: **Ingest** (a source → touches 10-15 pages), **Query** (answers by
+  reading the wiki, not the raw sources), **Lint** (health check: contradictions,
+  stale entries, orphans, missing cross-refs, gaps).
+- **Cortex ≈ "LLM Wiki + Postgres/pgvector + graph + multi-client + automatic
+  ingestion (Plane/Chat)".** **Lint** is the differential piece we should
+  formalise (it is our "curation" from §12).
+
+---
+
+## 3. What they do that Cortex does NOT (gap analysis)
+
+Cortex already gets right: **organisation by project/client, a
+documental+vectorial+relational layer in Postgres, an MCP of its own
+(save/search/context-pack/ask), classification/synthesis/graph agents, Plane and
+Google Chat ingestion, and the first loops (dedup, contradictions, entity
+resolution)**. That last part is genuinely ahead of most RAG on the market. The
+gaps:
+
+### A. Retrieval: hybrid + rerank (high impact, low cost)
+- **Hybrid search (BM25 + vector with RRF).** Glean, Onyx (Vespa), RAGFlow,
+  Elastic (BM25+ELSER+RRF), gbrain. Lexical wins on **proper nouns, IDs, ticket
+  codes, jargon** — extremely common in consultancy work. Today we use dense
+  pgvector only.
+- **2nd-stage reranking** (cross-encoder / Cohere Rerank / Vectara Slingshot):
+  almost everyone adds it after retrieval. We do not.
 - **Query understanding / expansion** (Glean, Onyx).
 
-### B. Grafo de conocimiento bi-temporal (Zep/Graphiti, Cognee)
-- **4 timestamps por hecho/edge**: `valid_from`, `valid_to`, `observed_at`,
-  `recorded_at`. Consultas point-in-time ("¿qué sabíamos del cliente X en marzo?").
-- **Invalidar, no borrar**: al detectar contradicción, cerrar la ventana de
-  validez del hecho viejo. Crítico en consultoría (decisiones que se revierten).
-- **Provenance por episodio**: cada hecho ligado a su fuente (ticket/mensaje).
+### B. Bi-temporal knowledge graph (Zep/Graphiti, Cognee)
+- **4 timestamps per fact/edge**: `valid_from`, `valid_to`, `observed_at`,
+  `recorded_at`. Point-in-time queries ("what did we know about client X in
+  March?").
+- **Invalidate, do not delete**: on spotting a contradiction, close the old fact's
+  validity window. Critical in consultancy (decisions do get reversed).
+- **Provenance per episode**: every fact tied to its source (ticket/message).
 
-### C. Resolución de entidades robusta (Cognee) — lo tenemos a medias
-- **Fast path determinista MinHash+LSH** antes del LLM (barato/escalable) con
-  **fallback LLM** solo en ambigüedad. Nuestro pase actual es normalización +
-  LLM en ingesta.
-- **Dedup de _edges_ + resolución de contradicciones como paso explícito**.
-- **Ontología/tipos prescritos** del dominio (Cliente, Proyecto, Decisión,
-  Requisito, Riesgo, Incidencia, Tecnología…) → mejora precisión de extracción.
+### C. Robust entity resolution (Cognee) — we are halfway there
+- **A deterministic MinHash+LSH fast path** before the LLM (cheap, scalable) with
+  an **LLM fallback** only on ambiguity. Our current pass is normalisation + an LLM
+  at ingestion.
+- **_Edge_ dedup + contradiction resolution as an explicit step**.
+- **A prescribed ontology/type set** for the domain (Client, Project, Decision,
+  Requirement, Risk, Incident, Technology…) → better extraction precision.
 
-### D. Curado / olvido / "lint" (Karpathy + Cognee `memify()`)
-- **Operación de Lint periódica** per-cliente: contradicciones, info obsoleta,
-  entidades huérfanas, cross-refs/huecos. Formaliza nuestros "loops de mejora".
-- **Ranking de entidades por frecuencia+recencia** (Memary): señal barata de
-  relevancia para el context-pack.
-- **Decay adaptativo** (por *velocity*/*volatility*): un riesgo caduca antes que
-  el nombre de un cliente.
+### D. Curation / forgetting / "lint" (Karpathy + Cognee `memify()`)
+- **A periodic Lint operation** per client: contradictions, stale information,
+  orphan entities, cross-refs/gaps. It formalises our "improvement loops".
+- **Ranking entities by frequency+recency** (Memary): a cheap relevance signal for
+  the context pack.
+- **Adaptive decay** (by *velocity*/*volatility*): a risk expires sooner than a
+  client's name.
 
-### E. Indexación del CÓDIGO de cada cliente (el mayor hueco vertical)
-Todos los líderes de código (Cursor, Augment, Continue, Cody, Tabnine, Qodo)
-**indexan el repo**; Aider/Serena/Greptile añaden estructura simbólica.
-- **`search_project_code`** sobre los repos del cliente: chunking sintáctico
-  (Tree-sitter) + embeddings en pgvector.
-- **Code-graph / LSP** (Serena, Aider PageRank): "¿qué rompe este cambio?", no solo
-  "¿qué se decidió?".
-- **Sync incremental** estilo Merkle (Cursor) y **branch-aware** (Augment).
-> Para una consultora de software, el contexto de código por cliente debería vivir
-> junto al de proyecto. Es el complemento natural a lo que ya tenemos.
+### E. Indexing each client's CODE (the biggest vertical gap)
+Every code leader (Cursor, Augment, Continue, Cody, Tabnine, Qodo) **indexes the
+repo**; Aider/Serena/Greptile add symbolic structure on top.
+- **`search_project_code`** over the client's repos: syntactic chunking
+  (Tree-sitter) + embeddings in pgvector.
+- **Code-graph / LSP** (Serena, Aider PageRank): "what does this change break?",
+  not just "what was decided?".
+- **Incremental sync** Merkle-style (Cursor) and **branch-aware** (Augment).
+> For a software consultancy, a client's code context ought to live next to its
+> project context. It is the natural complement to what we already have.
 
-### F. Conectores de fuentes (Glean 100+, Onyx ~31, MS Copilot 100+)
-Hoy: Plane + Google Chat. Prioridad para el nicho:
-- **GitHub/GitLab/Bitbucket** (repos, PRs, issues, commits) — clave en software.
-- **Confluence/Notion/Drive** (docs de cliente), **Jira** (clientes sin Plane),
+### F. Source connectors (Glean 100+, Onyx ~31, MS Copilot 100+)
+Today: Plane + Google Chat. Priorities for the niche:
+- **GitHub/GitLab/Bitbucket** (repos, PRs, issues, commits) — the key one in
+  software.
+- **Confluence/Notion/Drive** (client docs), **Jira** (clients with no Plane),
   **Slack/Teams**, **Gmail**.
-- **Parsing profundo de documentos** (RAGFlow DeepDoc, Morphik ColPali): PDFs,
-  tablas, diagramas, specs/diseños — vía Unstructured.io o similar.
-- **Sync incremental** con detección de borrados/cambios.
+- **Deep document parsing** (RAGFlow DeepDoc, Morphik ColPali): PDFs, tables,
+  diagrams, specs/designs — through Unstructured.io or similar.
+- **Incremental sync** with deletion/change detection.
 
-### G. Permisos / multi-tenant fuerte (Onyx, Glean, Elastic DLS, MS Copilot)
-Aislamos por proyecto/cliente, pero **dentro de un cliente no hay ACL por
-documento/usuario**. Para una consultora donde no todos ven todo de cada cliente:
-- **Permission-aware sync**: capturar ACLs de la fuente (GitHub/Confluence/Drive)
-  y filtrar en `search`/`ask` por identidad del usuario MCP.
-- **RLS en Postgres por `client_id`** + scoping de tools MCP por cliente +
-  verificación de pertenencia antes de servir contexto (que un agente nunca filtre
-  contexto de otro cliente).
-- **RBAC / SSO / audit log** para clientes empresariales.
-- Patrón **Collaborative Memory** (arXiv): memoria *private* por cliente + *shared*
-  (conocimiento reutilizable de la consultora) con control de acceso explícito.
+### G. Permissions / strong multi-tenancy (Onyx, Glean, Elastic DLS, MS Copilot)
+We isolate by project/client, but **inside a client there is no per
+document/user ACL**. For a consultancy where not everyone sees everything of every
+client:
+- **Permission-aware sync**: capture the source's ACLs (GitHub/Confluence/Drive)
+  and filter `search`/`ask` by the MCP user's identity.
+- **RLS in Postgres by `client_id`** + MCP tool scoping per client + a membership
+  check before serving context (so an agent never leaks another client's context).
+- **RBAC / SSO / audit log** for enterprise clients.
+- The **Collaborative Memory** pattern (arXiv): *private* memory per client +
+  *shared* memory (the consultancy's reusable knowledge) with explicit access
+  control.
 
-### H. Evaluación de calidad (Vectara HHEM, Glean AI Evaluator)
-- **Grounding/faithfulness check**: ¿la respuesta está fundamentada en el contexto
-  recuperado? (HHEM de Vectara es open-source) + **citas obligatorias verificables**.
-- **Feedback loop (👍/👎)** desde Claude Code que mejore ranking/curación.
-- **"Verified Answers" / document boosting** (Glean, Onyx): marcar contenido
-  autoritativo por proyecto — encaja con memoria curada.
+### H. Quality evaluation (Vectara HHEM, Glean AI Evaluator)
+- **Grounding/faithfulness check**: is the answer grounded in the retrieved
+  context? (Vectara's HHEM is open source) + **mandatory verifiable citations**.
+- **A feedback loop (👍/👎)** from Claude Code that improves ranking/curation.
+- **"Verified Answers" / document boosting** (Glean, Onyx): marking authoritative
+  content per project — a good fit for curated memory.
 
-### I. Producto / UX
-- **Trigger natural** tipo `use context7` → `use cortex` o auto-inyección del
-  contexto del cliente activo (sin fricción desde Claude Code).
-- **Memoria auto-curada por el agente** (Hermes/Claude-Mem): que decida qué
-  persistir según patrones, no solo por comando. Separar "ficha del cliente"
-  (preferencias/restricciones) de "notas de trabajo".
-- **Doble capa markdown + Postgres** (gbrain): markdown legible/auditable por la
-  consultora (transparencia con el cliente) + pgvector para retrieval.
-- **Cortex también como _cliente_ MCP** (no solo servidor): consumir MCPs de Plane,
-  GitHub, Confluence… para ingerir sin integraciones a medida una a una.
-
----
-
-## 4. Propuestas priorizadas (qué haría yo, y en qué orden)
-
-Ordenado por **impacto/esfuerzo** para la demo y el producto:
-
-### Ahora (alto impacto, bajo coste — encajan en lo que ya hay)
-1. **Híbrido BM25 + vector con RRF** usando el FTS de Postgres (`tsvector`/`ts_rank`
-   o ParadeDB `pg_search`) fusionado con pgvector. Gran salto de precisión en
-   IDs/nombres/jerga.
-2. **Rerank de 2ª etapa** (cross-encoder local o Cohere Rerank) + recorte por
-   presupuesto de tokens en `search`/`ask` → context-packs pequeños y de alta señal
-   (patrón Context7: ~9.7k→3.3k tokens).
-3. **Síntesis con citas verificables + "lo que no sabemos"** (patrón gbrain `think`):
-   ya casi lo tenemos en `ask`; añadir citas a fuente (PUBLI-x / hilo de chat) y un
-   apartado de huecos.
-4. **Operación de Lint** (Karpathy) como job/loop: contradicciones, obsoletos,
-   entidades huérfanas, huecos — per-cliente. Formaliza el §12.
-
-### Siguiente (diferenciadores del nicho)
-5. **Grafo bi-temporal**: añadir `valid_from/valid_to/observed_at/recorded_at` a
-   hechos/relaciones e **invalidar en vez de borrar**; consultas point-in-time.
-6. **Resolución de entidades 2 fases** (MinHash+LSH determinista → LLM solo en
-   ambigüedad) + **ontología prescrita** del dominio consultoría.
-7. **Indexación de código por cliente** (`search_project_code` con Tree-sitter +
-   pgvector; opcional code-graph/LSP estilo Serena) — el complemento vertical clave.
-8. **Permisos multi-tenant**: RLS por `client_id`, scoping de tools MCP por
-   cliente, y (fase 2) ACLs por documento heredadas de la fuente.
-
-### Más adelante (cobertura y robustez)
-9. **Más conectores** (GitHub/PRs primero; luego Confluence/Notion/Jira/Drive) y
-   **parsing profundo** de documentos (Unstructured/DeepDoc).
-10. **Eval de fundamentación** (HHEM) + **feedback 👍/👎** desde Claude Code.
-11. **Memoria private/shared** (consultora) + **versionado tipo Git** para auditoría.
-12. **Cortex como cliente MCP** para ingesta federada.
-
-> **Lo que NO deberíamos hacer:** reinventar el motor de grafo genérico (commodity).
-> El esfuerzo diferencial va en ingesta de calidad multi-fuente, scoping
-> multi-cliente, lint/curado y síntesis con citas.
+### I. Product / UX
+- **A natural trigger** à la `use context7` → `use cortex`, or auto-injecting the
+  active client's context (no friction from Claude Code).
+- **Memory self-curated by the agent** (Hermes/Claude-Mem): let it decide what to
+  persist from patterns, not only on command. Separate the "client profile"
+  (preferences/constraints) from the "working notes".
+- **A markdown + Postgres double layer** (gbrain): markdown the consultancy can
+  read and audit (transparency towards the client) + pgvector for retrieval.
+- **Cortex as an MCP _client_ too** (not only a server): consume Plane, GitHub,
+  Confluence… MCPs to ingest without building bespoke integrations one by one.
 
 ---
 
-## 5. Tabla rápida memoria/grafo (foco temporal/entidades)
+## 4. Prioritised proposals (what I would do, and in what order)
 
-| Framework | Grafo | Bi-temporal/invalidación | Resolución entidades | Curado/olvido | Licencia |
+Ordered by **impact/effort** for the demo and for the product:
+
+### Now (high impact, low cost — they fit what is already there)
+1. **Hybrid BM25 + vector with RRF** using Postgres FTS (`tsvector`/`ts_rank`, or
+   ParadeDB `pg_search`) fused with pgvector. A big precision jump on
+   IDs/names/jargon.
+2. **2nd-stage rerank** (a local cross-encoder or Cohere Rerank) + trimming by
+   token budget in `search`/`ask` → small, high-signal context packs (the Context7
+   pattern: ~9.7k→3.3k tokens).
+3. **Synthesis with verifiable citations + "what we do not know"** (the gbrain
+   `think` pattern): we almost have it in `ask`; add source citations (PUBLI-x /
+   chat thread) and a gaps section.
+4. **A Lint operation** (Karpathy) as a job/loop: contradictions, stale entries,
+   orphan entities, gaps — per client. It formalises §12.
+
+### Next (the niche's differentiators)
+5. **Bi-temporal graph**: add `valid_from/valid_to/observed_at/recorded_at` to
+   facts and relations, and **invalidate instead of deleting**; point-in-time
+   queries.
+6. **Two-phase entity resolution** (deterministic MinHash+LSH → an LLM only on
+   ambiguity) + a **prescribed ontology** for the consultancy domain.
+7. **Per-client code indexing** (`search_project_code` with Tree-sitter +
+   pgvector; optionally a Serena-style code-graph/LSP) — the key vertical
+   complement.
+8. **Multi-tenant permissions**: RLS by `client_id`, MCP tool scoping per client,
+   and (phase 2) per-document ACLs inherited from the source.
+
+### Later (coverage and robustness)
+9. **More connectors** (GitHub/PRs first; then Confluence/Notion/Jira/Drive) and
+   **deep document parsing** (Unstructured/DeepDoc).
+10. **A groundedness eval** (HHEM) + **👍/👎 feedback** from Claude Code.
+11. **Private/shared memory** (the consultancy's) + **Git-style versioning** for
+    auditing.
+12. **Cortex as an MCP client** for federated ingestion.
+
+> **What we should NOT do:** reinvent the generic graph engine (a commodity). The
+> differential effort goes into quality multi-source ingestion, multi-client
+> scoping, lint/curation and synthesis with citations.
+
+---
+
+## 5. Quick memory/graph table (temporal/entity focus)
+
+| Framework | Graph | Bi-temporal/invalidation | Entity resolution | Curation/forgetting | Licence |
 |---|---|---|---|---|---|
-| **gbrain** | Sí (sin LLM) | No | Sí (schema packs) | — | MIT |
-| **Zep+Graphiti** | Sí | **Sí (4 ts, invalida edge)** | Sí *(detalle ?)* | Vía invalidación | Apache-2.0 |
-| **Cognee** | Sí | Sí (Temporal Cognify) | **Sí (MinHash+LSH+LLM)** | **`memify()`** | Apache-2.0 |
-| **Mem0** | Opcional | Razonamiento temporal; sin invalidación (ADD-only) | Merge coseno | No | Apache-2.0 |
-| **Letta** | No | No | No | Reescritura bloques | Apache-2.0 |
-| **Memary** | Sí | No (recencia+freq) | Débil | Ranking recencia | MIT |
-| **Cortex (hoy)** | Sí (LLM) | No | Parcial (norm+LLM) | Loops dedup/contra | — |
+| **gbrain** | Yes (no LLM) | No | Yes (schema packs) | — | MIT |
+| **Zep+Graphiti** | Yes | **Yes (4 ts, invalidates the edge)** | Yes *(detail ?)* | Through invalidation | Apache-2.0 |
+| **Cognee** | Yes | Yes (Temporal Cognify) | **Yes (MinHash+LSH+LLM)** | **`memify()`** | Apache-2.0 |
+| **Mem0** | Optional | Temporal reasoning; no invalidation (ADD-only) | Cosine merge | No | Apache-2.0 |
+| **Letta** | No | No | No | Block rewriting | Apache-2.0 |
+| **Memary** | Yes | No (recency+freq) | Weak | Recency ranking | MIT |
+| **Cortex (today)** | Yes (LLM) | No | Partial (norm+LLM) | Dedup/contradiction loops | — |
 
 ---
 
-## 6. Fuentes (selección)
+## 6. Sources (a selection)
 - gbrain: https://github.com/garrytan/gbrain
 - LLM Wiki (Karpathy): https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f
 - Context7: https://github.com/upstash/context7 · GitMCP: https://github.com/idosal/git-mcp
@@ -244,9 +252,9 @@ Ordenado por **impacto/esfuerzo** para la demo y el producto:
 - Onyx: https://docs.onyx.app/admins/connectors/overview · Glean: https://docs.glean.com/connectors/
 - RAGFlow: https://ragflow.io · Morphik: https://github.com/morphik-org/morphik-core · Elastic DLS: https://www.elastic.co/docs/reference/search-connectors/es-dls-e2e-guide
 - Cursor indexing, Augment Context Engine, Continue, Aider, Serena (LSP/MCP): https://github.com/oraios/serena
-- MCP memory oficial: https://github.com/modelcontextprotocol/servers/tree/main/src/memory · basic-memory: https://github.com/basicmachines-co/basic-memory
+- Official MCP memory: https://github.com/modelcontextprotocol/servers/tree/main/src/memory · basic-memory: https://github.com/basicmachines-co/basic-memory
 - Collaborative Memory: https://arxiv.org/abs/2505.18279
 
-> Incertidumbres marcadas en el texto. Algunos detalles internos (Cursor/Turbopuffer,
-> resolución de entidades de Graphiti, 3 capas de Hermes) provienen de fuentes
-> secundarias. Varios repos quedaron archivados en 2026 (OpenCtx, Verba, Roo Code).
+> Uncertainties are marked in the text. Some internal details (Cursor/Turbopuffer,
+> Graphiti's entity resolution, Hermes's 3 layers) come from secondary sources.
+> Several repos were archived in 2026 (OpenCtx, Verba, Roo Code).

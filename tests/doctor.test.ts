@@ -5,17 +5,17 @@ import { join } from "node:path";
 import type { SetupCtx } from "../apps/cli/src/setup/types.js";
 
 /**
- * `cortex doctor` existe para una situación concreta: algo no va y el dev no sabe qué pieza
- * es. Así que lo que hay que comprobar es que **nombra la pieza rota y dice qué hacer**, y
- * que sale con código 1 solo cuando algo impide de verdad que Cortex funcione (que un agente
- * esté sin configurar es un aviso, no un fallo).
+ * `cortex doctor` exists for one specific situation: something is wrong and the dev does not
+ * know which piece it is. So what has to be checked is that it **names the broken piece and
+ * says what to do**, and that it exits with code 1 only when something really stops Cortex
+ * working (an unconfigured agent is a warning, not a failure).
  */
 
 let home: string;
 let cwd: string;
 /**
- * Contexto sin agentes detectados: preguntarle su estado a cada agente significa ejecutar su
- * binario, y eso ni se puede ni se quiere en un test.
+ * A context with no agents detected: asking each agent for its status means running its binary,
+ * and that neither can nor should happen in a test.
  */
 const ctxSinAgentes = (): SetupCtx => ({
   home,
@@ -29,16 +29,16 @@ const ctxSinAgentes = (): SetupCtx => ({
 });
 
 interface Resultado {
-  texto: string;
-  hayError: boolean;
+  text: string;
+  hasError: boolean;
 }
 
-async function correrDoctor(): Promise<Resultado> {
+async function runDoctor(): Promise<Resultado> {
   const { collectChecks } = await import("../apps/cli/src/commands/doctor.js");
   const checks = await collectChecks(ctxSinAgentes(), cwd);
   return {
-    texto: checks.map((c) => `${c.nivel} ${c.nombre} ${c.detalle}${c.arreglo ? ` → ${c.arreglo}` : ""}`).join("\n"),
-    hayError: checks.some((c) => c.nivel === "error"),
+    text: checks.map((c) => `${c.level} ${c.name} ${c.detail}${c.fix ? ` → ${c.fix}` : ""}`).join("\n"),
+    hasError: checks.some((c) => c.level === "error"),
   };
 }
 
@@ -64,24 +64,24 @@ afterEach(() => {
 });
 
 describe("cortex doctor", () => {
-  it("sin sesión, lo dice y manda a iniciarla", async () => {
+  it("with no session, it says so and sends you to sign in", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const { texto, hayError } = await correrDoctor();
-    expect(texto).toContain("not signed in");
-    expect(texto).toContain("cortex auth login");
-    expect(hayError).toBe(true);
+    const { text, hasError } = await runDoctor();
+    expect(text).toContain("not signed in");
+    expect(text).toContain("cortex auth login");
+    expect(hasError).toBe(true);
   });
 
-  it("si el servidor no responde, señala el servidor y no el token", async () => {
+  it("when the server does not answer, it points at the server and not at the token", async () => {
     conCredenciales();
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("fetch failed")));
-    const { texto, hayError } = await correrDoctor();
-    expect(texto).toMatch(/Server not responding/);
-    expect(texto).not.toContain("Token");
-    expect(hayError).toBe(true);
+    const { text, hasError } = await runDoctor();
+    expect(text).toMatch(/Server not responding/);
+    expect(text).not.toContain("Token");
+    expect(hasError).toBe(true);
   });
 
-  it("con el token caducado, señala el token", async () => {
+  it("with an expired token, it points at the token", async () => {
     conCredenciales();
     vi.stubGlobal(
       "fetch",
@@ -90,13 +90,13 @@ describe("cortex doctor", () => {
         return new Response("{}", { status: 401 });
       }),
     );
-    const { texto, hayError } = await correrDoctor();
-    expect(texto).toMatch(/Token rejected/);
-    expect(texto).toContain("cortex auth login");
-    expect(hayError).toBe(true);
+    const { text, hasError } = await runDoctor();
+    expect(text).toMatch(/Token rejected/);
+    expect(text).toContain("cortex auth login");
+    expect(hasError).toBe(true);
   });
 
-  it("todo en marcha: 401 del MCP cuenta como vivo, porque está pidiendo auth", async () => {
+  it("everything running: a 401 from the MCP counts as alive, because it is asking for auth", async () => {
     conCredenciales();
     writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "acme-portal" }));
     vi.stubGlobal(
@@ -111,72 +111,72 @@ describe("cortex doctor", () => {
         return new Response("{}", { status: 404 });
       }),
     );
-    const { texto, hayError } = await correrDoctor();
-    expect(texto).toMatch(/ok MCP/);
-    expect(texto).toContain('linked to "acme-portal"');
-    expect(hayError).toBe(false);
+    const { text, hasError } = await runDoctor();
+    expect(text).toMatch(/ok MCP/);
+    expect(text).toContain('linked to "acme-portal"');
+    expect(hasError).toBe(false);
   });
 
   /**
-   * Con dos servidores (ADR-0033), que uno esté caído no significa que Cortex no funcione:
-   * significa que ese no va. Si esta carpeta usa el otro, y el otro responde, el diagnóstico
-   * tiene que decir que todo lo esencial funciona. Antes decía «1 problem stopping Cortex
-   * from working», que es una falsa alarma de las caras: la primera vez que alguien la ve,
-   * deja de fiarse del diagnóstico entero.
+   * With two servers (ADR-0033), one being down does not mean Cortex does not work: it means
+   * that one does not. If this folder uses the other, and the other answers, the diagnosis has
+   * to say everything essential works. It used to say "1 problem stopping Cortex from working",
+   * which is an expensive false alarm: the first time somebody sees it, they stop trusting the
+   * whole diagnosis.
    */
-  it("un servidor caído que esta carpeta no usa es un aviso, no un fallo", async () => {
+  it("a server that is down and this folder does not use is a warning, not a failure", async () => {
     mkdirSync(join(home, ".cortex"), { recursive: true });
     writeFileSync(
       join(home, ".cortex/credentials"),
       JSON.stringify({
         version: 2,
         servers: {
-          "http://vivo.test": { token: "t1", email: "dev@example.com" },
-          "http://muerto.test": { token: "t2", email: "dev@example.com" },
+          "http://alive.test": { token: "t1", email: "dev@example.com" },
+          "http://dead.test": { token: "t2", email: "dev@example.com" },
         },
-        default: "http://vivo.test",
+        default: "http://alive.test",
       }),
     );
-    writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "x", server: "http://vivo.test" }));
+    writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "x", server: "http://alive.test" }));
     vi.stubGlobal("fetch", async (url: string) => {
-      if (String(url).includes("muerto.test")) throw new Error("fetch failed");
-      return new Response(JSON.stringify({ ok: true, mcpUrl: "http://vivo.test/mcp" }), { status: 200 });
+      if (String(url).includes("dead.test")) throw new Error("fetch failed");
+      return new Response(JSON.stringify({ ok: true, mcpUrl: "http://alive.test/mcp" }), { status: 200 });
     });
 
-    const r = await correrDoctor();
-    expect(r.texto).toContain("aviso Server · muerto.test");
-    expect(r.texto).toContain("cortex auth logout --server http://muerto.test");
-    expect(r.hayError, "un servidor que no se usa no puede bloquear").toBe(false);
+    const r = await runDoctor();
+    expect(r.text).toContain("warn Server · dead.test");
+    expect(r.text).toContain("cortex auth logout --server http://dead.test");
+    expect(r.hasError, "a server that is not used cannot block").toBe(false);
   });
 
-  /** Pero el que SÍ usa esta carpeta, si no responde, bloquea: ahí no hay Cortex que valga. */
-  it("si el caído es el que usa esta carpeta, entonces sí es un fallo", async () => {
+  /** But the one this folder DOES use blocks when it does not answer: there is no Cortex there. */
+  it("when the one that is down is the one this folder uses, then it is a failure", async () => {
     mkdirSync(join(home, ".cortex"), { recursive: true });
     writeFileSync(
       join(home, ".cortex/credentials"),
       JSON.stringify({
         version: 2,
         servers: {
-          "http://vivo.test": { token: "t1", email: "dev@example.com" },
-          "http://muerto.test": { token: "t2", email: "dev@example.com" },
+          "http://alive.test": { token: "t1", email: "dev@example.com" },
+          "http://dead.test": { token: "t2", email: "dev@example.com" },
         },
-        default: "http://vivo.test",
+        default: "http://alive.test",
       }),
     );
-    writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "x", server: "http://muerto.test" }));
+    writeFileSync(join(cwd, ".cortex.json"), JSON.stringify({ slug: "x", server: "http://dead.test" }));
     vi.stubGlobal("fetch", async (url: string) => {
-      if (String(url).includes("muerto.test")) throw new Error("fetch failed");
+      if (String(url).includes("dead.test")) throw new Error("fetch failed");
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     });
 
-    expect((await correrDoctor()).hayError).toBe(true);
+    expect((await runDoctor()).hasError).toBe(true);
   });
 
-  it("una carpeta sin vincular es un aviso, con el comando para vincularla", async () => {
+  it("an unlinked folder is a warning, with the command to link it", async () => {
     conCredenciales();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
-    const { texto } = await correrDoctor();
-    expect(texto).toContain("not linked to any project");
-    expect(texto).toContain("cortex link");
+    const { text } = await runDoctor();
+    expect(text).toContain("not linked to any project");
+    expect(text).toContain("cortex link");
   });
 });

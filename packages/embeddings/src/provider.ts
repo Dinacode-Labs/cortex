@@ -1,19 +1,19 @@
 /**
- * Interfaz de proveedor de embeddings (ADR-0005). Implementaciones enchufables:
- * local (por defecto, sin claves), openai, voyage.
+ * Embedding provider interface (ADR-0005). Pluggable implementations:
+ * local (the default, no keys), openai, voyage.
  */
 export interface EmbeddingProvider {
-  /** Identificador del modelo, se persiste con cada vector. */
+  /** Model identifier; persisted alongside every vector. */
   readonly model: string;
-  /** Versión del esquema de embedding (para reindexar si cambia). */
+  /** Embedding schema version (so things can be reindexed when it changes). */
   readonly version: string;
-  /** Dimensión de los vectores que produce. */
+  /** Dimension of the vectors it produces. */
   readonly dim: number;
-  /** Genera un embedding por cada texto, en el mismo orden. */
+  /** Produces one embedding per text, in the same order. */
   embed(texts: string[]): Promise<number[][]>;
 }
 
-/** Normaliza un vector a norma L2 = 1 (para similitud coseno estable). */
+/** Normalises a vector to L2 norm = 1 (for stable cosine similarity). */
 export function l2normalize(vec: number[]): number[] {
   let sum = 0;
   for (const v of vec) sum += v * v;

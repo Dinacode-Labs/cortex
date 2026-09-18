@@ -3,10 +3,10 @@ import { setEmbeddingUsageSink } from "@cortex/embeddings";
 import { getEnv } from "@cortex/shared";
 
 /**
- * Observabilidad de coste/uso de IA (ADR-0016). `recordUsage` registra cada llamada
- * al LLM (Agents de Mastra) y a embeddings con sus tokens y una estimación de coste
- * según una tabla de precios por modelo. nan (modelos free) = 0. Best-effort: nunca
- * lanza (la observabilidad no debe romper el pipeline).
+ * AI cost/usage observability (ADR-0016). `recordUsage` records every call to the LLM (Mastra
+ * Agents) and to embeddings with its tokens and an estimated cost from a per-model price
+ * table. Free models = 0. Best-effort: it never throws (observability must not break the
+ * pipeline).
  */
 
 export interface UsageRecord {
@@ -21,11 +21,11 @@ export interface UsageRecord {
   durationMs?: number;
 }
 
-/** Precios públicos aproximados (USD por 1M tokens), a 2026-07-13. Solo para ESTIMAR
- * coste; ajustar según contrato/catálogo (cambian rápido). Lo no listado se cuenta como
- * 0 y se avisa una vez (ADR-0021 / ADR-0023 §6.3). */
+/** Approximate public prices (USD per 1M tokens), as of 2026-07-13. For ESTIMATING cost
+ * only; adjust to your contract/catalogue (they change fast). Anything unlisted counts as 0
+ * and is warned about once (ADR-0021 / ADR-0023 section 6.3). */
 const PRICING: Record<string, { in: number; out: number }> = {
-  // NaN (suscripción mensual: el coste marginal por token es 0). ADR-0024.
+  // NaN (monthly subscription: the marginal cost per token is 0). ADR-0024.
   "deepseek-v4-flash": { in: 0, out: 0 },
   "glm5.3-flash": { in: 0, out: 0 },
   "mimo-v2.5": { in: 0, out: 0 },
@@ -38,7 +38,7 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "gpt-4o": { in: 2.5, out: 10 },
   "text-embedding-3-small": { in: 0.02, out: 0 },
   "text-embedding-3-large": { in: 0.13, out: 0 },
-  // OpenRouter — routing por rol (ADR-0023)
+  // OpenRouter -- per-role routing (ADR-0023)
   "deepseek/deepseek-v4-pro": { in: 0.43, out: 0.87 },
   "deepseek/deepseek-v4-flash": { in: 0.08, out: 0.15 },
   "x-ai/grok-4.5": { in: 2.0, out: 6.0 },
@@ -53,9 +53,10 @@ const warnedUnpriced = new Set<string>();
 
 let merged: Record<string, { in: number; out: number }> | undefined;
 
-/** Tabla efectiva: la de código más lo que añada `CORTEX_PRICING_JSON`. Permite corregir
- *  un precio o dar de alta un modelo nuevo sin desplegar (cierra el «revisar cuando» de
- *  ADR-0021). JSON inválido → aviso y se ignora: la observabilidad nunca rompe nada. */
+/** The effective table: the one in code plus whatever `CORTEX_PRICING_JSON` adds. It allows
+ *  fixing a price or registering a new model without deploying (which closes ADR-0021's
+ *  "revisit when"). Invalid JSON -> a warning and it is ignored: observability never breaks
+ *  anything. */
 function pricing(): Record<string, { in: number; out: number }> {
   if (merged) return merged;
   merged = { ...PRICING };
@@ -65,29 +66,29 @@ function pricing(): Record<string, { in: number; out: number }> {
       const extra = JSON.parse(raw) as Record<string, { in?: number; out?: number }>;
       for (const [model, p] of Object.entries(extra)) {
         if (typeof p?.in === "number" && typeof p?.out === "number") merged[model] = { in: p.in, out: p.out };
-        else console.warn(`[usage] CORTEX_PRICING_JSON: entrada inválida para "${model}" (se esperan números in/out).`);
+        else console.warn(`[usage] CORTEX_PRICING_JSON: invalid entry for "${model}" (in/out numbers expected).`);
       }
     } catch (e) {
-      console.warn(`[usage] CORTEX_PRICING_JSON no es JSON válido, se ignora: ${(e as Error).message}`);
+      console.warn(`[usage] CORTEX_PRICING_JSON is not valid JSON and is ignored: ${(e as Error).message}`);
     }
   }
   return merged;
 }
 
-/** Solo para tests: fuerza releer `CORTEX_PRICING_JSON`. @internal */
+/** Tests only: forces `CORTEX_PRICING_JSON` to be read again. @internal */
 export function resetPricingCache(): void {
   merged = undefined;
   warnedUnpriced.clear();
 }
 
-/** Coste estimado en USD de una llamada. @internal (exportado para tests) */
+/** A call's estimated cost in USD. @internal (exported for tests) */
 export function estimateCostUsd(model: string, inTok: number, outTok: number): number {
   const table = pricing();
   const p = table[model] ?? table[model.split("/").pop() ?? ""];
   if (!p) {
     if (!warnedUnpriced.has(model)) {
       warnedUnpriced.add(model);
-      console.warn(`[usage] modelo sin precio en PRICING: "${model}" → coste estimado $0. Añádelo a usage.ts.`);
+      console.warn(`[usage] model with no price in PRICING: "${model}" -> estimated cost $0. Add it to usage.ts.`);
     }
     return 0;
   }
@@ -107,7 +108,7 @@ export async function recordUsage(r: UsageRecord): Promise<void> {
               ${input}, ${output}, ${total}, ${cost}, ${r.durationMs ?? null})
     `;
   } catch (e) {
-    console.error("[usage] recordUsage falló (ignorado):", (e as Error).message);
+    console.error("[usage] recordUsage failed (ignored):", (e as Error).message);
   }
 }
 
@@ -149,7 +150,7 @@ export async function getUsageSummary(): Promise<UsageSummary> {
   };
 }
 
-// --- Trazas de IA (observabilidad B: spans de Mastra en ai_traces) -----------
+// --- AI traces (observability B: Mastra spans in ai_traces) -----------------
 export interface TraceSpan {
   spanId: string;
   parentSpanId: string | null;
@@ -171,7 +172,7 @@ export interface TraceTree {
   spans: TraceSpan[];
 }
 
-/** Últimas N trazas (árbol de spans por trace_id), recientes primero. */
+/** The last N traces (a span tree per trace_id), most recent first. */
 export async function getRecentTraces(limit = 15): Promise<TraceTree[]> {
   const sql = getSql();
   type R = Record<string, unknown>;
@@ -214,14 +215,13 @@ export async function getRecentTraces(limit = 15): Promise<TraceTree[]> {
   return [...byTrace.values()];
 }
 
-// El registro del sink es EXPLÍCITO: lo llaman los entrypoints (directamente o vía
-// wireLlm() de @cortex/agents). Antes se ejecutaba como side effect al importar este
-// módulo (import "./usage.js" desde vectors/code), lo que hacía la contabilidad
-// dependiente del orden de imports.
+// Registering the sink is EXPLICIT: the entrypoints call it (directly or through
+// @cortex/agents' wireLlm()). It used to run as a side effect of importing this module
+// (import "./usage.js" from vectors/code), which made the accounting depend on import order.
 let sinkRegistered = false;
 
-/** Registra el sink que contabiliza el uso de embeddings en llm_usage (idempotente).
- * Sin registro, las operaciones que embeben no dejan rastro de coste. */
+/** Registers the sink that records embedding usage into llm_usage (idempotent).
+ * Without it, operations that embed leave no cost trail. */
 export function registerUsageSink(): void {
   if (sinkRegistered) return;
   sinkRegistered = true;

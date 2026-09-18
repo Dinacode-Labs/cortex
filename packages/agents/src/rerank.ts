@@ -2,11 +2,10 @@ import type { SearchHit } from "@cortex/core";
 import { getAgent, runAgent } from "./mastra.js";
 
 /**
- * Reranker de 2ª etapa con LLM (qwen3.6 vía nan). Reordena los candidatos del
- * retrieval híbrido por relevancia a la pregunta. Usamos el modelo de chat porque
- * el reranker dedicado de nan dio resultados poco fiables (ver ADR-0009).
- * Implementado como Agent de Mastra (rol "reranker"). Ante cualquier fallo, deja
- * los hits como estaban.
+ * Second-stage LLM reranker. It reorders the hybrid retrieval's candidates by relevance to the
+ * question. The chat model is used because a dedicated reranker gave unreliable results (see
+ * ADR-0009). Implemented as a Mastra Agent (role "reranker"). On any failure it leaves the
+ * hits as they were.
  */
 export async function rerankLLM(query: string, hits: SearchHit[]): Promise<SearchHit[]> {
   if (!getAgent("reranker") || hits.length <= 1) return hits;
@@ -14,13 +13,13 @@ export async function rerankLLM(query: string, hits: SearchHit[]): Promise<Searc
   const list = hits
     .map((h, i) => `[${i}] (${h.entry.type}) ${h.entry.title}: ${(h.entry.summary ?? h.entry.content).slice(0, 200)}`)
     .join("\n");
-  const prompt = `Pregunta: "${query}"
+  const prompt = `Question: "${query}"
 
-Fragmentos candidatos:
+Candidate fragments:
 ${list}
 
-Ordena los índices de MÁS a MENOS relevante para responder la pregunta. Incluye solo
-los que aporten algo. Devuelve SOLO JSON: {"order":[índices]}.`;
+Order the indices from MOST to LEAST relevant for answering the question. Include only the
+ones that contribute something. Return ONLY JSON: {"order":[indices]}.`;
 
   try {
     const raw = await runAgent("reranker", prompt, { maxOutputTokens: 300 });
@@ -38,13 +37,13 @@ los que aporten algo. Devuelve SOLO JSON: {"order":[índices]}.`;
         reordered.push(hits[idx]!);
       }
     }
-    // Añade los no mencionados al final (preservando orden original).
+    // Append the ones not mentioned at the end (preserving their original order).
     hits.forEach((h, i) => {
       if (!seen.has(i)) reordered.push(h);
     });
     return reordered;
   } catch (err) {
-    console.error("[agents] rerankLLM falló:", (err as Error).message);
+    console.error("[agents] rerankLLM failed:", (err as Error).message);
     return hits;
   }
 }

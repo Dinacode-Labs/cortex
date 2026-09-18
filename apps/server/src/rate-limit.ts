@@ -2,65 +2,65 @@ import type { Context } from "hono";
 import { getEnvNum } from "@cortex/shared";
 
 /**
- * Límite por IP para el envío de códigos de acceso.
+ * Per-IP limit on sending sign-in codes.
  *
- * `requestOtp` ya limita **por dirección de correo**, que impide machacar a una persona. Lo que
- * no impedía es que desde una sola IP se pidan códigos para muchas direcciones distintas: cada
- * una estrena su propio cupo. Con el envío de correo activo eso son mensajes de verdad a gente
- * de verdad, y una factura.
+ * `requestOtp` already limits **per email address**, which stops one person being hammered.
+ * What it did not stop is a single IP requesting codes for many different addresses: each one
+ * starts with a fresh allowance. With email sending switched on, those are real messages to
+ * real people, and a bill.
  *
- * Es una medida acotada a este endpoint, no un límite general del servidor: eso vive en el
- * borde (proxy o CDN), donde se puede parar antes de gastar un proceso. Aquí se cubre el único
- * sitio que, sin autenticar, provoca un efecto fuera del servidor.
+ * It is a measure scoped to this endpoint, not a general server limit: that lives at the edge
+ * (a proxy or a CDN), where it can be stopped before a process is spent. Here we cover the one
+ * place that, unauthenticated, causes an effect outside the server.
  *
- * Ventana fija y en memoria a propósito: el coste de un almacén compartido no se justifica para
- * un solo endpoint, y con un solo nodo basta. Si algún día hay varios nodos, cada uno aplicará
- * su parte del límite; está anotado en el roadmap junto a las sesiones del MCP.
+ * A fixed, in-memory window on purpose: the cost of a shared store is not justified for a
+ * single endpoint, and one node is enough. If there are ever several nodes, each will apply
+ * its share of the limit; it is noted in the roadmap alongside the MCP sessions.
  */
 
 const MAX = (): number => getEnvNum("CORTEX_AUTH_IP_MAX", 10);
 const WINDOW_MS = (): number => getEnvNum("CORTEX_AUTH_IP_WINDOW_MIN", 15) * 60_000;
 
-interface Ventana {
-  hasta: number;
-  cuenta: number;
+interface Window {
+  until: number;
+  count: number;
 }
-const ventanas = new Map<string, Ventana>();
+const windows = new Map<string, Window>();
 
 /**
- * La IP del cliente. Detrás del proxy propio, `x-forwarded-for` acaba en la IP real y se coge
- * **la última**, no la primera: la primera la escribe quien llama y se puede inventar, así que
- * usarla convertiría el límite en un adorno.
+ * The client's IP. Behind our own proxy, `x-forwarded-for` ends with the real IP and **the
+ * last** one is taken, not the first: the first is written by the caller and can be made up,
+ * so using it would turn the limit into decoration.
  */
 export function clientIp(c: Context): string {
   const xff = c.req.header("x-forwarded-for");
   if (xff) {
-    const partes = xff.split(",").map((p) => p.trim()).filter(Boolean);
-    const ultima = partes[partes.length - 1];
-    if (ultima) return ultima;
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return last;
   }
-  return c.req.header("x-real-ip") ?? "desconocida";
+  return c.req.header("x-real-ip") ?? "unknown";
 }
 
-/** `true` si esta IP se ha pasado. Cuenta la petición. */
-export function demasiadasPeticiones(ip: string, ahora = Date.now()): boolean {
-  const v = ventanas.get(ip);
-  if (!v || ahora >= v.hasta) {
-    ventanas.set(ip, { hasta: ahora + WINDOW_MS(), cuenta: 1 });
-    limpia(ahora);
+/** `true` when this IP has gone over. It counts the request. */
+export function tooManyRequests(ip: string, now = Date.now()): boolean {
+  const w = windows.get(ip);
+  if (!w || now >= w.until) {
+    windows.set(ip, { until: now + WINDOW_MS(), count: 1 });
+    sweep(now);
     return false;
   }
-  v.cuenta++;
-  return v.cuenta > MAX();
+  w.count++;
+  return w.count > MAX();
 }
 
-/** Sin esto el mapa crece con cada IP que pase por aquí y no se vacía nunca. */
-function limpia(ahora: number): void {
-  if (ventanas.size < 1000) return;
-  for (const [ip, v] of ventanas) if (ahora >= v.hasta) ventanas.delete(ip);
+/** Without this the map grows with every IP that passes through and is never emptied. */
+function sweep(now: number): void {
+  if (windows.size < 1000) return;
+  for (const [ip, w] of windows) if (now >= w.until) windows.delete(ip);
 }
 
-/** Solo para los tests: deja el contador a cero. */
-export function reiniciaLimite(): void {
-  ventanas.clear();
+/** Tests only: resets the counter. */
+export function resetRateLimit(): void {
+  windows.clear();
 }

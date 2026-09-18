@@ -1,17 +1,17 @@
-## Qué cambia y por qué
+## What changes, and why
 
-<!-- El porqué importa más que el qué: el diff ya cuenta el qué. -->
+<!-- The why matters more than the what: the diff already tells the what. -->
 
-## Cómo lo has verificado
+## How you verified it
 
-<!-- Qué has ejecutado y qué salió. Si algo quedó sin probar, dilo. -->
+<!-- What you ran and what came out. If something went untested, say so. -->
 
 ## Checklist
 
-- [ ] `pnpm typecheck` en verde
-- [ ] `pnpm test` en verde
-- [ ] `pnpm test:integration` en verde (si tocas core, database o las apps HTTP)
-- [ ] Docs actualizadas **en este PR**: `README.md`, `docs/decisions.md` (ADR si la decisión
-      es de calado), `docs/roadmap.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `.env.example`
-- [ ] Línea añadida a `CHANGELOG.md` en `[Unreleased]`
-- [ ] Sin secretos, sin clientes por su nombre y sin personas como responsables (ADR-0026)
+- [ ] `pnpm typecheck` green
+- [ ] `pnpm test` green
+- [ ] `pnpm test:integration` green (if you touched core, database or the HTTP apps)
+- [ ] Docs updated **in this PR**: `README.md`, `docs/decisions.md` (an ADR when the decision
+      carries weight), `docs/roadmap.md`, `CONTRIBUTING.md`, `CLAUDE.md`, `.env.example`
+- [ ] A line added to `CHANGELOG.md` under `[Unreleased]`
+- [ ] No secrets, no clients by name and no people as owners (ADR-0026)

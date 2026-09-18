@@ -1,12 +1,16 @@
 import type { ContextEntryType, EntityType } from "@cortex/shared";
 
 /**
- * Heurísticas locales (sin LLM) para clasificar y enriquecer conocimiento.
- * Son un respaldo deliberadamente simple: los agentes Mastra (con LLM) deben
- * mejorar esto en fases posteriores. Documentado en docs/decisions.md (ADR-0005/6).
+ * Local heuristics (no LLM) for classifying and enriching knowledge. They are a deliberately
+ * simple fallback: the Mastra agents (with an LLM) are meant to improve on this in later
+ * phases. Documented in docs/decisions.md (ADR-0005/6).
+ *
+ * The patterns below are written against the CORPUS, which is Spanish, so they keep their
+ * Spanish alternatives alongside the English ones. They match what users write, not the
+ * language of this file; add a language here when a corpus in that language is ingested.
  */
 
-/** Normaliza un nombre a su forma canónica: minúsculas, sin acentos, sin espacios extra. */
+/** Normalises a name to its canonical form: lowercase, no accents, no extra whitespace. */
 export function canonicalize(name: string): string {
   return name
     .normalize("NFD")
@@ -16,7 +20,7 @@ export function canonicalize(name: string): string {
     .replace(/\s+/g, " ");
 }
 
-/** Deriva un título corto si el usuario no lo dio: primera frase, recortada. */
+/** Derives a short title when the user gave none: the first sentence, trimmed. */
 export function deriveTitle(content: string): string {
   const firstLine = content.trim().split(/\r?\n/)[0] ?? content.trim();
   const firstSentence = firstLine.split(/(?<=[.!?])\s/)[0] ?? firstLine;
@@ -24,28 +28,28 @@ export function deriveTitle(content: string): string {
   return title.length > 120 ? `${title.slice(0, 117)}...` : title;
 }
 
-/** Resumen heurístico: primera(s) frase(s) hasta ~240 caracteres. */
+/** Heuristic summary: the first sentence(s), up to ~240 characters. */
 /**
- * Quita del resumen el título que ya va justo encima.
+ * Strips from the summary the title that already sits right above it.
  *
- * El destilador escribe el contenido como «Título. Cuerpo…» y el resumen son sus primeros 240
- * caracteres, así que el resumen empezaba siempre repitiendo el título — en un proyecto real,
- * **355 de 355 entradas**. El pack pinta título y resumen uno debajo del otro, y con título
- * medio de 47 caracteres sobre resumen de 206 eso es el **23 % de cada entrada** gastado en
- * decir dos veces lo mismo. Con el presupuesto del hook eso son dos o tres entradas menos.
+ * The distiller writes content as "Title. Body..." and the summary is its first 240
+ * characters, so the summary always began by repeating the title -- in one real project,
+ * **355 entries out of 355**. The pack renders title and summary one under the other, and with
+ * an average 47-character title above a 206-character summary that is **23% of every entry**
+ * spent saying the same thing twice. Against the hook's budget that is two or three entries
+ * fewer.
  *
- * Tolerante con la puntuación y las mayúsculas porque el corte nunca es exacto; y si al quitarlo
- * no queda nada que merezca la pena, se deja como estaba: repetir es feo, quedarse sin resumen
- * es peor.
+ * Tolerant of punctuation and case because the cut is never exact; and if stripping leaves
+ * nothing worthwhile, it is left as it was: repeating is ugly, having no summary is worse.
  */
 export function stripLeadingTitle(summary: string, title: string): string {
   const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
   const t = norm(title);
-  if (t.length < 8) return summary; // un título muy corto puede ser una palabra legítima del texto
+  if (t.length < 8) return summary; // a very short title may be a legitimate word of the text
   const s = summary.trimStart();
   if (!norm(s).startsWith(t)) return summary;
-  const resto = s.slice(title.trim().length).replace(/^[\s.:;,—–-]+/, "");
-  return resto.length >= 40 ? resto : summary;
+  const rest = s.slice(title.trim().length).replace(/^[\s.:;,—–-]+/, "");
+  return rest.length >= 40 ? rest : summary;
 }
 
 export function summarize(content: string): string {
@@ -56,7 +60,7 @@ export function summarize(content: string): string {
   return lastStop > 80 ? cut.slice(0, lastStop + 1) : `${cut.trim()}...`;
 }
 
-// Reglas de clasificación en orden de prioridad (más específicas primero).
+// Classification rules in priority order (most specific first).
 const CLASSIFY_RULES: { type: ContextEntryType; re: RegExp }[] = [
   { type: "constraint", re: /\b(restricci|no (puede|permite|admite|podemos)|exige|pol[ií]tica|prohib|requisito|debe desplegarse|constraint|no se permite)/i },
   { type: "incident", re: /\b(error|fallo|bug|incidencia|ca[ií]d|se rompe|crash|incident|defecto)/i },
@@ -70,7 +74,7 @@ const CLASSIFY_RULES: { type: ContextEntryType; re: RegExp }[] = [
   { type: "decision", re: /\b(decid|elig|optamos|se va a|usaremos|mantener|decisi[oó]n|decision|acordamos)/i },
 ];
 
-/** Clasificación heurística del tipo de entrada. Por defecto: module_note. */
+/** Heuristic classification of the entry type. Defaults to module_note. */
 export function classifyType(content: string): ContextEntryType {
   for (const rule of CLASSIFY_RULES) {
     if (rule.re.test(content)) return rule.type;
@@ -78,7 +82,7 @@ export function classifyType(content: string): ContextEntryType {
   return "module_note";
 }
 
-// Diccionario mínimo de tecnologías reconocibles.
+// A minimal dictionary of recognisable technologies.
 const TECHNOLOGIES = [
   "laravel", "symfony", "vue", "react", "angular", "node", "nestjs", "next",
   "postgres", "postgresql", "mysql", "mariadb", "redis", "kafka", "rabbitmq",
@@ -87,7 +91,7 @@ const TECHNOLOGIES = [
   "php", "python", "elasticsearch", "mongodb",
 ];
 
-// Módulos/áreas funcionales habituales (ES) que merece la pena reconocer.
+// Common functional modules/areas worth recognising (Spanish and English spellings).
 const MODULE_KEYWORDS = [
   "facturaci[oó]n", "autenticaci[oó]n", "pagos", "billing", "auth", "payments",
   "usuarios", "notificaciones", "reporting", "documentos", "checkout",
@@ -98,7 +102,7 @@ export interface ExtractedEntity {
   type: EntityType;
 }
 
-/** Extrae entidades (tecnologías y módulos) mencionadas en el texto. Heurístico. */
+/** Extracts entities (technologies and modules) mentioned in the text. Heuristic. */
 export function extractEntities(content: string): ExtractedEntity[] {
   const found = new Map<string, ExtractedEntity>();
   const lower = content.toLowerCase();
@@ -116,17 +120,16 @@ export function extractEntities(content: string): ExtractedEntity[] {
 }
 
 /**
- * Etiquetas de "polaridad" para detección heurística de contradicciones (§12.5).
- * Dos entradas muy similares con etiquetas opuestas en un mismo eje se marcan
- * como posible contradicción.
+ * "Polarity" tags for heuristic contradiction detection (section 12.5). Two very similar
+ * entries carrying opposite tags on the same axis are flagged as a possible contradiction.
  */
 export function polarityTags(content: string): Set<string> {
   const tags = new Set<string>();
   const t = content.toLowerCase();
-  // Eje conservar vs eliminar/migrar
+  // Axis: keep vs remove/migrate
   if (/\b(mantener|conservar|no migrar|no eliminar|seguir usando|no tocar)\b/.test(t)) tags.add("keep");
   if (/\b(eliminar|migrar|quitar|retirar|deprecar|borrar|reemplazar)\b/.test(t)) tags.add("remove");
-  // Eje on-prem vs cloud
+  // Axis: on-prem vs cloud
   if (/\b(infraestructura propia|on-?prem|servidores propios)\b/.test(t)) tags.add("onprem");
   if (/\b(cloud p[uú]blico|proveedor cloud|nube p[uú]blica)\b/.test(t)) tags.add("cloud");
   return tags;
@@ -137,7 +140,7 @@ const OPPOSING_AXES: [string, string][] = [
   ["onprem", "cloud"],
 ];
 
-/** ¿Los dos conjuntos de polaridad se contradicen en algún eje? */
+/** Do the two polarity sets contradict each other on any axis? */
 export function polarityContradicts(a: Set<string>, b: Set<string>): boolean {
   return OPPOSING_AXES.some(([x, y]) => (a.has(x) && b.has(y)) || (a.has(y) && b.has(x)));
 }

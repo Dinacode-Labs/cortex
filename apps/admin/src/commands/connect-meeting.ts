@@ -5,13 +5,13 @@ import { sendCondensedSession } from "@cortex/client";
 import { shutdownObservability, wireLlm } from "@cortex/agents";
 
 /**
- * Conector de REUNIONES: transcribe grabaciones (audio/vídeo, vía `extract`) y, en vez de
- * guardar el transcript en crudo, lo **destila** a conocimiento tipado (decisiones,
- * incidencias, acuerdos…) reutilizando el pipeline de captura (distiller + reconciliación
- * + API autenticada → atribución/permisos). Una reunión de 1h → unas pocas entradas útiles.
+ * The MEETINGS connector: it transcribes recordings (audio/video, through `extract`) and,
+ * instead of storing the raw transcript, **distills** it into typed knowledge (decisions,
+ * incidents, agreements...) by reusing the capture pipeline (distiller + reconciliation +
+ * authenticated API -> attribution/permissions). A one-hour meeting -> a few useful entries.
  *
- * Uso: cortex connect-meeting "<slug>" <fichero|carpeta>
- * Requiere `cortex auth login`, el servidor en marcha y ffmpeg (para A/V).
+ * Usage: cortex-admin connect-meeting "<slug>" <file|folder>
+ * It needs `cortex auth login`, a running server and ffmpeg (for A/V).
  */
 const AV = new Set(["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga", "mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"]);
 
@@ -33,29 +33,29 @@ export async function run(args: string[]): Promise<void> {
 
 async function runMeeting(slug: string | undefined, path: string | undefined): Promise<void> {
   if (!slug || !path) {
-    console.error('Uso: cortex connect-meeting "<slug>" <fichero-audio/vídeo|carpeta>');
+    console.error('Usage: cortex-admin connect-meeting "<slug>" <audio/video-file|folder>');
     process.exitCode = 1;
     return;
   }
   if (!existsSync(path)) {
-    console.error(`No existe: ${path}`);
+    console.error(`It does not exist: ${path}`);
     process.exitCode = 1;
     return;
   }
   const files = walk(resolve(path));
-  console.log(`${files.length} grabación(es). Transcribiendo + destilando → "${slug}" (vía API)...`);
+  console.log(`${files.length} recording(s). Transcribing + distilling → "${slug}" (through the API)...`);
 
   let saved = 0;
   let updated = 0;
   let superseded = 0;
   let failed = 0;
   for (const file of files) {
-    const ex = await extractFileText(file); // transcribe (whisper + ffmpeg, con chunking)
+    const ex = await extractFileText(file); // transcribe (whisper + ffmpeg, with chunking)
     if (!ex || ex.text.length < 200) {
-      console.log(`  ${basename(file)}: sin transcripción útil`);
+      console.log(`  ${basename(file)}: no usable transcription`);
       continue;
     }
-    // El servidor destila (ADR-0025); aquí se espera porque el usuario mira los contadores.
+    // The server distills (ADR-0025); we wait here because the user is watching the counters.
     const r = await sendCondensedSession({
       slug,
       condensed: ex.text,
@@ -69,9 +69,9 @@ async function runMeeting(slug: string | undefined, path: string | undefined): P
     updated += c.updated;
     superseded += c.superseded;
     failed += c.failed;
-    console.log(`  ${basename(file)}: +${c.saved} nuevas, ~${c.updated} fusionadas, ⊘${c.superseded} superadas${c.failed ? `, ${c.failed} fallos` : ""}`);
+    console.log(`  ${basename(file)}: +${c.saved} new, ~${c.updated} merged, ⊘${c.superseded} superseded${c.failed ? `, ${c.failed} failed` : ""}`);
   }
-  console.log(`Reuniones: +${saved} nuevas, ~${updated} UPDATE, ⊘${superseded} SUPERSEDE${failed ? `, ${failed} fallos (¿cortex auth login / servidor?)` : ""}.`);
+  console.log(`Meetings: +${saved} new, ~${updated} UPDATE, ⊘${superseded} SUPERSEDE${failed ? `, ${failed} failed (is the server running, and are you signed in?)` : ""}.`);
 }
 
 

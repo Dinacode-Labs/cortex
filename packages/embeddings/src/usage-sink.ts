@@ -1,8 +1,7 @@
 /**
- * Sink de uso de embeddings (observabilidad de coste, ADR-0016). El paquete
- * embeddings es una hoja (no depende de core/database); para no acoplar, expone un
- * sink que el consumidor (core) inyecta para registrar tokens. Si nadie lo inyecta,
- * no pasa nada.
+ * Embedding usage sink (cost observability, ADR-0016). The embeddings package is a leaf (it
+ * does not depend on core/database); to avoid coupling, it exposes a sink that the consumer
+ * (core) injects to record tokens. If nobody injects one, nothing happens.
  */
 export interface EmbeddingUsage {
   model: string;
@@ -21,6 +20,6 @@ export function reportEmbeddingUsage(u: EmbeddingUsage): void {
   try {
     sink?.(u);
   } catch {
-    /* la observabilidad nunca rompe el embedding */
+    /* observability never breaks the embedding */
   }
 }

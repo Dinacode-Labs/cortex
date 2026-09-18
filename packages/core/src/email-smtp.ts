@@ -2,11 +2,11 @@ import { createTransport, type Transporter } from "nodemailer";
 import { getEnv, getEnvNum } from "@cortex/shared";
 
 /**
- * Transporte SMTP genérico. Vive en un módulo aparte para que `email.ts` pueda importarlo
- * de forma perezosa: quien usa `log` o `brevo` no carga nodemailer.
+ * Generic SMTP transport. It lives in its own module so `email.ts` can import it lazily:
+ * whoever uses `log` or `brevo` never loads nodemailer.
  *
- * Env: SMTP_HOST (obligatorio), SMTP_PORT (def. 587), SMTP_USER, SMTP_PASS,
- *      SMTP_SECURE (1/true → TLS implícito, lo habitual en el puerto 465).
+ * Env: SMTP_HOST (required), SMTP_PORT (default 587), SMTP_USER, SMTP_PASS,
+ *      SMTP_SECURE (1/true -> implicit TLS, the usual thing on port 465).
  */
 
 let transport: Transporter | undefined;
@@ -14,7 +14,7 @@ let transport: Transporter | undefined;
 export function createSmtpTransport(): Transporter {
   if (transport) return transport;
   const host = getEnv("SMTP_HOST", "").trim();
-  if (!host) throw new Error("SMTP_HOST es obligatorio con CORTEX_EMAIL_PROVIDER=smtp.");
+  if (!host) throw new Error("SMTP_HOST is required with CORTEX_EMAIL_PROVIDER=smtp.");
   const port = getEnvNum("SMTP_PORT", 587);
   const secureRaw = getEnv("SMTP_SECURE", "").trim().toLowerCase();
   const user = getEnv("SMTP_USER", "").trim();
@@ -22,15 +22,15 @@ export function createSmtpTransport(): Transporter {
   transport = createTransport({
     host,
     port,
-    // `secure` = TLS desde el principio (465). En 587 se usa STARTTLS, que nodemailer
-    // negocia solo con secure:false.
+    // `secure` = TLS from the start (465). Port 587 uses STARTTLS, which nodemailer
+    // negotiates on its own with secure:false.
     secure: secureRaw === "1" || secureRaw === "true" || port === 465,
-    ...(user ? { auth: { user, pass } } : {}), // relay interno sin auth: se admite
+    ...(user ? { auth: { user, pass } } : {}), // an internal relay with no auth is allowed
   });
   return transport;
 }
 
-/** Descarta el transporte cacheado. Solo para tests. */
+/** Drops the cached transport. Tests only. */
 export function resetSmtpTransport(): void {
   transport = undefined;
 }

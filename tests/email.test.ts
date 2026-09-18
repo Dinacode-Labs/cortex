@@ -8,12 +8,12 @@ import {
 } from "@cortex/core";
 
 /**
- * El OTP es la única puerta de entrada al producto: si el envío está mal configurado, nadie
- * entra. Por eso el proveedor es enchufable (ADR-0028) y la config se valida al arrancar
- * en vez de fallar en el primer login.
+ * The OTP is the product's only front door: if sending is misconfigured, nobody gets in. That
+ * is why the provider is pluggable (ADR-0028) and the config is validated at startup rather
+ * than failing on the first login.
  *
- * Contrato que NO se puede romper: en modo `log`, la línea impresa contiene el código de 6
- * dígitos — los tests de integración del flujo de auth lo capturan de ahí.
+ * A contract that must NOT be broken: in `log` mode, the printed line contains the 6-digit
+ * code -- the auth flow's integration tests capture it from there.
  */
 const VARS = [
   "CORTEX_EMAIL_PROVIDER", "CORTEX_EMAIL_FROM", "CORTEX_EMAIL_FROM_NAME",
@@ -32,62 +32,62 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("selección de proveedor", () => {
-  it("sin configurar nada usa `log` (se puede probar el login sin credenciales)", () => {
+describe("provider selection", () => {
+  it("with nothing configured it uses `log` (login can be tried with no credentials)", () => {
     expect(getEmailSender().name).toBe("log");
   });
 
-  it("con BREVO_API_KEY y sin CORTEX_EMAIL_PROVIDER asume brevo (compatibilidad)", () => {
+  it("with BREVO_API_KEY and no CORTEX_EMAIL_PROVIDER it assumes brevo (compatibility)", () => {
     vi.stubEnv("BREVO_API_KEY", "k");
     expect(getEmailSender().name).toBe("brevo");
   });
 
-  it("CORTEX_EMAIL_PROVIDER manda sobre la heurística", () => {
+  it("CORTEX_EMAIL_PROVIDER wins over the heuristic", () => {
     vi.stubEnv("BREVO_API_KEY", "k");
     vi.stubEnv("CORTEX_EMAIL_PROVIDER", "log");
     expect(getEmailSender().name).toBe("log");
   });
 
-  it("un proveedor desconocido falla con las opciones válidas", () => {
+  it("an unknown provider fails, listing the valid options", () => {
     vi.stubEnv("CORTEX_EMAIL_PROVIDER", "sendgrid");
     expect(() => getEmailSender()).toThrow(/log \| brevo \| smtp/);
   });
 });
 
 describe("validateEmailConfig", () => {
-  it("brevo sin remitente no arranca", () => {
+  it("brevo with no sender does not start", () => {
     vi.stubEnv("CORTEX_EMAIL_PROVIDER", "brevo");
     vi.stubEnv("BREVO_API_KEY", "k");
     expect(() => validateEmailConfig()).toThrow(/CORTEX_EMAIL_FROM/);
   });
 
-  it("brevo sin clave no arranca", () => {
+  it("brevo with no key does not start", () => {
     vi.stubEnv("CORTEX_EMAIL_PROVIDER", "brevo");
     vi.stubEnv("CORTEX_EMAIL_FROM", "no-reply@example.com");
     expect(() => validateEmailConfig()).toThrow(/BREVO_API_KEY/);
   });
 
-  it("smtp sin host no arranca", () => {
+  it("smtp with no host does not start", () => {
     vi.stubEnv("CORTEX_EMAIL_PROVIDER", "smtp");
     vi.stubEnv("CORTEX_EMAIL_FROM", "no-reply@example.com");
     expect(() => validateEmailConfig()).toThrow(/SMTP_HOST/);
   });
 
-  it("config completa de smtp pasa la validación", () => {
+  it("a complete smtp config passes validation", () => {
     vi.stubEnv("CORTEX_EMAIL_PROVIDER", "smtp");
     vi.stubEnv("CORTEX_EMAIL_FROM", "no-reply@example.com");
     vi.stubEnv("SMTP_HOST", "smtp.example.com");
     expect(validateEmailConfig()).toEqual([]);
   });
 
-  it("avisa (sin romper) si en producción los OTP solo se loguean", () => {
+  it("warns (without breaking) when in production the OTPs are only logged", () => {
     vi.stubEnv("NODE_ENV", "production");
     const warnings = validateEmailConfig();
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toMatch(/no se envían|NO se envían/i);
+    expect(warnings[0]).toMatch(/not emailed/i);
   });
 
-  it("acepta los nombres antiguos BREVO_SENDER como alias del remitente", () => {
+  it("accepts the old BREVO_SENDER names as aliases for the sender", () => {
     vi.stubEnv("CORTEX_EMAIL_PROVIDER", "brevo");
     vi.stubEnv("BREVO_API_KEY", "k");
     vi.stubEnv("BREVO_SENDER", "no-reply@example.com");
@@ -96,7 +96,7 @@ describe("validateEmailConfig", () => {
 });
 
 describe("sendOtpEmail", () => {
-  it("en modo log imprime el código de 6 dígitos (contrato de los tests de auth)", async () => {
+  it("in log mode it prints the 6-digit code (the auth tests' contract)", async () => {
     const spy = vi.spyOn(console, "log").mockImplementation(() => {});
     await sendOtpEmail("dev@example.com", "123456");
     const printed = spy.mock.calls.map((c) => c.join(" ")).join("\n");
@@ -104,7 +104,7 @@ describe("sendOtpEmail", () => {
     expect(printed).toContain("dev@example.com");
   });
 
-  it("usa la marca configurada en el asunto", async () => {
+  it("uses the configured brand in the subject", async () => {
     vi.stubEnv("CORTEX_BRAND_NAME", "Acme Memory");
     const sent: EmailMessage[] = [];
     setEmailSender({ name: "test", async send(m) { sent.push(m); } });
@@ -113,8 +113,8 @@ describe("sendOtpEmail", () => {
     expect(sent[0]!.html).toContain("123456");
   });
 
-  it("un sender inyectado gana a la configuración por entorno", async () => {
-    vi.stubEnv("BREVO_API_KEY", "k"); // haría brevo si no hubiera override
+  it("an injected sender beats the environment configuration", async () => {
+    vi.stubEnv("BREVO_API_KEY", "k"); // it would pick brevo were there no override
     let called = false;
     setEmailSender({ name: "test", async send() { called = true; } });
     await sendOtpEmail("dev@example.com", "000000");

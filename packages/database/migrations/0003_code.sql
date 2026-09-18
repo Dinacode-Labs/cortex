@@ -1,7 +1,7 @@
--- Índice de CÓDIGO por proyecto/cliente. Chunks de los repos del cliente con
--- embedding (vectorial) + FTS ('simple', apto para identificadores de código).
--- Tabla separada de context_entries: distinta forma (ruta, rango de líneas) y
--- volumen (miles de chunks).
+-- CODE index per project/client. Chunks of the client's repos with an embedding (vector)
+-- plus FTS ('simple', which suits code identifiers).
+-- A separate table from context_entries: different shape (path, line range) and different
+-- volume (thousands of chunks).
 
 CREATE TABLE code_chunks (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),

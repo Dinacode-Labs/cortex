@@ -6,39 +6,41 @@ import { captureSession } from "./cortex-api.js";
 import { condenseSession } from "./transcript-utils.js";
 import { readSessions } from "./session-readers.js";
 
-/** Plataformas de agente con lector de sesiones. */
+/** Agent platforms that have a session reader. */
 export type CapturePlatformName = CapturePlatform;
 
 /**
- * Envío de sesiones de agente al servidor para que las destile (ADR-0025).
+ * Sending agent sessions to the server so it can distill them (ADR-0025).
  *
- * El cliente hace lo barato —leer el transcript y condensarlo a diálogo útil, sin tool
- * calls ni volcados— y el servidor hace lo caro. Antes esto destilaba aquí mismo, lo que
- * obligaba a que cada portátil tuviera una clave de LLM en el `.env` de un repo clonado.
+ * The client does the cheap part -- reading the transcript and condensing it into useful
+ * dialogue, with no tool calls and no dumps -- and the server does the expensive part. This
+ * used to distill right here, which forced every laptop to keep an LLM key in the `.env` of
+ * a cloned repo.
  *
- * Vive en `client` y no en `agents` justamente por eso: ya no necesita el modelo.
+ * It lives in `client` rather than in `agents` for exactly that reason: it no longer needs
+ * the model.
  */
 
 /**
- * Tope de lo que se manda por sesión. Coincide con el del servidor
- * (`CORTEX_CAPTURE_SESSION_MAX_CHARS`), que responde 413 al pasarse.
+ * Cap on what is sent per session. It matches the server's own
+ * (`CORTEX_CAPTURE_SESSION_MAX_CHARS`), which answers 413 when exceeded.
  *
- * Importa recortar AQUÍ y no dejar que el servidor rechace: una sesión larga de trabajo con
- * un agente pasa de sobra de este tamaño —medido, 154.000 caracteres en una— y son justo esas
- * las que más conocimiento llevan. Rechazarlas entera significa perder el día entero.
+ * Trimming HERE rather than letting the server reject matters: a long working session with an
+ * agent goes well past this size -- 154,000 characters in one measured case -- and those are
+ * precisely the ones carrying the most knowledge. Rejecting one whole means losing the day.
  */
 const MAX_CHARS = 150_000;
 
 /**
- * Recorta por el PRINCIPIO, no por el final. Una sesión termina en conclusiones —qué se
- * decidió, qué se arregló, qué quedó pendiente— y empieza en tanteos. Si hay que perder
- * algo, que sea el tanteo. Se deja una marca para que la destilación no interprete el corte
- * como el comienzo real de la conversación.
+ * Trims from the START, not from the end. A session ends in conclusions -- what was decided,
+ * what was fixed, what is still open -- and begins in groping around. If something has to be
+ * lost, let it be the groping. A marker is left behind so distillation does not read the cut
+ * as the real beginning of the conversation.
  */
-export function limitaSesion(condensed: string, max = MAX_CHARS): string {
+export function limitSession(condensed: string, max = MAX_CHARS): string {
   if (condensed.length <= max) return condensed;
-  const aviso = "[… el principio de esta sesión se ha omitido por tamaño …]\n\n";
-  return aviso + condensed.slice(condensed.length - (max - aviso.length));
+  const notice = "[... the beginning of this session was omitted for size ...]\n\n";
+  return notice + condensed.slice(condensed.length - (max - notice.length));
 }
 
 export interface SessionCaptureOutcome {
@@ -48,7 +50,7 @@ export interface SessionCaptureOutcome {
   error?: string;
 }
 
-/** Manda un transcript ya condensado. Por defecto no espera al resultado. */
+/** Sends an already-condensed transcript. By default it does not wait for the result. */
 export async function sendCondensedSession(opts: {
   slug: string;
   condensed: string;
@@ -62,7 +64,7 @@ export async function sendCondensedSession(opts: {
       slug: opts.slug,
       platform: opts.platform,
       sessionId: opts.sessionId,
-      condensed: limitaSesion(opts.condensed),
+      condensed: limitSession(opts.condensed),
       ...(opts.sourceType ? { sourceType: opts.sourceType } : {}),
     },
     { wait: opts.wait },
@@ -74,7 +76,7 @@ export async function sendCondensedSession(opts: {
   return { sessionId: opts.sessionId, status: res.data.status, counters: res.data.counters };
 }
 
-/** Auto-captura del hook: lee el transcript `.jsonl`, lo condensa y lo manda. */
+/** The hook's auto-capture: reads the `.jsonl` transcript, condenses it and sends it. */
 export function sendSessionFile(
   slug: string,
   file: string,
@@ -84,7 +86,7 @@ export function sendSessionFile(
   return sendCondensedSession({ slug, condensed: condenseSession(file), sessionId, platform });
 }
 
-/** Transcripts de Claude Code de un repo, del más reciente al más antiguo. */
+/** A repo's Claude Code transcripts, newest first. */
 export function readClaudeSessions(repoPath: string, limit?: number): { sessionId: string; condensed: string }[] {
   const folder = join(homedir(), ".claude/projects", repoPath.replace(/[^a-zA-Z0-9]/g, "-"));
   if (!existsSync(folder)) return [];
@@ -100,8 +102,8 @@ export function readClaudeSessions(repoPath: string, limit?: number): { sessionI
 }
 
 /**
- * Backfill retroactivo de las sesiones de un repo. Espera a cada una (`wait`) porque el
- * usuario está mirando los contadores; el hook, que corre en silencio, no espera.
+ * Retroactive backfill of a repo's sessions. It waits for each one (`wait`) because the user
+ * is watching the counters; the hook, which runs silently, does not wait.
  */
 export async function backfillSessions(
   slug: string,
@@ -117,22 +119,22 @@ export async function backfillSessions(
 
   const total: CaptureSessionCounters = { saved: 0, updated: 0, superseded: 0, noop: 0, failed: 0, windows: 0 };
   if (sessions.length === 0) {
-    log(`No hay sesiones de ${platform} para ${repoPath}.`);
+    log(`No ${platform} sessions for ${repoPath}.`);
     return { sessions: 0, counters: total };
   }
-  log(`${sessions.length} sesiones (${platform}) para ${repoPath}. El servidor las destilará → "${slug}"...`);
+  log(`${sessions.length} ${platform} session(s) for ${repoPath}. The server will distill them → "${slug}"...`);
 
   for (const s of sessions) {
     const r = await sendCondensedSession({ ...s, slug, platform, wait: true });
     const c = r.counters;
     if (c) for (const k of Object.keys(total) as (keyof CaptureSessionCounters)[]) total[k] += c[k] ?? 0;
-    const detalle = c
-      ? `+${c.saved} nuevas, ~${c.updated} fusionadas, ⊘${c.superseded} superadas${c.failed ? `, ${c.failed} fallos` : ""}`
+    const detail = c
+      ? `+${c.saved} new, ~${c.updated} merged, ⊘${c.superseded} superseded${c.failed ? `, ${c.failed} failed` : ""}`
       : r.status === "duplicate"
-        ? "ya destilada"
+        ? "already distilled"
         : (r.error ?? r.status);
-    log(`  ${s.sessionId.slice(0, 8)}…: ${detalle}`);
+    log(`  ${s.sessionId.slice(0, 8)}…: ${detail}`);
   }
-  log(`Backfill: +${total.saved} nuevas, ~${total.updated} UPDATE, ⊘${total.superseded} SUPERSEDE${total.failed ? `, ${total.failed} fallos` : ""}.`);
+  log(`Backfill: +${total.saved} new, ~${total.updated} UPDATE, ⊘${total.superseded} SUPERSEDE${total.failed ? `, ${total.failed} failed` : ""}.`);
   return { sessions: sessions.length, counters: total };
 }

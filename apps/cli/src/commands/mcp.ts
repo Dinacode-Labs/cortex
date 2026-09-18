@@ -3,19 +3,19 @@ import { createMcpProxy } from "../mcp/proxy.js";
 import { httpTransport, resolveUpstream } from "../mcp/upstream.js";
 
 /**
- * `cortex mcp` — servidor MCP por stdio que reenvía al MCP HTTP del servidor.
+ * `cortex mcp` -- an MCP server over stdio that forwards to the server's HTTP MCP.
  *
- * Es lo que se registra en cada agente (`claude mcp add cortex -- cortex mcp`). El proceso
- * local no toca la base de datos: solo lleva y trae, autenticado con el token de
- * `cortex auth login`, así que las tools respetan los permisos del usuario.
+ * It is what gets registered in each agent (`claude mcp add cortex -- cortex mcp`). The local
+ * process never touches the database: it only carries messages back and forth, authenticated
+ * with `cortex auth login`'s token, so the tools respect the user's permissions.
  *
- * OJO: stdout es el canal del protocolo. Cualquier log va a stderr o rompe la sesión.
+ * NOTE: stdout is the protocol's channel. Any log goes to stderr or it breaks the session.
  */
 export async function run(): Promise<void> {
   const { server, close } = createMcpProxy({
     connect: async () => {
-      // `resolveUpstream` lanza `SinSesionError` con el servidor concreto y las sesiones que
-      // sí hay: el proxy lo enseña tal cual en vez de traducirlo a «no has iniciado sesión».
+      // `resolveUpstream` throws `NoSessionError` naming the concrete server and the sessions
+      // that do exist: the proxy shows that as is rather than reducing it to "not signed in".
       const target = await resolveUpstream();
       if (!target) throw Object.assign(new Error("no autenticado"), { code: 401 });
       return httpTransport(target);

@@ -2,23 +2,23 @@ import { setReconciler } from "@cortex/core";
 import { runAgent } from "./mastra.js";
 
 /**
- * Reconciliador LLM (merge + decisión) que core inyecta vía setReconciler. Lo usan tanto
- * la ingesta de sesiones como el servidor HTTP (capturas autenticadas) para hacer
- * ADD/UPDATE/SUPERSEDE/NOOP de verdad (no solo dedup determinista).
+ * The LLM reconciler (merge + decision) that core injects through setReconciler. Both session
+ * ingestion and the HTTP server (authenticated captures) use it to do real
+ * ADD/UPDATE/SUPERSEDE/NOOP, not just deterministic dedup.
  */
 async function mergeKnowledge(existing: string, incoming: string): Promise<string> {
-  const prompt = `Entrada existente:\n"""\n${existing}\n"""\n\nNueva información sobre lo mismo:\n"""\n${incoming}\n"""\n\nFúndelas en UNA entrada consolidada.`;
+  const prompt = `Existing entry:\n"""\n${existing}\n"""\n\nNew information about the same thing:\n"""\n${incoming}\n"""\n\nMerge them into ONE consolidated entry.`;
   const merged = (await runAgent("merger", prompt, { maxOutputTokens: 700 })).trim();
   return merged || existing;
 }
 
 async function reconcile(existing: string, incoming: string): Promise<"noop" | "update" | "supersede"> {
-  const prompt = `EXISTENTE:\n"""\n${existing}\n"""\n\nNUEVA:\n"""\n${incoming}\n"""\n\n¿Relación de la NUEVA respecto a la EXISTENTE?`;
+  const prompt = `EXISTING:\n"""\n${existing}\n"""\n\nNEW:\n"""\n${incoming}\n"""\n\nWhat is the NEW one's relationship to the EXISTING one?`;
   try {
     const raw = await runAgent("reconciler", prompt, { maxOutputTokens: 60 });
     const m = raw.match(/noop|update|supersede/i);
-    // Si el LLM no responde algo reconocible, NO tocar lo existente: un fallo
-    // (timeout, respuesta truncada) no debe reescribir conocimiento vía merge.
+    // When the LLM answers nothing recognisable, do NOT touch what exists: a failure (timeout,
+    // truncated response) must not rewrite knowledge through a merge.
     return (m ? m[0].toLowerCase() : "noop") as "noop" | "update" | "supersede";
   } catch {
     return "noop";
@@ -26,7 +26,7 @@ async function reconcile(existing: string, incoming: string): Promise<"noop" | "
 }
 
 let wired = false;
-/** Inyecta el reconciliador LLM en core (idempotente). */
+/** Injects the LLM reconciler into core (idempotent). */
 export function wireReconciler(): void {
   if (wired) return;
   setReconciler({ decide: reconcile, merge: mergeKnowledge });

@@ -1,14 +1,14 @@
 /**
- * Hooks en formato JSON: lo usan Claude Code (`~/.claude/settings.json`) y Codex
- * (`~/.codex/hooks.json`) con la MISMA forma, así que el merge vive aquí una sola vez.
+ * Hooks in JSON form: Claude Code (`~/.claude/settings.json`) and Codex
+ * (`~/.codex/hooks.json`) use the SAME shape, so the merge lives here once.
  *
- *   hooks: { <Evento>: [ { matcher?, hooks: [ { type, command, timeout? } ] } ] }
+ *   hooks: { <Event>: [ { matcher?, hooks: [ { type, command, timeout? } ] } ] }
  *
- * La parte delicada es que el fichero es del usuario: puede tener hooks suyos y hooks
- * nuestros de una versión anterior (el legado `pnpm -C <repo> cortex hook-context`, que ya no
- * funciona porque asume un clon del monorepo). Un hook de Cortex se reconoce por su marcador,
- * y cuando se encuentra uno viejo se SUSTITUYE en su sitio en vez de añadir otro: duplicarlos
- * significa destilar dos veces la misma sesión.
+ * The delicate part is that the file belongs to the user: it may hold hooks of their own and
+ * hooks of ours from an earlier version (the legacy `pnpm -C <repo> cortex hook-context`,
+ * which no longer works because it assumes a monorepo clone). A Cortex hook is recognised by
+ * its marker, and when an old one is found it is REPLACED in place rather than another being
+ * added: duplicating them means distilling the same session twice.
  */
 
 export type HookKind = "context" | "capture";
@@ -21,7 +21,7 @@ export interface HookDef {
   timeout?: number;
 }
 
-/** Cómo se reconoce un hook de Cortex, incluidas las sintaxis que ya hemos retirado. */
+/** How a Cortex hook is recognised, including the syntaxes we have already retired. */
 export const HOOK_MARKERS: Record<HookKind, string[]> = {
   context: ["hook-context", "hook:context"],
   capture: ["hook-capture", "hook:capture"],
@@ -46,7 +46,7 @@ const isCortex = (cmd: unknown, kind: HookKind): boolean =>
 
 const anyCortex = (cmd: unknown): boolean => isCortex(cmd, "context") || isCortex(cmd, "capture");
 
-/** Quita grupos y eventos que se hayan quedado vacíos, para no dejar basura en el fichero. */
+/** Removes groups and events left empty, so no junk is left behind in the file. */
 function prune(obj: HooksHolder): void {
   if (!obj.hooks) return;
   for (const [event, groups] of Object.entries(obj.hooks)) {
@@ -59,11 +59,11 @@ function prune(obj: HooksHolder): void {
 
 export interface MergeResult {
   changed: string[];
-  /** Hooks de una versión anterior que se han reescrito en su sitio. */
+  /** Hooks from an earlier version that were rewritten in place. */
   replacedLegacy: string[];
 }
 
-/** Instala (o actualiza) los hooks de Cortex dejando intactos los del usuario. */
+/** Installs (or updates) Cortex's hooks, leaving the user's untouched. */
 export function mergeHooks(obj: HooksHolder, defs: HookDef[]): MergeResult {
   const res: MergeResult = { changed: [], replacedLegacy: [] };
   obj.hooks ??= {};
@@ -91,7 +91,7 @@ export function mergeHooks(obj: HooksHolder, defs: HookDef[]): MergeResult {
   return res;
 }
 
-/** Saca todos los hooks de Cortex y deja el resto como estaba. */
+/** Removes every Cortex hook and leaves the rest as it was. */
 export function removeHooks(obj: HooksHolder): { changed: string[] } {
   const changed: string[] = [];
   if (!obj.hooks) return { changed };
@@ -106,7 +106,7 @@ export function removeHooks(obj: HooksHolder): { changed: string[] } {
   return { changed };
 }
 
-/** ¿Hay algún hook de Cortex instalado? (lo usa `--status`). */
+/** Is any Cortex hook installed? (used by `--status`). */
 export function hasCortexHooks(obj: HooksHolder): boolean {
   return Object.values(obj.hooks ?? {}).some((groups) => groups.some((g) => (g.hooks ?? []).some((h) => anyCortex(h.command))));
 }

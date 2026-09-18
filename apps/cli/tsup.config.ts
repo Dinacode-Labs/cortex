@@ -4,15 +4,15 @@ import { createRequire } from "node:module";
 const pkg = createRequire(import.meta.url)("./package.json") as { version: string };
 
 /**
- * El CLI se publica en npm como **un solo fichero**: `@cortex/client` y `@cortex/shared` se
- * meten dentro (`noExternal`) porque son paquetes privados del monorepo y npm no sabría
- * descargarlos.
+ * The CLI ships to npm as **a single file**: `@cortex/client` and `@cortex/shared` go inside
+ * it (`noExternal`) because they are private monorepo packages and npm would not know how to
+ * download them.
  *
- * Lo que SÍ queda fuera es el SDK de MCP, zod y yaml: el SDK hace `require` dinámicos que un
- * bundle plano rompe, y los tres son paquetes públicos que npm instala sin problema.
+ * What does stay outside is the MCP SDK, zod and yaml: the SDK does dynamic `require`s that a
+ * flat bundle breaks, and all three are public packages npm installs without trouble.
  *
- * La versión se inyecta en tiempo de build en vez de leer el package.json en ejecución:
- * después del bundle no hay package.json al lado del fichero.
+ * The version is injected at build time instead of reading package.json at runtime: after
+ * bundling there is no package.json next to the file.
  */
 export default defineConfig({
   entry: { cortex: "src/index.ts" },

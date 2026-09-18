@@ -2,28 +2,29 @@ import { describe, it, expect, afterEach } from "vitest";
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SinSesionError } from "../apps/cli/src/mcp/upstream.js";
+import { NoSessionError } from "../apps/cli/src/mcp/upstream.js";
 
 /**
- * «No has iniciado sesión» era mentira la mayoría de las veces.
+ * "You are not signed in" was a lie most of the time.
  *
- * El caso real es otro: la carpeta apunta —por su `.cortex.json` o por `CORTEX_SERVER_URL`— a
- * un servidor del que no hay credenciales, mientras sí las hay de otro. El mensaje mandaba a
- * repetir un `cortex auth login` ya hecho, y quien lo leía se quedaba dando vueltas. Un error
- * que dirige mal cuesta más que uno que calla, porque parece que sabe.
+ * The real case is different: the folder points -- through its `.cortex.json` or through
+ * `CORTEX_SERVER_URL` -- at a server there are no credentials for, while there are credentials
+ * for another. The message sent people off to repeat a `cortex auth login` they had already
+ * done, and whoever read it went round in circles. An error that misdirects costs more than
+ * one that stays quiet, because it looks like it knows.
  */
-const casas: string[] = [];
+const homes: string[] = [];
 
-function conSesiones(servidores: [string, string][]): string {
+function withSessions(servers: [string, string][]): string {
   const home = mkdtempSync(join(tmpdir(), "cortex-home-"));
-  casas.push(home);
+  homes.push(home);
   mkdirSync(join(home, ".cortex"));
   writeFileSync(
     join(home, ".cortex", "credentials"),
     JSON.stringify({
       version: 2,
-      default: servidores[0]?.[0],
-      servers: Object.fromEntries(servidores.map(([s, email]) => [s, { token: "t", email }])),
+      default: servers[0]?.[0],
+      servers: Object.fromEntries(servers.map(([s, email]) => [s, { token: "t", email }])),
     }),
   );
   process.env.CORTEX_HOME = home;
@@ -32,30 +33,30 @@ function conSesiones(servidores: [string, string][]): string {
 
 afterEach(() => {
   delete process.env.CORTEX_HOME;
-  for (const c of casas.splice(0)) rmSync(c, { recursive: true, force: true });
+  for (const c of homes.splice(0)) rmSync(c, { recursive: true, force: true });
 });
 
-describe("cuando el MCP no puede autenticarse", () => {
-  it("dice QUÉ servidor buscó, no un genérico", () => {
-    conSesiones([["https://cortex.example.com/api", "yo@example.com"]]);
-    const e = new SinSesionError("http://localhost:8787", "/repos/mi-proyecto");
+describe("when the MCP cannot authenticate", () => {
+  it("says WHICH server it looked for, not something generic", () => {
+    withSessions([["https://cortex.example.com/api", "yo@example.com"]]);
+    const e = new NoSessionError("http://localhost:8787", "/repos/my-project");
     expect(e.message).toContain("http://localhost:8787");
-    expect(e.message).toContain("/repos/mi-proyecto");
+    expect(e.message).toContain("/repos/my-project");
   });
 
-  it("y enseña las sesiones que SÍ hay, que es lo que resuelve el lío", () => {
-    conSesiones([["https://cortex.example.com/api", "yo@example.com"]]);
-    const e = new SinSesionError("https://cortex.example.com", "/repos/mi-proyecto");
+  it("and shows the sessions that DO exist, which is what untangles it", () => {
+    withSessions([["https://cortex.example.com/api", "yo@example.com"]]);
+    const e = new NoSessionError("https://cortex.example.com", "/repos/my-project");
     expect(e.message).toContain("https://cortex.example.com/api");
     expect(e.message).toContain("yo@example.com");
-    // Con otra sesión disponible, lo primero que sugiere es mirar a dónde apunta la carpeta,
-    // no repetir el login que ya se hizo.
+    // With another session available, the first thing it suggests is looking at where the
+    // folder points, not repeating the login that was already done.
     expect(e.message).toMatch(/\.cortex\.json|CORTEX_SERVER_URL/);
   });
 
-  it("si de verdad no hay ninguna sesión, dice eso y manda a iniciarla", () => {
-    conSesiones([]);
-    const e = new SinSesionError("https://cortex.example.com/api", "/repos/x");
+  it("when there really is no session at all, it says so and sends you to sign in", () => {
+    withSessions([]);
+    const e = new NoSessionError("https://cortex.example.com/api", "/repos/x");
     expect(e.message).toContain("no sessions on this machine");
     expect(e.message).toContain("cortex auth login --server https://cortex.example.com/api");
   });

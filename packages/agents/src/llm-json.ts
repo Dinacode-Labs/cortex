@@ -1,11 +1,10 @@
 /**
- * Utilidad compartida para recuperar el JSON de una respuesta LLM.
- * Los modelos a veces envuelven el JSON en un bloque cercado ```json ... ```;
- * priorizamos ese bloque y, si no lo hay, recortamos desde la primera `{` hasta
- * la última `}`.
+ * Shared utility for recovering the JSON from an LLM response.
+ * Models sometimes wrap the JSON in a ```json ... ``` fenced block; that block takes priority
+ * and, failing that, the text is trimmed from the first `{` to the last `}`.
  */
 
-/** Extrae el primer bloque JSON de una respuesta LLM (tolera fences ```json). */
+/** Extracts the first JSON block from an LLM response (it tolerates ```json fences). */
 export function extractJson(raw: string): string {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced?.[1]) return fenced[1].trim();

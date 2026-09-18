@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline/promises";
-import { resolveServidor } from "../servidor.js";
+import { resolveServer } from "../server.js";
 import { getEnv } from "@cortex/shared";
 import {
   DEFAULT_SERVER_URL,
@@ -14,17 +14,18 @@ import {
 } from "@cortex/client";
 
 /**
- * `cortex auth` — login por email y código contra un servidor de Cortex. Guarda el token en
- * `~/.cortex/credentials` (chmod 600), que es de donde lo sacan los hooks, el CLI y el MCP
- * para firmar las escrituras.
+ * `cortex auth` -- sign in by email and code against a Cortex server. It stores the token in
+ * `~/.cortex/credentials` (chmod 600), which is where the hooks, the CLI and the MCP take it
+ * from to sign their writes.
  *
- * Se puede estar dentro de **varios servidores a la vez** (ADR-0033): un Cortex por
- * organización, y el repo decide a cuál pertenece. Entrar en uno nuevo no echa del anterior.
+ * You can be signed in to **several servers at once** (ADR-0033): one Cortex per organisation,
+ * and the repo decides which one it belongs to. Signing in to a new one does not sign you out
+ * of the previous.
  *
  *   cortex auth login [--email x] [--server url]
  *   cortex auth status | whoami
  *   cortex auth logout [--server url] [--all]
- *   cortex auth use <url>            elegir el servidor por defecto
+ *   cortex auth use <url>            pick the default server
  */
 function argOf(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -38,9 +39,9 @@ async function postJson(url: string, body: unknown): Promise<{ ok: boolean; stat
 }
 
 async function login(args: string[]): Promise<void> {
-  // Antes esto se iba al servidor de desarrollo por defecto aunque ya hubiera una sesión
-  // configurada, así que quien tuviera dos acababa autenticándose contra el que no era.
-  const server = await resolveServidor(args, { verbo: "sign in to", permitirDesconocido: true });
+  // This used to go to the development server by default even when a session was already
+  // configured, so anyone with two ended up authenticating against the wrong one.
+  const server = await resolveServer(args, { verb: "sign in to", allowUnknown: true });
   if (!server) {
     process.exitCode = 1;
     return;
@@ -76,7 +77,7 @@ async function login(args: string[]): Promise<void> {
   }
 }
 
-/** Una sesión, comprobada contra su propio servidor. */
+/** One session, checked against its own server. */
 async function checkOne(c: { server: string; token: string; email: string }, esDefecto: boolean): Promise<boolean> {
   const marca = esDefecto ? " (default)" : "";
   try {
@@ -113,7 +114,7 @@ async function logout(args: string[]): Promise<void> {
   const todos = args.includes("--all");
   let server: string | undefined;
   if (!todos) {
-    const elegido = await resolveServidor(args, { verbo: "sign out of" });
+    const elegido = await resolveServer(args, { verb: "sign out of" });
     if (!elegido) {
       process.exitCode = 1;
       return;

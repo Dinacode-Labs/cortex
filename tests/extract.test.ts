@@ -6,12 +6,12 @@ import { extractFileText } from "../packages/core/src/extract";
 import { SUPPORTED_EXTS } from "@cortex/shared";
 
 /**
- * La capa `extract` la usan los conectores de documentos (connect-docs recorre una
- * carpeta y solo considera ficheros con extensión en SUPPORTED_EXTS). El texto plano y
- * el Markdown son el formato más común de docs de proyecto, así que deben ingerirse tal
- * cual (no requieren parseo binario). Estos tests fijan ese contrato.
+ * The `extract` layer is used by the document connectors (connect-docs walks a folder and only
+ * considers files whose extension is in SUPPORTED_EXTS). Plain text and Markdown are the most
+ * common format for project docs, so they must be ingested as is (they need no binary
+ * parsing). These tests pin that contract.
  */
-describe("extractFileText — texto plano / Markdown", () => {
+describe("extractFileText — plain text / Markdown", () => {
   const dir = mkdtempSync(join(tmpdir(), "cortex-extract-"));
   afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -27,22 +27,22 @@ describe("extractFileText — texto plano / Markdown", () => {
     }
   });
 
-  it("lee un .md tal cual y reporta el formato", async () => {
-    const p = write("nota.md", "# Decisión\n\nSe usa RabbitMQ para exportaciones asíncronas.");
+  it("reads a .md as is and reports the format", async () => {
+    const p = write("note.md", "# Decision\n\nRabbitMQ is used for asynchronous exports.");
     const ex = await extractFileText(p);
     expect(ex).not.toBeNull();
     expect(ex!.format).toBe("md");
     expect(ex!.text).toContain("RabbitMQ");
   });
 
-  it("lee un .txt tal cual", async () => {
-    const p = write("auditoria.txt", "Auditoría de notificaciones: email + push revisados.");
+  it("reads a .txt as is", async () => {
+    const p = write("audit.txt", "Notifications audit: email + push reviewed.");
     const ex = await extractFileText(p);
-    expect(ex!.text).toContain("notificaciones");
+    expect(ex!.text).toContain("Notifications");
   });
 
-  it("devuelve null si el fichero está vacío", async () => {
-    const p = write("vacio.md", "   \n\n  ");
+  it("returns null when the file is empty", async () => {
+    const p = write("empty.md", "   \n\n  ");
     expect(await extractFileText(p)).toBeNull();
   });
 });

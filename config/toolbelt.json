@@ -1,5 +1,5 @@
 {
-  "$comment": "Registry del toolbelt de TERCEROS. Cortex ya no se reparte a sí mismo por aquí: su MCP, su skill y su comando van en el plugin (plugin/claude-code/) y los instala `cortex setup`. Lo que queda es el esquema para el registry de tu organización — ver docs/toolbelt-registry.md. {REPO} lo resuelve el instalador.",
+  "$comment": "A THIRD-PARTY toolbelt registry. Cortex no longer distributes itself through here: its MCP, its skill and its command ship in the plugin (plugin/claude-code/) and `cortex setup` installs them. What is left is the schema for your organisation's registry — see docs/toolbelt-registry.md. The installer resolves {REPO}.",
   "mcpServers": {},
   "skills": [],
   "commands": []

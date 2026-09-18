@@ -59,7 +59,9 @@ system, a component layer, and no framework ([0053](#adr-0053)).
 **Living with several clocks — 16 September 2026** ([0059](#adr-0059), [0062](#adr-0062)). The
 repository went public and the CLI went to npm, and both brought the same lesson: what is
 right for one team is not right for every clone. The link file belongs to each clone, and the
-CLI and the server are two clocks that are compared, not tied.
+CLI and the server are two clocks that are compared, not tied. The same lesson closes the
+phase ([0064](#adr-0064)): a repository that switches language halfway is one whose
+explanations only its authors can read.
 
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
@@ -1835,3 +1837,70 @@ CLI and the server are two clocks that are compared, not tied.
   instead of listing project names; or the extractor stops producing `client`/`repository`
   noise ([0060](#adr-0060) is the first half of that), at which point the type filter can be
   relaxed and argued for on its merits rather than as a workaround.
+
+<a id="adr-0064"></a>
+
+## ADR-0064 · The whole repository is in English; what stays in Spanish is data, not prose
+
+- **Status:** accepted (2026-09-18). Supersedes the language convention set out in
+  [0031](#adr-0031)'s wake and stated until now in `CONTRIBUTING.md` and `CLAUDE.md`.
+- **Context:** the repository was deliberately bilingual. Everything an outsider *opened* was in
+  English — the README, `SECURITY.md`, the CLI, the MCP tool descriptions, the web UI, the API
+  errors — and everything that was the team's **working record** stayed in Spanish: code
+  comments, the ADRs, the roadmap, the research notes, test names and the LLM agents' prompts.
+  The reasoning was that the working record blocks nobody, and writing it in the language the
+  team thinks in is faster and more precise.
+
+  It does block somebody. Once the repository went public ([0029](#adr-0029),
+  [0059](#adr-0059)), the half a reader cannot parse turned out to be the half that explains
+  **why** things are the way they are. This log is the clearest case: it is cited from 67 files
+  and was already written in English precisely because outsiders read it — but the comment above
+  the function an outsider is actually reading, the one that says which bug a workaround exists
+  for, was not. A comment that saves an hour is worth nothing to somebody who cannot read it,
+  and a test name is the first description of a behaviour anyone meets.
+
+  Measured before the change: ~2,800 lines of comment, ~460 test names, 14 documents under
+  `docs/`, the CHANGELOG, the deployment files and the CI workflows.
+- **Decision:** the repository is in English, all of it. **Two** things stay in Spanish, and the
+  rule that separates them is that they are **data rather than prose we wrote**:
+
+  1. **Patterns that match the corpus**, which is Spanish: `CLASSIFY_RULES`, `MODULE_KEYWORDS`
+     and `polarityTags` in `packages/core/src/text.ts`, the deictics regex in
+     `packages/shared/src/domain.ts`, and the eval fixtures in `tests/fixtures/eval/` — the
+     recall@5 0.987 / MRR 0.928 baseline was measured against them, so translating them would
+     silently invalidate every comparison the eval exists to make. They match what users write,
+     not the language of the file they live in.
+  2. The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in
+     `packages/agents/src/mastra.ts`). The prompts themselves are now English; what the agents
+     *produce* is knowledge entries stored next to a corpus that is already Spanish. Translating
+     a prompt is a translation; changing the output language is a product decision, and it would
+     split every existing memory in two.
+
+  Values an external system owns keep their own spelling for the same reason — Plane's
+  `'Histórico'`, Notion's property names, the migration filenames, which are primary keys in
+  `schema_migrations` and would re-run every migration on every installation if renamed.
+
+  Each exception carries an English comment saying why, and `tests/docs.test.ts` holds the list:
+  it scans `packages/*/src`, `apps/*/src`, `tests/` and the docs, checks every exempted path
+  still exists, and checks each one explains itself. **An exception that is not written down is
+  indistinguishable from an oversight**, which is how the previous convention decayed.
+
+  Because the team is Spanish-speaking, two entry points are kept in Spanish as well —
+  `README.es.md` and `CONTRIBUTING.es.md` — deliberately *not* as line-by-line translations,
+  which drift and then lie. They cover the essentials and point at the English version, which is
+  the one that must be current when the two disagree; a test checks the links both ways.
+- **Alternatives:** keep the split — it is cheaper right up to the moment somebody outside tries
+  to change something, which is the moment that matters for a public repository; translate the
+  agents' output too, for one language across the board — it would strand every entry already
+  stored and is a product decision, not a housekeeping one; full bilingual documentation — two
+  copies of 14 documents, where the second copy is wrong within a month and nobody notices.
+- **Consequences:** contributing no longer requires reading Spanish. The cost is real and paid
+  up front: a translation pass over ~290 files, and from now on the team writes its working
+  record in its second language, which is slower and slightly less precise. Two things were
+  found by reading every line: a latent bug where `apps/server/src/routes/context.ts` matched an
+  error by the text of a message defined in `packages/core` and the two had drifted apart
+  (`/context-pack` answered 500 instead of 404), and a real client name left in a migration
+  fixture, against [0026](#adr-0026).
+- **Revisit when:** the corpus stops being predominantly Spanish. That single premise holds up
+  both exceptions — the patterns and the output language — and nothing else about this decision
+  depends on anything that is likely to change.

@@ -3,7 +3,7 @@ import type { EmbeddingProvider } from "@cortex/embeddings";
 import type { ContextEntry, ContextEntryType } from "@cortex/shared";
 import { rowToContextEntry, type Row } from "./map.js";
 
-/** Guarda (o actualiza) el embedding de una entrada para el texto dado. */
+/** Stores (or updates) an entry's embedding for the given text. */
 export async function storeEmbedding(
   sql: Sql,
   provider: EmbeddingProvider,
@@ -22,8 +22,8 @@ export async function storeEmbedding(
 }
 
 /**
- * Genera y guarda embeddings por lotes (1 petición por lote). Respeta los límites
- * del proveedor (p.ej. nan: 60 rpm, 3 en paralelo) haciendo lotes secuenciales.
+ * Generates and stores embeddings in batches (1 request per batch). It respects the provider's
+ * limits (e.g. 60 rpm, 3 in parallel) by running the batches sequentially.
  */
 export async function storeEmbeddingsBatch(
   sql: Sql,
@@ -51,16 +51,16 @@ export async function storeEmbeddingsBatch(
 
 export interface SearchHit {
   entry: ContextEntry;
-  /** Relevancia en [0,1]. En híbrido es RRF normalizado; en vectorial, coseno. */
+  /** Relevance in [0,1]. In hybrid it is normalised RRF; in vector search, cosine. */
   score: number;
 }
 
 /**
- * Reciprocal Rank Fusion: fusiona una lista vectorial y una léxica (FTS) sumando
- * `1/(K+rank+1)` por posición en cada lista. La rama vectorial además conserva el
- * coseno (`1 - distance`). Devuelve la lista ordenada por RRF desc y cortada a
- * `limit`. Función PURA (sin BD): cada llamador decide luego cómo derivar su score
- * final a partir de `rrf`/`cosine` (p.ej. híbrido normaliza; código no).
+ * Reciprocal Rank Fusion: merges a vector list and a lexical (FTS) one by adding
+ * `1/(K+rank+1)` per position in each list. The vector branch additionally keeps the cosine
+ * (`1 - distance`). It returns the list ordered by RRF desc and cut to `limit`. A PURE
+ * function (no database): each caller then decides how to derive its final score from
+ * `rrf`/`cosine` (hybrid normalises, for instance; code search does not).
  */
 export function rrfFuse(
   vecRows: { id: string; distance?: number | string }[],
@@ -87,9 +87,10 @@ export function rrfFuse(
 }
 
 /**
- * Búsqueda HÍBRIDA: combina candidatos vectoriales (pgvector) y léxicos (FTS de
- * Postgres, config 'spanish') y los fusiona con Reciprocal Rank Fusion (RRF).
- * El léxico aporta precisión con IDs, nombres propios y jerga; el vector, sentido.
+ * HYBRID search: it combines vector candidates (pgvector) and lexical ones (Postgres FTS,
+ * 'spanish' configuration, which matches the corpus) and fuses them with Reciprocal Rank
+ * Fusion (RRF). The lexical side brings precision on ids, proper nouns and jargon; the vector
+ * side brings meaning.
  */
 export async function hybridSearch(
   sql: Sql,
@@ -98,30 +99,30 @@ export async function hybridSearch(
     queryText: string;
     projectId?: string | null;
     /**
-     * Scoping por conjunto de proyectos ACCESIBLES (búsqueda sin proyecto concreto).
-     * Solo se aplica cuando NO hay `projectId` (un proyecto concreto manda). Un array
-     * VACÍO restringe a CERO filas (usuario sin proyectos accesibles → nada).
+     * Scoping by the set of ACCESSIBLE projects (a search with no concrete project). It only
+     * applies when there is no `projectId` (a concrete project wins). An EMPTY array restricts
+     * to ZERO rows (a user with no accessible projects gets nothing).
      */
     projectIds?: string[] | null;
     type?: ContextEntryType;
     limit: number;
     excludeId?: string;
     includeArchived?: boolean;
-    /** Consulta point-in-time: hechos válidos en esa fecha. */
+    /** Point-in-time query: facts valid on that date. */
     asOf?: Date;
-    /** Incluir hechos ya invalidados (histórico/superseded). Por defecto false. */
+    /** Include already-invalidated facts (historical/superseded). Defaults to false. */
     includeHistorical?: boolean;
   },
 ): Promise<SearchHit[]> {
   const pool = Math.max(args.limit * 4, 40);
 
-  // Filtros comunes (se aplican a ambas ramas; tabla siempre aliasada `ce`).
+  // Common filters (applied to both branches; the table is always aliased `ce`).
   let filters = sql``;
   if (args.projectId) {
     filters = sql`${filters} AND ce.project_id = ${args.projectId}`;
   } else if (args.projectIds) {
-    // Sin proyecto concreto pero con scoping de accesibles: restringe al conjunto.
-    // Array vacío → `= ANY('{}')` no casa con nada → cero filas (fail-closed).
+    // No concrete project but scoped to the accessible ones: restrict to that set.
+    // An empty array -> `= ANY('{}')` matches nothing -> zero rows (fail-closed).
     filters = sql`${filters} AND ce.project_id = ANY(${args.projectIds})`;
   }
   if (args.type) filters = sql`${filters} AND ce.type = ${args.type}`;
@@ -133,7 +134,7 @@ export async function hybridSearch(
     filters = sql`${filters} AND ce.valid_to IS NULL`;
   }
 
-  // Rama vectorial.
+  // Vector branch.
   const vectors = await provider.embed([args.queryText]);
   const lit = toVectorLiteral(vectors[0]!);
   const vecRows = (await sql`
@@ -146,7 +147,7 @@ export async function hybridSearch(
     LIMIT ${pool}
   `) as unknown as Row[];
 
-  // Rama léxica (FTS).
+  // Lexical branch (FTS).
   const ftsRows = (await sql`
     SELECT ce.id, ts_rank(ce.content_tsv, plainto_tsquery('spanish', ${args.queryText})) AS rank
     FROM context_entries ce
@@ -156,14 +157,14 @@ export async function hybridSearch(
     LIMIT ${pool}
   `) as unknown as Row[];
 
-  // Reciprocal Rank Fusion (fusión compartida en rrfFuse).
+  // Reciprocal Rank Fusion (the shared fusion lives in rrfFuse).
   const ranked = rrfFuse(
     vecRows as unknown as { id: string; distance?: number | string }[],
     ftsRows as unknown as { id: string }[],
     args.limit,
   );
   if (ranked.length === 0) return [];
-  // El híbrido NORMALIZA el RRF por el máximo (el primero) para dejarlo en [0,1].
+  // Hybrid NORMALISES the RRF by the maximum (the first one) to land it in [0,1].
   const maxRrf = ranked[0]!.rrf || 1;
 
   const ids = ranked.map((s) => s.id);
@@ -179,8 +180,8 @@ export async function hybridSearch(
 }
 
 /**
- * Búsqueda semántica por similitud coseno (pgvector `<=>`). Filtra por el modelo
- * de embedding actual para comparar solo vectores de la misma dimensión.
+ * Semantic search by cosine similarity (pgvector `<=>`). It filters by the current embedding
+ * model so that only vectors of the same dimension are compared.
  */
 export async function vectorSearch(
   sql: Sql,
@@ -189,14 +190,14 @@ export async function vectorSearch(
     queryText: string;
     projectId?: string | null;
     /**
-     * Scoping por conjunto de proyectos ACCESIBLES (búsqueda sin proyecto concreto).
-     * Solo se aplica cuando NO hay `projectId`. Array VACÍO → cero filas.
+     * Scoping by the set of ACCESSIBLE projects (a search with no concrete project). It only
+     * applies when there is no `projectId`. An EMPTY array -> zero rows.
      */
     projectIds?: string[] | null;
     type?: ContextEntryType;
     limit: number;
     excludeId?: string;
-    /** Excluir entradas rechazadas/obsoletas por defecto. */
+    /** Exclude rejected/obsolete entries by default. */
     includeArchived?: boolean;
     asOf?: Date;
     includeHistorical?: boolean;
@@ -209,7 +210,7 @@ export async function vectorSearch(
   if (args.projectId) {
     where = sql`${where} AND ce.project_id = ${args.projectId}`;
   } else if (args.projectIds) {
-    // Array vacío → `= ANY('{}')` no casa con nada → cero filas (fail-closed).
+    // An empty array -> `= ANY('{}')` matches nothing -> zero rows (fail-closed).
     where = sql`${where} AND ce.project_id = ANY(${args.projectIds})`;
   }
   if (args.type) where = sql`${where} AND ce.type = ${args.type}`;

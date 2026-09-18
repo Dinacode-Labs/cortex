@@ -1,65 +1,68 @@
-# El registry del toolbelt (esquema)
+# The toolbelt registry (schema)
 
-Cortex reparte a los agentes de cada developer dos cosas distintas, y conviene no
-confundirlas:
+Cortex distributes two different things to each developer's agents, and it is worth not
+confusing them:
 
-1. **Lo suyo** — el MCP de Cortex, la skill `cortex-capture` y el comando `/cortex-save`.
-   Eso lo instala `cortex setup`, en Claude Code a través del plugin `plugin/claude-code/`,
-   sin que haya que declarar nada en ningún registry.
-2. **El toolbelt de tu organización** — los MCPs y skills de las herramientas que use tu
-   equipo (gestor de tickets, chat, repositorio, lo que sea). Eso **no** vive en este repo:
-   se declara en un registry propio, normalmente en un repo privado, y se instala con
-   `cortex toolbelt sync --registry <ruta-o-url>`.
+1. **Its own** — Cortex's MCP, the `cortex-capture` skill and the `/cortex-save` command.
+   `cortex setup` installs those, in Claude Code through the `plugin/claude-code/` plugin,
+   without anything having to be declared in any registry.
+2. **Your organisation's toolbelt** — the MCPs and skills of the tools your team uses (ticket
+   tracker, chat, repository, whatever). That does **not** live in this repo: it is declared in
+   a registry of its own, usually in a private repo, and installed with
+   `cortex toolbelt sync --registry <path-or-url>`.
 
-La separación está en el [ADR-0014](./decisions.md) (revisado), el [ADR-0026](./decisions.md) y el [ADR-0032](./decisions.md).
+The separation is set out in [ADR-0014](./decisions.md) (revised), [ADR-0026](./decisions.md)
+and [ADR-0032](./decisions.md).
 
-## Formato
+## Format
 
-Un único JSON con tres listas. Ejemplo completo:
+A single JSON with three lists. A complete example:
 
 ```jsonc
 {
-  "$comment": "Toolbelt de <tu organización>. Reparte CONFIGURACIÓN, nunca credenciales.",
+  "$comment": "<your organisation>'s toolbelt. It distributes CONFIGURATION, never credentials.",
 
-  // MCPs que se registran en cada agente detectado.
+  // MCPs registered into every detected agent.
   "mcpServers": {
-    // stdio: se lanza un proceso local.
+    // stdio: a local process is launched.
     "tickets": {
       "transport": "stdio",
       "command": "uvx",
-      "args": ["mi-mcp-server", "stdio"],
-      "env": ["TICKETS_API_KEY", "TICKETS_BASE_URL"],  // se leen del entorno del dev
-      "auth": "token personal en TICKETS_API_KEY",     // texto para `cortex toolbelt doctor`
+      "args": ["my-mcp-server", "stdio"],
+      "env": ["TICKETS_API_KEY", "TICKETS_BASE_URL"],  // read from the dev's environment
+      "auth": "a personal token in TICKETS_API_KEY",   // text for `cortex toolbelt doctor`
       "agents": ["claude", "codex", "opencode", "hermes"]
     },
-    // http: servidor remoto (OAuth o cabecera). Codex no soporta este transporte.
+    // http: a remote server (OAuth or a header). Codex does not support this transport.
     "docs": {
       "transport": "http",
-      "url": "https://mcp.ejemplo.com/mcp",
-      "auth": "OAuth en el navegador la primera vez",
+      "url": "https://mcp.example.com/mcp",
+      "auth": "OAuth in the browser the first time",
       "agents": ["claude", "opencode", "hermes"]
     }
   },
 
-  // Skills (solo Claude Code): carpetas con SKILL.md dentro del repo del registry.
+  // Skills (Claude Code only): folders with a SKILL.md inside the registry's repo.
   "skills": [
-    { "name": "mi-skill", "auth": "ninguna" }
+    { "name": "my-skill", "auth": "none" }
   ],
 
-  // Comandos slash (Claude Code, Codex, OpenCode): ficheros .md del repo del registry.
+  // Slash commands (Claude Code, Codex, OpenCode): .md files from the registry's repo.
   "commands": [
-    { "name": "mi-comando", "file": "mi-comando.md" }
+    { "name": "my-command", "file": "my-command.md" }
   ]
 }
 ```
 
-## Reglas que conviene respetar
+## Rules worth respecting
 
-- **Configuración, nunca credenciales.** El campo `env` nombra variables; no pone valores.
-  Una entrada cuyas variables no estén exportadas se omite con un aviso, no falla.
-- **`{REPO}`** se sustituye por la ruta del checkout cuando el registry es local. Una
-  entrada que lo use no se puede instalar desde una URL remota: se omite con aviso.
-- **`agents`** acota a qué agentes va cada entrada. Útil porque no todos soportan lo mismo
-  (Codex no admite MCP por HTTP, y las skills hoy solo las consume Claude Code).
-- El registry es **idempotente**: `cortex toolbelt sync` sin `--apply` enseña el plan, y al aplicarlo
-  respeta lo que ya esté configurado a mano (no pisa la auth existente).
+- **Configuration, never credentials.** The `env` field names variables; it does not set
+  values. An entry whose variables are not exported is skipped with a warning, not a failure.
+- **`{REPO}`** is replaced by the checkout's path when the registry is local. An entry using it
+  cannot be installed from a remote URL: it is skipped with a warning.
+- **`agents`** narrows which agents each entry goes to. Useful because they do not all support
+  the same things (Codex does not accept MCP over HTTP, and today only Claude Code consumes
+  skills).
+- The registry is **idempotent**: `cortex toolbelt sync` without `--apply` shows the plan, and
+  applying it respects whatever is already configured by hand (it does not overwrite existing
+  auth).

@@ -1,5 +1,5 @@
-# Un solo dominio para todo. Alternativa descartada: tres subdominios, que triplica el DNS,
-# los certificados y las URLs que hay que configurar en cada cliente.
+# One domain for everything. The alternative we discarded: three subdomains, which triples
+# the DNS, the certificates and the URLs each client has to be configured with.
 {
 	email {$CORTEX_ACME_EMAIL}
 }
@@ -7,8 +7,8 @@
 {$CORTEX_DOMAIN} {
 	encode zstd gzip
 
-	# Los transcripts de sesión viajan enteros en el cuerpo; 25 MB da margen de sobra y
-	# corta un envío desmedido antes de que llegue a la aplicación.
+	# Session transcripts travel whole in the body; 25 MB leaves plenty of room and cuts an
+	# outsized upload before it reaches the application.
 	request_body {
 		max_size 25MB
 	}
@@ -18,17 +18,17 @@
 		-Server
 	}
 
-	# handle_path recorta el prefijo: el servidor sirve en / y no sabe que vive bajo /api.
+	# handle_path strips the prefix: the server serves at / and does not know it lives under /api.
 	handle_path /api/* {
 		reverse_proxy server:8787
 	}
 
-	# El instalador lo sirve la API, pero cuelga de la raíz para que la URL sea corta.
+	# The API serves the installer, but it hangs off the root so the URL stays short.
 	handle /install.sh {
 		reverse_proxy server:8787
 	}
 
-	# El MCP habla por streaming: con buffering, las respuestas llegan a trompicones o no llegan.
+	# MCP speaks over streaming: with buffering, responses arrive in fits and starts, or not at all.
 	handle /mcp* {
 		reverse_proxy mcp:8788 {
 			flush_interval -1

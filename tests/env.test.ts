@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /**
- * `loadEnv` resolvía el `.env` relativo a su propio fichero fuente
- * (`packages/shared/src/../../../.env`). Funcionaba solo mientras el código se ejecutara
- * desde el checkout con tsx: al compilar a `dist/` o al empaquetar el CLI, esa ruta deja de
- * existir. Ahora busca por entorno y cwd. Estos tests fijan ese orden.
+ * `loadEnv` used to resolve the `.env` relative to its own source file
+ * (`packages/shared/src/../../../.env`). That worked only while the code ran from the checkout
+ * under tsx: compiled to `dist/` or bundled into the CLI, that path stops existing. It now
+ * looks by environment and cwd. These tests pin that order.
  *
- * Se importa con `resetModules` en cada caso porque `loadEnv` cachea (solo carga una vez).
+ * It is imported with `resetModules` in each case because `loadEnv` caches (it loads once).
  */
 let dir: string;
 
@@ -17,8 +17,8 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "cortex-env-"));
   vi.resetModules();
   vi.stubEnv("CORTEX_ENV_FILE", "");
-  // Borrar, no vaciar: `process.loadEnvFile` no pisa lo que ya esté DEFINIDO, y una cadena
-  // vacía cuenta como definida (el mismo footgun que arreglamos en la config de proveedores).
+  // Delete, do not empty: `process.loadEnvFile` does not overwrite what is already DEFINED,
+  // and an empty string counts as defined (the same footgun we fixed in the provider config).
   delete process.env.CORTEX_TEST_VALUE;
 });
 afterEach(() => {
@@ -28,7 +28,7 @@ afterEach(() => {
 });
 
 describe("loadEnv", () => {
-  it("carga el fichero que indique CORTEX_ENV_FILE", async () => {
+  it("loads the file CORTEX_ENV_FILE points at", async () => {
     const file = join(dir, "custom.env");
     writeFileSync(file, "CORTEX_TEST_VALUE=desde-env-file\n");
     vi.stubEnv("CORTEX_ENV_FILE", file);
@@ -38,25 +38,25 @@ describe("loadEnv", () => {
     expect(process.env.CORTEX_TEST_VALUE).toBe("desde-env-file");
   });
 
-  it("no lanza si no hay ningún .env", async () => {
-    vi.stubEnv("CORTEX_ENV_FILE", join(dir, "no-existe.env"));
+  it("does not throw when there is no .env at all", async () => {
+    vi.stubEnv("CORTEX_ENV_FILE", join(dir, "does-not-exist.env"));
     const { loadEnv } = await import("@cortex/shared");
     expect(() => loadEnv()).not.toThrow();
   });
 
-  it("no pisa una variable que ya venga del entorno real", async () => {
+  it("does not overwrite a variable already coming from the real environment", async () => {
     const file = join(dir, "custom.env");
-    writeFileSync(file, "CORTEX_TEST_VALUE=del-fichero\n");
+    writeFileSync(file, "CORTEX_TEST_VALUE=from-the-file\n");
     vi.stubEnv("CORTEX_ENV_FILE", file);
     vi.stubEnv("CORTEX_TEST_VALUE", "del-entorno");
 
     const { loadEnv } = await import("@cortex/shared");
     loadEnv();
-    // `process.loadEnvFile` respeta lo ya definido: el entorno real manda sobre el fichero.
+    // `process.loadEnvFile` respects what is already defined: the real environment wins.
     expect(process.env.CORTEX_TEST_VALUE).toBe("del-entorno");
   });
 
-  it("solo carga una vez, aunque se llame varias veces", async () => {
+  it("loads only once, however many times it is called", async () => {
     const file = join(dir, "custom.env");
     writeFileSync(file, "CORTEX_TEST_VALUE=primera\n");
     vi.stubEnv("CORTEX_ENV_FILE", file);
