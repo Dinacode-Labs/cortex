@@ -36,6 +36,14 @@ fixes things.
   contain and what their baselines are is in `evals/README.md`. Both commands are run exactly
   as before, `--questions` / `--windows` / `--gold` still take a path of your own, and what
   guards the sets stays in `tests/`, where CI runs it.
+- **Retrieval is marked by a function, not by the command.** recall@k and MRR came out of the
+  middle of `eval`, where they could not be exercised without a Postgres and a real provider;
+  they are now `apps/admin/src/eval/retrieval-score.ts`, beside the distiller's marker, and the
+  table the command prints is the same one. What the numbers mean is tested with no database —
+  that one piece of evidence out of three is a third and not a hit, that MRR follows the first
+  one, that nothing past `--k` counts, and that the questions the corpus does not answer stay
+  out of the averages — and so is the set itself: evidence citing an id nobody wrote used to be
+  reported for ever as a miss and blamed on the search.
 - **`commands/` holds commands and nothing else**, in both CLIs: what a command needs and is not
   one itself lives in a sibling directory. A module parked in there reads as a subcommand that
   cannot be invoked, and a command that never reaches the dispatcher exists without being
