@@ -2092,3 +2092,67 @@ without ever being stated — formatting, and where `any` is allowed — were fi
   corroboration turns out to be too cheap a promotion — the same echo arriving twice from the same
   agent — at which point the threshold rises, or two corroborations inside one session stop
   counting as two.
+## ADR-0068 · A summary is prose, and only one that is a cut of the content may be rewritten
+
+- **Status:** accepted (2026-09-21).
+- **Context:** the pack renders `summary ?? content` under each title, so the summary is literally
+  what an agent reads when a session opens. Two writers stored knowledge without one — session
+  distillation and document ingestion, both with `useClassifier: false` — and fell back to the
+  heuristic, which returned the first 240 characters of the raw text. On a distilled entry of
+  300-500 characters that "summary" repeated almost the whole content; on a document chunk of
+  1400 it cut mid-word and mid-Markdown, and entries reached the agent ending in
+  `…(`usedConfigurationId`) **Frontend** -` and `… && Objects.equals(`.
+
+  The obvious fix — classify every chunk at ingestion time, which produces a model-written
+  summary — is a call per chunk. A folder of documentation is thousands of chunks, and batch
+  capture is cheap on purpose: the connectors ingest with heuristics and `maintain` adds the
+  intelligence afterwards, in one pass, over what is worth it.
+- **Decision:**
+  1. The heuristic takes the **Markdown out first** (headings, list markers, table pipes, inline
+     code, emphasis, link syntax, embedded HTML tags) and then keeps **whole sentences** up to 240
+     characters. It never ends mid-word: when the first sentence is longer than the budget it cuts
+     at the last space and says so with an ellipsis. Lines that are blocks of their own are joined
+     with a full stop, because otherwise a page of headings and bullets is a single 1400-character
+     "sentence" and every cut falls inside it.
+  2. The **distiller emits its own `summary`**, one sentence that does not repeat the title, and
+     `session-distill` passes it through. The precedence in `saveContext` is unchanged: explicit
+     input > LLM > heuristic.
+  3. A model-written summary is picked up **where the call is already being paid for**. Deferred
+     reclassification (`maintain`) asks the classifier for a type and was throwing away the summary
+     that came back in the same response; it now keeps it. Batch ingestion stays heuristic by
+     default, and `CORTEX_CAPTURE_LLM=1` still buys classification at ingest time.
+
+     That pass writes when the type changes **or** when the summary improves, which does not
+     reopen what [0067](#adr-0067) closed: what must not become a write is *confirming* a type,
+     because that is not an event in an entry's life. A summary that changes is one. And since
+     0067 confidence is counted from corroborations rather than read off `updated_at`, a write
+     here no longer promotes anything as a side effect.
+  4. What is already stored is rebuilt by `cortex-admin resummarize [--project X] [--dry-run]`,
+     with the classifier when one is wired and with the heuristic when it is not.
+  5. Both of those rewrite **only a derived summary**: one that starts where the content starts,
+     with or without the title, with or without the Markdown (`isDerivedSummary`). A summary an
+     explicit caller or the model wrote is knowledge in its own right and is never touched.
+- **Alternatives:** classify every document chunk at ingestion (`useClassifier: true` in
+  `captureBatch`) — it is the direct fix and it inverts a deliberate cost decision, turning any
+  folder of documentation into thousands of calls, to buy one pass earlier what `maintain` already
+  gives for free; leave it to the LLM and not touch the heuristic — everything has to keep working
+  with no `LLM_PROVIDER`, and that is the configuration most installs run; a `summarizer` role of
+  its own — a second call over the same text the classifier is already reading; rebuild every
+  summary in the backfill — it would overwrite the ones a person wrote, which are the good ones;
+  emit the summary only from the distiller (the original plan) — it leaves document chunks, which
+  are the worst offenders, exactly as they were.
+- **Consequences:** every rewrite moves the entry's `updated_at`, which the `context_entries`
+  trigger sets on any UPDATE. Since [0067](#adr-0067) that movement carries no meaning of its own —
+  confidence is counted, not inferred from it — but it is still a bulk write over a whole project,
+  which is why `resummarize` is run deliberately and `--dry-run` says what it would do first.
+  Summaries also stop being a literal prefix of the content, which is the signal
+  `isDerivedSummary` uses: a second pass over the same entries changes nothing, but an entry
+  re-summarised by the heuristic can still be improved later by the LLM.
+- **How to tell it worked:** over a project with documents ingested, no current entry has a summary
+  that ends in a Markdown marker or a word cut in half, and a distilled entry's summary is not a
+  prefix of its own content.
+- **Revisit when:** the heuristic has to understand a format it was not written for — a whole HTML
+  page, a chunk that is nothing but code — at which point the answer is probably to summarise at
+  extraction time rather than to keep growing the pattern list; or the distiller's summary turns
+  out, measured with `eval-distill`, to be no better than the first sentences of its own content,
+  at which point the field is dead weight in the prompt.

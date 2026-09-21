@@ -41,6 +41,7 @@ const COMMANDS: Record<string, Cmd> = {
   maintain: { help: "maintenance: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
   enrich: { help: "graph enrichment pass (entities + relations)", load: () => import("./commands/enrich.js") },
   lint: { help: "a project's knowledge health (contradictions, gaps...)", load: () => import("./commands/lint.js") },
+  resummarize: { help: "rebuild the summaries that are only a cut of the content", load: () => import("./commands/resummarize.js") },
   eval: { help: "measure retrieval against the question set with annotated evidence", load: () => import("./commands/eval.js") },
   "eval-distill": { help: "measure what the distiller keeps, drops and mistypes", load: () => import("./commands/eval-distill.js") },
   "lint-act": { help: "action plan (dry run) derived from the lint", load: () => import("./commands/lint-act.js") },

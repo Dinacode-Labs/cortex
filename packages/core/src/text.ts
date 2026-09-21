@@ -20,15 +20,135 @@ export function canonicalize(name: string): string {
     .replace(/\s+/g, " ");
 }
 
+const MAX_SUMMARY_CHARS = 240;
+/** Below this a summary says nothing, so whole sentences give way to a cut at a space. */
+const MIN_SUMMARY_CHARS = 80;
+const SENTENCE_END = /[.!?…]["')\]]?$/;
+
+interface CleanLine {
+  text: string;
+  /** A line that is a block of its own in Markdown: a heading, a list item, a table row. */
+  ownBlock: boolean;
+  /** It opens a block: the one above it too, plus the first line after a blank one. */
+  opensBlock: boolean;
+}
+
+// Only real HTML tag names, never `<[^>]+>`: a chunk of documentation that talks about
+// `List<String>` would lose half the sentence.
+const HTML_TAG =
+  /<\/?(?:img|br|hr|p|div|span|a|em|strong|b|i|u|s|code|pre|blockquote|ul|ol|li|dl|dt|dd|table|thead|tbody|tr|td|th|h[1-6]|details|summary|figure|figcaption|picture|source|sub|sup|kbd|small|center)\b[^>]*>/gi;
+
+function stripInline(s: string): string {
+  return s
+    .replace(HTML_TAG, " ")
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/(?<!\w)__([^_]+)__(?!\w)/g, "$1")
+    .replace(/(?<!\w)\*([^*\n]+)\*(?!\w)/g, "$1")
+    .replace(/(?<!\w)_([^_\n]+)_(?!\w)/g, "$1")
+    .replace(/~~([^~]+)~~/g, "$1");
+}
+
+function cleanLine(line: string): CleanLine | null {
+  const trimmed = line.trim();
+  if (!trimmed || /^(-{3,}|\*{3,}|_{3,}|={3,})$/.test(trimmed)) return null;
+
+  const heading = /^#{1,6}\s+/.test(trimmed);
+  let s = trimmed.replace(/^#{1,6}\s+/, "").replace(/^>\s?/, "");
+  const listItem = /^([-*+]|\d+[.)])\s+/.test(s);
+  s = s.replace(/^([-*+]|\d+[.)])\s+/, "");
+
+  let tableRow = false;
+  if (s.startsWith("|")) {
+    // A separator row (|---|:--:|) is layout, not content: whatever it contributes to a
+    // summary is noise.
+    if (/^\|[\s:|-]+\|?$/.test(s)) return null;
+    tableRow = true;
+    s = s
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((cell) => cell.trim())
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  s = stripInline(s).trim();
+  const ownBlock = heading || listItem || tableRow;
+  return s ? { text: s, ownBlock, opensBlock: ownBlock } : null;
+}
+
+/**
+ * Turns a Markdown fragment into the plain prose a summary is cut out of.
+ *
+ * The summary of a document chunk used to be its first 240 raw characters, which in a real
+ * ingestion produced entries whose whole "summary" was `…(`usedConfigurationId`) **Frontend** -`:
+ * table pipes, bold markers and a backtick cut in half. The pack renders that under the title
+ * and it is what the agent reads when a session opens.
+ *
+ * Fenced code is dropped rather than flattened -- a wall of Java in a summary teaches nobody
+ * anything -- but only while something is left over, because a chunk can be nothing but code.
+ *
+ * Lines are joined with a full stop when the previous one was a block of its own (a heading, a
+ * bullet, a table row) and did not end in one. Without it a page of headings and bullets is a
+ * single 1400-character "sentence", and any cut falls in the middle of it.
+ */
+export function stripMarkdown(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const joined = joinLines(lines, true);
+  if (joined) return joined;
+  const withCode = joinLines(lines, false);
+  return withCode || text.trim().replace(/\s+/g, " ");
+}
+
+function joinLines(lines: string[], dropFencedCode: boolean): string {
+  const blocks: CleanLine[] = [];
+  let inFence = false;
+  let afterBlank = true;
+  for (const raw of lines) {
+    if (/^\s*(```|~~~)/.test(raw)) {
+      inFence = !inFence;
+      afterBlank = true;
+      continue;
+    }
+    if (inFence && dropFencedCode) continue;
+    const cleaned = cleanLine(raw);
+    if (!cleaned) {
+      afterBlank = true;
+      continue;
+    }
+    blocks.push({ ...cleaned, opensBlock: cleaned.opensBlock || afterBlank });
+    afterBlank = false;
+  }
+
+  let out = "";
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i]!;
+    if (!out) {
+      out = block.text;
+      continue;
+    }
+    // Only a line that IS a block closes one: a paragraph wrapped over several lines is one
+    // sentence, and a full stop per line would chop it up.
+    const boundary = blocks[i - 1]!.ownBlock || block.opensBlock;
+    if (boundary && !SENTENCE_END.test(out)) out = `${out.replace(/[\s,;:·—–-]+$/, "")}. `;
+    else out += " ";
+    out += block.text;
+  }
+  // Inline markers are taken out per line AND here: Markdown wraps paragraphs, so a `**bold**`
+  // that opens on one line and closes on the next only matches once the lines are joined.
+  return stripInline(out).replace(/\s+/g, " ").trim();
+}
+
 /** Derives a short title when the user gave none: the first sentence, trimmed. */
 export function deriveTitle(content: string): string {
-  const firstLine = content.trim().split(/\r?\n/)[0] ?? content.trim();
-  const firstSentence = firstLine.split(/(?<=[.!?])\s/)[0] ?? firstLine;
-  const title = firstSentence.trim();
+  const firstLine = stripMarkdown(content).split(/(?<=[.!?])\s/)[0] ?? "";
+  const title = firstLine.trim();
   return title.length > 120 ? `${title.slice(0, 117)}...` : title;
 }
 
-/** Heuristic summary: the first sentence(s), up to ~240 characters. */
 /**
  * Strips from the summary the title that already sits right above it.
  *
@@ -52,12 +172,50 @@ export function stripLeadingTitle(summary: string, title: string): string {
   return rest.length >= 40 ? rest : summary;
 }
 
+function cutAtSpace(text: string, max: number): string {
+  const cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  const kept = lastSpace > 0 ? cut.slice(0, lastSpace) : cut;
+  return kept.replace(/[\s.\-–—*|_:;,·]+$/, "");
+}
+
+/**
+ * Heuristic summary (no LLM): Markdown out, then whole sentences up to 240 characters.
+ *
+ * It never ends mid-word. When the very first sentence is longer than the budget there is no
+ * sentence boundary to stop at, so it cuts at the last space and says so with an ellipsis.
+ */
 export function summarize(content: string): string {
-  const text = content.trim().replace(/\s+/g, " ");
-  if (text.length <= 240) return text;
-  const cut = text.slice(0, 240);
-  const lastStop = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
-  return lastStop > 80 ? cut.slice(0, lastStop + 1) : `${cut.trim()}...`;
+  const text = stripMarkdown(content);
+  if (text.length <= MAX_SUMMARY_CHARS) return text;
+
+  let kept = "";
+  for (const sentence of text.split(/(?<=[.!?…])\s+/)) {
+    const next = kept ? `${kept} ${sentence}` : sentence;
+    if (next.length > MAX_SUMMARY_CHARS) break;
+    kept = next;
+  }
+  if (kept.length >= MIN_SUMMARY_CHARS) return kept;
+  return `${cutAtSpace(text, MAX_SUMMARY_CHARS)}...`;
+}
+
+/**
+ * Is this summary just a cut of the content, rather than something a person or a model wrote?
+ *
+ * It is what tells apart what may be rebuilt from what must not be touched: an explicit
+ * summary from the caller, or one the LLM wrote, is knowledge in its own right. A derived one
+ * always starts where the content starts -- before or after the title, with the Markdown still
+ * in or already taken out, depending on which heuristic produced it.
+ */
+export function isDerivedSummary(summary: string | null, content: string, title: string): boolean {
+  const norm = (s: string) => s.trim().replace(/\s+/g, " ");
+  const s = norm(summary ?? "").replace(/\.{3}$/, "").trim();
+  if (!s) return true;
+  const raw = norm(content);
+  const clean = norm(stripMarkdown(content));
+  return [raw, norm(stripLeadingTitle(raw, title)), clean, norm(stripLeadingTitle(clean, title))].some((c) =>
+    c.startsWith(s),
+  );
 }
 
 // Classification rules in priority order (most specific first).

@@ -80,6 +80,7 @@ export const distillSession: DistillSessionFn = async (input) => {
             content: scrub(`${item.title}\n\n${item.content}`),
             project: input.projectName,
             title: item.title,
+            summary: item.summary,
             type: item.type,
             confidence: "low", // distilled knowledge is born low-confidence; `maintain` raises it once corroborated
             sourceType,
