@@ -22,6 +22,7 @@ import {
   invalidateEntry,
   reclassifyProject,
   renderContextPack,
+  resummarizeEntries,
 } from "@cortex/core";
 
 const RID = Date.now().toString(36); // a unique suffix -> it isolates each run
@@ -260,6 +261,156 @@ describe("deferred reclassification (maintain, a real database)", () => {
       setClassifier(null);
     }
   });
+
+  /**
+   * The classifier returns a summary whether we ask it for one or not, and reclassification
+   * used to throw it away. A document chunk ingested cheaply then reached the pack with the
+   * first characters of itself as its summary for ever, because nothing else was going to
+   * revisit it.
+   */
+  it("reclassifyProject keeps the summary the classifier returned, and does not overwrite one that was written", async () => {
+    const p = await createProject(`IT ReclassSummary ${RID}`);
+    const opts = { detectImprovements: false, skipEmbedding: false, useClassifier: false } as const;
+    const content = "The exports worker retries three times and then sends the message to the DLQ.";
+    await saveContext({ content, project: p.name, title: "Worker retries", sourceReference: "rs-derived" } as never, opts);
+    await saveContext(
+      { content, project: p.name, title: "Worker retries", summary: "Written by a human being.", sourceReference: "rs-written" } as never,
+      opts,
+    );
+
+    setClassifier(async () => ({ type: "decision", title: "T", summary: "Three retries and then the DLQ.", entities: [] }));
+    try {
+      await reclassifyProject(p.name);
+      const entries = await listEntries({ project: p.name });
+      expect(entries.find((e) => e.sourceReference === "rs-derived")?.summary).toBe("Three retries and then the DLQ.");
+      expect(entries.find((e) => e.sourceReference === "rs-written")?.summary).toBe("Written by a human being.");
+    } finally {
+      setClassifier(null);
+    }
+  });
+
+  /**
+   * Where this pass meets ADR-0067: confirming a type must NOT produce a write, but a summary
+   * that changes must. Collapsing the two -- writing for both, or for neither -- breaks one of
+   * the two rules in silence, and the one that breaks quietly is the summary.
+   */
+  it("writes the better summary even when the classifier confirms the type it already had", async () => {
+    const p = await createProject(`IT ReclassConfirmed ${RID}`);
+    const touched = async (id: string): Promise<number> =>
+      (await listEntries({ project: p.name })).find((e) => e.id === id)!.updatedAt.getTime();
+
+    const { entry } = await saveContext(
+      {
+        content: "The exports worker retries three times before the DLQ.",
+        project: p.name,
+        title: "Worker retries",
+        type: "decision",
+        sourceReference: "rc-confirmed",
+      } as never,
+      { detectImprovements: false, skipEmbedding: false, useClassifier: false },
+    );
+    const atRest = await touched(entry.id);
+
+    setClassifier(async () => ({ type: "decision", title: "T", summary: "Three attempts, then the DLQ.", entities: [] }));
+    try {
+      const first = await reclassifyProject(p.name);
+      expect(first.reclassified).toBe(0); // the type was already right: nothing to re-type
+      const entries = await listEntries({ project: p.name });
+      expect(entries.find((e) => e.sourceReference === "rc-confirmed")?.summary).toBe("Three attempts, then the DLQ.");
+      const afterFirst = await touched(entry.id);
+      expect(afterFirst).not.toBe(atRest); // the summary was worth a write
+
+      // The second pass finds a summary that is no longer a cut of the content, and a type it
+      // only confirms: it must not touch the row at all.
+      await reclassifyProject(p.name);
+      expect(await touched(entry.id)).toBe(afterFirst);
+    } finally {
+      setClassifier(null);
+    }
+  });
+});
+
+describe("a distilled entry's summary (a real database)", () => {
+  const title = "Retries move to the dead-letter queue";
+  const body = "Beyond three attempts the message is parked in the DLQ and an operator replays it by hand.";
+
+  it("is not a prefix of its own content, with the summary the distiller writes", async () => {
+    const p = await createProject(`IT Distilled ${RID}`);
+    const summary = "Three attempts, then a human being decides.";
+    const { entry } = await saveContext(
+      { content: `${title}\n\n${body}`, project: p.name, title, summary, sourceType: "agent_session", confidence: "low" } as never,
+      { useClassifier: false, detectImprovements: false, skipEmbedding: true },
+    );
+    expect(entry.summary).toBe(summary);
+    expect(entry.content.replace(/\s+/g, " ").startsWith(entry.summary!)).toBe(false);
+  });
+
+  it("is not a prefix of its own content either when there is no model to write one", async () => {
+    const p = await createProject(`IT DistilledNoLlm ${RID}`);
+    const { entry } = await saveContext(
+      { content: `${title}\n\n${body}`, project: p.name, title, sourceType: "agent_session", confidence: "low" } as never,
+      { useClassifier: false, detectImprovements: false, skipEmbedding: true },
+    );
+    expect(entry.summary).toBe(body); // the title above it is not repeated underneath
+    expect(entry.content.replace(/\s+/g, " ").startsWith(entry.summary!)).toBe(false);
+  });
+});
+
+/**
+ * `resummarize` exists for what is ALREADY stored: the heuristic changed, and a memory is
+ * mostly entries nobody is going to re-ingest. What it must never do is rewrite a summary a
+ * person or the model wrote, which is knowledge and not a cut of the content.
+ */
+describe("resummarize (a real database)", () => {
+  const chunk = `## Configuration fields
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| \`usedConfigurationId\` | string | **Frontend** |
+
+The frontend sends \`usedConfigurationId\` when the user picks a saved configuration, and the backend ignores it while recomputing the price.`;
+
+  it("rebuilds a summary that is only a cut of the content and leaves a written one alone", async () => {
+    const p = await createProject(`IT Resummarize ${RID}`);
+    const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: true } as const;
+    const sql = getSql();
+    const derived = await saveContext({ content: chunk, project: p.name, title: "Configuration fields", sourceType: "document", sourceReference: "rs1" } as never, opts);
+    const written = await saveContext({ content: chunk, project: p.name, title: "Configuration fields", summary: "Which fields travel and who computes them.", sourceType: "document", sourceReference: "rs2" } as never, opts);
+    // The summary as the old heuristic stored it: the first 240 raw characters.
+    await sql`UPDATE context_entries SET summary = ${chunk.replace(/\s+/g, " ").slice(0, 240)} WHERE id = ${derived.entry.id}`;
+
+    const dry = await resummarizeEntries({ project: p.name, dryRun: true });
+    expect(dry.rewritten).toBe(1);
+    const afterDry = await listEntries({ project: p.name });
+    expect(afterDry.find((e) => e.sourceReference === "rs1")?.summary).toMatch(/\|/); // nothing was written
+
+    const r = await resummarizeEntries({ project: p.name });
+    expect(r.rewritten).toBe(1);
+    const entries = await listEntries({ project: p.name });
+    const rebuilt = entries.find((e) => e.sourceReference === "rs1")!.summary!;
+    expect(rebuilt).not.toMatch(/[|#`*]/);
+    expect(rebuilt.endsWith(".")).toBe(true);
+    expect(entries.find((e) => e.sourceReference === "rs2")?.summary).toBe("Which fields travel and who computes them.");
+    expect(written.entry.summary).toBe("Which fields travel and who computes them.");
+
+    // Idempotent: a second pass has nothing left to change.
+    expect((await resummarizeEntries({ project: p.name })).rewritten).toBe(0);
+  });
+
+  it("uses the classifier's summary when one is wired, and the heuristic when it is not", async () => {
+    const p = await createProject(`IT ResummarizeLlm ${RID}`);
+    const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: true } as const;
+    await saveContext({ content: chunk, project: p.name, title: "Configuration fields", sourceType: "document", sourceReference: "rl1" } as never, opts);
+
+    setClassifier(async () => ({ type: "module_note", title: "T", summary: "The price is always recomputed on the backend.", entities: [] }));
+    try {
+      expect((await resummarizeEntries({ project: p.name })).rewritten).toBe(1);
+    } finally {
+      setClassifier(null);
+    }
+    const entries = await listEntries({ project: p.name });
+    expect(entries.find((e) => e.sourceReference === "rl1")?.summary).toBe("The price is always recomputed on the backend.");
+  });
 });
 
 describe("confidence is earned by corroboration (a real database)", () => {
@@ -310,20 +461,23 @@ describe("confidence is earned by corroboration (a real database)", () => {
     expect(afterCuration.find((e) => e.id === entryIdA)?.confidence).toBe("medium");
     expect(afterCuration.find((e) => e.id === lone.entry.id)?.confidence).toBe("low");
 
-    // Reclassifying is not corroborating: a classifier that confirms the type must not write,
-    // because the write is what auto-curation used to read as "this recurred".
-    const touchedBefore = afterCuration.find((e) => e.id === lone.entry.id)!;
-    setClassifier(async () => ({ type: "decision", title: "T", summary: "s", entities: [] }));
+    // Reclassifying is not corroborating: a pass with nothing to change must not write, because
+    // the write is what auto-curation used to read as "this recurred". The same call also
+    // carries a summary, and a summary that improves on a cut of the content IS worth a write
+    // (ADR-0068) -- so what proves the rule is the SECOND pass, when nothing is left to change.
+    setClassifier(async () => ({ type: "decision", title: "T", summary: "It never resets mid-year.", entities: [] }));
     try {
       const rc = await reclassifyProject(p.name);
       expect(rc.scanned).toBe(2);
       expect(rc.reclassified).toBe(0);
+      const settled = (await listEntries({ project: p.name })).find((e) => e.id === lone.entry.id)!;
+      await reclassifyProject(p.name);
+      const touchedAfter = (await listEntries({ project: p.name })).find((e) => e.id === lone.entry.id)!;
+      expect(touchedAfter.updatedAt.getTime()).toBe(settled.updatedAt.getTime());
+      expect(touchedAfter.confidence).toBe("low");
     } finally {
       setClassifier(null);
     }
-    const touchedAfter = (await listEntries({ project: p.name })).find((e) => e.id === lone.entry.id)!;
-    expect(touchedAfter.updatedAt.getTime()).toBe(touchedBefore.updatedAt.getTime());
-    expect(touchedAfter.confidence).toBe("low");
   });
 
   /**

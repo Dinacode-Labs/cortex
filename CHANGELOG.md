@@ -92,6 +92,20 @@ fixes things.
   corroborated will start leaving search (`obsolete`, and reversible). Nothing is deleted, and
   what a person validated or promoted by hand is left alone
   ([ADR-0067](docs/decisions.md#adr-0067)).
+- **What your agent reads at the start of a session is a summary again, not the first 240
+  characters of the entry.** Distilled entries and document chunks were stored with no summary of
+  their own, so the pack showed a raw cut of the content: chopped mid-word and mid-Markdown, with
+  table pipes and half a backtick left in it. Now the distiller writes a summary of its own, and
+  the fallback used when there is no model takes the Markdown out first and stops at a sentence,
+  never mid-word. **This works with no LLM configured**; with one, the summary the classifier
+  already returns is kept instead of thrown away, so the entries your connectors ingested get a
+  real summary on the next `cortex-admin maintain` ([ADR-0068](docs/decisions.md#adr-0068)).
+- **The entries you already have can be fixed without re-ingesting anything.** `cortex-admin
+  resummarize [--project "<slug-or-name>"] [--dry-run]` rebuilds the summary of every current entry
+  whose summary is only a cut of its content, with the model when one is configured and with the
+  heuristic when it is not, and prints how many changed. A summary you or the model wrote is never
+  touched. Each rewrite moves that entry's `updated_at`, which no longer has any bearing on
+  confidence, but `--dry-run` still tells you what would change before anything does.
 
 ## [0.1.12] — 2026-09-18
 

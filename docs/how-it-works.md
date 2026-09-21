@@ -313,7 +313,7 @@ one shared function, `runAgent`, which also **records the tokens** spent, for ob
 | `graph` | Extracts entities **and relations**, the graph | nothing (dictionary entities only) |
 | `reranker` | Reorders search results | original hybrid order |
 | `retriever` | Writes the prose answer, citing the context | shows the raw fragments |
-| `distiller` | Distils a session or meeting into typed knowledge | nothing |
+| `distiller` | Distils a session or meeting into typed knowledge, each item with its own summary | nothing |
 | `reconciler` | Decides noop / update / supersede on a near-duplicate | deterministic dedup (noop only) |
 | `merger` | Merges two pieces about the same thing into one | keeps the existing one |
 
@@ -455,6 +455,15 @@ Under 300 characters, because every character of preamble is one the pack does n
 pack is the part the agent cannot work out by reading the code. The same sentence reaches the agents
 with no plugin through the MCP's `instructions`, which `cortex mcp` declares itself: `initialize` is
 answered by the proxy, before it has talked to any server.
+
+**What each line says.** An entry is rendered as its title and, under it, its `summary` — the
+content only when there is no summary. So the summary is not decoration: it is the entry, as far as
+the agent is concerned. It comes from whoever knows best, in this order: an explicit summary from
+whoever saved the entry, then the one the LLM wrote (the classifier and the distiller both produce
+one), then the heuristic. The heuristic takes the Markdown out and keeps whole sentences up to 240
+characters, so a document chunk arrives as prose rather than as its own first 240 raw characters,
+and it never ends mid-word ([ADR-0068](decisions.md#adr-0068)). Entries stored before that was true
+are rebuilt in place by `cortex-admin resummarize`.
 
 **What goes in it.** Everything that describes the **state** of the project: decisions,
 constraints, risks, technical debt, conventions, architecture, business rules, past incidents,

@@ -59,6 +59,8 @@ export {
   extractEntities,
   canonicalize,
   deriveTitle,
+  isDerivedSummary,
+  stripMarkdown,
   summarize,
 } from "./text.js";
 export {

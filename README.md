@@ -387,10 +387,15 @@ model, which stay on the server side rather than on every laptop
 version.
 
 By default capture types each item **heuristically**, which is cheap, and the intelligence,
-re-typing with an LLM, the graph, reconciliation and curation, is applied afterwards by
-`cortex-admin maintain`. With `CORTEX_CAPTURE_LLM=1` each item is classified by the LLM at
-ingestion time instead, which gives you reliable types from minute one at the cost of one LLM
-call per item.
+re-typing with an LLM, a real summary, the graph, reconciliation and curation, is applied
+afterwards by `cortex-admin maintain`. With `CORTEX_CAPTURE_LLM=1` each item is classified by the
+LLM at ingestion time instead, which gives you reliable types from minute one at the cost of one
+LLM call per item.
+
+Entries stored before a heuristic changed can be brought up to date without re-ingesting the
+source: `cortex-admin resummarize [--project "<slug-or-name>"] [--dry-run]` rebuilds the summary of
+every current entry whose summary is only a cut of its content, and leaves alone any summary you or
+the model wrote ([ADR-0068](./docs/decisions.md#adr-0068)).
 
 Code indexing and the standalone maintenance passes are operator commands, so they live in
 `cortex-admin`. See `cortex-admin --help`.

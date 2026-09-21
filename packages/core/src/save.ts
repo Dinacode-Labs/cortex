@@ -16,6 +16,7 @@ import {
   classifyType,
   deriveTitle,
   extractEntities,
+  isDerivedSummary,
   polarityContradicts,
   polarityTags,
   stripLeadingTitle,
@@ -278,18 +279,21 @@ export function decideReclassification(
  * HEURISTICALLY (connectors ingest cheaply). It is the piece that makes the "cheap ingestion ->
  * maintain adds intelligence" philosophy real: it fixes the types of what was already ingested
  * WITHOUT re-ingesting, and complements `CORTEX_CAPTURE_LLM` (which types during ingestion
- * itself). It touches only the `type` (not the embedding). With no classifier wired (no LLM) it
- * is a no-op.
+ * itself). It touches the `type` and the `summary` (not the embedding). With no classifier
+ * wired (no LLM) it is a no-op.
  *
  * Two marks keep it out: `enrichedBy='llm'` (a model typed it on the way in) and
  * `enrichedBy='distiller'` (a model typed it with the whole session window in front of it, far
  * more context than a classifier reading one entry on its own). Precedence is intact: neither
  * of those, nor what humans curated, is overwritten.
  *
- * It writes **only when the type changes**. Confirming a type is not an event in an entry's
- * life and an UPDATE would record it as one. The price is one classifier call per confirmed
- * entry on every pass -- the mark that used to save that call was itself the write, and the
- * write was the bug (ADR-0067).
+ * It writes when the type changes, and when the `summary` the same call returned improves on
+ * one that is only a cut of the content -- the classifier returns a summary whether we ask for
+ * it or not, and it used to be thrown away, so a document chunk ingested cheaply reached the
+ * pack with the first 240 characters of itself for ever (ADR-0068). What it does NOT do is
+ * write to record that a type was confirmed: that is not an event in an entry's life, and one
+ * UPDATE per pass per entry is (ADR-0067). A summary that changes is a change to the entry; a
+ * type that stays the same is not.
  */
 export async function reclassifyProject(project: string): Promise<{ scanned: number; reclassified: number }> {
   const sql = getSql();
@@ -298,7 +302,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   if (!classifier) return { scanned: 0, reclassified: 0 }; // no LLM -> no-op
 
   const rows = (await sql`
-    SELECT id, content, type, metadata
+    SELECT id, title, content, summary, type, metadata
     FROM context_entries
     WHERE project_id = ${projectId} AND valid_to IS NULL
       AND COALESCE(metadata->>'enrichedBy', 'heuristic') NOT IN ('llm', 'distiller')
@@ -308,11 +312,89 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   for (const r of rows) {
     const res = await classifier(r.content as string).catch(() => null);
     const proposed = res?.type;
-    if (decideReclassification(r.type as ContextEntryType, proposed) !== "retype") continue;
-    reclassified++;
-    // `retype` is returned only for a type that is there and differs from the stored one.
-    const meta = { ...((r.metadata as Record<string, unknown>) ?? {}), enrichedBy: "llm" } as Parameters<typeof sql.json>[0];
-    await sql`UPDATE context_entries SET type = ${proposed!}, metadata = ${sql.json(meta)} WHERE id = ${r.id}`;
+    const decision = decideReclassification(r.type as ContextEntryType, proposed);
+    // Only asked of a classifier that answered: with none, the heuristic already ran on the
+    // way in and re-running it here is not what this pass is for.
+    const summary = res ? betterSummary(res.summary, r) : null;
+    if (decision === "retype") {
+      reclassified++;
+      // `retype` is returned only for a type that is there and differs from the stored one.
+      const meta = { ...((r.metadata as Record<string, unknown>) ?? {}), enrichedBy: "llm" } as Parameters<typeof sql.json>[0];
+      await sql`
+        UPDATE context_entries
+        SET type = ${proposed!}, summary = ${summary ?? (r.summary as string | null)}, metadata = ${sql.json(meta)}
+        WHERE id = ${r.id}
+      `;
+    } else if (summary) {
+      await sql`UPDATE context_entries SET summary = ${summary} WHERE id = ${r.id}`;
+    }
   }
   return { scanned: rows.length, reclassified };
+}
+
+/** The candidate summary for an entry, or null when what it already has must be kept. */
+function betterSummary(candidate: string | undefined, row: Row): string | null {
+  const title = row.title as string;
+  const content = row.content as string;
+  const current = (row.summary as string | null) ?? null;
+  if (!isDerivedSummary(current, content, title)) return null;
+  const next = stripLeadingTitle((candidate ?? summarize(content)).trim(), title).trim();
+  return next && next !== current ? next : null;
+}
+
+// --- deferred re-summarising (the `resummarize` command) ---------------------
+
+export interface ResummarizeOptions {
+  /** Slug or name; with none, every project (and whatever has no project). */
+  project?: string;
+  /** Computes and reports without writing. Defaults to false. */
+  dryRun?: boolean;
+  /** Called for each entry whose summary changes, before it is written. */
+  onRewrite?: (change: { id: string; title: string; before: string | null; after: string }) => void;
+}
+
+export interface ResummarizeResult {
+  scanned: number;
+  rewritten: number;
+}
+
+/**
+ * Rebuilds the summary of the CURRENT entries whose summary is just a cut of their content,
+ * with the LLM when one is wired and with the heuristic when it is not.
+ *
+ * It exists because the heuristic that produced those summaries was changed, and a memory is
+ * mostly made of what was already stored: without this, the entries an agent reads today keep
+ * the first 240 raw characters of themselves until somebody re-ingests the source.
+ *
+ * Writing moves `updated_at`, which the `context_entries` trigger sets on every UPDATE. That
+ * movement decides nothing on its own -- confidence is counted from corroborations (ADR-0067) --
+ * but it is a bulk write, which is what `dryRun` is for.
+ */
+export async function resummarizeEntries(opts: ResummarizeOptions = {}): Promise<ResummarizeResult> {
+  const sql = getSql();
+  let projectId: string | null = null;
+  if (opts.project) {
+    projectId = await findProjectIdByName(sql, opts.project);
+    if (!projectId) throw new Error(`Project not found: "${opts.project}".`);
+  }
+
+  const rows = (await sql`
+    SELECT id, title, content, summary
+    FROM context_entries
+    WHERE valid_to IS NULL
+      ${projectId ? sql`AND project_id = ${projectId}` : sql``}
+  `) as unknown as Row[];
+
+  let rewritten = 0;
+  for (const r of rows) {
+    const current = (r.summary as string | null) ?? null;
+    if (!isDerivedSummary(current, r.content as string, r.title as string)) continue;
+    const llm = classifier ? await classifier(r.content as string).catch(() => null) : null;
+    const next = betterSummary(llm?.summary, r);
+    if (!next) continue;
+    rewritten++;
+    opts.onRewrite?.({ id: r.id as string, title: r.title as string, before: current, after: next });
+    if (!opts.dryRun) await sql`UPDATE context_entries SET summary = ${next} WHERE id = ${r.id}`;
+  }
+  return { scanned: rows.length, rewritten };
 }

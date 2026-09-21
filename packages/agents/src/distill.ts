@@ -10,11 +10,15 @@ import { extractJson } from "./llm-json.js";
  * (decisions/constraints/incidents/conventions...). It does not ingest the raw transcript: it
  * extracts only what is DURABLE and reusable, discarding noise. It is the "intelligent" part
  * of the session capture pipeline.
+ *
+ * Each item also carries its own `summary`. Without it the entry was summarised by the
+ * heuristic over "Title. Body", so the summary of a 300-character distilled entry repeated
+ * almost all of it, and that is what the pack hands the agent when a session opens.
  */
 
 const TYPES = contextEntryType.options as readonly string[];
 
-export interface Item { type: string; title: string; content: string }
+export interface Item { type: string; title: string; content: string; summary?: string }
 
 /**
  * Is the provider rejecting us? This is told apart from a per-window failure because it is NOT
@@ -36,14 +40,19 @@ export async function distill(project: string, window: string): Promise<Item[]> 
 ${window}
 """
 Extract ONLY the DURABLE, reusable knowledge as JSON:
-{"items":[{"type": one of [${TYPES.join(", ")}], "title": "a short title", "content": "the knowledge in 1-3 sentences"}]}
+{"items":[{"type": one of [${TYPES.join(", ")}], "title": "a short title", "content": "the knowledge in 1-3 sentences", "summary": "one sentence that does NOT repeat the title"}]}
 Include technical decisions, constraints, incidents and how they were resolved, conventions, technical debt, risks and how-tos. DISCARD noise (tool calls, file dumps, narration, greetings, abandoned attempts). NEVER include secrets or keys. When nothing is worth keeping, return {"items":[]}.`;
   try {
     const raw = await runAgent("distiller", prompt, { maxOutputTokens: 1500 });
-    const parsed = JSON.parse(extractJson(raw)) as { items?: { type?: string; title?: string; content?: string }[] };
+    const parsed = JSON.parse(extractJson(raw)) as { items?: { type?: string; title?: string; content?: string; summary?: string }[] };
     return (parsed.items ?? [])
       .filter((i): i is Item => Boolean(i?.title && i?.content))
-      .map((i) => ({ type: TYPES.includes(i.type ?? "") ? (i.type as string) : "module_note", title: i.title.trim().slice(0, 160), content: i.content.trim() }));
+      .map((i) => ({
+        type: TYPES.includes(i.type ?? "") ? (i.type as string) : "module_note",
+        title: i.title.trim().slice(0, 160),
+        content: i.content.trim(),
+        summary: i.summary?.trim() || undefined,
+      }));
   } catch (e) {
     // With no LLM configured there is no failure: that is a deliberate state and core falls
     // back to heuristics.
