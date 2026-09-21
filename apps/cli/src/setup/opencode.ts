@@ -1,4 +1,5 @@
 import { existsSync, rmSync } from "node:fs";
+import { CAPTURE_DO_NOT_SAVE, CAPTURE_SELF_CHECK, SAVE_TOOL, captureTrigger } from "@cortex/shared";
 import { GENERATED_MARKER, emptyReport, type AgentAdapter, type AgentStatus, type SetupCtx, type SetupReport } from "./types.js";
 import { homeFile, readJson, removeIfGenerated, tilde, writeIfChanged, writeJson } from "./fs.js";
 
@@ -64,13 +65,23 @@ export const CortexPlugin = async ({ $, directory }) => {
 };
 `;
 
+// OpenCode has no skill mechanism, so the command carries the protocol itself: the trigger, the
+// self-check and the format, in the same words as the Claude Code skill (`capture-protocol.ts`).
 const COMMAND_MD = `---
 description: Save project knowledge to Cortex
 ---
 
-${GENERATED_MARKER}. Use the \`save_project_context\` tool (MCP \`cortex\`) to save what was just
-decided or discovered in the project linked to this folder. Summarise it in a sentence or two,
-say where it came from, and do not invent anything that was not said.
+${GENERATED_MARKER}. Save what was just decided or discovered in the project linked to this folder
+with the \`${SAVE_TOOL}\` tool (MCP \`cortex\`).
+
+${captureTrigger()} ${CAPTURE_SELF_CHECK}
+
+\`title\`: verb + object. \`content\`: **What** (one sentence) / **Why** (the reason, or the user's
+own words) / **Where** (files or modules) / **Learned** (gotchas, if any). Declarative facts, not
+orders. Pass \`confidence: "high"\` only when the user stated or confirmed it.
+
+${CAPTURE_DO_NOT_SAVE} Invent nothing that was not said, and if the answer flags a duplicate or a
+contradiction, say so instead of saving a second copy.
 `;
 
 interface McpEntry {

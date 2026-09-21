@@ -5,6 +5,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { z } from "zod";
 import { createMcpProxy, isAuthError } from "../apps/cli/src/mcp/proxy.js";
+import { CAPTURE_DO_NOT_SAVE, captureTrigger } from "../packages/shared/src/capture-protocol.js";
 
 /**
  * The proxy is the only MCP agents will see after ADR-0025, so what has to be guaranteed is not
@@ -45,6 +46,23 @@ async function linkedUpstream(server: McpServer): Promise<Transport> {
 }
 
 describe("createMcpProxy", () => {
+  /**
+   * `initialize` is answered by the PROXY, not by the server behind it, so the server's
+   * `instructions` never reach the agent: they were written for a connection the agent does not
+   * make. The proxy has to declare them itself — and it has to do so with no session and with the
+   * server down, which is exactly when it answers `initialize` and cannot ask anybody.
+   */
+  it("declares the capture protocol as instructions, with no upstream at all", async () => {
+    const { client, close } = await harness(() => Promise.reject(new Error("fetch failed")));
+    try {
+      const instructions = client.getInstructions() ?? "";
+      expect(instructions).toContain(captureTrigger());
+      expect(instructions).toContain(CAPTURE_DO_NOT_SAVE);
+    } finally {
+      await close();
+    }
+  });
+
   it("forwards the tool list along with its inputSchema", async () => {
     const up = upstreamServer();
     const { client, close } = await harness(() => linkedUpstream(up));

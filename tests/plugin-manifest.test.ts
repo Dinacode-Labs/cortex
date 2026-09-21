@@ -62,4 +62,35 @@ describe("plugin de Claude Code", () => {
     expect(existsSync(resolve(root, "plugin/claude-code/skills/cortex-capture/SKILL.md"))).toBe(true);
     expect(existsSync(resolve(root, "plugin/claude-code/commands/cortex-save.md"))).toBe(true);
   });
+
+  /**
+   * The skill used to say "when you finish a piece of work" and "do not save noise", and agents
+   * almost never called the tool: nothing in it named a moment you could recognise while working.
+   * What it has to carry now is a trigger list, the self-check, what NOT to save and one format.
+   * A section that quietly disappears takes the protocol with it and nothing else fails.
+   */
+  it("the skill carries the whole protocol, and still fits in a session", () => {
+    const skill = readFileSync(resolve(root, "plugin/claude-code/skills/cortex-capture/SKILL.md"), "utf8");
+    for (const section of [/^## Triggers/m, /^## Self-check after every task/m, /^## Do NOT save/m, /^## Format/m]) {
+      expect(skill, `missing section ${section}`).toMatch(section);
+    }
+    // The description is what makes it fire at all: it triggers on being asked, and on deciding.
+    // Folded (`>-`), so a line break in it is a space once the frontmatter is parsed.
+    const description = (/^description: >-\n([\s\S]*?)\n---/m.exec(skill)?.[1] ?? "").replace(/\s+/g, " ");
+    for (const phrase of ["remember this", "record that decision", "decides"]) {
+      expect(description, `the description does not trigger on "${phrase}"`).toContain(phrase);
+    }
+    // Spanish stays because the users write it: the confirmation is the trigger, not the language.
+    expect(skill).toContain("vale");
+    // A skill nobody reads to the end is a skill whose format section does not apply (120 lines).
+    expect(skill.split("\n").length).toBeLessThanOrEqual(120);
+  });
+
+  /** The command is a shortcut into the skill, not a second, quietly different protocol. */
+  it("/cortex-save points at the skill instead of restating the format", () => {
+    const command = readFileSync(resolve(root, "plugin/claude-code/commands/cortex-save.md"), "utf8");
+    expect(command).toContain("cortex-capture");
+    expect(command).toMatch(/Format/);
+    expect(command.split("\n").length).toBeLessThanOrEqual(20);
+  });
 });

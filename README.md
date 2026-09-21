@@ -336,6 +336,17 @@ Cortex ships **its own** pieces, the MCP with the 8 tools, the `cortex-capture` 
 other agents are configured through their own native mechanism by the same command. The
 plugin also carries the two hooks that close the loop.
 
+**The capture protocol.** Injecting the memory is the easy half. The other half is getting the
+agent to write back **at the moment it learns something**, which is when the reason is still on
+screen: a decision taken, a recommendation you confirmed or turned down, a bug fixed with its root
+cause, a convention you corrected, a constraint that surfaced. That is what the `cortex-capture`
+skill is — a trigger list acted on mid-task, with a self-check, an explicit list of what **not** to
+save, and one format (`title` as verb + object; `content` as What / Why / Where / Learned). The same
+sentences reach every agent from one place, `packages/shared/src/capture-protocol.ts`: the
+session-start header, the MCP's instructions, the skill, OpenCode's command and Pi's memory
+tool all take their wording from there, and a test fails if one of them starts writing its own
+([ADR-0066](./docs/decisions.md#adr-0066)).
+
 Separately there is **your organisation's toolbelt**, the MCPs and skills for whatever tools
 your team uses. That installs from an **external registry**, usually in a private repository.
 It deliberately does not live here: it is not product, it is one company's configuration

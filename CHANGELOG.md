@@ -8,6 +8,25 @@ fixes things.
 
 ## [Unreleased]
 
+### Changed
+- **Your agent now knows *when* to write to the memory, not just how.** The `cortex-capture` skill
+  was a report-at-the-end skill — four occasions to save and "do not save noise" — and agents
+  hardly ever called the tool, so the memory filled up from distilled sessions instead. It is now a
+  **trigger list acted on mid-task**: a decision taken, a recommendation you confirmed ("go with
+  that", "vale", "sí, así") or turned down ("no, mejor X"), a bug fixed with its root cause, a
+  convention you corrected, a constraint that surfaced, a workaround. Plus a self-check to repeat
+  after every task, an explicit list of what **not** to save — task progress, session-local
+  hiccups, open questions, what the repository already documents, secrets — and one format:
+  `title` as verb + object, `content` as What / Why / Where / Learned, written as facts rather than
+  as orders. What you get is entries that keep the *why*, which is the part a summary written later
+  has already lost.
+
+  The same sentences now reach **every** agent from one place: the three-line header at session
+  start, the MCP's instructions — declared by `cortex mcp` itself, so they arrive even with no
+  session and with the server down, which is how Hermes and any plugin-less agent hear about this
+  at all — the skill, OpenCode's `/cortex-save` and Pi's memory tool. `cortex setup` rewrites the
+  generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
+
 ## [0.1.12] — 2026-09-18
 
 ### Added

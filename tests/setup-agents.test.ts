@@ -3,6 +3,7 @@ import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parse as yamlParse } from "yaml";
+import { CAPTURE_DO_NOT_SAVE, captureTrigger } from "../packages/shared/src/capture-protocol.js";
 import { codexAdapter } from "../apps/cli/src/setup/codex.js";
 import { hermesAdapter } from "../apps/cli/src/setup/hermes.js";
 import { openCodeAdapter } from "../apps/cli/src/setup/opencode.js";
@@ -68,6 +69,19 @@ describe("opencode", () => {
     expect(existsSync(join(home, ".config/opencode/command/cortex-save.md"))).toBe(true);
   });
 
+  /**
+   * OpenCode has no skill mechanism, so this command is the only place the capture protocol can
+   * live for it. Written by hand it drifted from the skill's wording within one release, which is
+   * how an agent ends up with a different protocol from the agent next to it.
+   */
+  it("the /cortex-save command carries the shared protocol, not its own wording", async () => {
+    await openCodeAdapter.apply(ctxWith());
+    const command = readFileSync(join(home, ".config/opencode/command/cortex-save.md"), "utf8");
+    expect(command).toContain(captureTrigger());
+    expect(command).toContain(CAPTURE_DO_NOT_SAVE);
+    expect(command).toMatch(/What.*Why.*Where/s);
+  });
+
   it("re-declares the MCP that pointed at the cloned repo", async () => {
     put(CFG, JSON.stringify({ mcp: { cortex: { type: "local", command: ["pnpm", "-C", "/repo", "--filter", "@cortex/mcp-server", "start"] } } }));
     const report = await openCodeAdapter.apply(ctxWith());
@@ -128,6 +142,12 @@ describe("pi", () => {
       expect(ext).toContain(`name: "${t}"`);
     }
     expect(ext).not.toContain('name: "mem_save"');
+    // A tool's description is the only text Pi puts in front of the model for us, so the trigger
+    // travels there -- naming the tool Pi HAS: telling it to call `save_project_context` would be
+    // pointing it at a tool that does not exist in this agent.
+    expect(ext).toContain(captureTrigger("cortex.mem_save"));
+    expect(ext).toContain(CAPTURE_DO_NOT_SAVE);
+    expect(ext).not.toContain(captureTrigger());
     expect(readJson(MCP).mcpServers.cortex).toEqual({ command: "cortex", args: ["mcp"] });
     expect(readJson(MCP).mcpServers.context7).toBeDefined();
   });

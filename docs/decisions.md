@@ -1962,3 +1962,69 @@ without ever being stated — formatting, and where `any` is allowed — were fi
 - **Revisit when:** contributors from outside start arriving and style diverges in pull requests,
   at which point a formatter finally earns its cost; or the rules grow past what is worth loading
   in every session, at which point the rarely-needed ones move to skills.
+
+## ADR-0066 · The capture protocol is pushed at the moment, in one wording, from `shared`
+
+- **Status:** accepted (2026-09-21).
+- **Context:** the loop was closed at both ends — a hook injects the pack at session start, another
+  distils the transcript at the end — and the middle was empty. The `cortex-capture` skill listed
+  four occasions to save, said "do not save noise" and proposed a loose summary shape; the header
+  the context hook injected was one line that ended in "capture what is new"; the MCP server
+  declared no `instructions` at all. Nothing named a moment an agent can recognise while it is
+  working, so agents almost never called `save_project_context` and the memory filled up from
+  distillation instead.
+
+  That matters because the two routes do not produce the same thing. Entries saved **through the
+  tool** carry the why and the where, and their titles read like decisions; distilled ones are a
+  session summarised by a model that was not in the room — the what survives, the reason does not.
+  The best writer of a project memory is the agent right after the event, with the user present and
+  the reason still on screen.
+
+  Five entrypoints say this to five agents (the session header, the MCP's instructions, the Claude
+  Code plugin's skill, OpenCode's command, Pi's tool description), and each one was written on its
+  own. Two of them had already drifted.
+- **Decision:**
+  1. The skill is a **trigger list acted on mid-task**, not a report written at the end: a decision
+     taken, a recommendation the user confirmed or rejected, a bug fixed with its root cause, a
+     convention established or corrected, a constraint learned, a non-obvious discovery, a
+     workaround. Plus a **self-check** quoted verbatim so it can be repeated, an explicit **do NOT
+     save** list, and **one format** — `title` as verb + object, `content` as What / Why / Where /
+     Learned.
+  2. The confirmations and rejections are listed **in Spanish as well** ("vale", "sí, así", "no,
+     mejor X"). They are corpus data, like the classification patterns of [0064](#adr-0064): the
+     trigger is the confirmation, not the language it arrives in.
+  3. Facts are written **declaratively** ("Repositories use in-memory fakes in tests"), never as
+     orders ("Always use in-memory fakes"). An entry phrased as an order is re-read next session as
+     an instruction and starts governing work it was never about.
+  4. The shared sentences live in **`packages/shared/src/capture-protocol.ts`** and every carrier
+     takes them from there: the session header (under 300 characters, because it competes with the
+     pack for the session's budget), the MCP's `instructions` (under 400), the skill, OpenCode's
+     command and Pi's tool description. The trigger takes the **tool's name as an argument**: Pi's
+     is `cortex.mem_save`, and telling it to call `save_project_context` would point it at a tool
+     it does not have. For the same reason the pointer to the skill only goes to whoever installs
+     the plugin.
+  5. The `instructions` are declared **in the stdio proxy** (`cortex mcp`) as well as in the HTTP
+     MCP. `initialize` is answered by the proxy, so what the server declares never reaches the
+     agent — and the proxy answers it with no session and with the server down, which is when it
+     has nobody to ask (ADR-0025 put the proxy in the middle precisely so the agent starts anyway).
+- **Alternatives:** leave it to distillation — cheaper, and it is what produced the entries we like
+  least; make the capture hook fire more often — it distils more of the same, rather than better;
+  write the protocol once per agent where each one reads it — that is what was there, and it had
+  already drifted; a single long block of instructions injected at session start — the budget it
+  would eat belongs to the pack, which is the part the agent cannot get by reading the code; make
+  the model decide what is worth saving with no list — that is exactly the instruction that was
+  being ignored.
+- **Consequences:** the same protocol now reaches every agent, and a carrier cannot quietly grow its
+  own version of it: `tests/capture-protocol.test.ts` fails if one writes the sentence by hand, and
+  it fails if the header or the instructions outgrow their budget. The cost is that saving competes
+  with answering — an agent that saves mid-task spends a call on it — which is why the skill makes
+  the delivery rule explicit: the save happens before the final answer and is never the answer.
+  Entries will also arrive in greater numbers and at higher confidence, so `lint` and `autoCurate`
+  matter more than they did, not less.
+- **How to tell it worked:** the weekly share of entries with `source_type = 'claude_code'` against
+  `agent_session`, and a read of 20 new tool-saved entries — the title is verb + object, the content
+  has a Why and a Where.
+- **Revisit when:** the triggers fire so often that the memory fills with near-duplicates the
+  reconciler has to absorb, at which point the list narrows to decisions and corrections; or a
+  measurement shows the tool is still not being called, at which point the problem is not the
+  wording and the honest answer is a save the user confirms rather than one the agent volunteers.

@@ -1,4 +1,5 @@
 import { existsSync } from "node:fs";
+import { CAPTURE_DO_NOT_SAVE, captureTrigger } from "@cortex/shared";
 import { homeFile, readJson, removeIfGenerated, tilde, writeIfChanged, writeJson } from "./fs.js";
 import { GENERATED_MARKER, emptyReport, type AgentAdapter, type AgentStatus, type SetupCtx, type SetupReport } from "./types.js";
 
@@ -28,6 +29,17 @@ import { GENERATED_MARKER, emptyReport, type AgentAdapter, type AgentStatus, typ
  * session loses its beginning). The JSONL's path arrives in `event.targetSessionFile` or in
  * `ctx.sessionManager.getSessionFile()`, which is what the hook knows how to read.
  */
+
+/**
+ * A tool's description is the only text Pi puts in front of the model on our behalf, so it is
+ * where the capture protocol has to travel — in the shared wording, naming the tool Pi actually
+ * has (`cortex.mem_save`, not `save_project_context`).
+ */
+const MEM_SAVE_DESCRIPTION = [
+  "Save a piece of project knowledge (decision, constraint, convention, incident…) to Cortex, the shared project memory.",
+  captureTrigger("cortex.mem_save"),
+  CAPTURE_DO_NOT_SAVE,
+].join(" ");
 
 const EXT_FILE = (ctx: SetupCtx): string => homeFile(ctx, ".pi/agent/extensions/cortex.ts");
 const MCP_FILE = (ctx: SetupCtx): string => homeFile(ctx, ".pi/agent/mcp.json");
@@ -108,7 +120,7 @@ export default function (pi: any) {
   pi.registerTool({
     name: "cortex.mem_save",
     label: "Cortex: save",
-    description: "Save a piece of project knowledge (decision, constraint, convention, incident…) to Cortex, the shared project memory.",
+    description: ${JSON.stringify(MEM_SAVE_DESCRIPTION)},
     promptSnippet: "Cortex memory: save",
     parameters: T({ content: S("What to remember, written so it still makes sense in six months"), title: S("Short, searchable title"), type: S("decision | constraint | convention | incident | risk | how_to | architecture…") }, ["content"]),
     execute: async (_id: string, p: any, _s: unknown, _u: unknown, ctx: any) =>
