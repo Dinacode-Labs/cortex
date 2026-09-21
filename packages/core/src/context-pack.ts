@@ -9,8 +9,6 @@ import { findProjectByName, projectIdsWithAncestors } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import { vectorSearch, type SearchHit } from "./vectors.js";
 
-// --- validate_context_entry --------------------------------------------------
-
 /** Changes an entry's validation status. Section 15.4. */
 export async function validateEntry(
   id: string,
@@ -22,8 +20,6 @@ export async function validateEntry(
   `) as unknown as Row[];
   return rows[0] ? rowToContextEntry(rows[0]) : null;
 }
-
-// --- get_project_context_pack ------------------------------------------------
 
 /**
  * Which knowledge types go into the pack, in what order and with how much weight.
@@ -113,7 +109,6 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
     throw new Error(`Project not found: "${project}".`);
   }
 
-  // Inheritance: the pack includes the project's knowledge plus its ancestors' (the parent's).
   const ids = await projectIdsWithAncestors(projectId);
   const byType = await Promise.all(PACK_SECTIONS.map((s) => entriesByType(sql, ids, s.type, asOf)));
   const sections: PackSection[] = PACK_SECTIONS.map((s, i) => ({ ...s, entries: byType[i]! })).filter(
@@ -257,8 +252,6 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
     })),
   }));
 }
-
-// --- helpers -----------------------------------------------------------------
 
 /** The project's id plus all its ancestors' (parent hierarchy). For context inheritance. */
 

@@ -260,7 +260,6 @@ export async function indexRepo(
   let i = 0;
   let done = 0;
   while (i < all.length) {
-    // Batch bounded both by count and by a character (~token) budget per request.
     const batch: CodeChunk[] = [];
     let chars = 0;
     while (i < all.length && batch.length < batchSize && (batch.length === 0 || chars + all[i]!.content.length <= BATCH_CHAR_BUDGET)) {

@@ -45,7 +45,6 @@ export async function run(args: string[]): Promise<void> {
   const items = JSON.parse(readFileSync(resolve(file), "utf8")) as IngestItem[];
   console.log(`Ingesting ${items.length} items into "${project}" (llm=${USE_LLM})...`);
 
-  // --- Phase 1: persist entries without an embedding (database only) ---
   const toEmbed: { contextEntryId: string; text: string }[] = [];
   let done = 0;
   let failed = 0;
@@ -81,7 +80,6 @@ export async function run(args: string[]): Promise<void> {
   await Promise.all(Array.from({ length: PHASE1_CONCURRENCY }, () => worker()));
   console.log(`Phase 1 done: ${toEmbed.length} entries (${failed} failed).`);
 
-  // --- Phase 2: embeddings in batches ---
   console.log(`Phase 2: generating embeddings in batches of ${EMBED_BATCH}...`);
   await storeEmbeddingsBatch(getSql(), getEmbeddingProvider(), toEmbed, {
     batchSize: EMBED_BATCH,

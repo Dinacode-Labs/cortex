@@ -109,8 +109,6 @@ export async function invalidateEntry(entryId: string, supersededById: string): 
   `;
 }
 
-// --- Reusable write reconciliation (sessions + connectors) -------------------
-
 /** Injectable LLM reconciler (provided by @cortex/agents through setReconciler). Without it,
  * reconciliation is deterministic: near-identical dedup only (no merge/supersede). */
 export interface ReconcilerHooks {

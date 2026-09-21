@@ -8,7 +8,6 @@ import { parseBody } from "../validate.js";
 /** Authentication routes (email + OTP) and the session's lifecycle. */
 export const authRoutes = new Hono();
 
-// --- REQUEST schemas (zod v3) -------------------------------------------------
 const authRequestSchema = z.object({ email: z.string().min(1) });
 const authVerifySchema = z.object({ email: z.string().min(1), code: z.string().min(1) });
 

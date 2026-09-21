@@ -10,8 +10,6 @@ import { z } from "zod";
  * and the TypeScript types are derived with z.infer.
  */
 
-// --- Domain enums ------------------------------------------------------------
-
 /** Kind of knowledge unit. Section 14, context_entries.type */
 export const contextEntryType = z.enum([
   "decision",
@@ -144,8 +142,6 @@ export const sourceType = z.enum([
 ]);
 export type SourceType = z.infer<typeof sourceType>;
 
-// --- Persisted entities ------------------------------------------------------
-
 /** A unit of knowledge. Section 14, context_entries */
 export const contextEntry = z.object({
   id: z.string().uuid(),
@@ -209,8 +205,6 @@ export const source = z.object({
   createdAt: z.date(),
 });
 export type Source = z.infer<typeof source>;
-
-// --- Input DTOs (shared by ingestion and the MCP tools) ----------------------
 
 /**
  * Minimal input for saving context. Used both by manual capture and by Claude Code (the

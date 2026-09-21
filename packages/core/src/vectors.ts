@@ -134,7 +134,6 @@ export async function hybridSearch(
     filters = sql`${filters} AND ce.valid_to IS NULL`;
   }
 
-  // Vector branch.
   const vectors = await provider.embed([args.queryText]);
   const lit = toVectorLiteral(vectors[0]!);
   const vecRows = (await sql`
@@ -147,7 +146,6 @@ export async function hybridSearch(
     LIMIT ${pool}
   `) as unknown as Row[];
 
-  // Lexical branch (FTS).
   const ftsRows = (await sql`
     SELECT ce.id, ts_rank(ce.content_tsv, plainto_tsquery('spanish', ${args.queryText})) AS rank
     FROM context_entries ce
@@ -157,7 +155,6 @@ export async function hybridSearch(
     LIMIT ${pool}
   `) as unknown as Row[];
 
-  // Reciprocal Rank Fusion (the shared fusion lives in rrfFuse).
   const ranked = rrfFuse(
     vecRows as unknown as { id: string; distance?: number | string }[],
     ftsRows as unknown as { id: string }[],

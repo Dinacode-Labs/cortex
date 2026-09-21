@@ -135,7 +135,6 @@ export async function getProjectGraph(
   const includeEntries = opts.includeEntries ?? true;
   const maxEntries = opts.maxEntries ?? 500;
 
-  // The project's entities (linked to its entries), excluding the project itself.
   const entityRows = (await sql`
     SELECT DISTINCT en.id, en.name, en.type
     FROM entities en
@@ -167,7 +166,6 @@ export async function getProjectGraph(
   }
 
   const edges: GraphEdge[] = [];
-  // Relations (entity <-> entity, entry -> entity) with both ends inside the graph.
   const relRows = (await sql`
     SELECT source_id, target_id, relation_type
     FROM relations
@@ -178,7 +176,6 @@ export async function getProjectGraph(
       edges.push({ from: r.source_id, to: r.target_id, label: r.relation_type, kind: "relation" });
     }
   }
-  // Entry -> entity mentions (when entries are included).
   if (includeEntries) {
     const linkRows = (await sql`
       SELECT cee.context_entry_id, cee.entity_id

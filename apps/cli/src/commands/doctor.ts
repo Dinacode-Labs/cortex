@@ -47,7 +47,6 @@ async function ping(url: string, opts: { token?: string } = {}): Promise<{ ok: b
 export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]> {
   const checks: Check[] = [];
 
-  // --- Node -----------------------------------------------------------------
   const major = Number(process.versions.node.split(".")[0]);
   const minor = Number(process.versions.node.split(".")[1]);
   checks.push({
@@ -65,7 +64,6 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
     });
   }
 
-  // --- Session and server ---------------------------------------------------
   // EVERY server there is a session for is checked (ADR-0033): with several of them, knowing
   // one works says nothing about the other, and the repo you are in may point at any of them.
   const sessions = listCredentials();
@@ -137,7 +135,6 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
     }
   }
 
-  // --- This repo ------------------------------------------------------------
   const link = useProjectServer(cwd);
   if (!link) {
     checks.push({
@@ -153,7 +150,6 @@ export async function collectChecks(ctx: SetupCtx, cwd: string): Promise<Check[]
     checks.push({ name: "This folder", level: "ok", detail: `linked to "${link.slug ?? link.project}"${whereItGoes}` });
   }
 
-  // --- Agentes --------------------------------------------------------------
   const detectados = detectAgents(ctx);
   if (detectados.length === 0) {
     checks.push({ name: "Agents", level: "warn", detail: "none found on this machine" });
@@ -180,7 +176,6 @@ export async function run(args: string[] = []): Promise<void> {
   const cwd = process.env.INIT_CWD || process.cwd();
   const checks = await collectChecks(defaultCtx(), cwd);
 
-  // --- Informe --------------------------------------------------------------
   const width = Math.max(...checks.map((c) => c.name.length));
   console.log("cortex doctor\n");
   for (const c of checks) {

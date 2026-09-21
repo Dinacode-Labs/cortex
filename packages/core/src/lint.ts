@@ -47,7 +47,6 @@ export async function lintProject(project: string): Promise<LintReport> {
     ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
 
-  // Contradictions: 'contradicts' relations with either end inside the project.
   const contraRows = (await sql`
     SELECT COALESCE(es.name, ces.title, '?') AS a, COALESCE(et.name, cet.title, '?') AS b,
            ces.id AS a_id, cet.id AS b_id
@@ -100,7 +99,6 @@ export async function lintProject(project: string): Promise<LintReport> {
     LIMIT 25
   `) as unknown as Row[];
 
-  // Orphan entities: a single entry and no relations.
   const orphanRows = (await sql`
     SELECT en.name, en.type
     FROM entities en
@@ -123,7 +121,6 @@ export async function lintProject(project: string): Promise<LintReport> {
     ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND (validity='historical' OR metadata->>'state'='Histórico')`) as unknown as Row[])[0]!.n, // 'Histórico' is Plane's own value
   );
 
-  // Gaps: areas (module/service) with incidents but no documented decisions.
   const gapRows = (await sql`
     SELECT en.name, en.type, count(*) FILTER (WHERE ce.type='incident') AS incidents
     FROM entities en

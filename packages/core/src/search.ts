@@ -13,8 +13,6 @@ import { inferTypeFromQuery } from "./query-intent.js";
 
 export type { SearchHit } from "./vectors.js";
 
-// --- Optional rerank hook (the LLM layer) ------------------------------------
-
 /** Optional second-stage reranker (e.g. an LLM). It reorders the hits by relevance. */
 export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]>;
 
@@ -24,8 +22,6 @@ let reranker: Reranker | null = null;
 export function setReranker(fn: Reranker | null): void {
   reranker = fn;
 }
-
-// --- search_project_context --------------------------------------------------
 
 /**
  * Hybrid search (vector + FTS + RRF) with optional rerank. Section 15.6.
@@ -115,8 +111,6 @@ export async function searchContext(
   const reranked = await reranker(parsed.query, ordered).catch(() => ordered);
   return reranked.slice(0, parsed.limit);
 }
-
-// --- list_project_decisions --------------------------------------------------
 
 /** Lists a project's technical decisions. */
 export async function listDecisions(project: string, limit = 20): Promise<ContextEntry[]> {
