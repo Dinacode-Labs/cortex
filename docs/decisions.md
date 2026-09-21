@@ -1871,8 +1871,8 @@ without ever being stated — formatting, and where `any` is allowed — were fi
 
   1. **Patterns that match the corpus**, which is Spanish: `CLASSIFY_RULES`, `MODULE_KEYWORDS`
      and `polarityTags` in `packages/core/src/text.ts`, the deictics regex in
-     `packages/shared/src/domain.ts`, and the eval fixtures in `tests/fixtures/eval/` — the
-     recall@5 0.987 / MRR 0.928 baseline was measured against them, so translating them would
+     `packages/shared/src/domain.ts`, and the eval sets in `evals/` — the recall@5 0.987 /
+     MRR 0.928 baseline was measured against them, so translating them would
      silently invalidate every comparison the eval exists to make. They match what users write,
      not the language of the file they live in.
   2. The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in

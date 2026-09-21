@@ -17,6 +17,12 @@ and its own marking key. Neither half is the implicit one: the first set in does
 in the root and the first language in does not get to be the one with no suffix, or whatever
 arrives second is an afterthought bolted onto a name.
 
+These are **not tests**, which is why they live here and not under `tests/`: they put a mark on
+a model, so they need a real provider, they cost money and minutes, and they are launched by
+hand — CI never runs one. What does run on every commit is what guards them, with no model
+involved: `tests/eval-*.test.ts`, which mark both the markers and the sets themselves. How one
+of these is built, and what has to be true of it: `.claude/rules/evals.md`.
+
 ## Why an invented corpus and not the real memory
 
 Because an eval exists to compare runs, and the real memory changes every day: the same code

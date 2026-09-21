@@ -47,9 +47,9 @@ Dos cosas se quedan en castellano a propósito, y las dos son **datos, no prosa 
 escrito nosotros**:
 
 - **Los patrones que casan con el corpus**, que es español: las reglas de clasificación de
-  `packages/core/src/text.ts`, los deícticos de `packages/shared/src/domain.ts` y las fixtures
-  del eval de `tests/fixtures/eval/` (la línea base se midió contra ellas). Casan con lo que
-  escribe la gente, no con el idioma del fichero en el que viven.
+  `packages/core/src/text.ts`, los deícticos de `packages/shared/src/domain.ts` y los conjuntos
+  de eval de `evals/` (la línea base se midió contra ellos). Casan con lo que escribe la gente,
+  no con el idioma del fichero en el que viven.
 - **El idioma de salida de los agentes LLM** (`OUTPUT_LANGUAGE` en
   `packages/agents/src/mastra.ts`). Los prompts están en inglés; lo que los agentes producen son
   entradas de conocimiento que se guardan junto a un corpus que ya es español, así que cambiarlo

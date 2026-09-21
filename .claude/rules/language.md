@@ -15,8 +15,8 @@ Two things, and the rule that separates them is that they are **data rather than
 
 1. **Patterns that match the corpus**, which is Spanish: `CLASSIFY_RULES`, `MODULE_KEYWORDS` and
    `polarityTags` in `packages/core/src/text.ts`, the deictics regex in
-   `packages/shared/src/domain.ts`, and the eval fixtures in `tests/fixtures/eval/` — the baseline
-   was measured against them, so translating them silently invalidates every comparison.
+   `packages/shared/src/domain.ts`, and the eval sets in `evals/` — the baseline was measured
+   against them, so translating them silently invalidates every comparison.
 2. The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in
    `packages/agents/src/mastra.ts`). The prompts are English; what the agents produce is stored
    next to a corpus that is already Spanish. Changing it is a product decision, not a translation.

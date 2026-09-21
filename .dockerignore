@@ -10,6 +10,7 @@ node_modules
 *.log
 docs
 tests
+evals
 deploy
 plugin
 .claude

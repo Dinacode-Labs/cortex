@@ -11,7 +11,7 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
  * the embeddings: **did it get better or worse?** Without this, every change is defended with
  * hand-picked examples, which is the same as not defending it.
  *
- * The corpus is fixed in the repo (`tests/fixtures/eval/retrieval/`) and is not taken from the real
+ * The corpus is fixed in the repo (`evals/retrieval/`) and is not taken from the real
  * memory: an eval exists to compare runs, and the real memory changes every day, so the same
  * code change would give different numbers depending on what was captured that week.
  *
@@ -56,7 +56,7 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 const ROOT = new URL("../../../../", import.meta.url).pathname;
-const FIXTURES_DIR = join(ROOT, "tests/fixtures/eval/retrieval");
+const FIXTURES_DIR = join(ROOT, "evals/retrieval");
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;

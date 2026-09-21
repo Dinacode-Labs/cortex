@@ -6,13 +6,18 @@
 ## Where each one goes
 
 - **Unit** (`tests/*.test.ts`, `pnpm test`): pure, deterministic logic — schemas, permissions,
-  slugs, session parsers, version compatibility. No database, no network.
+  slugs, session parsers, version compatibility. No database, no network. The glob is **not
+  recursive**: a `*.test.ts` inside a subdirectory of `tests/` stops running and says nothing.
 - **Integration** (`tests/integration/*.test.ts`, `pnpm test:integration`): against a real Postgres
   (`cortex_test`), `local` embeddings and `LLM_PROVIDER=none`. Hermetic: no network, no keys. They
   cover persistence and search, hierarchy and inheritance, permissions and cascades, batch capture
   and auth. They need `pnpm db:up`; the `globalSetup` creates and migrates the database.
 - They share one database, so they run serially and each test isolates itself with a unique suffix
   (`RID`).
+- **An eval is not a test** and does not live here. It marks a model, so it needs a provider,
+  costs money and is launched by hand; nothing in CI runs one. Its exam and its marking key go
+  in `evals/<set>/`, and `tests/` keeps only what guards them — `tests/eval-*.test.ts`, which
+  mark the marker and the set itself with no model involved. See `.claude/rules/evals.md`.
 
 ## The rule that sets this repo apart
 

@@ -451,7 +451,7 @@ pnpm admin maintain-worker    # scheduled maintenance
   own mark; `--verbose` prints every item it emitted. Both need a real provider, and
   `eval-distill` refuses to run without an LLM, because the distiller *is* the model and with no
   model every window comes back empty. What each set contains and what the numbers mean:
-  [`tests/fixtures/eval/README.md`](./tests/fixtures/eval/README.md).
+  [`evals/README.md`](./evals/README.md).
 
 ### Deployment
 

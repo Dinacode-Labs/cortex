@@ -130,6 +130,11 @@ are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
 
   Add tests with your PR when you touch testable logic.
 
+  **Evals are not tests** and live apart, in `evals/`: they put a mark on a model, so they need
+  a real provider, they cost money and they are launched by hand — CI never runs one
+  ([`evals/README.md`](./evals/README.md)). What does run on every commit is what guards them,
+  `tests/eval-*.test.ts`, with no model involved.
+
 ## Pull requests
 
 1. Branch from `main`; keep the change focused.
