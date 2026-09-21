@@ -1,0 +1,19 @@
+USER: Ok.
+
+ASSISTANT: ¿Sigo con algo más?
+
+USER: No, por ahora nada. Gracias.
+
+ASSISTANT: A mandar.
+
+USER: Vale, luego lo miro con calma.
+
+ASSISTANT: Perfecto. Aquí estoy cuando quieras.
+
+USER: Gracias otra vez.
+
+ASSISTANT: Un placer.
+
+USER: Hasta luego.
+
+ASSISTANT: Hasta luego.

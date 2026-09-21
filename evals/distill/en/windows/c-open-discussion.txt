@@ -1,0 +1,15 @@
+USER: We have no real monitoring. If a worker dies at night nobody knows until a customer calls. What are the options?
+
+ASSISTANT: Three, roughly. Prometheus with Grafana on our own host: no per-metric cost, full control, and it is one more thing to run and to back up. Datadog: it works on the afternoon you install it and the bill grows with the number of hosts and custom metrics, which is exactly what we would add most of. Or the middle ground, start with structured logs and alerts on top of what we already store, which buys us the night-time alerting without committing to a platform.
+
+USER: What would Datadog cost us at our size?
+
+ASSISTANT: For three services and the database it is not dramatic today. The part that grows is custom metrics and log retention, and that is the part we cannot predict yet because we do not know what we will want to watch.
+
+USER: And running Prometheus ourselves? Realistically.
+
+ASSISTANT: Standing it up is an afternoon. Keeping it is the part people underestimate: retention, disk, upgrades, and the alerting rules, which is where the actual work is either way.
+
+USER: Right. I do not want to decide this today with the numbers we have. Park it, I will bring it up when we know what we want to watch. Nothing here is decided.
+
+ASSISTANT: Understood, leaving it open.

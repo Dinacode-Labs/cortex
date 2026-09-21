@@ -27,7 +27,7 @@ content** (ADR-0065):
 
 - Always: `architecture.md`, `language.md`, `tests.md`, `documentation.md`.
 - Only when you touch what they cover (a `paths:` header): `typescript-style.md`, `api-http.md`,
-  `cli.md`, `web.md`, `llm-agents.md`.
+  `cli.md`, `web.md`, `llm-agents.md`, `evals.md`.
 
 If you work with another agent that does not read `.claude/rules/`, those files are still the
 reference: they are written for anyone.
@@ -81,6 +81,9 @@ plugin/        # claude-code/: what Cortex installs into Claude Code (hooks, MCP
 config/        # only the schema of the THIRD-PARTY registry (the organisation's toolbelt,
                # ADR-0014/0026). The product's own no longer lives here: it is in plugin/
 tests/         # unit + integration (a real Postgres; see CONTRIBUTING.md)
+evals/         # the eval sets: retrieval/ (corpus + questions) and distill/<lang>/ (windows +
+               # gold). NOT tests: they mark a model, need a provider and are launched by hand,
+               # so they live outside tests/ and CI never runs them (.claude/rules/evals.md)
 docs/
   decisions.md # a light ADR log: decisions = hypotheses to revisit
   design.md    # what the web UI is for and what it is not; read it BEFORE touching apps/web
