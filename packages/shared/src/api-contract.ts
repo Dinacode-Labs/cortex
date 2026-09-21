@@ -12,8 +12,6 @@ import { confidenceLevel, contextEntryType, sourceType } from "./domain.js";
  * isolated -- ADR-0008).
  */
 
-// --- Configuration the server announces to its clients --------------------------------
-
 export const clientConfig = z.object({
   /** API base (it may carry a path prefix when there is a proxy in front). */
   apiUrl: z.string(),
@@ -26,8 +24,6 @@ export const clientConfig = z.object({
   minClientVersion: z.string(),
 });
 export type ClientConfig = z.infer<typeof clientConfig>;
-
-// --- Projects -------------------------------------------------------------------------
 
 export const projectSummary = z.object({
   slug: z.string(),
@@ -66,8 +62,6 @@ export const createProjectResponse = z.object({
   created: z.boolean(),
 });
 export type CreateProjectResponse = z.infer<typeof createProjectResponse>;
-
-// --- Capture of an agent session ------------------------------------------------------
 
 export const capturePlatform = z.enum(["claude", "codex", "opencode", "hermes", "pi", "meeting", "other"]);
 export type CapturePlatform = z.infer<typeof capturePlatform>;
@@ -110,8 +104,6 @@ export const captureSessionResponse = z.object({
 });
 export type CaptureSessionResponse = z.infer<typeof captureSessionResponse>;
 
-// --- One-off capture (a single piece of knowledge) ------------------------------------
-
 export const captureRequest = z.object({
   slug: z.string().min(1),
   content: z.string().min(1),
@@ -123,8 +115,6 @@ export const captureRequest = z.object({
   metadata: z.record(z.unknown()).optional(),
 });
 export type CaptureRequest = z.infer<typeof captureRequest>;
-
-// --- Batch capture (connectors) -------------------------------------------------------
 
 /**
  * One item of `POST /capture/batch`. The enum-ish fields are typed as `string` on purpose:
@@ -141,8 +131,6 @@ export interface BatchItem {
   metadata?: Record<string, unknown>;
 }
 
-// --- Search and access by id ----------------------------------------------------------
-//
 // The API could write (`/capture`) but not read: search only existed over MCP, against the
 // database. That left out the CLI and any integration that is not an MCP-speaking agent,
 // such as the memory tools Cortex registers in Pi (ADR-0034).

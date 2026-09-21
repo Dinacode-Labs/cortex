@@ -240,7 +240,6 @@ export function classifyType(content: string): ContextEntryType {
   return "module_note";
 }
 
-// A minimal dictionary of recognisable technologies.
 const TECHNOLOGIES = [
   "laravel", "symfony", "vue", "react", "angular", "node", "nestjs", "next",
   "postgres", "postgresql", "mysql", "mariadb", "redis", "kafka", "rabbitmq",

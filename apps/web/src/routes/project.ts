@@ -38,8 +38,6 @@ export const projectRoutes = new Hono<WebEnv>();
  *  it teaches people to ignore the warnings, which is exactly what we do not want (ADR-0050). */
 const linkEntry = (id: string, text: Html | string): Html => html`<a href="/entry/${id}">${text}</a>`;
 
-// --- Memory ------------------------------------------------------------------------------
-
 projectRoutes.get("/p/:slug", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
@@ -136,8 +134,6 @@ projectRoutes.get("/p/:slug", async (c) => {
   return c.html(layout(project.name, body, { user }));
 });
 
-// --- Ask ---------------------------------------------------------------------------------
-
 projectRoutes.get("/p/:slug/ask", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
@@ -176,8 +172,6 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
     ${q ? html`<h2 style="font-size:17px">${q}</h2>${answerHtml}` : ""}`;
   return c.html(layout(`${project.name} · Ask`, body, { user }));
 });
-
-// --- What agents see (context pack) -------------------------------------------------------
 
 projectRoutes.get("/p/:slug/agents", async (c) => {
   const user = c.get("user")!;
@@ -263,8 +257,6 @@ projectRoutes.get("/p/:slug/agents.md", async (c) => {
   return c.text(renderContextPack(pack), 200, { "content-type": "text/plain; charset=utf-8" });
 });
 
-// --- Health (lint) ------------------------------------------------------------------------
-
 projectRoutes.get("/p/:slug/health", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
@@ -333,8 +325,6 @@ projectRoutes.get("/p/:slug/health", async (c) => {
   return c.html(layout(`${project.name} · Health`, body, { user }));
 });
 
-// --- Across this client -------------------------------------------------------------------
-
 /**
  * The question that can only be asked from a parent: what its repos share and where they
  * contradict each other (ADR-0063). It only exists when there are children to look at.
@@ -395,8 +385,6 @@ projectRoutes.get("/p/:slug/across", async (c) => {
   return c.html(layout(`${project.name} · Across this client`, body, { user }));
 });
 
-// --- Map (graph) --------------------------------------------------------------------------
-
 projectRoutes.get("/p/:slug/map", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
@@ -425,8 +413,6 @@ projectRoutes.get("/p/:slug/map", async (c) => {
     <script src="/graph.js"></script>`;
   return c.html(layout(`${project.name} · Map`, body, { user }));
 });
-
-// --- Code ---------------------------------------------------------------------------------
 
 projectRoutes.get("/p/:slug/code", async (c) => {
   const user = c.get("user")!;

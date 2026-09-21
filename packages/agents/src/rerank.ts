@@ -37,7 +37,6 @@ ones that contribute something. Return ONLY JSON: {"order":[indices]}.`;
         reordered.push(hits[idx]!);
       }
     }
-    // Append the ones not mentioned at the end (preserving their original order).
     hits.forEach((h, i) => {
       if (!seen.has(i)) reordered.push(h);
     });

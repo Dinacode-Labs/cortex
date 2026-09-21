@@ -24,8 +24,6 @@ import {
 } from "./text.js";
 import { storeEmbedding, vectorSearch } from "./vectors.js";
 
-// --- Optional classification hook (the LLM layer) ----------------------------
-
 export interface ClassifierResult {
   type?: ContextEntryType;
   title?: string;
@@ -46,8 +44,6 @@ let classifier: Classifier | null = null;
 export function setClassifier(fn: Classifier | null): void {
   classifier = fn;
 }
-
-// --- save_project_context ----------------------------------------------------
 
 export interface ContextWarning {
   kind: "possible_duplicate" | "possible_contradiction";
@@ -112,7 +108,6 @@ export async function saveContext(
     enrichedBy,
   } as Parameters<typeof sql.json>[0];
 
-  // Entities: the heuristic ones plus whatever the LLM detects, deduplicated.
   const detectedEntities = mergeEntities(extractEntities(parsed.content), llm?.entities ?? []);
 
   let projectId: string | null = null;
@@ -145,7 +140,6 @@ export async function saveContext(
 
   if (!opts.skipEmbedding) await storeEmbedding(sql, provider, entry.id, embedText);
 
-  // Entity linking (the relational graph)
   const entityIds: string[] = [];
   for (const e of detectedEntities) {
     const ent = await resolveEntity(sql, e.name, e.type);
@@ -189,7 +183,6 @@ async function detectImprovements(
   const seen = new Set<string>();
   const newPolarity = polarityTags(entry.content);
 
-  // Duplicates by vector similarity.
   const hits = await vectorSearch(sql, provider, {
     queryText: embedText,
     projectId,
@@ -210,7 +203,6 @@ async function detectImprovements(
     }
   }
 
-  // Contradictions by opposite polarity over shared entities.
   if (newPolarity.size > 0 && entityIds.length > 0) {
     const candidates = (await sql`
       SELECT DISTINCT ce.*
@@ -253,8 +245,6 @@ function mergeEntities(
   }
   return [...byKey.values()];
 }
-
-// --- deferred reclassification (maintain) ------------------------------------
 
 /** What a reclassification pass does with one entry. */
 export type ReclassifyDecision = "retype" | "confirmed" | "unclassified";
@@ -341,8 +331,6 @@ function betterSummary(candidate: string | undefined, row: Row): string | null {
   const next = stripLeadingTitle((candidate ?? summarize(content)).trim(), title).trim();
   return next && next !== current ? next : null;
 }
-
-// --- deferred re-summarising (the `resummarize` command) ---------------------
 
 export interface ResummarizeOptions {
   /** Slug or name; with none, every project (and whatever has no project). */

@@ -71,7 +71,6 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
     const t = await applyTemporalInvalidation();
     console.log(`  [temporal] ${t.historical} marked historical, ${t.superseded} superseded`);
 
-    // Auto-curation (no human): it promotes what was corroborated and decays the old and never corroborated.
     const c = await autoCurate();
     console.log(`  [curate] ${c.promoted} promoted (corroborated), ${c.decayed} decayed (obsolete)`);
 

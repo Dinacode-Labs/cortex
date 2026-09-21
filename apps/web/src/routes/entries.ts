@@ -107,7 +107,6 @@ entriesRoutes.post("/entry/:id/validate", async (c) => {
   return c.redirect(`/entry/${id}`);
 });
 
-// --- Saving context ------------------------------------------------------------
 entriesRoutes.post("/save", async (c) => {
   const user = c.get("user")!;
   const form = await c.req.parseBody();

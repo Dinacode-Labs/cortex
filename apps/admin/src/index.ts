@@ -27,17 +27,14 @@ function boot(load: () => Promise<unknown>, help: string): Cmd {
 }
 
 const COMMANDS: Record<string, Cmd> = {
-  // --- Services ---
   server: boot(() => import("@cortex/server/start"), "start the HTTP API (auth + context)"),
   "mcp-http": boot(() => import("@cortex/mcp-server/http"), "start the authenticated MCP over HTTP"),
   "maintain-worker": { help: "scheduled maintenance worker (cron)", managed: false, load: () => import("./commands/maintain-worker.js") },
 
-  // --- Schema and data ---
   migrate: { help: "apply the database's pending migrations", load: () => import("./commands/migrate.js") },
   seed: { help: "load the demo data (the fictional Acme Portal project)", load: () => import("./commands/seed.js") },
   ingest: { help: "bulk context ingestion from a JSON of items", load: () => import("./commands/ingest.js") },
 
-  // --- Knowledge curation ---
   maintain: { help: "maintenance: enrich/resolve/temporal/curate/reconcile/lint", load: () => import("./commands/maintain.js") },
   enrich: { help: "graph enrichment pass (entities + relations)", load: () => import("./commands/enrich.js") },
   lint: { help: "a project's knowledge health (contradictions, gaps...)", load: () => import("./commands/lint.js") },
@@ -49,7 +46,6 @@ const COMMANDS: Record<string, Cmd> = {
   "resolve-entities": { help: "merge entity variants into a canonical one", load: () => import("./commands/resolve-entities.js") },
   "index-code": { help: "index a local repo's code into a project", load: () => import("./commands/index-code.js") },
 
-  // --- Heavy connectors (local extraction: Office, PDF, audio, vision) ---
   "connect-docs": { help: "ingest a folder of documents (Word/PDF/Excel/...)", load: () => import("./commands/connect-docs.js") },
   "connect-notion": { help: "ingest a Notion export (pages + attachments)", load: () => import("./commands/connect-notion.js") },
   "connect-meeting": { help: "transcribe meeting recordings and ingest them", load: () => import("./commands/connect-meeting.js") },

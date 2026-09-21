@@ -19,8 +19,6 @@ export function joinHtml(parts: Html[], sep = ""): Html {
   return html`${parts.flatMap((p, i) => (i === 0 ? [p] : [raw(sep), p]))}`;
 }
 
-// --- Colour semantics ---------------------------------------------------------------------
-//
 // The interface's colour is almost all ink on paper; what colour there is carries meaning.
 // These maps are that meaning, which is why they live together: when a state changes colour it
 // changes here and everywhere at once.
@@ -55,8 +53,6 @@ export const statusBadge = (s: string): Html => badge(s, STATUS_COLORS[s] ?? "#5
 export const typeBadge = (t: string): Html => badge(t, TYPE_COLORS[t] ?? "#5b6673");
 export const confidenceBadge = (c: string): Html => badge(`conf: ${c}`, "#5b6673");
 export const scoreBadge = (n: number): Html => badge(n.toFixed(2), "#1a6dff");
-
-// --- Surfaces -----------------------------------------------------------------------------
 
 export interface PanelOptions {
   /** One line explaining what the section is about. Almost always needed. */
@@ -94,8 +90,6 @@ export function warn(message: Html | string, kind: "notice" | "contradiction" = 
   return html`<div class="warn ${kind === "contradiction" ? "contradiction" : ""}">${message}</div>`;
 }
 
-// --- Entry card ---------------------------------------------------------------------------
-
 export function entryCard(entry: ContextEntry): Html {
   return html`<a class="card" href="/entry/${entry.id}">
     <div class="card-head">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)}</div>
@@ -118,8 +112,6 @@ export function hitCard(entry: ContextEntry, score: number, origin?: Html): Html
   </a>`;
 }
 
-// --- Project card -------------------------------------------------------------------------
-
 /**
  * The card a project is chosen from.
  *
@@ -140,8 +132,6 @@ export function projectCard(p: AccessibleProject, health: Html): Html {
     </div>
   </a>`;
 }
-
-// --- Forms --------------------------------------------------------------------------------
 
 /**
  * A search box with its button: it appears in five places and must be the same in all five.

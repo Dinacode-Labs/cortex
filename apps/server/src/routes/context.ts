@@ -23,7 +23,6 @@ import { parseBody } from "../validate.js";
  */
 export const contextRoutes = new Hono();
 
-// --- REQUEST schemas (zod v3) -------------------------------------------------
 // The enums come from @cortex/shared: the values the real connectors send (document,
 // github_pr/github_issue, notion_doc, meeting_transcript, agent_session;
 // pr_summary/ticket_resolution/incident; belongs_to) are all inside the enum.
@@ -61,8 +60,6 @@ const relateSchema = z.object({
   targetId: z.string().min(1),
   relationType: relationType,
 });
-
-// --- Routes --------------------------------------------------------------------
 
 /** Context injection (the SessionStart hook): the linked project's pack, access permitting. */
 contextRoutes.get("/context-pack", async (c) => {
@@ -154,15 +151,12 @@ contextRoutes.post("/relate", async (c) => {
   return c.json({ ok: true });
 });
 
-// --- Reading: search and access by id --------------------------------------------------
-
 /**
  * The ids are UUIDs and arrive from outside (an agent will invent one before asking). Without
  * this check, a malformed id reaches Postgres and comes back as a 500: it is user input, not a
  * server fault, so the answer is the same as for an id that does not exist.
  */
 const ES_UUID = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-//
 // The API could write but not read: search only existed over MCP, against the database. That
 // left out the CLI and the memory tools Cortex registers in Pi (ADR-0034).
 

@@ -37,7 +37,6 @@ export async function resolveEntities(): Promise<ResolveResult> {
     linkCounts.set(r.entity_id, Number(r.n));
   }
 
-  // Group by type + normalised name.
   const groups = new Map<string, Row[]>();
   for (const e of entities) {
     const normalized = norm(e.name);
@@ -115,7 +114,6 @@ export async function resolveEntities(): Promise<ResolveResult> {
     groupsMerged++;
   }
 
-  // Deduplicate relations and drop self-relations after the merge.
   await sql`DELETE FROM relations WHERE source_id = target_id`;
   await sql`
     DELETE FROM relations a USING relations b

@@ -38,8 +38,6 @@ export interface ExtractedFile {
   format: string;
 }
 
-// --- Optional multimodal extraction hook (the LLM layer) ---------------------
-
 /** Injectable multimodal extractor (provided by @cortex/agents through setMediaExtractor).
  * Each function returns null when it gets no useful text (irrelevant image, no text, missing
  * external tool, provider failure...). */

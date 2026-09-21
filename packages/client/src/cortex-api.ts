@@ -30,8 +30,6 @@ import { readCredentials, writeCredentials, clearCredentials } from "./credentia
  * new as optional on the side that reads it.
  */
 
-// --- Meta -----------------------------------------------------------------------------
-
 /** The configuration the server announces. `null` when it does not respond or is an older
  *  version that does not expose the endpoint yet: the caller decides the fallback. */
 export async function getClientConfig(server?: string): Promise<ClientConfig | null> {
@@ -46,8 +44,6 @@ export async function getServerVersion(): Promise<string | null> {
   const res = await apiRequest<{ version: string }>("GET", "/version", undefined, { auth: false });
   return res.ok ? res.data.version : null;
 }
-
-// --- Auth -----------------------------------------------------------------------------
 
 export function requestOtpCode(server: string, email: string): Promise<ApiResult<{ ok?: boolean }>> {
   return apiRequest("POST", "/auth/request", { email }, { auth: false, baseUrl: server });
@@ -74,8 +70,6 @@ export function uiTicket(): Promise<ApiResult<{ ticket?: string }>> {
   return apiRequest("POST", "/auth/ui-ticket", {});
 }
 
-// --- Projects -------------------------------------------------------------------------
-
 export function listProjects(): Promise<ApiResult<{ projects: ProjectSummary[] }>> {
   return apiRequest("GET", "/projects");
 }
@@ -89,8 +83,6 @@ export function createProject(
 ): Promise<ApiResult<CreateProjectResponse & { error?: string; admins?: string[] }>> {
   return apiRequest("POST", "/projects", body);
 }
-
-// --- Context --------------------------------------------------------------------------
 
 /** The project's rendered context pack. `null` with no session, no access or no server. */
 export async function getContextPack(slug: string): Promise<{ project: string; text: string } | null> {
@@ -127,8 +119,6 @@ export function getCaptureSession(id: string): Promise<ApiResult<CaptureSessionR
 
 // Re-exported for convenience: whoever uses the client almost always needs the credentials.
 export { readCredentials, writeCredentials, clearCredentials };
-
-// --- Reading: search and access by id --------------------------------------------------
 
 /** Hybrid search. Without `slug`, over everything accessible; with one, only that project. */
 export function searchEntries(input: SearchRequest): Promise<ApiResult<SearchResponse>> {
