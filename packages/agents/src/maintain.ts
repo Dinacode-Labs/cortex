@@ -86,7 +86,7 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
 
     for (const p of projects) {
       const l = await lintProject(p);
-      console.log(`  [lint] ${p}: ${l.contradictions.length} contradictions · ${l.gaps.length} gaps · ${l.duplicates.length} dups · ${l.orphanEntities.length} orphans · ${l.lowConfidence} low-confidence`);
+      console.log(`  [lint] ${p}: ${l.contradictions.length} contradictions · ${l.gaps.length} gaps · ${l.duplicates.length} dups · ${l.orphanEntities.length} orphans · ${l.lowConfidence} low-confidence · ${l.neverReviewed} never reviewed`);
     }
 
     console.log("[maintain] done.");

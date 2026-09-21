@@ -282,6 +282,74 @@ describe("lint only looks at current entries (a real database)", () => {
   });
 });
 
+/**
+ * An ingested file lands as one entry per chunk (`chunkDocument`, ADR-0023), all of them
+ * carrying the same `metadata.file` and a `ref#k` of their own. Parts of a repetitive
+ * document -- a run's warnings, a table of readings -- are near-identical by construction,
+ * so they scored at the very top and filled the 25 rows of the report, burying the
+ * duplicates somebody could actually act on.
+ */
+describe("the duplicates report skips the parts of one document (a real database)", () => {
+  const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
+  const warnings = (from: number): string =>
+    Array.from({ length: 12 }, (_, i) =>
+      `WARN worker=export-${from + i} queue=exports retry=1 reason=timeout waiting for the downstream invoicing API; the job was requeued and finished on the second attempt.`,
+    ).join("\n");
+
+  it("parts of the same file are not reported; the very same texts split across files are", async () => {
+    const oneFile = await createProject(`IT Lint Chunks ${RID}`);
+    for (const i of [0, 1, 2]) {
+      await saveContext(
+        {
+          content: warnings(100 * (i + 1)),
+          project: oneFile.name,
+          title: `Nightly export (${i + 1}/3)`,
+          type: "incident",
+          sourceReference: `reports/nightly.md#${i}`,
+          metadata: { file: "reports/nightly.md", chunk: i, chunks: 3 },
+        } as never,
+        opts,
+      );
+    }
+    const chunks = await lintProject(oneFile.name);
+    expect(chunks.totalEntries).toBe(3);
+    expect(chunks.duplicates).toEqual([]); // every offender, not just the first
+
+    const manyFiles = await createProject(`IT Lint Files ${RID}`);
+    for (const i of [0, 1, 2]) {
+      await saveContext(
+        {
+          content: warnings(100 * (i + 1)),
+          project: manyFiles.name,
+          title: `Nightly export ${i + 1}`,
+          type: "incident",
+          sourceReference: `reports/nightly-${i}.md`,
+          metadata: { file: `reports/nightly-${i}.md` },
+        } as never,
+        opts,
+      );
+    }
+    const files = await lintProject(manyFiles.name);
+    expect(files.duplicates.length).toBe(3); // the three pairs: this is what the filter must not eat
+  });
+
+  it("two entries with no source reference are still compared: nothing is 'the same document' as nothing", async () => {
+    const p = await createProject(`IT Lint Refs ${RID}`);
+    const pair = (title: string, from: number, sourceReference?: string) =>
+      saveContext({ content: warnings(from), project: p.name, title, type: "incident", sourceReference } as never, opts);
+    const a = await pair("Warnings A", 100, "ops/run-42");
+    const b = await pair("Warnings B", 200, "ops/run-42");
+    const c = await pair("Warnings C", 300);
+    const d = await pair("Warnings D", 400);
+
+    const r = await lintProject(p.name);
+    const key = (x: string, y: string) => [x, y].sort().join("+");
+    const pairs = r.duplicates.map((x) => key(x.aId, x.bId));
+    expect(pairs).not.toContain(key(a.entry.id, b.entry.id)); // one source, two parts
+    expect(pairs).toContain(key(c.entry.id, d.entry.id)); // both sourceless, and unrelated
+  });
+});
+
 describe("graph integrity (the partial UNIQUE on active edges, D-5)", () => {
   it("relate is idempotent: the same edge twice → a single row", async () => {
     const sql = getSql();

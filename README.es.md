@@ -117,7 +117,7 @@ credenciales guardan una sesión por servidor (ADR-0033).
   secretos, y el servidor lo destila con su propia clave.
 - **Jerarquía de proyectos**: un cliente con varios repos es un proyecto padre con un hijo por
   repo. La herencia sube (un repo ve lo de su cliente) y los permisos también.
-- **Lint de la memoria**: contradicciones, duplicados, entradas obsoletas y huecos.
+- **Lint de la memoria**: contradicciones, duplicados, entradas sin revisar, entradas obsoletas y huecos.
 - **UI web** para leer, corregir y validar lo que los agentes han ido guardando.
 
 ## Arquitectura, en una línea

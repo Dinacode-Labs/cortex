@@ -326,7 +326,7 @@ directly and applies no permissions. It is for developing the server, not for da
 | `validate_context_entry` | Validate, reject, or mark obsolete |
 | `ask_project_context` | A question in plain language, answered from the memory with sources |
 | `search_project_code` | Hybrid search over the project's indexed code |
-| `lint_project_context` | Health of the memory: contradictions, duplicates, gaps |
+| `lint_project_context` | Health of the memory: contradictions, duplicates, gaps, unreviewed entries |
 
 ## How Cortex reaches your agents
 
