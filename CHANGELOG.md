@@ -106,6 +106,14 @@ fixes things.
   heuristic when it is not, and prints how many changed. A summary you or the model wrote is never
   touched. Each rewrite moves that entry's `updated_at`, which no longer has any bearing on
   confidence, but `--dry-run` still tells you what would change before anything does.
+- **The output cap each role asks for is in force again.** It was being sent at the top level of
+  the Mastra call, where this version drops it with no warning: every generation ran with no
+  ceiling, so a pathological window could cost an unbounded number of output tokens and the
+  generation traces recorded no parameters at all. The caps now travel where Mastra reads them —
+  60 tokens for the reconciler, 300 for the reranker, 700 for the merger, 900 for the retriever,
+  1200 for the graph, 1500 for the distiller and 2000 for the classifier, all unchanged — and
+  the roles that answer JSON generate at temperature 0, so the same window yields the same entry
+  instead of a different one each run.
 
 ## [0.1.12] — 2026-09-18
 
