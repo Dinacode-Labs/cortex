@@ -20,8 +20,8 @@
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/shared": "workspace:*",
-    "@mastra/core": "^1.45.0",
-    "@mastra/observability": "^1.15.0",
+    "@mastra/core": "^1.67.0",
+    "@mastra/observability": "^1.17.8",
     "@openrouter/ai-sdk-provider": "^2.9.1",
     "ai": "^6.0.208",
     "zod": "^4.4.3"
