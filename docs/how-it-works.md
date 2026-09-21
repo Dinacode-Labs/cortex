@@ -378,7 +378,7 @@ dumped in raw. The key step is **reconciliation**, inspired by
 existing one and decides **what to do**:
 
 ```
-similarity ≥ 0.95 and same source  → NOOP        (near-identical, adds nothing)
+similarity ≥ 0.95                   → NOOP        (near-identical, whatever its origin)
 similarity 0.82–0.95 (reconciler available):
         reconciler says "update"     → MERGE      (fuse and re-embed)  [auto-captured only]
         reconciler says "supersede"  → INVALIDATE (close the old window, see §6)
@@ -388,6 +388,10 @@ similarity < 0.82                   → ADD         (enters as a new fact, low c
 ```
 
 Both thresholds are configurable, through `CORTEX_DEDUP_NOOP` and `CORTEX_DEDUP_THRESHOLD`.
+
+Every outcome that does **not** add a new entry — a no-op or a merge — counts as a
+**corroboration** of the entry that was already there, and it is that count, not the fact of
+having been written to, that auto-curation promotes on ([ADR-0067](decisions.md#adr-0067)).
 
 **The critical guardrail:** Cortex **never automatically rewrites or invalidates** knowledge
 that came from a source or was curated by a human. Only **auto-captured** entries
@@ -406,9 +410,12 @@ one format. Distillation stays as the net underneath, for the sessions where nob
 
 **Auto-curation, with no human in the loop.** Capture writes immediately, at low confidence.
 Later, `maintain` runs `autoCurate`, which **promotes** to medium confidence anything that
-has been **corroborated**, meaning it came up again in another session, and **decays**, so
-removes from search, old material that was never corroborated. Quality rises over time
-without slowing capture down.
+has been **corroborated** — the same knowledge arrived again and reconciliation had nothing
+to add to it, or folded it in — and **decays**, so removes from search, old material that
+nothing ever corroborated. Corroborations are **counted**, one per encounter. Being written
+to does not count as one: an entry gets reclassified, re-embedded and corrected by hand
+without any of that making it truer ([ADR-0067](decisions.md#adr-0067)). Quality rises over
+time without slowing capture down.
 
 **Secrets.** Before the LLM sees anything, and again before storing, **secrets are
 stripped**: PEM keys, JWTs, `sk-…`, GitHub, Slack, AWS and Google tokens, `Bearer …` and

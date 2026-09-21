@@ -75,6 +75,24 @@ fixes things.
   at all — the skill, OpenCode's `/cortex-save` and Pi's memory tool. `cortex setup` rewrites the
   generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
 
+### Fixed
+- **Confidence is earned by corroboration, not by having been touched.** Almost every
+  distilled entry was reaching medium confidence on the first `maintain` run without anything
+  ever having confirmed it: promotion went by "has this entry been written to since it was
+  created", and maintenance itself rewrote each one minutes earlier while re-checking its type.
+  Corroborations are now **counted** — one each time the same knowledge arrives and
+  reconciliation has nothing to add or folds it in — and promotion, decay and the ordering of the
+  context pack all follow that count.
+
+  A migration undoes the promotions that were a side effect, so **most auto-captured entries go
+  back to low**: the counter starts empty, and an entry earns medium again the next time that
+  knowledge turns up. In the context pack this shows up straight away — what really has been
+  corroborated comes first, and the rest falls back to most-recent-first instead of the flat
+  block of medium it used to be. Decay can also fire again, so old material nothing ever
+  corroborated will start leaving search (`obsolete`, and reversible). Nothing is deleted, and
+  what a person validated or promoted by hand is left alone
+  ([ADR-0067](docs/decisions.md#adr-0067)).
+
 ## [0.1.12] — 2026-09-18
 
 ### Added

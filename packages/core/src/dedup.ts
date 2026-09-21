@@ -45,6 +45,24 @@ export async function isNearDuplicate(project: string, text: string, threshold =
   return n !== null && n.score >= threshold;
 }
 
+/**
+ * Records that an entry was CORROBORATED: the same knowledge arrived again and reconciliation
+ * decided there was nothing to add (noop) or folded it in (update). It is the only signal
+ * `autoCurate` promotes on (ADR-0067). Being WRITTEN to is not one: an entry gets reclassified,
+ * re-embedded and corrected by hand without any of that making it truer.
+ *
+ * One statement rather than read-modify-write, because two sessions closing at the same time
+ * would otherwise read the same value and store the same increment.
+ */
+export async function recordCorroboration(entryId: string): Promise<void> {
+  await getSql()`
+    UPDATE context_entries
+       SET metadata = jsonb_set(metadata, '{corroborations}',
+                                to_jsonb(cortex_corroborations(metadata) + 1))
+     WHERE id = ${entryId}
+  `;
+}
+
 /** UPDATE: replaces an entry's content (the result of the merge) and re-embeds it. */
 export async function updateEntryContent(entryId: string, content: string): Promise<void> {
   const sql = getSql();
@@ -115,13 +133,17 @@ export interface ReconcileResult {
 /**
  * Stores a piece while reconciling against what exists (mem0 style):
  *  - NOOP when something near-identical already exists (>= NOOP_THRESHOLD), **whatever its
- *    origin**. Deterministic dedup, no LLM. Acknowledging that we already know it touches
- *    nothing, so there is no need to demand the same origin.
+ *    origin**. Deterministic dedup, no LLM. Acknowledging that we already know it changes
+ *    nothing of what the entry says, so there is no need to demand the same origin.
  *  - With a reconciler injected, similarity 0.82-0.95 **and the same `sourceType`**: UPDATE
  *    (merge, auto-captured only), SUPERSEDE (invalidate the old auto-captured one; if it is
  *    sourced or curated it is only marked `contradicts`) or NOOP. Here the same origin IS
  *    required, because these branches MODIFY what was already there.
  *  - ADD in every other case. It NEVER rewrites or invalidates sourced or curated knowledge.
+ *
+ * Every branch that does NOT add a new entry -- the three noops and the merge -- counts as a
+ * corroboration of the entry that was already there (`recordCorroboration`), which is what
+ * auto-curation later promotes on.
  *
  * One known case remains: a PARAPHRASE (~0.84) of something captured by hand is added rather
  * than merged, because it lands in the UPDATE band where origin rules. That is deliberate --
@@ -143,7 +165,10 @@ export async function saveWithReconciliation(
   // repeats in its answer what the memory just told it, capture distills that, and since it
   // comes from "agent_session" it is never compared against the original "manual" entry. The
   // memory kept filling up with echoes of itself.
-  if (near && near.score >= NOOP_THRESHOLD) return { action: "noop", entryId: near.id };
+  if (near && near.score >= NOOP_THRESHOLD) {
+    await recordCorroboration(near.id);
+    return { action: "noop", entryId: near.id };
+  }
 
   // The same knowledge by TWO routes: the agent stores it with the tool and, on closing the
   // session, distillation stores it again. They arrive with different `sourceType`s ("manual"
@@ -156,13 +181,17 @@ export async function saveWithReconciliation(
   // added because we already knew it, which is exactly what is wanted.
   if (near && !sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
     if ((await reconciler.decide(near.content, input.content)) === "noop") {
+      await recordCorroboration(near.id);
       return { action: "noop", entryId: near.id };
     }
   }
 
   if (near && sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
     const decision = await reconciler.decide(near.content, input.content);
-    if (decision === "noop") return { action: "noop", entryId: near.id };
+    if (decision === "noop") {
+      await recordCorroboration(near.id);
+      return { action: "noop", entryId: near.id };
+    }
     if (decision === "supersede") {
       const { entry } = await saveContext(input, opts); // the new one becomes the current one
       if (near.sourceType === "agent_session") {
@@ -176,6 +205,7 @@ export async function saveWithReconciliation(
     // update: only auto-captured entries are merged (sourced/curated is never rewritten)
     if (near.sourceType === "agent_session") {
       await updateEntryContent(near.id, await reconciler.merge(near.content, input.content));
+      await recordCorroboration(near.id);
       return { action: "update", entryId: near.id };
     }
   }
