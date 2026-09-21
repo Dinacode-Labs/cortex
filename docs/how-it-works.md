@@ -492,11 +492,17 @@ a far more expensive thing to be wrong about than seeing fewer decisions
 base**, a step almost no product on the market bothers with. It checks:
 
 1. **Contradictions**, the `contradicts` edges in the graph.
-2. **Likely duplicates**, pairs with vector similarity above 0.88.
+2. **Likely duplicates**, pairs with vector similarity above 0.85 within one type and above
+   0.88 across types, **skipping the parts of a single document**: an ingested file becomes N
+   overlapping chunks that resemble each other by construction, and reporting them as
+   duplicates buried the ones worth acting on.
 3. **Orphan entities**, a node linked to a single entry and with no relations.
-4. **Low confidence**, how many `low` entries there are.
-5. **Historical and obsolete material**, how much has aged out.
-6. **Gaps**, the interesting one: modules or services with **two or more incidents and zero
+4. **Never reviewed**, how many current entries no person has ever confirmed or corrected.
+   Usually the biggest number in the report: while nobody validates, `status` and `confidence`
+   carry no information and the pack cannot favour what is trustworthy.
+5. **Low confidence**, how many `low` entries there are.
+6. **Historical and obsolete material**, how much has aged out.
+7. **Gaps**, the interesting one: modules or services with **two or more incidents and zero
    decisions** documented. Things that keep breaking while nobody has written down what to do
    about it.
 

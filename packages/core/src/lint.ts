@@ -64,14 +64,28 @@ export async function lintProject(project: string): Promise<LintReport> {
   `) as unknown as Row[];
 
   // Near-identical duplicates by vector similarity (a self-join over embeddings).
+  //
+  // `doc_key` is which document an entry came out of. An ingested file is split into
+  // overlapping chunks (`chunkDocument`, ADR-0023) that share 400 characters by construction
+  // and each land as their own entry -- `metadata.file` names the file they all came from,
+  // while `source_reference` is `ref#0`, `ref#1`… and differs. "Doc (1/4)" against
+  // "Doc (2/4)" therefore scored at the very top and filled the 25 rows the report shows,
+  // burying the duplicates that are worth looking at. Consecutive parts of one source are
+  // neighbours, not duplicates. A missing or empty reference groups with nothing: an entry
+  // with no source is not "the same document" as every other entry with no source.
   const dupRows = (await sql`
+    WITH current_entries AS (
+      SELECT id, title, type, NULLIF(COALESCE(metadata->>'file', source_reference), '') AS doc_key
+      FROM context_entries
+      WHERE project_id=${pid} AND valid_to IS NULL
+    )
     SELECT ca.title AS a, cb.title AS b, ca.id AS a_id, cb.id AS b_id,
            (1 - (a.vector <=> b.vector)) AS score
     FROM embeddings a
     JOIN embeddings b ON a.context_entry_id < b.context_entry_id
       AND a.embedding_model = b.embedding_model
-    JOIN context_entries ca ON ca.id=a.context_entry_id AND ca.project_id=${pid} AND ca.valid_to IS NULL
-    JOIN context_entries cb ON cb.id=b.context_entry_id AND cb.project_id=${pid} AND cb.valid_to IS NULL
+    JOIN current_entries ca ON ca.id=a.context_entry_id
+    JOIN current_entries cb ON cb.id=b.context_entry_id
     -- Threshold per type: across different types a high similarity is usually legitimate (the
     -- incident that prompted a decision looks a lot like the decision, and neither is
     -- redundant), so the bar stays high there. Within the same type it drops to 0.85, because
@@ -81,6 +95,7 @@ export async function lintProject(project: string): Promise<LintReport> {
     -- It is a signal for someone to look at, not a truth: reclassify can change an entry's type
     -- and bring together two that were not. That is why the report says "likely".
     WHERE (a.vector <=> b.vector) < CASE WHEN ca.type = cb.type THEN 0.15 ELSE 0.12 END
+      AND (ca.doc_key IS NULL OR ca.doc_key IS DISTINCT FROM cb.doc_key)
     ORDER BY score DESC
     LIMIT 25
   `) as unknown as Row[];
@@ -157,6 +172,12 @@ export function renderLintReport(r: LintReport): string {
   L.push(...(r.gaps.length ? r.gaps.map((g) => `- ${g.area} (${g.type}): ${g.incidents} incidents, 0 decisions`) : ["- (none)"]));
   L.push("", `## 🧩 Orphan entities (${r.orphanEntities.length})`);
   L.push(...(r.orphanEntities.length ? r.orphanEntities.slice(0, 20).map((e) => `- ${e.type}: ${e.name}`) : ["- (none)"]));
-  L.push("", `## 📉 Other`, `- Low confidence: ${r.lowConfidence}`, `- Superseded or obsolete: ${r.staleHistorical}`);
+  L.push(
+    "",
+    `## 📉 Other`,
+    `- Never reviewed by a person: ${r.neverReviewed} of ${r.totalEntries}`,
+    `- Low confidence: ${r.lowConfidence}`,
+    `- Superseded or obsolete: ${r.staleHistorical}`,
+  );
   return L.join("\n");
 }

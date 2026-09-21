@@ -29,6 +29,15 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **The lint's duplicates are duplicates again, and it says how many entries nobody has ever
+  reviewed.** An ingested file becomes several overlapping chunks, each one its own entry; they
+  resemble each other by construction ("Doc (1/4)" against "Doc (2/4)"), so they took the top of
+  the report and pushed out the pairs worth acting on. Parts of one document no longer count as
+  duplicates — pairs coming from different sources still do, and an entry with no source groups
+  with nothing. The report also prints, under "Other", how many current entries no person has
+  ever confirmed or corrected: it was computed and shown in the web UI, but neither `cortex-admin
+  lint` nor the `lint_project_context` MCP tool ever printed it, and it is usually the biggest
+  number there is.
 - **The eval sets moved out of `tests/` and into `evals/`.** An eval is not a test: it marks a
   model, so it needs a real provider, costs money and is launched by hand, while everything
   under `tests/` runs on every commit and has to pass. The corpus and the questions are now in
