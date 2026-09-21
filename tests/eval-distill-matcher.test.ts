@@ -15,8 +15,8 @@ import {
  * like a regression. Either way the numbers stop meaning anything and nobody notices, because
  * the only thing that is ever read is the total.
  *
- * The items and the keywords are Spanish because the fixture corpus is (see
- * `tests/fixtures/eval/README.md`): they are data, not prose.
+ * The items and the keywords are Spanish because the eval corpus is (see
+ * `evals/README.md`): they are data, not prose.
  */
 const item = (type: string, title: string, content: string): DistillItem => ({ type, title, content });
 

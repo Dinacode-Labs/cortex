@@ -12,10 +12,10 @@ import { matchDistillItems, summarizeDistillMatches, type DistillItem, type Gold
  * an opinion. This answers the same question that one does -- did it get better or worse? --
  * over a fixed set of transcript windows with an annotated expectation each.
  *
- * The windows are invented (`tests/fixtures/eval/distill/<language>/`) and not real sessions:
- * an eval exists to compare runs, and real sessions change every day. One directory per
- * language, each holding its own windows and its own gold: the two are useless apart, and
- * adding a language has to be copying a directory rather than editing this file.
+ * The windows are invented (`evals/distill/<language>/`) and not real sessions: an eval exists
+ * to compare runs, and real sessions change every day. One directory per language, each holding
+ * its own windows and its own gold: the two are useless apart, and adding a language has to be
+ * copying a directory rather than editing this file.
  *
  *   cortex-admin eval-distill                    the English set
  *   cortex-admin eval-distill --lang es          the same eight cases in the corpus's language
@@ -23,7 +23,7 @@ import { matchDistillItems, summarizeDistillMatches, type DistillItem, type Gold
  *   cortex-admin eval-distill --windows <dir> --gold <file>    a fixture from outside the repo
  */
 
-/** The fictional project the whole eval corpus is about (`tests/fixtures/eval/retrieval/`). */
+/** The fictional project the whole eval corpus is about (`evals/retrieval/`). */
 const PROJECT = "Nébula";
 
 /**
@@ -44,7 +44,7 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 const ROOT = new URL("../../../../", import.meta.url).pathname;
-const FIXTURES_DIR = join(ROOT, "tests/fixtures/eval/distill");
+const SETS_DIR = join(ROOT, "evals/distill");
 
 function table(rows: string[][]): string {
   const columns = rows[0]?.length ?? 0;
@@ -86,10 +86,10 @@ export async function run(args: string[]): Promise<void> {
 async function evalDistill(args: string[]): Promise<void> {
   const verbose = args.includes("--verbose");
   const language = flag(args, "lang") ?? DEFAULT_LANGUAGE;
-  const set = join(FIXTURES_DIR, language);
+  const set = join(SETS_DIR, language);
   const custom = flag(args, "windows") ?? flag(args, "gold");
   if (!custom && !existsSync(set)) {
-    const available = readdirSync(FIXTURES_DIR, { withFileTypes: true })
+    const available = readdirSync(SETS_DIR, { withFileTypes: true })
       .filter((d) => d.isDirectory())
       .map((d) => d.name)
       .sort();

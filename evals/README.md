@@ -17,6 +17,13 @@ and its own marking key. Neither half is the implicit one: the first set in does
 in the root and the first language in does not get to be the one with no suffix, or whatever
 arrives second is an afterthought bolted onto a name.
 
+These are **not tests**, which is why they live here and not under `tests/`: they put a mark on
+a model, so they need a real provider, they cost money and minutes, and they are launched by
+hand — CI never runs one. What does run on every commit is what guards them, with no model
+involved: `tests/eval-retrieval-score.test.ts` and `tests/eval-distill-matcher.test.ts` mark the
+markers, `tests/eval-retrieval-fixture.test.ts` and `tests/eval-distill-fixture.test.ts` mark
+these sets. How one of these is built, and what has to be true of it: `.claude/rules/evals.md`.
+
 ## Why an invented corpus and not the real memory
 
 Because an eval exists to compare runs, and the real memory changes every day: the same code
@@ -57,6 +64,14 @@ wreckage teaches something too.
 
 The questions are labelled by type so the numbers can be read separately: a drop only in the
 paraphrased ones points at the embeddings; only in the spread-out ones, at the chunking.
+
+What can be wrong in here without the run ever saying so is checked apart, with no database and
+no provider: evidence citing an id nobody wrote, a repeated id, a kind outside the table, a type
+the domain does not know, or a question that claims to be unanswerable while carrying evidence
+(`tests/eval-retrieval-fixture.test.ts`). The marking has its own
+(`tests/eval-retrieval-score.test.ts`): that one piece of evidence out of three is a third and
+not a hit, that MRR follows the first one, that nothing past k counts, and that the questions
+the corpus does not answer stay out of both averages.
 
 ### Baseline (2026-09-12)
 

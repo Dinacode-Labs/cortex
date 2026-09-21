@@ -1,7 +1,8 @@
 ---
 paths:
-  - "tests/fixtures/eval/**"
+  - "evals/**"
   - "tests/eval-*.test.ts"
+  - "apps/admin/src/eval/*.ts"
   - "apps/admin/src/commands/eval*.ts"
 ---
 
@@ -18,7 +19,7 @@ defence available today is two hand-picked examples. That is the same as no defe
 
 ## The shape
 
-Four pieces, and the names in `tests/fixtures/eval/` are the reference:
+Four pieces, and the names in `evals/` are the reference:
 
 - **The exam**: a fixed set of inputs in the repo, **invented**, never real data. An eval exists
   to compare runs; real data changes every week and the same code change would score
@@ -31,6 +32,18 @@ Four pieces, and the names in `tests/fixtures/eval/` are the reference:
   model, no database and no filesystem. It goes in a file of its own **outside `commands/`**
   (`apps/admin/src/eval/`): that directory holds commands, each exporting `run(args)` and each
   registered in the dispatcher, and there is a test for it.
+
+## Where it lives
+
+An eval is **not a test**. It needs a model or a real provider, it costs money and minutes, and
+it is launched by hand: nothing in CI ever runs one. So the exam and its key live in a tree of
+their own at the root — `evals/<set>/`, one directory per set — and never under `tests/`, where
+everything is expected to run on every commit and to pass.
+
+What does stay in `tests/` is what guards them: the marker's tests and the ones that check the
+set itself (`tests/eval-*.test.ts`), ordinary unit tests that touch no model, no database and no
+network. The examiner is a command in `apps/admin/src/commands/`, and the marker sits beside it
+in `apps/admin/src/eval/`, one file per set.
 
 ## Marking
 
@@ -78,5 +91,6 @@ Four pieces, and the names in `tests/fixtures/eval/` are the reference:
 
 A set is worth nothing until the **first run exists**, dated and naming the model. Without it
 there is nothing to compare the second one against, and the prompt change goes back to being an
-opinion. Write it next to the fixture, with the model it was measured with, and **never invent
-it**: an eval whose numbers nobody ran is worse than no eval, because it will be quoted.
+opinion. Write it next to the set, in `evals/README.md`, with the model it was measured with,
+and **never invent it**: an eval whose numbers nobody ran is worse than no eval, because it
+will be quoted.

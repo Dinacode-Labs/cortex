@@ -3,6 +3,13 @@ import { join } from "node:path";
 import { createProject, saveContext, searchContext, type ProjectRef } from "@cortex/core";
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
+import {
+  scoreQuestion,
+  summarizeRetrieval,
+  type CorpusEntry,
+  type EvalQuestion,
+  type QuestionScore,
+} from "../eval/retrieval-score.js";
 
 /**
  * `cortex-admin eval` -- measures retrieval against a set of questions with annotated evidence.
@@ -11,9 +18,9 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
  * the embeddings: **did it get better or worse?** Without this, every change is defended with
  * hand-picked examples, which is the same as not defending it.
  *
- * The corpus is fixed in the repo (`tests/fixtures/eval/retrieval/`) and is not taken from the real
- * memory: an eval exists to compare runs, and the real memory changes every day, so the same
- * code change would give different numbers depending on what was captured that week.
+ * The corpus is fixed in the repo (`evals/retrieval/`) and is not taken from the real memory:
+ * an eval exists to compare runs, and the real memory changes every day, so the same code
+ * change would give different numbers depending on what was captured that week.
  *
  *   cortex-admin eval                  the fixed corpus in a temporary project (deleted on exit)
  *   cortex-admin eval --keep           keeps the project so it can be inspected
@@ -22,33 +29,6 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
  *   cortex-admin eval --k 10           how many results are looked at (5 by default)
  */
 
-interface CorpusEntry {
-  id: string;
-  type: string;
-  title: string;
-  content: string;
-}
-
-interface Question {
-  id: string;
-  kind: string;
-  question: string;
-  /** The corpus ids that answer it. Empty = the answer is not there: nothing good should come out. */
-  evidence: string[];
-}
-
-interface Result {
-  question: Question;
-  /** Position (1..k) of the first correct piece of evidence, or 0 when none appears. */
-  firstHit: number;
-  found: number;
-  expected: number;
-  /** For the unanswerable questions: what the best thing that came out scored. */
-  bestScore: number;
-  /** What came out, so a failure can be examined without rebuilding the corpus. */
-  returned: { title: string; kind: string; score: number; hit: boolean }[];
-}
-
 function flag(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);
   if (i >= 0 && args[i + 1] && !args[i + 1]!.startsWith("--")) return args[i + 1];
@@ -56,7 +36,7 @@ function flag(args: string[], name: string): string | undefined {
 }
 
 const ROOT = new URL("../../../../", import.meta.url).pathname;
-const FIXTURES_DIR = join(ROOT, "tests/fixtures/eval/retrieval");
+const SET_DIR = join(ROOT, "evals/retrieval");
 
 function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
@@ -88,7 +68,7 @@ function table(rows: [string, string, string, string][]): string {
 export async function run(args: string[]): Promise<void> {
   const k = Number(flag(args, "k") ?? "5");
   const existingProject = flag(args, "project");
-  const questions = readJson<Question[]>(flag(args, "questions") ?? join(FIXTURES_DIR, "questions.json"));
+  const questions = readJson<EvalQuestion[]>(flag(args, "questions") ?? join(SET_DIR, "questions.json"));
 
   const provider = getEmbeddingProvider();
   if (provider.model.startsWith("local")) {
@@ -116,7 +96,7 @@ export async function run(args: string[]): Promise<void> {
     project = rows[0] as ProjectRef;
     map = new Map(); // with a real project, the evidence already carries the real ids
   } else {
-    const corpus = readJson<CorpusEntry[]>(join(FIXTURES_DIR, "corpus.json"));
+    const corpus = readJson<CorpusEntry[]>(join(SET_DIR, "corpus.json"));
     project = await createProject(`Eval ${Date.now().toString(36)}`);
     console.log(`Loading ${corpus.length} entries into "${project.name}"...`);
     map = await loadCorpus(project, corpus);
@@ -124,59 +104,30 @@ export async function run(args: string[]): Promise<void> {
 
   const realId = (id: string): string => map.get(id) ?? id;
 
-  const results: Result[] = [];
+  const results: QuestionScore[] = [];
   for (const p of questions) {
     const hits = await searchContext({ query: p.question, project: project.name, limit: k });
-    const expected = new Set(p.evidence.map(realId));
-    let firstHit = 0;
-    let found = 0;
-    hits.forEach((h, i) => {
-      if (!expected.has(h.entry.id)) return;
-      found++;
-      if (firstHit === 0) firstHit = i + 1;
-    });
-    results.push({
-      question: p,
-      firstHit,
-      found,
-      expected: expected.size,
-      bestScore: hits[0]?.score ?? 0,
-      returned: hits.map((h) => ({
-        title: h.entry.title ?? "(untitled)",
-        kind: h.entry.type,
-        score: h.score,
-        hit: expected.has(h.entry.id),
-      })),
-    });
+    const retrieved = hits.map((h) => ({
+      id: h.entry.id,
+      title: h.entry.title ?? "(untitled)",
+      type: h.entry.type,
+      score: h.score,
+    }));
+    results.push(scoreQuestion(p, retrieved, { k, entryId: realId }));
   }
 
-  // --- Numbers -----------------------------------------------------------------
-  // recall@k with several pieces of evidence: getting ONE of three is not getting the question
-  // right, so the fraction retrieved of each is measured and averaged. MRR only over the
-  // answerable ones: for the unanswerable there is no correct position to measure.
-  const answerable = results.filter((r) => r.expected > 0);
-  const recall = answerable.reduce((s, r) => s + r.found / r.expected, 0) / (answerable.length || 1);
-  const mrr = answerable.reduce((s, r) => s + (r.firstHit ? 1 / r.firstHit : 0), 0) / (answerable.length || 1);
-
-  const byKind = new Map<string, Result[]>();
-  for (const r of answerable) byKind.set(r.question.kind, [...(byKind.get(r.question.kind) ?? []), r]);
-
+  const summary = summarizeRetrieval(results);
   const rows: [string, string, string, string][] = [["kind", "n", "recall@" + k, "MRR"]];
-  for (const [kind, rs] of [...byKind].sort()) {
-    rows.push([
-      kind,
-      String(rs.length),
-      (rs.reduce((s, r) => s + r.found / r.expected, 0) / rs.length).toFixed(3),
-      (rs.reduce((s, r) => s + (r.firstHit ? 1 / r.firstHit : 0), 0) / rs.length).toFixed(3),
-    ]);
+  for (const { kind, questions: n, recall, mrr } of summary.byKind) {
+    rows.push([kind, String(n), recall.toFixed(3), mrr.toFixed(3)]);
   }
-  rows.push(["TOTAL", String(answerable.length), recall.toFixed(3), mrr.toFixed(3)]);
+  rows.push(["TOTAL", String(summary.answerable), summary.recall.toFixed(3), summary.mrr.toFixed(3)]);
 
   console.log(`\n# Retrieval eval — ${project.name}`);
   console.log(`_${questions.length} questions · embeddings: ${provider.model} (${provider.dim} dim)_\n`);
   console.log(table(rows));
 
-  const missed = answerable.filter((r) => r.found < r.expected);
+  const missed = results.filter((r) => r.expected > 0 && r.found < r.expected);
   if (missed.length > 0) {
     console.log(`\n## Not fully retrieved (${missed.length})`);
     for (const r of missed) {

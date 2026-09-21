@@ -14,7 +14,7 @@ import type { GoldWindow } from "../apps/admin/src/eval/distill-match.js";
  * than the previous one, which is indistinguishable from the prompt having got worse, and that
  * is the one thing this eval exists to tell apart.
  */
-const FIXTURES = resolve(import.meta.dirname, "fixtures/eval/distill");
+const FIXTURES = resolve(import.meta.dirname, "../evals/distill");
 
 /** `CORTEX_SESSIONS_WINDOW_CHARS` default: a bigger window is not what the pipeline produces. */
 const WINDOW_CHARS = 9000;

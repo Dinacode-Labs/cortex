@@ -10,15 +10,15 @@ fixes things.
 
 ### Added
 - **The distiller can be measured.** `cortex-admin eval-distill` runs the session distiller over
-  a fixed set of eight transcript windows (`tests/fixtures/eval/distill/`) with an annotated
-  expectation each, and reports expected recall, forbidden leaks, mistyped items, items per
-  window and windows with nothing in them; `--verbose` prints every item it emitted, and
-  `--windows` / `--gold` point it at another fixture. Half of the windows expect **nothing** —
+  a fixed set of eight transcript windows (`evals/distill/`) with an annotated expectation
+  each, and reports expected recall, forbidden leaks, mistyped items, items per window and
+  windows with nothing in them; `--verbose` prints every item it emitted, and
+  `--windows` / `--gold` point it at another set. Half of the windows expect **nothing** —
   narration, an open discussion, a hiccup local to the session, acknowledgements — because
   recall is cheap to buy by keeping everything. It needs an LLM and refuses to run without one:
   the distiller *is* the model, so with no model every window comes back empty and the table
   would read as a perfect zero. What each window tests and what the numbers mean:
-  `tests/fixtures/eval/README.md`.
+  `evals/README.md`.
 
   The eight cases exist **in English and in Spanish**, one directory per language
   (`distill/en/`, `distill/es/`), run separately and each with its own mark: mixed into one
@@ -29,6 +29,21 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **The eval sets moved out of `tests/` and into `evals/`.** An eval is not a test: it marks a
+  model, so it needs a real provider, costs money and is launched by hand, while everything
+  under `tests/` runs on every commit and has to pass. The corpus and the questions are now in
+  `evals/retrieval/`, the distillation windows in `evals/distill/<language>/`, and what the sets
+  contain and what their baselines are is in `evals/README.md`. Both commands are run exactly
+  as before, `--questions` / `--windows` / `--gold` still take a path of your own, and what
+  guards the sets stays in `tests/`, where CI runs it.
+- **Retrieval is marked by a function, not by the command.** recall@k and MRR came out of the
+  middle of `eval`, where they could not be exercised without a Postgres and a real provider;
+  they are now `apps/admin/src/eval/retrieval-score.ts`, beside the distiller's marker, and the
+  table the command prints is the same one. What the numbers mean is tested with no database —
+  that one piece of evidence out of three is a third and not a hit, that MRR follows the first
+  one, that nothing past `--k` counts, and that the questions the corpus does not answer stay
+  out of the averages — and so is the set itself: evidence citing an id nobody wrote used to be
+  reported for ever as a miss and blamed on the search.
 - **`commands/` holds commands and nothing else**, in both CLIs: what a command needs and is not
   one itself lives in a sibling directory. A module parked in there reads as a subcommand that
   cannot be invoked, and a command that never reaches the dispatcher exists without being
