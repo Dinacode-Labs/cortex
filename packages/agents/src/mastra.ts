@@ -138,12 +138,24 @@ export async function runAgent(
 ): Promise<string> {
   const agent = getAgent(role);
   if (!agent) throw new Error("LLM not enabled (LLM_PROVIDER / API key).");
-  const options: Record<string, unknown> = { maxRetries: opts.maxRetries ?? 6 };
-  if (opts.maxOutputTokens) options.maxOutputTokens = opts.maxOutputTokens;
+  // Everything the provider has to honour travels inside `modelSettings`: that is the only
+  // channel @mastra/core 1.45 reads (`modelSettings?: Omit<CallSettings, "abortSignal">` in
+  // dist/agent/agent.types.d.ts, spread into the model call by the loop), and the same keys at
+  // the top level are dropped with no warning -- which is how the per-role caps stopped being
+  // in force. `maxRetries` is the one this version does not honour from here either: it
+  // overwrites it per model with the Agent's own (`maxRetries: modelConfig.maxRetries`,
+  // default 0), so what is asked for below only applies the day that stops being true.
+  const modelSettings: { maxRetries: number; maxOutputTokens?: number; temperature?: number } = {
+    maxRetries: opts.maxRetries ?? 6,
+  };
+  if (opts.maxOutputTokens) modelSettings.maxOutputTokens = opts.maxOutputTokens;
+  // The roles that answer JSON get no room to improvise: the same window has to yield the same
+  // entry, and a creative model is what turns a parse into a retry.
+  if (JSON_ROLES.has(role)) modelSettings.temperature = 0;
   const t0 = Date.now();
   // One slot per call: the provider caps concurrent requests per API key, and
   // enrich/maintain fires several in parallel (CORTEX_ENRICH_CONCURRENCY).
-  const res = (await withLlmSlot(() => agent.generate(prompt, options as never))) as {
+  const res = (await withLlmSlot(() => agent.generate(prompt, { modelSettings }))) as {
     text?: string;
     usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number };
     response?: { modelId?: string };
