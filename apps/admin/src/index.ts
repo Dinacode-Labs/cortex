@@ -42,6 +42,7 @@ const COMMANDS: Record<string, Cmd> = {
   enrich: { help: "graph enrichment pass (entities + relations)", load: () => import("./commands/enrich.js") },
   lint: { help: "a project's knowledge health (contradictions, gaps...)", load: () => import("./commands/lint.js") },
   eval: { help: "measure retrieval against the question set with annotated evidence", load: () => import("./commands/eval.js") },
+  "eval-distill": { help: "measure what the distiller keeps, drops and mistypes", load: () => import("./commands/eval-distill.js") },
   "lint-act": { help: "action plan (dry run) derived from the lint", load: () => import("./commands/lint-act.js") },
   temporal: { help: "temporal invalidation: closes the validity of facts no longer current", load: () => import("./commands/temporal.js") },
   "resolve-entities": { help: "merge entity variants into a canonical one", load: () => import("./commands/resolve-entities.js") },

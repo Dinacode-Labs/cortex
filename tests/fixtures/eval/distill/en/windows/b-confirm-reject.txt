@@ -1,0 +1,17 @@
+USER: The three services talk to each other over whatever each one felt like at the time. I want one answer for all of them.
+
+ASSISTANT: Two options. Option A, gRPC: typed contracts, code generation, the fastest on the wire, and every service has to carry the toolchain and the generated stubs. Option B, plain HTTP with JSON: slower and untyped at the boundary, but debuggable with curl and readable in a log by anyone.
+
+USER: Let's go with B. gRPC I do not want: we are three services, not thirty, and the day something breaks at three in the morning I want whoever is on call to be able to replay the call from a terminal without generating a single stub.
+
+ASSISTANT: Do we validate the JSON at the boundary, or trust it?
+
+USER: Validate it, with a schema per endpoint, and reject anything that does not match instead of coercing it. An untyped boundary is fine as long as it is a checked boundary.
+
+ASSISTANT: While we are here, we could move this to Kafka and have the services talk through events instead of calls.
+
+USER: How about we finish the HTTP part first?
+
+ASSISTANT: Fair. Then the retries between services use the same backoff as the processing queue?
+
+USER: The same one, do not invent a second one.

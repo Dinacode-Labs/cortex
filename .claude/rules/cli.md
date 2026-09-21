@@ -19,6 +19,11 @@ and `shared`. If the command needs the database, the model or to stand up a serv
 - **No `process.exit` and no side effects at import time**: the dispatcher owns the lifecycle.
 - Register it in `COMMANDS` (`apps/cli/src/index.ts`) with its help line. Loading is lazy and by
   literal path: `cortex --help` must not pay the cost of loading anything.
+- **`commands/` holds commands and nothing else.** Whatever a command needs and is not one
+  itself goes in a sibling directory (`apps/admin/src/eval/`): parked in `commands/` it reads as
+  a subcommand that cannot be invoked, and nobody looking for library code finds it there.
+  `tests/cli-commands.test.ts` checks both halves — everything in there exports `run`, and
+  everything in there is registered.
 
 ## Several servers, one client
 

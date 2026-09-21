@@ -1,0 +1,21 @@
+USER: Sigue con lo que estabas.
+
+ASSISTANT: Voy. Ahora edito el fichero ocr.ts del servicio de proceso para renombrar la función de extracción.
+
+ASSISTANT: Renombrado. Actualizo los tres sitios que la llamaban.
+
+ASSISTANT: He ejecutado la batería completa. Los tests pasan, doscientos catorce en verde.
+
+USER: Vale.
+
+ASSISTANT: Ahora muevo el fichero de utilidades a su carpeta y corrijo los imports.
+
+ASSISTANT: Hecho. He comprobado los tipos y no hay errores.
+
+USER: Sigue.
+
+ASSISTANT: He revisado el listado de ficheros del módulo y no queda ninguna referencia al nombre antiguo. Los tests pasan otra vez.
+
+ASSISTANT: Con esto termino la tarea que tenía pendiente.
+
+USER: Perfecto.

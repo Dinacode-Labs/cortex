@@ -1,0 +1,15 @@
+USER: Necesito ideas para el logo de Nébula, que el que tenemos lo hice yo en diez minutos y se nota.
+
+ASSISTANT: Van unas cuantas. Una nube de puntos que al alejarse forma una hoja de documento. Un sello de esos de registro de entrada, medio girado. Tres líneas que entran por la izquierda y salen convertidas en una sola por la derecha, por lo de recepción, proceso y facturación. O directamente una letra ene tratada como si fuera un recorte de papel.
+
+USER: La de las tres líneas no está mal. ¿Cómo se vería en pequeño, en una pestaña del navegador?
+
+ASSISTANT: A dieciséis píxeles las tres líneas se van a juntar. Si vamos por ahí habría que tener una versión reducida de dos líneas, o quedarse solo con el cruce.
+
+USER: ¿Y lo del sello?
+
+ASSISTANT: Aguanta mejor en pequeño porque es una silueta cerrada, pero está muy visto en cualquier cosa que suene a administración.
+
+USER: Ya. Pues nada, era por curiosidad mientras esperaba el despliegue. Sigamos con lo nuestro, que el logo no lo vamos a cambiar ahora.
+
+ASSISTANT: De acuerdo.

@@ -51,6 +51,10 @@ Working, and in daily use by a team:
   (`planLintActions`, `saveWithReconciliation`).
 - **A project cannot be renamed.** The name and the slug are fixed at creation; getting it wrong
   forces deleting and redoing, and only when it is empty.
+- **The distiller has no baseline.** `pnpm admin eval-distill` and its fixture of eight
+  annotated windows are in the repo, but the numbers for the current prompt still have to be
+  taken against a real provider. Until that first run exists there is nothing to compare
+  against, and any change to the distiller's prompt remains an opinion.
 
 ### Ingestion
 
