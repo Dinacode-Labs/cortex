@@ -85,7 +85,9 @@ export const distillSession: DistillSessionFn = async (input) => {
             sourceType,
             sourceReference,
             createdBy: input.createdBy,
-            metadata: { platform: input.platform, sessionId: input.sessionId },
+            // `distiller`: a model already chose this type with the whole session window in
+            // front of it, so `maintain`'s reclassification leaves it alone (ADR-0067).
+            metadata: { platform: input.platform, sessionId: input.sessionId, enrichedBy: "distiller" },
           } as never,
           { useClassifier: false, detectImprovements: false },
         );

@@ -30,6 +30,7 @@ export {
   findNearest,
   updateEntryContent,
   updateEntryFields,
+  recordCorroboration,
   invalidateEntry,
   setReconciler,
   saveWithReconciliation,

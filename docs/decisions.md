@@ -2028,3 +2028,67 @@ without ever being stated — formatting, and where `any` is allowed — were fi
   reconciler has to absorb, at which point the list narrows to decisions and corrections; or a
   measurement shows the tool is still not being called, at which point the problem is not the
   wording and the honest answer is a save the user confirms rather than one the agent volunteers.
+
+<a id="adr-0067"></a>
+
+## ADR-0067 · Confidence is earned by corroboration, not by having been touched
+
+- **Status:** accepted (2026-09-21).
+- **Context:** auto-captured knowledge enters at low confidence, and `autoCurate` was meant to
+  raise it to medium once it had been **corroborated** — once the same thing turned up again in
+  another session. The signal it used was `updated_at > created_at`, on the assumption that only
+  a merge moves `updated_at`.
+
+  Nothing held that assumption up. `set_updated_at` fires on every UPDATE, and minutes earlier in
+  that same maintenance run `reclassifyProject` rewrote every current entry whose `enrichedBy` was
+  not `llm` — which is every distilled entry, because distillation saves with
+  `useClassifier: false` — and it rewrote them even when the classifier returned the type the
+  entry already had.
+
+  So the first `maintain` run promoted practically everything that had ever been distilled, and
+  none of it for having recurred. Three more consequences followed, none of them visible from a
+  log line that reads "N promoted (corroborated)": the decay branch, which only looked at entries
+  that were never touched, stopped firing at all; the classifier was paid for once per distilled
+  entry per run, and could re-type what the distiller had chosen with the whole session window in
+  front of it; and the context pack, which orders by confidence, degenerated into
+  `created_at DESC` because everything shared one confidence.
+- **Decision:**
+  1. Corroboration becomes **explicit and counted**. `recordCorroboration` raises
+     `metadata.corroborations` in a single statement, and `saveWithReconciliation` calls it on
+     every outcome that does **not** add a new entry: the three noops and the merge. Never on add,
+     supersede or contradict — those are new knowledge or a correction, not a confirmation.
+  2. `autoCurate` goes by that counter and by nothing else: promote at `>= 1`, decay at `0` once
+     past `CORTEX_DECAY_DAYS`. Its guards are unchanged (low confidence, `agent_session`,
+     `pending_validation`, still current).
+  3. **What the distiller typed was already typed by a model.** Distilled entries carry
+     `enrichedBy = 'distiller'` and reclassification skips them as it skips `'llm'`. A classifier
+     reading one entry on its own has less context than the distiller had, not more.
+  4. Reclassification **writes only when the type changes**. Confirming a type is not an event in
+     an entry's life, and an UPDATE records it as one.
+  5. A corrective migration (`0020`) puts back to low the auto-captured entries that were promoted
+     as a side effect: still current, still `pending_validation`, no corroborations. The counter
+     starts empty, so entries that genuinely had been corroborated come down too and earn medium
+     again the next time that knowledge turns up.
+- **Alternatives:** keep `updated_at` as the signal and limit the fix to reclassification not
+  writing — it works today and breaks the next time anything writes to an entry for any reason,
+  which is precisely how this got here; promote by **age** — it says nothing about whether
+  something is true, only that it survived; record each corroboration as a relation or in a table
+  of its own — more faithful, since it would say who corroborated and when, and more machinery
+  than a counter earns before anybody has asked that question; give reclassification its own "the
+  LLM confirmed this type" mark so it need not run again — that mark is a write, and the write was
+  the bug.
+- **Consequences:** after the migration most distilled entries read `low` again, so the pack puts
+  the corroborated ones first and the rest fall back to most-recent-first, which is closer to the
+  truth than the flat medium they had. Decay can fire for the first time and will move old
+  uncorroborated material to `obsolete` — reversible, but the first `maintain` run after this is
+  worth reading rather than trusting. And a heuristically typed entry whose type the LLM confirms
+  is classified again on every pass: one call per entry per run, the price of not writing in order
+  to say that nothing happened.
+- **How to tell it worked:** the share of `agent_session` entries at medium follows
+  `corroborations >= 1` instead of sitting near 100%, and `maintain` reports a `decayed` that is
+  not zero for the first time.
+- **Revisit when:** the classifier calls spent re-confirming types cost more than they are worth,
+  at which point the confirmation needs somewhere to live that is not the entry's own row; or one
+  corroboration turns out to be too cheap a promotion — the same echo arriving twice from the same
+  agent — at which point the threshold rises, or two corroborations inside one session stop
+  counting as two.

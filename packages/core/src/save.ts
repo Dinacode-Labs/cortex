@@ -255,15 +255,41 @@ function mergeEntities(
 
 // --- deferred reclassification (maintain) ------------------------------------
 
+/** What a reclassification pass does with one entry. */
+export type ReclassifyDecision = "retype" | "confirmed" | "unclassified";
+
+/**
+ * Whether reclassification WRITES to an entry. Only a type that really changes is worth an
+ * UPDATE: storing the type the entry already had moves `updated_at` through the
+ * `set_updated_at` trigger, and a movement there reads downstream as "something happened to
+ * this entry" -- which is how auto-curation came to promote nearly every distilled entry in the
+ * same maintenance pass (ADR-0067).
+ */
+export function decideReclassification(
+  current: ContextEntryType,
+  proposed: ContextEntryType | null | undefined,
+): ReclassifyDecision {
+  if (!proposed) return "unclassified";
+  return proposed === current ? "confirmed" : "retype";
+}
+
 /**
  * Uses the LLM to reclassify the `type` of a project's CURRENT entries that were typed
- * HEURISTICALLY (connectors ingest cheaply: `enrichedBy != 'llm'`). It is the piece that makes
- * the "cheap ingestion -> maintain adds intelligence" philosophy real: it fixes the types of
- * what was already ingested WITHOUT re-ingesting, and complements `CORTEX_CAPTURE_LLM` (which
- * types during ingestion itself). It touches only the `type` (not the embedding). Idempotent:
- * it marks `enrichedBy='llm'`, so the next pass skips whatever was already reclassified. With
- * no classifier wired (no LLM) it is a no-op. Precedence is intact: it overwrites neither what
- * the LLM already classified nor what humans curated (heuristic entries only).
+ * HEURISTICALLY (connectors ingest cheaply). It is the piece that makes the "cheap ingestion ->
+ * maintain adds intelligence" philosophy real: it fixes the types of what was already ingested
+ * WITHOUT re-ingesting, and complements `CORTEX_CAPTURE_LLM` (which types during ingestion
+ * itself). It touches only the `type` (not the embedding). With no classifier wired (no LLM) it
+ * is a no-op.
+ *
+ * Two marks keep it out: `enrichedBy='llm'` (a model typed it on the way in) and
+ * `enrichedBy='distiller'` (a model typed it with the whole session window in front of it, far
+ * more context than a classifier reading one entry on its own). Precedence is intact: neither
+ * of those, nor what humans curated, is overwritten.
+ *
+ * It writes **only when the type changes**. Confirming a type is not an event in an entry's
+ * life and an UPDATE would record it as one. The price is one classifier call per confirmed
+ * entry on every pass -- the mark that used to save that call was itself the write, and the
+ * write was the bug (ADR-0067).
  */
 export async function reclassifyProject(project: string): Promise<{ scanned: number; reclassified: number }> {
   const sql = getSql();
@@ -275,16 +301,18 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
     SELECT id, content, type, metadata
     FROM context_entries
     WHERE project_id = ${projectId} AND valid_to IS NULL
-      AND COALESCE(metadata->>'enrichedBy', 'heuristic') <> 'llm'
+      AND COALESCE(metadata->>'enrichedBy', 'heuristic') NOT IN ('llm', 'distiller')
   `) as unknown as Row[];
 
   let reclassified = 0;
   for (const r of rows) {
     const res = await classifier(r.content as string).catch(() => null);
-    if (!res?.type) continue; // the LLM did not classify: it will be retried next pass
-    if (res.type !== r.type) reclassified++;
+    const proposed = res?.type;
+    if (decideReclassification(r.type as ContextEntryType, proposed) !== "retype") continue;
+    reclassified++;
+    // `retype` is returned only for a type that is there and differs from the stored one.
     const meta = { ...((r.metadata as Record<string, unknown>) ?? {}), enrichedBy: "llm" } as Parameters<typeof sql.json>[0];
-    await sql`UPDATE context_entries SET type = ${res.type}, metadata = ${sql.json(meta)} WHERE id = ${r.id}`;
+    await sql`UPDATE context_entries SET type = ${proposed!}, metadata = ${sql.json(meta)} WHERE id = ${r.id}`;
   }
   return { scanned: rows.length, reclassified };
 }
