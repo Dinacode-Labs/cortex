@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { saveContextInput, searchContextInput } from "@cortex/shared";
+import { MCP_INSTRUCTIONS, saveContextInput, searchContextInput } from "@cortex/shared";
 import {
   checkEntryAccess,
   checkProjectAccess,
@@ -41,7 +41,10 @@ const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
 
 export function buildMcpServer(user?: AuthUser): McpServer {
-  const server = new McpServer({ name: "cortex", version: VERSION });
+  // `instructions` is what the client puts in front of the model on connecting. For an agent with
+  // no plugin — Hermes, an editor speaking MCP — it is the only place the capture protocol reaches,
+  // which is why the wording is the shared one and not a second version of it.
+  const server = new McpServer({ name: "cortex", version: VERSION }, { instructions: MCP_INSTRUCTIONS });
 
   // Project access permission (only when there is an authenticated user; without `user` --
   // local stdio -- no guards apply). It returns the denial message, or null when the call may

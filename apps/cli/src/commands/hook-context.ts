@@ -1,4 +1,4 @@
-import { getBrandName } from "@cortex/shared";
+import { getBrandName, sessionMemoryHeader } from "@cortex/shared";
 import { apiGet, useProjectServer } from "@cortex/client";
 import { readHookStdin } from "../hook-stdin.js";
 
@@ -61,12 +61,17 @@ export async function run(): Promise<void> {
     );
     if (!res || !res.text.trim()) return; // no session, no server, no access, or an empty pack
 
-    const additionalContext = `## ${getBrandName()} context — project "${res.project}"\nLiving project memory (current decisions, constraints, risks). Check it before touching a module, and capture what is new.\n\n${res.text.slice(0, MAX_CTX)}`; // the slice is a safety net: the server does the splitting
+    // The header is the only place that tells the agent WHEN to write back, so its wording is
+    // shared with the MCP's instructions and the skill (`capture-protocol.ts`), not written here.
+    // The pointer to the skill only goes to whoever installs the plugin -- Claude and Codex, which
+    // are the two that read this format. Hermes, OpenCode and Pi have no skill to be sent to.
+    const header = sessionMemoryHeader(getBrandName(), res.project, { skill: format === "claude" });
+    const additionalContext = `${header}\n\n${res.text.slice(0, MAX_CTX)}`; // the slice is a safety net: the server does the splitting
 
     if (format === "hermes") {
       process.stdout.write(JSON.stringify({ context: additionalContext })); // Hermes pre_llm_call
     } else if (format === "text") {
-      process.stdout.write(additionalContext); // OpenCode plugin lee stdout
+      process.stdout.write(additionalContext); // the OpenCode plugin reads stdout
     } else {
       process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: input.hook_event_name || "SessionStart", additionalContext } })); // Claude / Codex
     }

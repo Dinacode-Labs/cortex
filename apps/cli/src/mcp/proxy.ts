@@ -1,4 +1,4 @@
-import { getBrandName } from "@cortex/shared";
+import { MCP_INSTRUCTIONS, getBrandName } from "@cortex/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
@@ -59,7 +59,11 @@ function authHint(e: unknown): string {
 export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () => Promise<void> } {
   const log = opts.log ?? ((m: string) => console.error(`[cortex mcp] ${m}`));
   const info = opts.serverInfo ?? { name: "cortex", version: "0.0.0" };
-  const server = new Server(info, { capabilities: { tools: {} } });
+  // `initialize` is answered HERE, not by the server behind this: the agent never sees the
+  // instructions the HTTP MCP declares, so the capture protocol has to be declared on this side.
+  // Which also means it arrives with no session and with the server down, when there is nobody to
+  // ask -- the same reason the tool list degrades to empty instead of failing.
+  const server = new Server(info, { capabilities: { tools: {} }, instructions: MCP_INSTRUCTIONS });
 
   let client: Client | null = null;
   let connecting: Promise<Client> | null = null;
@@ -130,7 +134,7 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
       try {
         await client?.close();
       } catch {
-        /* cerrando: da igual el motivo */
+        /* closing: the reason does not matter */
       }
       client = null;
       await server.close().catch(() => {});

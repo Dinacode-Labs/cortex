@@ -50,7 +50,8 @@ reference: they are written for anyone.
 
 ```
 packages/
-  shared/      # domain types, enums, zod v3 schemas, API contracts, env, branding
+  shared/      # domain types, enums, zod v3 schemas, API contracts, env, branding,
+               # capture protocol (the wording every agent gets, ADR-0066)
   client/      # client side: HTTP + credentials + .cortex.json + transcripts (→ shared only)
   database/    # SQL schema + migrations + Postgres client
   embeddings/  # pluggable provider (local | openai-compatible | openai | voyage)

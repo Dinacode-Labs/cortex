@@ -395,6 +395,15 @@ that came from a source or was curated by a human. Only **auto-captured** entrie
 curated, a `contradicts` edge is recorded so **a person reviews it**. The AI does not
 overwrite what a human signed off on.
 
+**The two routes are not equally good.** An entry saved **through the tool**, by the agent that was
+there when it happened, carries the why and the where and its title reads like a decision. A
+distilled one is a session summarised afterwards by a model that was not in the room: the *what*
+survives, the reason often does not. So the agent is pushed to save **mid-task**, at the moment
+something is decided, confirmed, rejected, corrected or fixed with a known root cause — that is what
+the `cortex-capture` skill is, a trigger list with a self-check, a list of what **not** to save and
+one format. Distillation stays as the net underneath, for the sessions where nobody saved anything
+([ADR-0066](decisions.md#adr-0066)).
+
 **Auto-curation, with no human in the loop.** Capture writes immediately, at low confidence.
 Later, `maintain` runs `autoCurate`, which **promotes** to medium confidence anything that
 has been **corroborated**, meaning it came up again in another session, and **decays**, so
@@ -432,6 +441,13 @@ same way: being a member of "Acme" opens its subprojects.
 This pack, rendered to Markdown, is **exactly what the `SessionStart` hook injects** into
 your agent when you open a session. It goes through the authenticated API within a character
 budget — roughly 8000, configurable with `CORTEX_HOOK_CTX_CHARS`.
+
+Above it go **three lines** and no more: what this is, read it before touching a module, and when to
+write back (`When the user decides, confirms or corrects you, save it with save_project_context`).
+Under 300 characters, because every character of preamble is one the pack does not get — and the
+pack is the part the agent cannot work out by reading the code. The same sentence reaches the agents
+with no plugin through the MCP's `instructions`, which `cortex mcp` declares itself: `initialize` is
+answered by the proxy, before it has talked to any server.
 
 **What goes in it.** Everything that describes the **state** of the project: decisions,
 constraints, risks, technical debt, conventions, architecture, business rules, past incidents,
