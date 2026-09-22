@@ -29,14 +29,13 @@ describe("the capture protocol has one wording", () => {
   /**
    * The header shares the session's budget with the context pack (`CORTEX_HOOK_CTX_CHARS`, 8000).
    * Every character of preamble is one the pack does not get, and the pack is the part the agent
-   * cannot work out by reading the code. It was 300 when the header carried the write half alone;
-   * the read half is the rest, and `tests/lookup-protocol.test.ts` holds that end.
+   * cannot work out by reading the code.
    */
   it("the session header says the four things in under 500 characters", () => {
     const header = sessionMemoryHeader("Cortex", "Acme Portal", { skill: true });
     expect(header.length).toBeLessThan(500);
     const lines = header.split("\n");
-    expect(lines).toHaveLength(4); // title + what this is + when to read + when to write back
+    expect(lines).toHaveLength(4);
     expect(lines[1]).toMatch(/memory/i);
     expect(lines[2]).toContain(CAPTURE_READ_FIRST);
     expect(lines[3]).toBe(`${captureTrigger()} ${CAPTURE_SKILL_POINTER}`);

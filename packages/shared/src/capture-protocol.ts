@@ -1,17 +1,3 @@
-/**
- * The agent protocol: the sentences that make an agent **read** the memory before it answers and
- * **write** to it at the moment it learns something, rather than at the end of the session or
- * never.
- *
- * They live in `shared` because five entrypoints say the same thing to five different agents —
- * the session-start header, the MCP server's instructions, the Claude Code plugin's skill, the
- * OpenCode command and Pi's memory tool — and a wording that drifts between them is a protocol
- * nobody follows. Whoever carries this text is checked by `tests/capture-protocol.test.ts`.
- *
- * The lengths are deliberate: the header competes with the context pack for the session's budget,
- * and instructions the agent skims are instructions it does not apply.
- */
-
 /** The MCP tool that saves. Pi renames it (`cortex.mem_save`), so the trigger takes it as an argument. */
 export const SAVE_TOOL = "save_project_context";
 
@@ -47,37 +33,24 @@ export const CAPTURE_SKILL_POINTER = "See the cortex-capture skill.";
  */
 export const CAPTURE_READ_FIRST = "Read it before touching a module";
 
-/** The MCP tool that searches. Pi renames its tools, so the trigger takes the name as an argument. */
 export const SEARCH_TOOL = "search_project_context";
 
-/**
- * The second half of the sentence is what makes the lookup happen: "read the memory first" on its
- * own reads as advice and loses to an answer the agent has already found in `.claude/`.
- */
 export function lookupTrigger(tool: string = SEARCH_TOOL): string {
   return `Before answering from the repository alone, ask it with \`${tool}\`: the files hold the rules, the memory holds what the project learned the hard way.`;
 }
 
-/** Phrased as the shapes a question arrives in: that is what an agent can match against. */
 export const LOOKUP_WHEN =
   "Call it when the question is about how this project does something, why it is the way it is, whether it was already decided, tried or broken before, or what to watch out for in a module.";
 
-/** Quoted verbatim by every carrier: a self-check the agent has to paraphrase is one it skips. */
 export const LOOKUP_SELF_CHECK =
   "Am I about to answer something about this project out of the repository alone? If yes, ask the memory first.";
 
-/** Where the long form of the lookup half lives. Only for whoever installs the plugin. */
 export const LOOKUP_SKILL_POINTER = "See the cortex-recall skill.";
 
-/** Never dropped, whatever the budget: the line it goes on was already spent on a count. */
 export function packShowing(shown: number, total: number): string {
   return `Showing ${shown} of ${total} ${total === 1 ? "entry" : "entries"}`;
 }
 
-/**
- * It travels with the pack, not with the session header, because `get_project_context_pack` hands
- * the same text to an agent that never saw one.
- */
 export function packIsASample(tool: string = SEARCH_TOOL): string {
   return [
     "A sample of the memory, not the memory: what is not here is not absent, it did not fit.",
@@ -93,11 +66,6 @@ export interface SessionMemoryHeaderOptions {
   skill?: boolean;
 }
 
-/**
- * Under 500 characters on purpose: every character here is one the pack does not get
- * (`CORTEX_HOOK_CTX_CHARS`). The lookup line is worth about one entry and is spent anyway — an
- * agent that has the whole pack and does not know to ask for the rest answers from the tree.
- */
 export function sessionMemoryHeader(brand: string, project: string, opts: SessionMemoryHeaderOptions = {}): string {
   const read = `${CAPTURE_READ_FIRST}. ${lookupTrigger()}`;
   return [

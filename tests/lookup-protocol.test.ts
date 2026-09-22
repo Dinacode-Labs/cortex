@@ -17,18 +17,6 @@ import { renderContextPack } from "../packages/core/src/render.js";
 import type { ContextPack } from "../packages/core/src/context-pack.js";
 import type { ContextEntry } from "@cortex/shared";
 
-/**
- * An agent opened a session with the pack injected, was asked something about the project,
- * recognised it as a question about the repository, found a coherent answer in `.claude/` and
- * stopped there. The entry it needed was in the part the pack had cut — the cut said so, in
- * italics, as `…and 11 more here. Ask Cortex for the rest.`, which names a brand and no tool and
- * reads as a footnote. Nothing failed; the answer was just the rules, with the experience missing.
- *
- * So what is checked here is that the material Cortex injects still asks for the lookup by itself:
- * that a truncated section says how many it dropped and which call brings them back, that the pack
- * says what fraction of the memory it is, and that every carrier of the protocol says the read half
- * and not only the write half. Wording is exactly the kind of thing that gets "tidied" back.
- */
 const ROOT = resolve(import.meta.dirname, "..");
 const read = (rel: string): string => readFileSync(resolve(ROOT, rel), "utf8");
 
@@ -57,7 +45,6 @@ const pack = (perSection = 12, totalEntries = 349): ContextPack =>
     conflicts: [],
   }) as unknown as ContextPack;
 
-/** The `- **+N more** not shown` lines of a rendered pack. */
 const cuts = (text: string): string[] => text.split("\n").filter((l) => /\*\*\+\d+ more\*\*/.test(l));
 
 describe("a truncated pack asks for the rest", () => {
@@ -65,12 +52,10 @@ describe("a truncated pack asks for the rest", () => {
     const text = renderContextPack(pack(), { maxChars: 8000 });
     const lines = cuts(text);
     expect(lines.length, "nothing was truncated: this pack no longer exercises the case").toBeGreaterThan(0);
-    // Every offender, and the tool itself is named once in the header rather than eleven times.
     expect(lines.filter((l) => !/`type: "[a-z_]+"`/.test(l))).toEqual([]);
     expect(text.split("\n").slice(0, 3).join(" ")).toContain(SEARCH_TOOL);
   });
 
-  /** A wrong count is worse than none: it is the number the agent weighs the pack against. */
   it("the count is the real number left behind", () => {
     const text = renderContextPack(pack(12), { maxChars: 4000 });
     const shownPerSection = new Map<string, number>();
@@ -85,8 +70,6 @@ describe("a truncated pack asks for the rest", () => {
     }
   });
 
-  /** A filter naming a type the domain lacks comes back empty, and the agent reads that as "the
-   * memory has nothing" — worse than offering no filter at all. */
   it("a typed section names a type the search tool accepts", () => {
     const text = renderContextPack(pack(), { maxChars: 8000 });
     const types = new Set(PACK_SECTIONS.map((s) => s.type as string));
@@ -95,7 +78,6 @@ describe("a truncated pack asks for the rest", () => {
     expect(named.filter((t) => !types.has(t))).toEqual([]);
   });
 
-  /** The old wording is the one that failed. If it comes back, it comes back knowingly. */
   it("the footnote wording does not come back", () => {
     for (const cap of [2000, 8000]) {
       expect(renderContextPack(pack(), { maxChars: cap })).not.toMatch(/Ask \w+ for the rest/);
@@ -111,7 +93,6 @@ describe("the pack says what fraction of the memory it is", () => {
     expect(text.split("\n")[2]).toContain(packIsASample());
   });
 
-  /** Calling a complete pack a sample teaches the agent to ignore the line when it is true. */
   it("a pack holding everything does not call itself a sample", () => {
     const whole = renderContextPack(pack(12, 12 * PACK_SECTIONS.length), {});
     expect(whole).not.toContain("a sample of the memory");
@@ -124,11 +105,6 @@ describe("the pack says what fraction of the memory it is", () => {
     expect(packShowing(25, 349)).toBe("Showing 25 of 349 entries");
   });
 
-  /**
-   * The header grew, and the splitting still has to respect the cap it was given. From 1500,
-   * which is where an eleven-section pack stops being able to announce all eleven: below that the
-   * floor is the titles themselves, and it was already so before this line existed.
-   */
   it("the pack never goes over its cap, however you ask for it", () => {
     for (const cap of [1500, 2000, 3000, 6000, 8000, 20000, 40000]) {
       expect(renderContextPack(pack(), { maxChars: cap }).length, `cap ${cap}`).toBeLessThanOrEqual(cap);
@@ -137,14 +113,12 @@ describe("the pack says what fraction of the memory it is", () => {
 });
 
 describe("the read half reaches every agent", () => {
-  /** Pi renames its tools: a trigger pointing at one the reader does not have is one it skips. */
   it("the trigger names the tool of whoever is reading it", () => {
     expect(lookupTrigger()).toContain(`\`${SEARCH_TOOL}\``);
     expect(lookupTrigger("cortex.mem_search")).toContain("`cortex.mem_search`");
     expect(lookupTrigger("cortex.mem_search")).not.toContain(SEARCH_TOOL);
   });
 
-  /** Without the second half the trigger reads as advice and loses to an answer already found. */
   it("the trigger says why the repository is not enough", () => {
     expect(lookupTrigger()).toMatch(/repository/i);
     expect(lookupTrigger()).toMatch(/files hold the rules/i);
@@ -152,20 +126,16 @@ describe("the read half reaches every agent", () => {
 
   it("the session header carries both halves of the loop, inside its budget", () => {
     const header = sessionMemoryHeader("Cortex", "Acme Portal", { skill: true });
-    // It was under 300 when it carried the write half only. The read half is the rest, and it
-    // costs about one pack entry — which the pack was losing anyway to an agent that never asked.
     expect(header.length).toBeLessThan(500);
     expect(header).toContain(lookupTrigger());
     expect(header).toContain(LOOKUP_SKILL_POINTER);
   });
 
-  /** Hermes and anyone with no plugin hear the protocol here and nowhere else. */
   it("the MCP instructions carry the lookup trigger, inside their budget", () => {
     expect(MCP_INSTRUCTIONS.length).toBeLessThan(600);
     expect(MCP_INSTRUCTIONS).toContain(lookupTrigger());
   });
 
-  /** A carrier that writes its own version drifts: the capture half learned that in ADR-0066. */
   it.each([
     ["apps/cli/src/commands/hook-context.ts", "sessionMemoryHeader("],
     ["apps/mcp-server/src/server.ts", "LOOKUP_WHEN"],
@@ -182,7 +152,6 @@ describe("the lookup skill", () => {
   const skill = read("plugin/claude-code/skills/cortex-recall/SKILL.md");
   const description = (/^description: >-\n([\s\S]*?)\n---/m.exec(skill)?.[1] ?? "").replace(/\s+/g, " ");
 
-  /** Both earlier skills were WRITE skills: the tools were there, and a tool is not a trigger. */
   it("the description fires on a question about the project, not only on being asked to look", () => {
     expect(description.length).toBeGreaterThan(0);
     for (const phrase of ["how this project does something", "why it is the way it is", "already decided"]) {
@@ -190,7 +159,6 @@ describe("the lookup skill", () => {
     }
   });
 
-  /** A description that does not contradict "I already have an answer" never gets to fire. */
   it("the description fires even when the repository looks like it answers", () => {
     expect(description).toMatch(/even when the repository looks like it already answers/i);
     expect(description).toMatch(/\.claude\//);
@@ -200,7 +168,6 @@ describe("the lookup skill", () => {
     expect(skill.replace(/[\s>]+/g, " ")).toContain(LOOKUP_SELF_CHECK);
   });
 
-  /** Sections that quietly disappear take the protocol with them and nothing else fails. */
   it("the skill carries the whole protocol, and still fits in a session", () => {
     for (const section of [/^## Triggers/m, /^## Self-check before every answer/m, /^## Which tool/m, /^## If the tools are not loaded/m]) {
       expect(skill, `missing section ${section}`).toMatch(section);
@@ -208,13 +175,11 @@ describe("the lookup skill", () => {
     expect(skill.split("\n").length).toBeLessThanOrEqual(120);
   });
 
-  /** `ToolSearch` waits for a connecting server, so asking at the start costs nothing. */
   it("the skill says to load the tools in the first batch", () => {
     expect(skill).toContain("ToolSearch");
     expect(skill).toMatch(/first\*{0,2} batch/i);
   });
 
-  /** The read tools are only worth naming if they are the ones the server actually registers. */
   it("every tool the skill sends you to is registered by the MCP server", () => {
     const server = read("apps/mcp-server/src/server.ts");
     const named = [...skill.matchAll(/`(?:mcp__[a-z_]+__)?((?:search|ask|get|list)_project_[a-z_]+)`/g)].map((m) => m[1]!);
@@ -226,7 +191,6 @@ describe("the lookup skill", () => {
 describe("the query tools say when to call them", () => {
   const server = read("apps/mcp-server/src/server.ts");
 
-  /** A tool described by its implementation says what it does and never when to reach for it. */
   it("the read tools name an occasion, not only a mechanism", () => {
     expect(server).toContain("LOOKUP_WHEN");
     expect(LOOKUP_WHEN).toMatch(/Call it when/);
@@ -237,7 +201,6 @@ describe("the query tools say when to call them", () => {
     expect(silent).toEqual([]);
   });
 
-  /** The pack's cut lines point at `search_project_context`; its own description has to admit it. */
   it("the pack tool says that what it returns is a sample", () => {
     const at = server.indexOf(`registerTool(\n    "get_project_context_pack"`);
     expect(server.slice(at, at + 900)).toMatch(/sample/);

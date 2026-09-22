@@ -49,9 +49,6 @@ interface Section {
   type?: string;
 }
 
-// Which tool to pass the `type` to is said once in the header: repeated here it put a floor under
-// the pack — a section cut to zero entries still prints this line — that a small budget could not
-// get below (ADR-0069).
 function note(n: number, type?: string): string {
   return type ? `- **+${n} more** not shown (\`type: "${type}"\`)` : `- **+${n} more** not shown`;
 }
@@ -154,8 +151,6 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
     },
   ].filter((s) => s.blocks.length > 0);
 
-  // The module list is not entries, and the area hits are entries already counted where they came
-  // from: counting either would make "showing N of M" overstate N.
   const entriesShown = (counts: number[]): number => sections.reduce((a, s, i) => a + (s.type ? counts[i]! : 0), 0);
   const total = entriesShown(sections.map((s) => s.blocks.length));
 
@@ -179,7 +174,6 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
     const join = (counts: number[]) =>
       [head(entriesShown(counts), explain), ...sections.map((s, i) => write(s, counts[i]!))].join("\n");
 
-    // Initial weighted split: it guarantees something from EVERY kind of knowledge arrives.
     const shares = share(
       sections.map((s) => write(s, s.blocks.length).length),
       sections.map((s) => s.weight),
@@ -187,9 +181,6 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
     );
     const counts = sections.map((s, i) => howManyFit(s, shares[i]!));
 
-    // And then it is checked against the real cap, not against the split's arithmetic: it shrinks
-    // from the tail when we overshot and grows from the head with whatever is left over. The
-    // order of `sections` is the order of importance for whoever is going to read it.
     const fits = () => join(counts).length <= cap;
     for (let i = sections.length - 1; i >= 0 && !fits(); i--) {
       while (counts[i]! > 0 && !fits()) counts[i] = counts[i]! - 1;
@@ -211,8 +202,6 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
     return { text: join(counts), counts };
   };
 
-  // A section that arrives empty reads as "there is nothing here" (see `write`), so the preamble
-  // is dropped rather than starve one — as well as when it simply does not fit.
   const explained = layout(true);
   const plain = layout(false);
   const kept = (counts: number[]): number => counts.filter((n) => n > 0).length;
