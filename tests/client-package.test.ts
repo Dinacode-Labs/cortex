@@ -98,6 +98,6 @@ describe("the API's typed client", () => {
     const res = await listProjects();
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
-    expect(fetchSpy).not.toHaveBeenCalled(); // it does not even bother hitting the network
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

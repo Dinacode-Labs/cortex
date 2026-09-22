@@ -231,7 +231,7 @@ describe("readOpenCodeSessions (SQLite, the current format)", () => {
     part("p2", "m2", "ses1", { type: "reasoning", text: "thinking out loud" }, 1);
     part("p3", "m2", "ses1", { type: "text", text: "Exponential, capped at 60s." }, 2);
     ses("ses-sub", REPO, "ses1", 3); // a sub-agent: it must not come out on its own
-    ses("ses-other", "/other/repo", null, 4); // another repo
+    ses("ses-other", "/other/repo", null, 4);
     msg("m3", "ses-other", "user", 4);
     part("p4", "m3", "ses-other", { type: "text", text: "This belongs to another repository." }, 4);
 

@@ -3,7 +3,7 @@ import { saveContextInput, contextEntryType, confidenceLevel } from "../packages
 
 describe("schemas de dominio (zod)", () => {
   it("saveContextInput requires content and accepts the bare minimum", () => {
-    expect(saveContextInput.safeParse({}).success).toBe(false); // content requerido
+    expect(saveContextInput.safeParse({}).success).toBe(false);
     const ok = saveContextInput.safeParse({ content: "a technical decision" });
     expect(ok.success).toBe(true);
   });

@@ -58,7 +58,7 @@ describe("batch capture plus reconciliation (a real database)", () => {
     const r1 = await captureBatch(p.name, [item], "dev@example.com");
     expect(r1[0]!.action).toBe("added");
     const r2 = await captureBatch(p.name, [item], "dev@example.com");
-    expect(r2[0]!.action).toBe("existing"); // already ingested
+    expect(r2[0]!.action).toBe("existing");
     const entries = await listEntries({ project: p.name });
     expect(entries.some((e) => e.createdBy === "dev@example.com")).toBe(true);
   });

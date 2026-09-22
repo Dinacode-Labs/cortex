@@ -29,7 +29,6 @@ describe("chunkDocument", () => {
     const r = chunkDocument(doc, { targetChars: 2000, maxChars: 2500, overlapChars: 200 });
     expect(r.length).toBeGreaterThan(1);
     for (const c of r) expect(c.content.length).toBeLessThanOrEqual(2500 + 200 + 2); // tope + solape + "…\n\n"
-    // consecutive indices and a coherent total
     r.forEach((c, i) => { expect(c.index).toBe(i); expect(c.total).toBe(r.length); });
   });
 
@@ -41,7 +40,7 @@ describe("chunkDocument", () => {
   });
 
   it("a giant paragraph with no punctuation is hard-cut without exceeding the cap", () => {
-    const monster = "x".repeat(12000); // no spaces and no punctuation
+    const monster = "x".repeat(12000);
     const r = chunkDocument(monster, { targetChars: 2000, maxChars: 2500, overlapChars: 0 });
     expect(r.length).toBeGreaterThan(1);
     for (const c of r) expect(c.content.length).toBeLessThanOrEqual(2500);
