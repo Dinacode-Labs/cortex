@@ -59,18 +59,26 @@ What to check before calling the deployment good:
 ## Updating
 
 ```bash
-$EDITOR deploy/.env    # CORTEX_VERSION=0.2.0
-docker compose -f deploy/docker-compose.yml pull
-docker compose -f deploy/docker-compose.yml up -d
+./deploy/update.sh 0.2.0
 ```
 
-The migrations apply themselves: the `migrate` service runs before the others and they wait for
-it to finish successfully.
+One command, in this order: a backup, `CORTEX_VERSION` pinned in `deploy/.env`, that exact image
+pulled, everything brought up waiting for each service to report healthy, and then the three
+checks below. Any step that fails stops the run and says what to look at; it never leaves you
+guessing whether the host was updated or left halfway. The migrations apply themselves: the
+`migrate` service runs before the others and they wait for it to finish successfully.
 
-**Going back is not symmetric.** Migrations only move forward, so lowering the image's version
-works as long as the newer version has not migrated the schema. If it did, the previous backup
-has to be restored. That is why a manual backup before a large update is worth it:
-`./deploy/backup-now.sh`.
+It refuses `latest` and anything else that is not a version: a floating tag means a restart can
+change version without anybody having decided to. A published tag (`v0.2.0`) and the image's
+version (`0.2.0`) are both accepted.
+
+`CORTEX_UPDATE_TIMEOUT` (300 seconds by default) is how long it waits for the services to become
+healthy before giving up.
+
+**Going back is not symmetric.** Migrations only move forward, so lowering the image's version —
+`./deploy/update.sh 0.1.0`, which backs up first as well — works as long as the newer version has
+not migrated the schema. If it did, the backup has to be restored, and the one the update took
+before touching anything is the one to reach for.
 
 ## Backups
 

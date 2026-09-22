@@ -504,7 +504,7 @@ apps/        mcp-server (MCP stdio + HTTP) · web (UI) · server (API + auth)
              cli (@dinacodelabs/cortex, published to npm) · admin (operator, lives in the image)
 packages/    shared · client (client side) · database · embeddings · core · agents
 plugin/      claude-code/ (hooks + MCP + cortex-recall/cortex-capture skills + /cortex-save)
-deploy/      docker-compose.yml · local.yml · Caddyfile · restore.sh · README.md
+deploy/      docker-compose.yml · local.yml · Caddyfile · update.sh · restore.sh · README.md
 config/      toolbelt.json (schema for third-party registries)
 scripts/     install.sh · set-version.mjs · changelog-notes.mjs
 docs/        how-it-works.md · decisions.md (ADRs) · design.md (web UI) · roadmap.md · research/

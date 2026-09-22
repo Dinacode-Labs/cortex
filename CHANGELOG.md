@@ -9,6 +9,15 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Updating a host is one reviewable command.** `./deploy/update.sh 0.2.0` takes a backup, pins
+  `CORTEX_VERSION` in `deploy/.env`, pulls that exact image, brings everything up waiting for each
+  service to report healthy, and then checks that the host really answers: `/api/health`,
+  `/health` and a `401` from `/mcp`. It refuses `latest` and anything else that is not a version,
+  it backs up **before** touching anything — migrations only move forward, so a backup taken after
+  the new version has migrated the schema is a backup of the problem — and when a step fails it
+  says the host may be halfway, where to look and that going back is not symmetric. It replaces
+  the four commands `deploy/README.md` used to ask for, and the checklist that lived in the head
+  of whoever was deploying.
 - **What a comment is for, written down and loaded in every session.** `.claude/rules/comments.md`
   sets the bar at Clean Code's: a comment is an admission that the code failed to say it, so the
   better name, the smaller function or the named constant comes first, and only a why the code
