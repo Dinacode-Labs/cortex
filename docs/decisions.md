@@ -1218,9 +1218,10 @@ without ever being stated — formatting, and where `any` is allowed — were fi
   The budget is shared out between sections rather than spent in order: each gets an equal
   share, whatever a section doesn't need goes back into the pot for the others, and then the
   remainder is spent top-down by importance. Every section that has entries appears, and each
-  one says how many it left behind (`…and 15 more here. Ask Cortex for the rest.`) so the
-  agent knows the difference between "no constraints" and "constraints you haven't been
-  shown", and knows to ask.
+  one says how many it left behind so the agent knows the difference between "no constraints" and
+  "constraints you haven't been shown", and knows to ask. (The wording of that line was
+  `…and 15 more here. Ask Cortex for the rest.`; it is now the one [0069](#adr-0069) decided, which
+  names the tool and the argument instead of the brand.)
 
   Ordering changed with it. Entries came out `created_at DESC`, which after a backfill is no
   order at all — everything was created within the same minute, so the twenty that survived a
@@ -1914,7 +1915,9 @@ without ever being stated — formatting, and where `any` is allowed — were fi
 
 ## ADR-0065 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
 
-- **Status:** accepted (2026-09-18).
+- **Status:** revised (2026-09-22). Points 2 and 3 stand as written. Point 1's count does not:
+  comments moved out of TypeScript style into an always-loaded rule of their own, so five files
+  load every session and four carry a `paths:` header ([0070](#adr-0070)).
 - **Context:** `CLAUDE.md` was the only written guidance for an agent working in this repository,
   and it had grown to 11.6 KB while still leaving out most of what an agent actually needs to get
   right: how a route, a command or a screen is written here, when to throw and when to return,
@@ -2156,3 +2159,144 @@ without ever being stated — formatting, and where `any` is allowed — were fi
   extraction time rather than to keep growing the pattern list; or the distiller's summary turns
   out, measured with `eval-distill`, to be no better than the first sentences of its own content,
   at which point the field is dead weight in the prompt.
+
+<a id="adr-0069"></a>
+
+## ADR-0069 · The injected material asks for the lookup, so the agent does not have to remember to
+
+- **Status:** accepted (2026-09-22).
+- **Context:** [0066](#adr-0066) gave the **write** half of the loop a protocol — a trigger list, a
+  self-check, one wording in `shared` that every carrier takes from. The **read** half was one
+  clause of one sentence: "Read it before touching a module". Reading is the half an agent skips
+  when nothing asks for it, and it skipped.
+
+  What that looks like: an agent opened a session with the pack injected, was asked something about
+  the project, recognised it as a question about the repository, found a coherent answer in
+  `.claude/` — a skill and a rules file — and answered. It was never wrong; it was the **rules**,
+  and the project had also learned something by running into the problem. That half was in the
+  memory, in the part the pack had cut. Three things lined up:
+
+  1. **The cut said so, and said it as a footnote.** `…and 11 more here. Ask Cortex for the rest.`
+     — in italics, naming a brand where a tool was needed, with no count of the whole and no
+     argument to pass. On a sensitive project the same line stood for 240 entries.
+  2. **Both skills that shipped were write skills** (`cortex-capture`, `/cortex-save`). Asked a
+     question about the project, there was nothing to load. A tool is not a trigger.
+  3. **The query tools' descriptions said what they do and never when to call them.** "Hybrid
+     search (semantic plus keyword) over the project knowledge base" is a mechanism; an agent that
+     already has an answer in hand has no reason to read past it.
+
+  A fourth thing explains the sequence without justifying it: the MCP server was still connecting
+  when the session opened and its tools arrive deferred, so the first batch of calls went out
+  without them. `ToolSearch` waits for a server that is still connecting, so they could have been
+  asked for at the start.
+- **Decision:** the material Cortex already injects carries the trigger, and nothing depends on the
+  agent remembering.
+
+  1. **The truncation line is an instruction, not a note**: a section that had to cut ends in
+     **+11 more** not shown (`type: "convention"`). The count in bold, and the exact argument that brings those entries
+     back — `search_project_context` takes `type`, so a cut section hands over its own query. The
+     tool is named once, in the header, rather than eleven times under eleven sections: repeated it
+     read as boilerplate and, because a section reduced to zero entries still prints this line, it
+     put a floor under the pack that a small budget could not get below.
+  2. **The pack says what fraction of the memory it is, first**: `_Showing 38 of 349 entries_`,
+     followed by one line saying what that means and which call closes the gap. Two numbers on a
+     line that was already spent on a count. In the **header**, because a warning that arrives
+     after the sections arrives after the agent has decided the pack is the memory. And in the pack
+     rather than in the session header, because `get_project_context_pack` hands the same text to a
+     reader who never saw one.
+  3. **The explanation is the lowest-priority thing in the pack.** It is dropped when it does not
+     fit and when it would cost a section its only entry. That keeps `maxChars` a cap rather than a
+     wish, and keeps what [0049](#adr-0049) and [0054](#adr-0054) bought: a section that arrives
+     empty reads as "there is nothing here", which is a more expensive thing to be wrong about than
+     a missing sentence about the memory.
+  4. **A read skill, `cortex-recall`**, alongside the write one. Its description fires on the shape
+     of a question about the project — how this project does something, why it is the way it is,
+     whether it was already decided, tried or broken — and, the part that matters, **says to use it
+     even when the repository looks like it already answers**. A description that does not
+     contradict "I already have an answer" never gets to fire. It also says to ask for the tools in
+     the **first** batch of calls, because `ToolSearch` waits.
+  5. **The query tools name an occasion**, not only a mechanism (`LOOKUP_WHEN`), and
+     `get_project_context_pack` admits in its own description that what it returns is a sample.
+  6. **The wording lives beside the write half**, in `packages/shared/src/capture-protocol.ts`, and
+     every carrier takes it from there. The session header grows from under 300 characters to under
+     500 and the MCP's instructions from under 400 to under 600. That is worth about one pack entry
+     — which the pack was losing anyway, to an agent that had it all and never asked for more.
+- **What was taken from [engram](https://github.com/Gentleman-Programming/engram), and what was
+  not.** Its memory protocol was read for this, and no text from it is in this repository.
+
+  Taken: a read side phrased as **situations you can match against the message in front of you**
+  rather than as advice, including the one this failure turns on — the user's first message names a
+  feature or a problem, so search it before replying; and the instruction to **load deferred tools
+  in the first batch**, which its session hook does by injecting the `ToolSearch` call itself.
+
+  Not taken: **injecting the protocol on every user prompt**, which is where its trigger lives. It
+  is the strongest version of this and we already have the measurement that rules it out — around
+  676 tokens of protocol per turn, against a pack injected once per session. The budget that would
+  buy belongs to the pack. Nor the **time-based nudge** ("15 minutes since your last save"), which
+  is stateful hook machinery for the write half; nor the **ALL-CAPS MANDATORY register**, because
+  the file it would go in already records that instructions an agent skims are instructions it does
+  not apply; nor **listing every prefixed tool id in the injected string**, which belongs in the
+  skill, where there is room, and not in the session's budget.
+- **Alternatives:** write it in `CLAUDE.md` and ask agents to remember — a paragraph asking somebody
+  to remember something is precisely what this repository turns into a test; make the pack bigger —
+  [0049](#adr-0049) already answered that, it moves the cliff, and the failure was not that 25
+  entries were too few but that the agent did not know there were 324 more; have a model decide when
+  to search — `core` is deterministic and everything has to work with no `LLM_PROVIDER`; ship the
+  skill and leave the pack alone — the skill reaches whoever installs the plugin, the pack reaches
+  every agent; put everything in the header and drop the per-section line — an agent looking for one
+  specific thing reads sections, not headers, and the section is where the absence is felt.
+- **Consequences:** the pack carries about 350 characters of preamble when it ships and the session
+  header about 150 more than it did, which together cost roughly one entry out of the 8,000-character
+  budget. A dense eleven-section pack at 6,000 characters drops the preamble rather than starve a
+  section, so the two numbers and the per-section lines are the part that is always there. The cost
+  is paid every session; the entry it buys back is the one nobody asked for.
+- **How to tell it worked:** the share of sessions where a query tool is called **before** the first
+  answer about the project; and how many `search_project_context` calls carry a `type` argument,
+  which nothing but the pack's cut line teaches. **Not measured here:** retrieval quality needs a
+  provider, and none of this changes what is retrieved — only whether it is asked for.
+- **Revisit when:** agents search on every question, including the ones the tree answers perfectly
+  well, at which point the trigger narrows to "already decided, already broken"; or a read of real
+  sessions shows one of the two signals doing all the work — the header preamble or the per-section
+  lines — at which point the other is dead weight and goes.
+
+<a id="adr-0070"></a>
+
+## ADR-0070 · Comments are a rule of their own, and the bar is Clean Code's
+
+- **Status:** accepted (2026-09-22).
+- **Context:** what a comment is for was three bullets inside `typescript-style.md`, which carries
+  `paths: "**/*.ts"`. Two problems followed from that. It loaded only when a TypeScript file was
+  opened, so a migration, a shell script or a skill got no guidance at all; and, being three
+  bullets among formatting, modules, types and errors, it read as a footnote to style rather than
+  as the rule it is.
+
+  The bar itself was also too low. "The **why** only" rules out `// increment the counter` and
+  nothing else, and the tree shows what that permits: paragraph-length blocks that re-explain a
+  function the reader is looking at. Two recent sweeps went through dropping JSDoc that only
+  restated the symbol below it and test comments that only restated the next line — evidence the
+  rule as written was not stopping them from being written in the first place.
+- **Decision:** `.claude/rules/comments.md`, loaded in **every** session, and the `## Comments`
+  section leaves `typescript-style.md` rather than being copied — one subject, one file
+  ([0065](#adr-0065)).
+
+  The bar is Clean Code's: **a comment is an admission that the code failed to say it**. The
+  cheaper fix comes first — a better name, a smaller function, a named constant, an extracted
+  predicate — and only a why the code genuinely cannot carry earns a comment: a hidden constraint,
+  a workaround and the bug behind it, a subtle invariant, a surprise. One or two lines. A why that
+  needs a paragraph is an ADR, and the code cites its number.
+
+  Cleaning up is scoped to **the file you are already editing**, because `documentation.md` asks
+  for narrowly scoped PRs and a repository-wide comment sweep is a change of its own.
+- **Alternatives:** raise the bar inside `typescript-style.md` — it still would not load for
+  anything but `.ts`, which is where a third of the offenders are; ban comments outright, which is
+  the reading of Clean Code that loses the constraint nobody can rediscover from the code; a linter
+  rule — there is no linter here on purpose ([0065](#adr-0065)), and no linter distinguishes a why
+  from a what; leave it as it was — two sweeps in one month say it does not hold.
+- **Consequences:** `typescript-style.md` is shorter and the guidance now reaches every file type,
+  at the cost of one more rule in every session's context. Expect the comment count to fall as
+  files are touched; the tree will read inconsistently while that happens, which is the price of
+  not sweeping it in one pass.
+- **Revisit when:** a why that mattered is lost because somebody read this as "no comments" — the
+  rule then needs the examples it currently only gestures at; or the always-loaded set grows to the
+  point where the rules themselves crowd out the context pack, at which point what loads always and
+  what loads by path is the thing to redecide, not this.

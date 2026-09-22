@@ -31,9 +31,9 @@ describe("the capture protocol has one wording", () => {
    * Every character of preamble is one the pack does not get, and the pack is the part the agent
    * cannot work out by reading the code.
    */
-  it("the session header says the three things in under 300 characters", () => {
+  it("the session header says the four things in under 500 characters", () => {
     const header = sessionMemoryHeader("Cortex", "Acme Portal", { skill: true });
-    expect(header.length).toBeLessThan(300);
+    expect(header.length).toBeLessThan(500);
     const lines = header.split("\n");
     expect(lines).toHaveLength(4);
     expect(lines[1]).toMatch(/memory/i);
@@ -54,8 +54,8 @@ describe("the capture protocol has one wording", () => {
     expect(read("apps/cli/src/commands/hook-context.ts")).toContain('skill: format === "claude"');
   });
 
-  it("the MCP instructions carry the trigger and the do-not-save list in under 400 characters", () => {
-    expect(MCP_INSTRUCTIONS.length).toBeLessThan(400);
+  it("the MCP instructions carry the trigger and the do-not-save list in under 600 characters", () => {
+    expect(MCP_INSTRUCTIONS.length).toBeLessThan(600);
     expect(MCP_INSTRUCTIONS).toContain(captureTrigger());
     expect(MCP_INSTRUCTIONS).toContain(CAPTURE_DO_NOT_SAVE);
   });

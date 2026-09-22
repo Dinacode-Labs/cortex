@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { MCP_INSTRUCTIONS, saveContextInput, searchContextInput } from "@cortex/shared";
+import { LOOKUP_WHEN, MCP_INSTRUCTIONS, saveContextInput, searchContextInput } from "@cortex/shared";
 import {
   checkEntryAccess,
   checkProjectAccess,
@@ -85,7 +85,10 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       title: "Search project context",
       description:
         "Hybrid search (semantic plus keyword) over the project knowledge base. Returns the " +
-        "closest entries with their score, summary and source. Can be filtered by project and type.",
+        "closest entries with their score, summary and source. Can be filtered by project and type. " +
+        LOOKUP_WHEN +
+        " The repository holds the rules; this holds what the project learned the hard way, which " +
+        "is not in the files. Pass `type` to read back what a context pack section left out.",
       inputSchema: searchContextInput.shape,
     },
     async (args) => {
@@ -110,7 +113,9 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       description:
         "Build a briefing for working on a project: current decisions, constraints, risks, " +
         "technical debt, conventions and sensitive modules, plus whatever is most relevant to " +
-        "an area if you name one. Read this before touching a module.",
+        "an area if you name one. Read this before touching a module. What comes back is a " +
+        "sample: its header says how many of the project's entries it is showing, and each " +
+        "section that had to cut says how to ask for the rest with `search_project_context`.",
       inputSchema: {
         project: z.string().describe("Project slug (what `cortex link` shows) or name, e.g. 'acme-portal' or 'Acme Portal'"),
         area: z.string().optional().describe("Optional area or module, e.g. 'billing'"),
@@ -132,7 +137,9 @@ export function buildMcpServer(user?: AuthUser): McpServer {
     "list_project_decisions",
     {
       title: "List project decisions",
-      description: "List the technical decisions recorded for a project, most recent first.",
+      description:
+        "List the technical decisions recorded for a project, most recent first. Call it when the " +
+        "question is whether something was already decided, or what a past choice ruled out.",
       inputSchema: {
         project: z.string().describe("Project slug or name"),
         limit: z.number().int().positive().max(50).optional(),
@@ -184,7 +191,9 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       description:
         "Ask a question about a project in plain language. Retrieves the relevant context and " +
         "writes an answer grounded in it, citing the entries it used. Needs an LLM configured; " +
-        "without one it falls back to search results.",
+        "without one it falls back to search results. " +
+        LOOKUP_WHEN +
+        " Use it instead of `search_project_context` when you want the answer rather than the list.",
       inputSchema: {
         question: z.string().describe("The question, in plain language"),
         project: z.string().optional().describe("Project slug or name"),

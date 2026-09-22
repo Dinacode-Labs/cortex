@@ -1,4 +1,4 @@
-import { getBrandName, type ContextEntry } from "@cortex/shared";
+import { getBrandName, packIsASample, packShowing, type ContextEntry } from "@cortex/shared";
 import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "./vectors.js";
@@ -45,10 +45,11 @@ interface Section {
   title: string;
   blocks: string[];
   weight: number;
+  type?: string;
 }
 
-function note(n: number): string {
-  return `- _…and ${n} more here. Ask ${getBrandName()} for the rest._`;
+function note(n: number, type?: string): string {
+  return type ? `- **+${n} more** not shown (\`type: "${type}"\`)` : `- **+${n} more** not shown`;
 }
 
 /**
@@ -60,7 +61,7 @@ function note(n: number): string {
  */
 function write(s: Section, n: number): string {
   const left = s.blocks.length - n;
-  const body = [...s.blocks.slice(0, n), ...(left > 0 ? [note(left)] : [])];
+  const body = [...s.blocks.slice(0, n), ...(left > 0 ? [note(left, s.type)] : [])];
   return `\n## ${s.title}\n${body.join("\n")}`;
 }
 
@@ -139,7 +140,7 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
   };
 
   const sections: Section[] = [
-    ...pack.sections.map((s) => ({ title: s.title, weight: s.weight, blocks: s.entries.map(line) })),
+    ...pack.sections.map((s) => ({ title: s.title, weight: s.weight, type: s.type, blocks: s.entries.map(line) })),
     { title: "Sensitive modules", weight: 1, blocks: pack.sensitiveModules.map((m) => `- ${m}`) },
     {
       title: "Most relevant to the area you asked about",
@@ -149,43 +150,59 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
     },
   ].filter((s) => s.blocks.length > 0);
 
-  const header = [
-    `# Context Pack — ${pack.project}`,
-    `_${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total · generated ${pack.generatedAt.toISOString()}_`,
-  ].join("\n");
+  const entriesShown = (counts: number[]): number => sections.reduce((a, s, i) => a + (s.type ? counts[i]! : 0), 0);
+  const total = entriesShown(sections.map((s) => s.blocks.length));
 
-  const join = (pieces: string[]) => [header, ...pieces].join("\n");
+  const head = (shown: number, explain: boolean): string => {
+    const cut = shown < total || shown < pack.totalEntries;
+    const count = cut ? packShowing(shown, pack.totalEntries) : `${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total`;
+    return [
+      `# Context Pack — ${pack.project}`,
+      `_${count} · generated ${pack.generatedAt.toISOString()}_`,
+      ...(cut && explain ? [`> ${packIsASample()}`] : []),
+    ].join("\n");
+  };
+
   const cap = opts.maxChars;
-  if (!cap || cap <= 0) return join(sections.map((s) => write(s, s.blocks.length)));
-
-  // Initial weighted split: it guarantees something from EVERY kind of knowledge arrives.
-  const shares = share(
-    sections.map((s) => write(s, s.blocks.length).length),
-    sections.map((s) => s.weight),
-    Math.max(cap - header.length - sections.length, 0),
-  );
-  const counts = sections.map((s, i) => howManyFit(s, shares[i]!));
-
-  // And then it is checked against the real cap, not against the split's arithmetic: it shrinks
-  // from the tail when we overshot and grows from the head with whatever is left over. The
-  // order of `sections` is the order of importance for whoever is going to read it.
-  const fits = () => join(sections.map((s, i) => write(s, counts[i]!))).length <= cap;
-  for (let i = sections.length - 1; i >= 0 && !fits(); i--) {
-    while (counts[i]! > 0 && !fits()) counts[i] = counts[i]! - 1;
+  if (!cap || cap <= 0) {
+    const whole = sections.map((s) => s.blocks.length);
+    return [head(entriesShown(whole), true), ...sections.map((s) => write(s, s.blocks.length))].join("\n");
   }
-  for (let pass = 0; pass < sections.length; pass++) {
-    let moved = false;
-    for (let i = 0; i < sections.length; i++) {
-      while (counts[i]! < sections[i]!.blocks.length) {
-        counts[i] = counts[i]! + 1;
-        if (fits()) moved = true;
-        else {
-          counts[i] = counts[i]! - 1;
-          break;
+
+  const layout = (explain: boolean): { text: string; counts: number[] } => {
+    const join = (counts: number[]) =>
+      [head(entriesShown(counts), explain), ...sections.map((s, i) => write(s, counts[i]!))].join("\n");
+
+    const shares = share(
+      sections.map((s) => write(s, s.blocks.length).length),
+      sections.map((s) => s.weight),
+      Math.max(cap - head(0, explain).length - sections.length, 0),
+    );
+    const counts = sections.map((s, i) => howManyFit(s, shares[i]!));
+
+    const fits = () => join(counts).length <= cap;
+    for (let i = sections.length - 1; i >= 0 && !fits(); i--) {
+      while (counts[i]! > 0 && !fits()) counts[i] = counts[i]! - 1;
+    }
+    for (let pass = 0; pass < sections.length; pass++) {
+      let moved = false;
+      for (let i = 0; i < sections.length; i++) {
+        while (counts[i]! < sections[i]!.blocks.length) {
+          counts[i] = counts[i]! + 1;
+          if (fits()) moved = true;
+          else {
+            counts[i] = counts[i]! - 1;
+            break;
+          }
         }
       }
+      if (!moved) break;
     }
-    if (!moved) break;
-  }
-  return join(sections.map((s, i) => write(s, counts[i]!)));
+    return { text: join(counts), counts };
+  };
+
+  const explained = layout(true);
+  const plain = layout(false);
+  const kept = (counts: number[]): number => counts.filter((n) => n > 0).length;
+  return explained.text.length <= cap && kept(explained.counts) >= kept(plain.counts) ? explained.text : plain.text;
 }
