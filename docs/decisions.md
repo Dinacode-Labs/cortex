@@ -1915,7 +1915,9 @@ without ever being stated — formatting, and where `any` is allowed — were fi
 
 ## ADR-0065 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
 
-- **Status:** accepted (2026-09-18).
+- **Status:** revised (2026-09-22). Points 2 and 3 stand as written. Point 1's count does not:
+  comments moved out of TypeScript style into an always-loaded rule of their own, so five files
+  load every session and four carry a `paths:` header ([0070](#adr-0070)).
 - **Context:** `CLAUDE.md` was the only written guidance for an agent working in this repository,
   and it had grown to 11.6 KB while still leaving out most of what an agent actually needs to get
   right: how a route, a command or a screen is written here, when to throw and when to return,
@@ -2256,3 +2258,45 @@ without ever being stated — formatting, and where `any` is allowed — were fi
   well, at which point the trigger narrows to "already decided, already broken"; or a read of real
   sessions shows one of the two signals doing all the work — the header preamble or the per-section
   lines — at which point the other is dead weight and goes.
+
+<a id="adr-0070"></a>
+
+## ADR-0070 · Comments are a rule of their own, and the bar is Clean Code's
+
+- **Status:** accepted (2026-09-22).
+- **Context:** what a comment is for was three bullets inside `typescript-style.md`, which carries
+  `paths: "**/*.ts"`. Two problems followed from that. It loaded only when a TypeScript file was
+  opened, so a migration, a shell script or a skill got no guidance at all; and, being three
+  bullets among formatting, modules, types and errors, it read as a footnote to style rather than
+  as the rule it is.
+
+  The bar itself was also too low. "The **why** only" rules out `// increment the counter` and
+  nothing else, and the tree shows what that permits: paragraph-length blocks that re-explain a
+  function the reader is looking at. Two recent sweeps went through dropping JSDoc that only
+  restated the symbol below it and test comments that only restated the next line — evidence the
+  rule as written was not stopping them from being written in the first place.
+- **Decision:** `.claude/rules/comments.md`, loaded in **every** session, and the `## Comments`
+  section leaves `typescript-style.md` rather than being copied — one subject, one file
+  ([0065](#adr-0065)).
+
+  The bar is Clean Code's: **a comment is an admission that the code failed to say it**. The
+  cheaper fix comes first — a better name, a smaller function, a named constant, an extracted
+  predicate — and only a why the code genuinely cannot carry earns a comment: a hidden constraint,
+  a workaround and the bug behind it, a subtle invariant, a surprise. One or two lines. A why that
+  needs a paragraph is an ADR, and the code cites its number.
+
+  Cleaning up is scoped to **the file you are already editing**, because `documentation.md` asks
+  for narrowly scoped PRs and a repository-wide comment sweep is a change of its own.
+- **Alternatives:** raise the bar inside `typescript-style.md` — it still would not load for
+  anything but `.ts`, which is where a third of the offenders are; ban comments outright, which is
+  the reading of Clean Code that loses the constraint nobody can rediscover from the code; a linter
+  rule — there is no linter here on purpose ([0065](#adr-0065)), and no linter distinguishes a why
+  from a what; leave it as it was — two sweeps in one month say it does not hold.
+- **Consequences:** `typescript-style.md` is shorter and the guidance now reaches every file type,
+  at the cost of one more rule in every session's context. Expect the comment count to fall as
+  files are touched; the tree will read inconsistently while that happens, which is the price of
+  not sweeping it in one pass.
+- **Revisit when:** a why that mattered is lost because somebody read this as "no comments" — the
+  rule then needs the examples it currently only gestures at; or the always-loaded set grows to the
+  point where the rules themselves crowd out the context pack, at which point what loads always and
+  what loads by path is the thing to redecide, not this.

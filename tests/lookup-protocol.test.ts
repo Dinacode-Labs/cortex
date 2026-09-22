@@ -70,10 +70,7 @@ describe("a truncated pack asks for the rest", () => {
     expect(text.split("\n").slice(0, 3).join(" ")).toContain(SEARCH_TOOL);
   });
 
-  /**
-   * The count is the whole argument. "Some entries were left out" is a disclaimer; "240 more not
-   * shown here" is a fact about the memory that an agent cannot read past.
-   */
+  /** A wrong count is worse than none: it is the number the agent weighs the pack against. */
   it("the count is the real number left behind", () => {
     const text = renderContextPack(pack(12), { maxChars: 4000 });
     const shownPerSection = new Map<string, number>();
@@ -88,11 +85,8 @@ describe("a truncated pack asks for the rest", () => {
     }
   });
 
-  /**
-   * A typed section hands over the argument that returns exactly that section, so the agent does
-   * not have to guess a query. A filter naming a type the domain does not have is worse than none:
-   * the call comes back empty and the agent concludes the memory is empty.
-   */
+  /** A filter naming a type the domain lacks comes back empty, and the agent reads that as "the
+   * memory has nothing" — worse than offering no filter at all. */
   it("a typed section names a type the search tool accepts", () => {
     const text = renderContextPack(pack(), { maxChars: 8000 });
     const types = new Set(PACK_SECTIONS.map((s) => s.type as string));
@@ -117,10 +111,7 @@ describe("the pack says what fraction of the memory it is", () => {
     expect(text.split("\n")[2]).toContain(packIsASample());
   });
 
-  /**
-   * And it does not lie in the other direction: an uncapped pack of everything the project has is
-   * not a sample, and calling it one teaches the agent to ignore the line when it is true.
-   */
+  /** Calling a complete pack a sample teaches the agent to ignore the line when it is true. */
   it("a pack holding everything does not call itself a sample", () => {
     const whole = renderContextPack(pack(12, 12 * PACK_SECTIONS.length), {});
     expect(whole).not.toContain("a sample of the memory");
@@ -146,21 +137,14 @@ describe("the pack says what fraction of the memory it is", () => {
 });
 
 describe("the read half reaches every agent", () => {
-  /**
-   * Pi renames its tools (`cortex.mem_search`), so the sentence has to name the tool THAT agent
-   * has. A trigger pointing at a tool the reader does not have is a trigger it learns to skip.
-   */
+  /** Pi renames its tools: a trigger pointing at one the reader does not have is one it skips. */
   it("the trigger names the tool of whoever is reading it", () => {
     expect(lookupTrigger()).toContain(`\`${SEARCH_TOOL}\``);
     expect(lookupTrigger("cortex.mem_search")).toContain("`cortex.mem_search`");
     expect(lookupTrigger("cortex.mem_search")).not.toContain(SEARCH_TOOL);
   });
 
-  /**
-   * The sentence that does the work is the second half: "the files hold the rules, the memory
-   * holds what the project learned the hard way". Without it the trigger reads as advice and loses
-   * to an answer the agent has already found in the tree — which is precisely what happened.
-   */
+  /** Without the second half the trigger reads as advice and loses to an answer already found. */
   it("the trigger says why the repository is not enough", () => {
     expect(lookupTrigger()).toMatch(/repository/i);
     expect(lookupTrigger()).toMatch(/files hold the rules/i);
@@ -181,10 +165,7 @@ describe("the read half reaches every agent", () => {
     expect(MCP_INSTRUCTIONS).toContain(lookupTrigger());
   });
 
-  /**
-   * A carrier that writes its own version of the sentence is a carrier that drifts. The capture
-   * half learned this the expensive way (ADR-0066) and the read half starts out the same.
-   */
+  /** A carrier that writes its own version drifts: the capture half learned that in ADR-0066. */
   it.each([
     ["apps/cli/src/commands/hook-context.ts", "sessionMemoryHeader("],
     ["apps/mcp-server/src/server.ts", "LOOKUP_WHEN"],
@@ -201,10 +182,7 @@ describe("the lookup skill", () => {
   const skill = read("plugin/claude-code/skills/cortex-recall/SKILL.md");
   const description = (/^description: >-\n([\s\S]*?)\n---/m.exec(skill)?.[1] ?? "").replace(/\s+/g, " ");
 
-  /**
-   * Both skills that shipped before this one were WRITE skills. Asked a question about the
-   * project, an agent had nothing to load: the tools were there, and a tool is not a trigger.
-   */
+  /** Both earlier skills were WRITE skills: the tools were there, and a tool is not a trigger. */
   it("the description fires on a question about the project, not only on being asked to look", () => {
     expect(description.length).toBeGreaterThan(0);
     for (const phrase of ["how this project does something", "why it is the way it is", "already decided"]) {
@@ -212,11 +190,7 @@ describe("the lookup skill", () => {
     }
   });
 
-  /**
-   * The one sentence that would have prevented the incident: the agent found a coherent answer in
-   * the repository and never asked what the project knew from experience. A description that does
-   * not contradict "I already have an answer" never gets to fire.
-   */
+  /** A description that does not contradict "I already have an answer" never gets to fire. */
   it("the description fires even when the repository looks like it answers", () => {
     expect(description).toMatch(/even when the repository looks like it already answers/i);
     expect(description).toMatch(/\.claude\//);
@@ -234,11 +208,7 @@ describe("the lookup skill", () => {
     expect(skill.split("\n").length).toBeLessThanOrEqual(120);
   });
 
-  /**
-   * The tools arrive deferred and the server may still be connecting when the first batch of calls
-   * goes out. `ToolSearch` waits for a connecting server, so the honest instruction is to ask at
-   * the start rather than to work around the wait — which is what the failed session did.
-   */
+  /** `ToolSearch` waits for a connecting server, so asking at the start costs nothing. */
   it("the skill says to load the tools in the first batch", () => {
     expect(skill).toContain("ToolSearch");
     expect(skill).toMatch(/first\*{0,2} batch/i);
@@ -256,11 +226,7 @@ describe("the lookup skill", () => {
 describe("the query tools say when to call them", () => {
   const server = read("apps/mcp-server/src/server.ts");
 
-  /**
-   * A tool described by its implementation ("hybrid search over the knowledge base") tells an agent
-   * what it does and never tells it when. Both read tools were written that way, and neither was
-   * called by an agent that had a question and an answer already in hand.
-   */
+  /** A tool described by its implementation says what it does and never when to reach for it. */
   it("the read tools name an occasion, not only a mechanism", () => {
     expect(server).toContain("LOOKUP_WHEN");
     expect(LOOKUP_WHEN).toMatch(/Call it when/);

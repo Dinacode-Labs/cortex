@@ -84,8 +84,6 @@ export function buildMcpServer(user?: AuthUser): McpServer {
     "search_project_context",
     {
       title: "Search project context",
-      // A description that only says how the tool works is a tool nobody calls: what was missing
-      // was the occasion. `type` is named because it is what a truncated pack section points at.
       description:
         "Hybrid search (semantic plus keyword) over the project knowledge base. Returns the " +
         "closest entries with their score, summary and source. Can be filtered by project and type. " +

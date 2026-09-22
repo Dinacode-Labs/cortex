@@ -59,11 +59,3 @@ code you are not touching: a formatting diff hides the real change.
   drawer.
 - Explicit precedence, on one readable line: what the caller asked for > what the LLM says > the
   heuristic (`parsed.type ?? llm?.type ?? classifyType(content)`).
-
-## Comments
-
-- The **why** only. The what is already in the names; if it is not, fix the name.
-- A good comment here says **what happened**: the hidden constraint, the incident that motivated
-  the line, the ADR that decided it. "222 nodes named after a whole sentence" teaches something;
-  "extracts the entities" does not.
-- Never reference the current task, ticket or PR from the code.

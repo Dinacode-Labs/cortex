@@ -51,54 +51,32 @@ export const CAPTURE_READ_FIRST = "Read it before touching a module";
 export const SEARCH_TOOL = "search_project_context";
 
 /**
- * What makes an agent ask the memory instead of answering from the tree.
- *
- * The second half is the one that does the work. An agent asked something about the project
- * recognises it as a question about the repository, finds a rule in `.claude/` or a README that
- * answers it coherently, and stops there — it never asks what the project knows from experience,
- * which is the one thing the files do not hold. Naming that difference is what makes the lookup
- * happen; "read the memory first" on its own reads as advice and loses to an answer already found.
+ * The second half of the sentence is what makes the lookup happen: "read the memory first" on its
+ * own reads as advice and loses to an answer the agent has already found in `.claude/`.
  */
 export function lookupTrigger(tool: string = SEARCH_TOOL): string {
   return `Before answering from the repository alone, ask it with \`${tool}\`: the files hold the rules, the memory holds what the project learned the hard way.`;
 }
 
-/**
- * When to call the search tool, for the carriers that have room to say more than the trigger: the
- * tool's own description and the lookup skill. Phrased as the shapes a question arrives in,
- * because that is what an agent can match against the message in front of it.
- */
+/** Phrased as the shapes a question arrives in: that is what an agent can match against. */
 export const LOOKUP_WHEN =
   "Call it when the question is about how this project does something, why it is the way it is, whether it was already decided, tried or broken before, or what to watch out for in a module.";
 
-/**
- * The question the agent asks itself before answering. Quoted verbatim by every carrier, like
- * `CAPTURE_SELF_CHECK`: a self-check the agent has to paraphrase is one it skips.
- */
+/** Quoted verbatim by every carrier: a self-check the agent has to paraphrase is one it skips. */
 export const LOOKUP_SELF_CHECK =
   "Am I about to answer something about this project out of the repository alone? If yes, ask the memory first.";
 
 /** Where the long form of the lookup half lives. Only for whoever installs the plugin. */
 export const LOOKUP_SKILL_POINTER = "See the cortex-recall skill.";
 
-/**
- * The two numbers that stop a pack being mistaken for the memory. They cost nothing — the line
- * they go on was already being spent on a count — so they are never dropped, whatever the budget.
- */
+/** Never dropped, whatever the budget: the line it goes on was already spent on a count. */
 export function packShowing(shown: number, total: number): string {
   return `Showing ${shown} of ${total} ${total === 1 ? "entry" : "entries"}`;
 }
 
 /**
- * What a rendered context pack is, said in the pack itself.
- *
- * It travels with the pack rather than with the session header because the header is not always
- * there: `get_project_context_pack` hands the same text to an agent that never saw one.
- *
- * "What is not here is not absent" is the sentence doing the work. The pack reads like a complete
- * briefing — eleven titled sections, every kind of knowledge present — and an agent that takes it
- * for the memory concludes from a section it has fully read that the project has nothing more to
- * say on it. It has; it did not fit.
+ * It travels with the pack, not with the session header, because `get_project_context_pack` hands
+ * the same text to an agent that never saw one.
  */
 export function packIsASample(tool: string = SEARCH_TOOL): string {
   return [
@@ -116,13 +94,9 @@ export interface SessionMemoryHeaderOptions {
 }
 
 /**
- * The four lines above the context pack at session start: what this is, when to read it, when to
- * write back, and where the long form of each half lives. Under 450 characters on purpose — every
- * character here is one the pack does not get (`CORTEX_HOOK_CTX_CHARS`).
- *
- * The lookup line is worth about one pack entry and is spent anyway: an agent that has the whole
- * pack and does not know to ask for the rest answers from the tree, which is the failure the pack
- * was already losing to.
+ * Under 500 characters on purpose: every character here is one the pack does not get
+ * (`CORTEX_HOOK_CTX_CHARS`). The lookup line is worth about one entry and is spent anyway — an
+ * agent that has the whole pack and does not know to ask for the rest answers from the tree.
  */
 export function sessionMemoryHeader(brand: string, project: string, opts: SessionMemoryHeaderOptions = {}): string {
   const read = `${CAPTURE_READ_FIRST}. ${lookupTrigger()}`;

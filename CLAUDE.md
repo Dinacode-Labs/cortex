@@ -25,7 +25,7 @@ What you have to respect when writing code here lives in `.claude/rules/`, one f
 Claude Code loads them by itself, so **do not import them from here and do not duplicate their
 content** (ADR-0065):
 
-- Always: `architecture.md`, `language.md`, `tests.md`, `documentation.md`.
+- Always: `architecture.md`, `comments.md`, `language.md`, `tests.md`, `documentation.md`.
 - Only when you touch what they cover (a `paths:` header): `typescript-style.md`, `api-http.md`,
   `cli.md`, `web.md`, `llm-agents.md`, `evals.md`.
 
