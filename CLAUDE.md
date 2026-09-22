@@ -76,8 +76,8 @@ apps/
                # connectors, services). It lives in the image, not on the laptop
 scripts/       # install.sh (the remote installer; apps/server serves it)
 plugin/        # claude-code/: what Cortex installs into Claude Code (hooks, MCP, the
-               # cortex-capture skill, /cortex-save). The marketplace is declared in
-               # .claude-plugin/marketplace.json, at the root (ADR-0032)
+               # cortex-recall and cortex-capture skills, /cortex-save). The marketplace
+               # is declared in .claude-plugin/marketplace.json, at the root (ADR-0032)
 config/        # only the schema of the THIRD-PARTY registry (the organisation's toolbelt,
                # ADR-0014/0026). The product's own no longer lives here: it is in plugin/
 tests/         # unit + integration (a real Postgres; see CONTRIBUTING.md)

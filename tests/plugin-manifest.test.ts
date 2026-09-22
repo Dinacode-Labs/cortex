@@ -58,8 +58,14 @@ describe("plugin de Claude Code", () => {
     expect(mcp.mcpServers.cortex).toEqual({ command: "cortex", args: ["mcp"] });
   });
 
-  it("the skill and the command live inside the plugin", () => {
-    expect(existsSync(resolve(root, "plugin/claude-code/skills/cortex-capture/SKILL.md"))).toBe(true);
+  /**
+   * Both halves of the loop ship as skills. For a while only the write half did, and an agent
+   * asked a question about the project had nothing to load: it answered out of `.claude/`.
+   */
+  it("the skills and the command live inside the plugin", () => {
+    for (const skill of ["cortex-capture", "cortex-recall"]) {
+      expect(existsSync(resolve(root, `plugin/claude-code/skills/${skill}/SKILL.md`)), skill).toBe(true);
+    }
     expect(existsSync(resolve(root, "plugin/claude-code/commands/cortex-save.md"))).toBe(true);
   });
 

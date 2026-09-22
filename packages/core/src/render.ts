@@ -1,4 +1,4 @@
-import { getBrandName, type ContextEntry } from "@cortex/shared";
+import { getBrandName, packIsASample, packShowing, type ContextEntry } from "@cortex/shared";
 import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "./vectors.js";
@@ -46,10 +46,28 @@ interface Section {
   blocks: string[];
   /** How much budget it gets relative to the others. See `PACK_SECTIONS`. */
   weight: number;
+  /**
+   * The entry type behind the section, when it has one. It is in the note that says what was
+   * left out, because it is the argument that brings exactly those entries back.
+   */
+  type?: string;
 }
 
-function note(n: number): string {
-  return `- _…and ${n} more here. Ask ${getBrandName()} for the rest._`;
+/**
+ * The line that stands in for what did not fit.
+ *
+ * It used to read `…and 11 more here. Ask Cortex for the rest.` — italic, a brand instead of a
+ * tool, and no way to act on it. An agent read it as a footnote, kept the pack for the whole
+ * memory and answered out of the tree; the entry it needed was in the 11. What replaces it is the
+ * count in bold and the exact argument that brings those entries back, which is `type`.
+ *
+ * The sentence that says which tool to pass it to is in the header, once. Repeated under every
+ * section it cost eleven times as much and read as boilerplate, and — because a section reduced to
+ * zero entries still prints this line — it put a floor under the pack that a small budget could
+ * not get below.
+ */
+function note(n: number, type?: string): string {
+  return type ? `- **+${n} more** not shown (\`type: "${type}"\`)` : `- **+${n} more** not shown`;
 }
 
 /**
@@ -61,7 +79,7 @@ function note(n: number): string {
  */
 function write(s: Section, n: number): string {
   const left = s.blocks.length - n;
-  const body = [...s.blocks.slice(0, n), ...(left > 0 ? [note(left)] : [])];
+  const body = [...s.blocks.slice(0, n), ...(left > 0 ? [note(left, s.type)] : [])];
   return `\n## ${s.title}\n${body.join("\n")}`;
 }
 
@@ -140,7 +158,7 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
   };
 
   const sections: Section[] = [
-    ...pack.sections.map((s) => ({ title: s.title, weight: s.weight, blocks: s.entries.map(line) })),
+    ...pack.sections.map((s) => ({ title: s.title, weight: s.weight, type: s.type, blocks: s.entries.map(line) })),
     { title: "Sensitive modules", weight: 1, blocks: pack.sensitiveModules.map((m) => `- ${m}`) },
     {
       title: "Most relevant to the area you asked about",
@@ -150,43 +168,78 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
     },
   ].filter((s) => s.blocks.length > 0);
 
-  const header = [
-    `# Context Pack — ${pack.project}`,
-    `_${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total · generated ${pack.generatedAt.toISOString()}_`,
-  ].join("\n");
+  // Only the typed sections count towards "showing N of M": the module list is not knowledge
+  // entries, and the area hits are entries already counted in the section they came from.
+  const entriesShown = (counts: number[]): number => sections.reduce((a, s, i) => a + (s.type ? counts[i]! : 0), 0);
+  const total = entriesShown(sections.map((s) => s.blocks.length));
 
-  const join = (pieces: string[]) => [header, ...pieces].join("\n");
+  /**
+   * The pack says how much of the memory it is, and it says it FIRST: an agent that meets the
+   * warning after the sections has already decided the pack is the memory.
+   *
+   * The two numbers are unconditional — they replace a count that was on that line anyway. The
+   * sentence explaining them is not: at a budget where it would cost entries it is dropped, which
+   * is what keeps `maxChars` a cap rather than a wish. `get_project_context_pack` passes no cap,
+   * so the reader who has no session header above the pack always gets the sentence.
+   */
+  const head = (shown: number, explain: boolean): string => {
+    const cut = shown < total || shown < pack.totalEntries;
+    const count = cut ? packShowing(shown, pack.totalEntries) : `${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total`;
+    return [
+      `# Context Pack — ${pack.project}`,
+      `_${count} · generated ${pack.generatedAt.toISOString()}_`,
+      ...(cut && explain ? [`> ${packIsASample()}`] : []),
+    ].join("\n");
+  };
+
   const cap = opts.maxChars;
-  if (!cap || cap <= 0) return join(sections.map((s) => write(s, s.blocks.length)));
-
-  // Initial weighted split: it guarantees something from EVERY kind of knowledge arrives.
-  const shares = share(
-    sections.map((s) => write(s, s.blocks.length).length),
-    sections.map((s) => s.weight),
-    Math.max(cap - header.length - sections.length, 0),
-  );
-  const counts = sections.map((s, i) => howManyFit(s, shares[i]!));
-
-  // And then it is checked against the real cap, not against the split's arithmetic: it shrinks
-  // from the tail when we overshot and grows from the head with whatever is left over. The
-  // order of `sections` is the order of importance for whoever is going to read it.
-  const fits = () => join(sections.map((s, i) => write(s, counts[i]!))).length <= cap;
-  for (let i = sections.length - 1; i >= 0 && !fits(); i--) {
-    while (counts[i]! > 0 && !fits()) counts[i] = counts[i]! - 1;
+  if (!cap || cap <= 0) {
+    const whole = sections.map((s) => s.blocks.length);
+    return [head(entriesShown(whole), true), ...sections.map((s) => write(s, s.blocks.length))].join("\n");
   }
-  for (let pass = 0; pass < sections.length; pass++) {
-    let moved = false;
-    for (let i = 0; i < sections.length; i++) {
-      while (counts[i]! < sections[i]!.blocks.length) {
-        counts[i] = counts[i]! + 1;
-        if (fits()) moved = true;
-        else {
-          counts[i] = counts[i]! - 1;
-          break;
+
+  const layout = (explain: boolean): { text: string; counts: number[] } => {
+    const join = (counts: number[]) =>
+      [head(entriesShown(counts), explain), ...sections.map((s, i) => write(s, counts[i]!))].join("\n");
+
+    // Initial weighted split: it guarantees something from EVERY kind of knowledge arrives.
+    const shares = share(
+      sections.map((s) => write(s, s.blocks.length).length),
+      sections.map((s) => s.weight),
+      Math.max(cap - head(0, explain).length - sections.length, 0),
+    );
+    const counts = sections.map((s, i) => howManyFit(s, shares[i]!));
+
+    // And then it is checked against the real cap, not against the split's arithmetic: it shrinks
+    // from the tail when we overshot and grows from the head with whatever is left over. The
+    // order of `sections` is the order of importance for whoever is going to read it.
+    const fits = () => join(counts).length <= cap;
+    for (let i = sections.length - 1; i >= 0 && !fits(); i--) {
+      while (counts[i]! > 0 && !fits()) counts[i] = counts[i]! - 1;
+    }
+    for (let pass = 0; pass < sections.length; pass++) {
+      let moved = false;
+      for (let i = 0; i < sections.length; i++) {
+        while (counts[i]! < sections[i]!.blocks.length) {
+          counts[i] = counts[i]! + 1;
+          if (fits()) moved = true;
+          else {
+            counts[i] = counts[i]! - 1;
+            break;
+          }
         }
       }
+      if (!moved) break;
     }
-    if (!moved) break;
-  }
-  return join(sections.map((s, i) => write(s, counts[i]!)));
+    return { text: join(counts), counts };
+  };
+
+  // The explanation is the lowest-priority thing in the pack: it is dropped both when it does not
+  // fit and when it would cost a section its only entry. A section that arrives empty reads as
+  // "there is nothing here" (see `write`), and paying for a sentence about the memory with a
+  // silence about part of it is the trade this pack exists to refuse.
+  const explained = layout(true);
+  const plain = layout(false);
+  const kept = (counts: number[]): number => counts.filter((n) => n > 0).length;
+  return explained.text.length <= cap && kept(explained.counts) >= kept(plain.counts) ? explained.text : plain.text;
 }

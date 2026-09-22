@@ -1,7 +1,7 @@
 {
   "name": "cortex",
   "version": "0.1.12",
-  "description": "Project memory for AI coding agents: context on session start, capture on session end, and 8 MCP tools.",
+  "description": "Project memory for AI coding agents: context on session start, a skill that asks it before answering, capture on session end, and 8 MCP tools.",
   "author": {
     "name": "Dinacode Labs"
   },

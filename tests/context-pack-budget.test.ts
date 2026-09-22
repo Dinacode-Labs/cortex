@@ -60,18 +60,18 @@ describe("renderContextPack with a budget", () => {
     }
   });
 
-  it("respeta el tope", () => {
+  it("it respects the cap", () => {
     expect(renderContextPack(pack(), { maxChars: 6000 }).length).toBeLessThanOrEqual(6000);
     expect(renderContextPack(pack(), { maxChars: 2000 }).length).toBeLessThanOrEqual(2000);
   });
 
   it("says how much was left out instead of keeping quiet about it", () => {
-    expect(renderContextPack(pack(), { maxChars: 6000 })).toMatch(/…and \d+ more here/);
+    expect(renderContextPack(pack(), { maxChars: 6000 })).toMatch(/\*\*\+\d+ more\*\* not shown/);
   });
 
   it("never goes over the cap, however you ask for it", () => {
-    for (const tope of [500, 1000, 2000, 3000, 6000, 12000, 20000, 40000]) {
-      expect(renderContextPack(pack(), { maxChars: tope }).length, `tope ${tope}`).toBeLessThanOrEqual(tope);
+    for (const cap of [500, 1000, 2000, 3000, 6000, 12000, 20000, 40000]) {
+      expect(renderContextPack(pack(), { maxChars: cap }).length, `cap ${cap}`).toBeLessThanOrEqual(cap);
     }
   });
 
@@ -80,6 +80,6 @@ describe("renderContextPack with a budget", () => {
     (p as { sensitiveModules: string[] }).sensitiveModules = ["payments"]; // a tiny section
     const txt = renderContextPack(p, { maxChars: 6000 });
     expect(txt).toContain("- payments");
-    expect(txt).not.toMatch(/## Sensitive modules[\s\S]*…and/); // it does not trim a list that fitted
+    expect(txt).not.toMatch(/## Sensitive modules[\s\S]*more\*\* not shown/); // it does not trim a list that fitted
   });
 });

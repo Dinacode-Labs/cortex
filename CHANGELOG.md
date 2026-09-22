@@ -9,6 +9,17 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Your agent now asks the memory instead of answering out of the repository.** The context pack
+  injected at session start says, in its first two lines, how many of the project's entries it is
+  showing (`Showing 38 of 349 entries`) and that the rest are one call away; each section that had
+  to cut now ends in **+11 more** not shown (`type: "convention"`), which is the exact argument
+  that reads them back, instead of the old footnote `…and 11 more here. Ask Cortex for the rest.`
+  A new **`cortex-recall`** skill ships in the Claude Code plugin next to `cortex-capture`: it
+  fires on questions about the project — how it does something, why it is that way, whether it was
+  already decided or already broken — including when the repository looks like it already answers,
+  which is when the memory is worth most. The query tools now say **when** to call them, not only
+  what they do. Why, and what was taken from elsewhere and deliberately left:
+  [ADR-0069](docs/decisions.md#adr-0069).
 - **The distiller can be measured.** `cortex-admin eval-distill` runs the session distiller over
   a fixed set of eight transcript windows (`evals/distill/`) with an annotated expectation
   each, and reports expected recall, forbidden leaks, mistyped items, items per window and

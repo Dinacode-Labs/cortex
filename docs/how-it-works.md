@@ -406,7 +406,9 @@ survives, the reason often does not. So the agent is pushed to save **mid-task**
 something is decided, confirmed, rejected, corrected or fixed with a known root cause — that is what
 the `cortex-capture` skill is, a trigger list with a self-check, a list of what **not** to save and
 one format. Distillation stays as the net underneath, for the sessions where nobody saved anything
-([ADR-0066](decisions.md#adr-0066)).
+([ADR-0066](decisions.md#adr-0066)). The read half has the same shape in `cortex-recall`: a
+question about the project is asked of the memory before it is answered out of the tree
+([ADR-0069](decisions.md#adr-0069)).
 
 **Auto-curation, with no human in the loop.** Capture writes immediately, at low confidence.
 Later, `maintain` runs `autoCurate`, which **promotes** to medium confidence anything that
@@ -472,8 +474,11 @@ integrations, module notes and how-tos. Left out on purpose are the three types 
 still reach ([ADR-0054](decisions.md#adr-0054)).
 
 **How it shortens matters more than the number.** The budget is shared out between sections
-rather than spent from the top, so every kind of knowledge reaches the agent, each section
-saying how many entries it left behind (`…and 15 more here. Ask Cortex for the rest.`).
+rather than spent from the top, so every kind of knowledge reaches the agent, each section saying
+how many entries it left behind and how to read them — **+15 more** not shown
+(`type: "constraint"`), which is the argument `search_project_context` takes
+([ADR-0069](decisions.md#adr-0069)). The pack's own header carries both numbers,
+`Showing 38 of 349 entries`, so it cannot be mistaken for the memory.
 Sections that govern today's work — decisions, constraints, architecture — carry twice the
 weight of the ones that merely accompany it. Within a section, higher-confidence entries come
 first. The point is that a missing section reads as "this project has none of those", which is
