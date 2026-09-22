@@ -117,7 +117,7 @@ describe("Dockerfile", () => {
 });
 
 describe("operation scripts", () => {
-  for (const s of ["deploy/restore.sh", "deploy/backup-now.sh"]) {
+  for (const s of ["deploy/restore.sh", "deploy/backup-now.sh", "deploy/update.sh"]) {
     it(`${s} is valid POSIX and executable`, () => {
       execFileSync("sh", ["-n", resolve(root, s)]);
       expect(statSync(resolve(root, s)).mode & 0o111).toBeGreaterThan(0);
@@ -134,6 +134,94 @@ describe("operation scripts", () => {
   it("restore.sh does not `source` the .env: there are unquoted values with spaces", () => {
     // The worker's cron expression blew up the whole script under `set -e`.
     expect(read("deploy/restore.sh")).not.toMatch(/^\s*\.\s+\.\/\.env/m);
+  });
+});
+
+/**
+ * Updating a host used to be four commands typed by hand, with the "did it go well?" checklist
+ * living in the head of whoever was deploying. What is checked here is what hurts when the
+ * script silently loses it: an update that runs before its backup, a host left on a floating
+ * tag, and a failure the operator cannot tell apart from a success.
+ */
+describe("update.sh (updating a host)", () => {
+  const sh = read("deploy/update.sh");
+
+  const run = (...args: string[]): { code: number; out: string } => {
+    try {
+      const out = execFileSync("sh", [resolve(root, "deploy/update.sh"), ...args], {
+        encoding: "utf8",
+        stdio: "pipe",
+        timeout: 10_000,
+      });
+      return { code: 0, out };
+    } catch (e) {
+      const err = e as { status: number; stdout: string; stderr: string };
+      return { code: err.status, out: `${err.stdout}${err.stderr}` };
+    }
+  };
+
+  // Where each step is CALLED: comments and the function declarations at the top of the script
+  // are left out, or the order asserted below would be the order things are written in.
+  const step = (needle: string): number => {
+    const i = sh
+      .split("\n")
+      .findIndex((l) => !l.trimStart().startsWith("#") && !/^\w+\(\)/.test(l) && l.includes(needle));
+    expect(i, `the script no longer does: ${needle}`).toBeGreaterThan(-1);
+    return i;
+  };
+
+  it("backs up before pulling and before touching the .env", () => {
+    // Going back is not symmetric: migrations only move forward, so a backup taken after the
+    // new version has already migrated the schema is a backup of the problem.
+    expect(step("./backup-now.sh")).toBeLessThan(step("$COMPOSE pull"));
+    expect(step("./backup-now.sh")).toBeLessThan(step('pin_version "$VERSION"'));
+  });
+
+  it("refuses to deploy `latest`, and refuses it before doing anything", () => {
+    // With `latest` a restart changes version without anybody having decided to. The refusal
+    // arrives with no .env and no Docker in sight, which is why this can be run here at all.
+    const r = run("latest");
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("latest");
+    expect(r.out).not.toContain("Backing up");
+  });
+
+  it("with no version it says how it is used instead of guessing one", () => {
+    const r = run();
+    expect(r.code).toBe(1);
+    expect(r.out).toContain("Usage:");
+  });
+
+  it("does not `source` the .env: there are unquoted values with spaces", () => {
+    // The same cron expression that blew up restore.sh under `set -e`.
+    expect(sh).not.toMatch(/^\s*\.\s+\.\/\.env/m);
+  });
+
+  it("waits for the services to be healthy rather than starting them blind", () => {
+    expect(step("$COMPOSE up -d")).toBeLessThan(step("wait_healthy"));
+    // migrate runs once and exits: waiting for it to be healthy would never end.
+    expect(sh).toMatch(/config --services.*grep -v .\^migrate/);
+  });
+
+  it("checks the three URLs the README documents, the MCP by its 401", () => {
+    // A 200 on its own does not say Caddy is still routing each path to the service it
+    // belongs to, so the answer's own name is what gets checked.
+    expect(sh).toContain('"service":"cortex-server"');
+    expect(sh).toContain('"service":"cortex-web"');
+    expect(sh).toMatch(/MCP_CODE" = "401"/);
+  });
+
+  it("on failure it says the host may be halfway and that going back is not symmetric", () => {
+    // An operator who cannot tell an updated host from a half-updated one will do nothing,
+    // which is the worst of the three outcomes.
+    expect(sh).toMatch(/somewhere between/);
+    expect(sh).toMatch(/not symmetric/);
+    expect(sh).toContain("restore.sh");
+  });
+
+  it("the README tells the operator the script exists", () => {
+    // A script nobody knows about is four commands typed by hand for ever.
+    expect(read("deploy/README.md")).toContain("./deploy/update.sh");
   });
 });
 
