@@ -3,9 +3,6 @@ import type { ContextEntry, ContextEntryType, ContextEntryStatus, Entity, Source
 import { findProjectIdByName } from "./projects.js";
 import { rowToContextEntry, rowToEntity, rowToSource, type Row } from "./map.js";
 
-/** Read queries for the UI / inspection (non-semantic). */
-
-/** Lists the projects (entities of type project) with their entry count. */
 export async function listProjects(): Promise<{ entity: Entity; entryCount: number }[]> {
   const sql = getSql();
   const rows = (await sql`
@@ -71,7 +68,6 @@ export interface EntryDetail {
   projectName: string | null;
 }
 
-/** Returns an entry with its source, linked entities and project. */
 export async function getEntryDetail(id: string): Promise<EntryDetail | null> {
   const sql = getSql();
   const entryRows = (await sql`SELECT * FROM context_entries WHERE id = ${id} LIMIT 1`) as unknown as Row[];

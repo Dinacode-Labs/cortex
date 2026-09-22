@@ -230,7 +230,6 @@ async function detectImprovements(
   return warnings;
 }
 
-/** Merges heuristic and LLM entities, deduplicating by (type + canonical name). */
 function mergeEntities(
   ...lists: { name: string; type: EntityType }[][]
 ): { name: string; type: EntityType }[] {
@@ -246,7 +245,6 @@ function mergeEntities(
   return [...byKey.values()];
 }
 
-/** What a reclassification pass does with one entry. */
 export type ReclassifyDecision = "retype" | "confirmed" | "unclassified";
 
 /**

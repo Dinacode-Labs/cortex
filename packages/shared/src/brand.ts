@@ -10,7 +10,6 @@ import { getEnv } from "./env.js";
  * context injected into agents and the CLI help.
  */
 
-/** Visible brand name. Defaults to "Cortex". */
 export function getBrandName(): string {
   return getEnv("CORTEX_BRAND_NAME", "").trim() || "Cortex";
 }
@@ -75,7 +74,6 @@ export interface MarkCell {
   part: MarkPart;
 }
 
-/** The mark's 36 cells in reading order, each with the part it belongs to. */
 export function markCells(): MarkCell[] {
   const cells: MarkCell[] = [];
   MARK_GRID.forEach((row, y) => {
@@ -91,7 +89,6 @@ export function markCells(): MarkCell[] {
 export interface MarkSvgOptions {
   /** Colour of the pieces: the fill when solid, the stroke when hollow. `var(--ink)` works. */
   ink: string;
-  /** Colour of the centre. */
   accent: string;
   /**
    * Hollow pieces: filled with this colour and outlined in `ink`, `strokeWidth` units wide (the

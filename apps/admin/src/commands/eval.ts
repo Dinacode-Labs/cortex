@@ -42,7 +42,6 @@ function readJson<T>(path: string): T {
   return JSON.parse(readFileSync(path, "utf8")) as T;
 }
 
-/** Loads the corpus into a fresh project and returns the corpus-id -> entry-id map. */
 async function loadCorpus(project: ProjectRef, corpus: CorpusEntry[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   for (const e of corpus) {

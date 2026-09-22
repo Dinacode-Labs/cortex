@@ -158,7 +158,6 @@ export async function lintProject(project: string): Promise<LintReport> {
   };
 }
 
-/** Renders the report as Markdown (for the CLI/MCP). */
 export function renderLintReport(r: LintReport): string {
   const L: string[] = [`# Lint — ${r.project}`, `_${r.totalEntries} ${r.totalEntries === 1 ? "entry" : "entries"}_`, ""];
   L.push(`## ⚠️ Contradictions (${r.contradictions.length})`);

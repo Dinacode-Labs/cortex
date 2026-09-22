@@ -44,7 +44,6 @@ export function credentialsPath(): string {
   return join(credentialsHome(), ".cortex", "credentials");
 }
 
-/** Reads the file and normalises it to the current format, whatever shape it arrives in. */
 function parse(): CredentialsFile | null {
   const f = credentialsPath();
   if (!existsSync(f)) return null;
@@ -95,7 +94,6 @@ export function listCredentials(): Credentials[] {
   return keys.map((k) => ({ server: k, token: file.servers[k]!.token, email: file.servers[k]!.email }));
 }
 
-/** Which server is the default? `null` when there is no session at all. */
 export function defaultServer(): string | null {
   const file = parse();
   return file?.default ?? (file ? (Object.keys(file.servers)[0] ?? null) : null);

@@ -26,7 +26,6 @@ export async function resolveEntity(
   return rowToEntity(rows[0]!);
 }
 
-/** Links a context entry with an entity it mentions. */
 export async function linkEntryToEntity(
   sql: Sql,
   contextEntryId: string,

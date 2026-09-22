@@ -23,7 +23,6 @@ import { getSql } from "@cortex/database";
  * system is used and how much it costs, which is not information for the world.
  */
 
-/** One metric in Prometheus's text format. */
 function metric(name: string, help: string, type: "gauge" | "counter", values: { labels?: string; value: number }[]): string {
   const lines = [`# HELP ${name} ${help}`, `# TYPE ${name} ${type}`];
   for (const v of values) lines.push(`${name}${v.labels ? `{${v.labels}}` : ""} ${v.value}`);

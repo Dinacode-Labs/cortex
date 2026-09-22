@@ -20,12 +20,10 @@ export interface SetupCtx {
   home: string;
   /** Writes nothing: it only reports what it would do. */
   dryRun: boolean;
-  /** Uninstall instead of install. */
   remove: boolean;
   /** Claude Code: do not use the plugin, configure hooks in settings.json instead. */
   noPlugin: boolean;
   log: (line: string) => void;
-  /** Is the agent's binary on the PATH? */
   detect: (bin: string) => boolean;
   /** Runs a binary and returns its stdout. Throws on failure. */
   exec: (bin: string, args: string[]) => string;
@@ -35,9 +33,7 @@ export interface SetupCtx {
 export interface SetupReport {
   /** What was changed (or would be changed in a dry run). */
   changed: string[];
-  /** What was already fine. */
   skipped: string[];
-  /** What needs a human hand. */
   warnings: string[];
 }
 
@@ -48,7 +44,6 @@ export interface AgentStatus {
 
 export interface AgentAdapter {
   id: AgentId;
-  /** The binary whose presence gives away that the agent is installed. */
   bin: string;
   apply(ctx: SetupCtx): Promise<SetupReport>;
   remove(ctx: SetupCtx): Promise<SetupReport>;

@@ -6,7 +6,6 @@ import { captureSession } from "./cortex-api.js";
 import { condenseSession } from "./transcript-utils.js";
 import { readSessions } from "./session-readers.js";
 
-/** Agent platforms that have a session reader. */
 export type CapturePlatformName = CapturePlatform;
 
 /**
@@ -76,7 +75,6 @@ export async function sendCondensedSession(opts: {
   return { sessionId: opts.sessionId, status: res.data.status, counters: res.data.counters };
 }
 
-/** The hook's auto-capture: reads the `.jsonl` transcript, condenses it and sends it. */
 export function sendSessionFile(
   slug: string,
   file: string,

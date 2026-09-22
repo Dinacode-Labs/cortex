@@ -99,7 +99,6 @@ function share(costs: number[], weights: number[], budget: number): number[] {
   return allocated;
 }
 
-/** How many of the section's entries fit into what it was allocated. */
 function howManyFit(s: Section, budget: number): number {
   let n = 0;
   while (n < s.blocks.length && write(s, n + 1).length <= budget) n++;

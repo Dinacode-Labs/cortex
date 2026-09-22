@@ -141,7 +141,6 @@ export function noticeLine(c: Compat): string | null {
   }
 }
 
-/** The message a write command fails with when the CLI is below the minimum. */
 export function blockedMessage(c: Extract<Compat, { kind: "blocked" }>): string {
   return (
     `this CLI is ${CLI_VERSION} and the server at ${c.server} accepts ${c.minClientVersion} or newer. ` +

@@ -50,7 +50,6 @@ function release(): void {
   inFlight--;
 }
 
-/** Runs `fn` while holding one inference-provider slot. */
 export async function withLlmSlot<T>(fn: () => Promise<T>): Promise<T> {
   await acquire();
   try {

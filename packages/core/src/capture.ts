@@ -71,7 +71,6 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
   return results;
 }
 
-/** Creates a relation between entries (e.g. an attachment `belongs_to` its Notion page). */
 export async function relateEntries(sourceId: string, targetId: string, relationType: RelationType): Promise<void> {
   await relate(getSql(), { sourceId, sourceType: "context_entry", targetId, targetType: "context_entry", relationType });
 }

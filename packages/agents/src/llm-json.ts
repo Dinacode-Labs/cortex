@@ -4,7 +4,6 @@
  * and, failing that, the text is trimmed from the first `{` to the last `}`.
  */
 
-/** Extracts the first JSON block from an LLM response (it tolerates ```json fences). */
 export function extractJson(raw: string): string {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenced?.[1]) return fenced[1].trim();

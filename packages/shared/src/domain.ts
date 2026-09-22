@@ -212,7 +212,6 @@ export type Source = z.infer<typeof source>;
  * Cortex fills in and classifies the rest (section 5.2).
  */
 export const saveContextInput = z.object({
-  /** Free text of the knowledge to store. */
   content: z.string().min(1, "content cannot be empty"),
   /** Project slug or name. Resolved to a `project` entity; created if it does not exist. */
   project: z.string().min(1).optional().describe("Project slug (what `cortex link` shows) or name; a new project is created if neither matches"),

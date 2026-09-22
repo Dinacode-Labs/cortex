@@ -42,11 +42,8 @@ export interface ExtractedFile {
  * Each function returns null when it gets no useful text (irrelevant image, no text, missing
  * external tool, provider failure...). */
 export interface MediaExtractorHooks {
-  /** An image caption (an indexable description), or null when it is decorative. */
   captionImage?: (path: string, ext: string) => Promise<string | null>;
-  /** OCR of a scanned PDF (one with no text layer). */
   ocrPdf?: (path: string) => Promise<string | null>;
-  /** Audio/video transcription (whisper). `kind` marks video (the audio track is extracted). */
   transcribe?: (path: string, ext: string, kind: "audio" | "video") => Promise<string | null>;
 }
 

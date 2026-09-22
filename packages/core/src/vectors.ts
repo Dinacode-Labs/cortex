@@ -3,7 +3,6 @@ import type { EmbeddingProvider } from "@cortex/embeddings";
 import type { ContextEntry, ContextEntryType } from "@cortex/shared";
 import { rowToContextEntry, type Row } from "./map.js";
 
-/** Stores (or updates) an entry's embedding for the given text. */
 export async function storeEmbedding(
   sql: Sql,
   provider: EmbeddingProvider,

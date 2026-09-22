@@ -120,7 +120,6 @@ export function getCaptureSession(id: string): Promise<ApiResult<CaptureSessionR
 // Re-exported for convenience: whoever uses the client almost always needs the credentials.
 export { readCredentials, writeCredentials, clearCredentials };
 
-/** Hybrid search. Without `slug`, over everything accessible; with one, only that project. */
 export function searchEntries(input: SearchRequest): Promise<ApiResult<SearchResponse>> {
   const p = new URLSearchParams({ q: input.q });
   if (input.slug) p.set("slug", input.slug);
@@ -129,12 +128,10 @@ export function searchEntries(input: SearchRequest): Promise<ApiResult<SearchRes
   return apiRequest<SearchResponse>("GET", `/search?${p.toString()}`);
 }
 
-/** One entry by id, with its provenance. */
 export function getEntry(id: string): Promise<ApiResult<EntryDetailResponse>> {
   return apiRequest<EntryDetailResponse>("GET", `/entries/${encodeURIComponent(id)}`);
 }
 
-/** Corrects an entry's title and/or content. */
 export function updateEntry(id: string, body: UpdateEntryRequest): Promise<ApiResult<{ ok: boolean; id: string }>> {
   return apiRequest<{ ok: boolean; id: string }>("PATCH", `/entries/${encodeURIComponent(id)}`, body);
 }

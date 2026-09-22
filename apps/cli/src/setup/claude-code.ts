@@ -83,7 +83,6 @@ function ensureMcp(ctx: SetupCtx, report: SetupReport): void {
   }
 }
 
-/** Writes (or removes) Cortex's hooks in ~/.claude/settings.json. */
 function writeHooks(ctx: SetupCtx, report: SetupReport, mode: "install" | "uninstall"): void {
   const file = settingsFile(ctx);
   const obj = readJson<HooksHolder>(file);

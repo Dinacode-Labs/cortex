@@ -24,7 +24,6 @@ export interface RawSession {
 const MAX_MSG = 2000;
 const MAX_TOTAL = 60_000;
 
-/** Joins {role,text} messages into a readable transcript (capped per message and overall). */
 function condenseMessages(msgs: { role: string; text: string }[]): string {
   const out: string[] = [];
   let total = 0;
@@ -157,7 +156,6 @@ async function loadSqlite(): Promise<any | null> {
 // a single session. Both are supported, database first, because a laptop with an older
 // OpenCode still has the file store.
 
-/** One OpenCode session by id (what the hook provides). */
 export async function readOpenCodeSession(sessionId: string): Promise<RawSession | null> {
   if (!sessionId) return null;
   return (await collectOpenCode(null, sessionId))[0] ?? null;
@@ -268,7 +266,6 @@ function collectOpenCodeFiles(target: string | null, wantedId: string | null): R
 }
 
 // --- Hermes: ~/.hermes/state.db (SQLite: sessions, messages) ------------------
-/** One Hermes session by id. */
 export async function readHermesSession(sessionId: string): Promise<RawSession | null> {
   if (!sessionId) return null;
   const all = await collectHermes(null, sessionId);
@@ -351,7 +348,6 @@ export function readPiSession(filePath: string): (RawSession & { cwd: string }) 
   return { sessionId: id || basename(filePath).replace(/\.jsonl$/, ""), condensed, cwd };
 }
 
-/** Every Pi session belonging to a repo. */
 export function readPiSessions(repoPath: string): RawSession[] {
   const root = piRoot();
   if (!existsSync(root)) return [];

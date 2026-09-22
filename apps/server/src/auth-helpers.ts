@@ -6,13 +6,11 @@ import { validateToken, type AuthUser } from "@cortex/core";
  * effects: they pull the token out of the header and resolve it to a user against the database.
  */
 
-/** Extracts the token from the `Authorization: Bearer <token>` header (null when absent). */
 export function bearer(c: Context): string | null {
   const m = (c.req.header("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
   return m ? m[1]!.trim() : null;
 }
 
-/** Resolves the authenticated user from the Bearer (null when there is no valid session). */
 export async function currentUser(c: Context): Promise<AuthUser | null> {
   const token = bearer(c);
   return token ? validateToken(token) : null;

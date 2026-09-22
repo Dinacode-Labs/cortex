@@ -13,7 +13,6 @@ import {
 import { layout, type Html } from "../views/layout.js";
 import type { WebEnv } from "./session.js";
 
-/** The access-denied page for a private project (403). */
 export const deniedPage = (user: AuthUser | null): Html =>
   layout(
     "No access",

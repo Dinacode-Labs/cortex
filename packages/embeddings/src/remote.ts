@@ -19,10 +19,6 @@ async function postWithRetry(url: string, init: RequestInit, label: string): Pro
   throw new Error(`${label}: retries exhausted`);
 }
 
-/**
- * Embedding provider for any OpenAI-compatible endpoint (/v1/embeddings): OpenAI,
- * nan.builders, and so on. Configurable by base URL, model and dimension.
- */
 export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
   readonly model: string;
   readonly version: string;

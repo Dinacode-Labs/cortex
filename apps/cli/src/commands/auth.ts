@@ -77,7 +77,6 @@ async function login(args: string[]): Promise<void> {
   }
 }
 
-/** One session, checked against its own server. */
 async function checkOne(c: { server: string; token: string; email: string }, esDefecto: boolean): Promise<boolean> {
   const marca = esDefecto ? " (default)" : "";
   try {

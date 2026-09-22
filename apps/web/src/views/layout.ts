@@ -43,7 +43,6 @@ function brandMark(play: boolean): Html {
 
 export interface LayoutOptions {
   user?: User | null;
-  /** Which header link is marked as current. */
   active?: "projects" | "admin";
   /** The text in the global search box, so it is not lost when the results appear. */
   q?: string;

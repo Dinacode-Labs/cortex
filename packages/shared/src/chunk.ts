@@ -20,7 +20,6 @@ export interface DocChunk {
   section: string | null;
   /** The chunk's index (0-based) within the document. */
   index: number;
-  /** Total number of chunks in the document. */
   total: number;
 }
 

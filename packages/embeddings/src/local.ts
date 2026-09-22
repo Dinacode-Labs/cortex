@@ -35,7 +35,6 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
   }
 }
 
-/** Tokenises: lowercase, split on non-alphanumerics (unicode), drop empties. */
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
@@ -43,7 +42,6 @@ function tokenize(text: string): string[] {
     .filter((t) => t.length > 1);
 }
 
-/** FNV-1a 32-bit. Deterministic and fast; good enough for feature hashing. */
 function fnv1a(str: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) {

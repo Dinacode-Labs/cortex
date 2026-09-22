@@ -22,7 +22,6 @@ const execFileAsync = promisify(execFile);
 // is transcoded with ffmpeg to mono 16 kHz mp3 before transcribing.
 const WHISPER_OK = new Set(["mp3", "m4a", "wav", "ogg", "oga", "flac", "mpga", "webm", "mp4", "mpeg"]);
 
-/** A generic vision call (image -> text), with retries on 429/5xx. */
 async function visionCall(dataUrl: string, prompt: string, maxTokens: number, cfg: LlmConfig): Promise<string | null> {
   const body = JSON.stringify({
     model: cfg.model,
@@ -70,7 +69,6 @@ async function captionImage(path: string, ext: string, cfg: LlmConfig): Promise<
   return v;
 }
 
-/** OCR of an image (a rendered page) through the vision model. */
 async function ocrImage(path: string, cfg: LlmConfig): Promise<string | null> {
   const t = await visionCall(`data:image/png;base64,${readFileSync(path).toString("base64")}`, OCR_PROMPT, 1500, cfg);
   return t && !/^NO_TEXT/i.test(t) ? t : null;
@@ -105,7 +103,6 @@ let tmpCounter = 0;
 const MAX_AUDIO_BYTES = 24 * 1024 * 1024; // the whisper endpoint's limit
 const SEGMENT_SEC = getEnvNum("CORTEX_AUDIO_SEGMENT_SEC", 600); // 10 min (mono 16k 64k ≈ 5 MB/chunk)
 
-/** POSTs an audio buffer to whisper, with retries on 429/5xx. */
 async function postWhisper(buf: Buffer, cfg: SttConfig): Promise<string | null> {
   const headers = { authorization: `Bearer ${cfg.apiKey}`, "user-agent": "Mozilla/5.0 Cortex", "x-title": getBrandName() };
   return withLlmSlot(async () => {
@@ -187,8 +184,6 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
   }
 }
 
-/** Factory for the multimodal extractor. Vision and STT are independent: each capability is
- * only offered when its config exists. Null when there is neither. */
 export function createMediaExtractor(): MediaExtractorHooks | null {
   const vision = getVisionConfig();
   const stt = getSttConfig();

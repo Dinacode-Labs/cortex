@@ -30,7 +30,6 @@ const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
  *  is ever read as a provider. */
 const KNOWN_PROVIDERS = new Set(["openai-compatible", "openrouter", "nan"]);
 
-/** Defaults inherited from a provider alias (today only `nan`). */
 interface AliasDefaults {
   baseURL?: string;
   apiKey?: string;
@@ -39,7 +38,6 @@ interface AliasDefaults {
 
 let warnedNanAlias = false;
 
-/** Maps the declared provider to a canonical one plus whatever defaults the alias brings. */
 function normalizeProvider(declared: string): { provider: string; defaults: AliasDefaults } {
   if (declared !== "nan") return { provider: declared, defaults: {} };
   if (!warnedNanAlias) {
@@ -61,7 +59,6 @@ function normalizeProvider(declared: string): { provider: string; defaults: Alia
   };
 }
 
-/** Splits `provider:model` when the prefix is a known provider. */
 function splitModelSpec(spec: string): { provider?: string; model: string } {
   const i = spec.indexOf(":");
   if (i <= 0) return { model: spec };
@@ -70,7 +67,6 @@ function splitModelSpec(spec: string): { provider?: string; model: string } {
   return { provider: prefix, model: spec.slice(i + 1).trim() };
 }
 
-/** Builds the config for one provider, or null when its credentials are missing. */
 function resolveProvider(provider: string, model: string, defaults: AliasDefaults): LlmConfig | null {
   if (provider === "openai-compatible") {
     const baseURL = (getEnv("LLM_BASE_URL", "").trim() || defaults.baseURL || "").trim();

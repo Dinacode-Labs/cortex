@@ -17,7 +17,6 @@ import { buildMcpServer } from "./server.js";
  * (`http.ts`) starts it. That way the tests can exercise it with `app.request()`.
  */
 
-/** An MCP session: its transport, the owning user and the last activity (for the sweep). */
 type McpSession = { transport: WebStandardStreamableHTTPServerTransport; email?: string; lastSeen: number };
 
 /** The authentication result: a user (valid Bearer), anonymous (no token) or invalid.

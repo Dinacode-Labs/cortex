@@ -45,7 +45,6 @@ export function cortexLinkPath(dir: string): string {
   return join(dir, ".cortex.json");
 }
 
-/** Writes a directory's `.cortex.json` and returns the path written. */
 export function writeCortexLink(dir: string, link: CortexLink): string {
   const f = cortexLinkPath(dir);
   mkdirSync(dir, { recursive: true });
