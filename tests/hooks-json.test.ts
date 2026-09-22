@@ -48,7 +48,7 @@ describe("mergeHooks", () => {
     const res = mergeHooks(obj, DEFS);
     expect(res.replacedLegacy).toHaveLength(1);
     const start = obj.hooks!.SessionStart!.flatMap((g) => g.hooks ?? []);
-    expect(start).toHaveLength(1); // no duplicate, and no two distillations
+    expect(start).toHaveLength(1);
     expect(start[0]!.command).toBe("cortex hook-context");
     expect(start[0]!.timeout).toBe(20);
   });
@@ -69,7 +69,7 @@ describe("removeHooks", () => {
     removeHooks(obj);
     expect(obj.hooks!.SessionStart!.flatMap((g) => g.hooks ?? []).map((h) => h.command)).toEqual(["my-usual-script"]);
     expect(obj.hooks!.PreToolUse).toBeDefined();
-    expect(obj.hooks!.SessionEnd).toBeUndefined(); // an empty group: gone
+    expect(obj.hooks!.SessionEnd).toBeUndefined();
   });
 
   it("when there were only our hooks, it does not even leave the `hooks` key", () => {

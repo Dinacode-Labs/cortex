@@ -21,11 +21,9 @@ describe("connect-docs walk — ignora dependencias y dotfiles", () => {
     return p;
   };
 
-  // Deben incluirse
   file("docs/guia.md");
   file("notas.txt");
   file("informe.pdf");
-  // Deben excluirse
   file("node_modules/pkg/readme.md");
   file("wt-back-end/vendor/squizlabs/php_codesniffer/fixture.xml");
   file("dist/bundle.md");

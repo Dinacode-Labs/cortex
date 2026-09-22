@@ -2,8 +2,8 @@ import { withLlmSlot } from "@cortex/shared";
 import { type EmbeddingProvider } from "./provider.js";
 import { reportEmbeddingUsage } from "./usage-sink.js";
 
-/** POST with exponential retries on 429/5xx. The slot is held by the caller (`embed`), so
- *  retries do NOT release the budget: retrying is part of the same call. */
+/** The slot is held by the caller (`embed`), so retries do NOT release the budget:
+ *  retrying is part of the same call. */
 async function postWithRetry(url: string, init: RequestInit, label: string): Promise<Response> {
   const max = 6;
   for (let attempt = 0; attempt < max; attempt++) {

@@ -35,7 +35,7 @@ function positional(args: string[]): string | undefined {
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
     if (a.startsWith("--")) {
-      if (!a.includes("=") && args[i + 1] && !args[i + 1]!.startsWith("--")) i++; // salta su valor
+      if (!a.includes("=") && args[i + 1] && !args[i + 1]!.startsWith("--")) i++;
       continue;
     }
     return a;

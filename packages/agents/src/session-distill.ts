@@ -17,7 +17,6 @@ import { distill } from "./distill.js";
  */
 
 export interface DistillSessionInput {
-  /** The project's name (what `saveContext` expects). */
   projectName: string;
   /** The already-condensed transcript. It is scrubbed again here: the client is not trusted. */
   condensed: string;

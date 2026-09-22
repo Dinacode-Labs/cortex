@@ -77,7 +77,7 @@ describe("renderContextPack with a budget", () => {
 
   it("what one section does not spend is shared out: a small one takes no extra room", () => {
     const p = pack();
-    (p as { sensitiveModules: string[] }).sensitiveModules = ["payments"]; // a tiny section
+    (p as { sensitiveModules: string[] }).sensitiveModules = ["payments"];
     const txt = renderContextPack(p, { maxChars: 6000 });
     expect(txt).toContain("- payments");
     expect(txt).not.toMatch(/## Sensitive modules[\s\S]*…and/); // it does not trim a list that fitted

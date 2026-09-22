@@ -10,7 +10,7 @@ export { setEmbeddingUsageSink, type EmbeddingUsage } from "./usage-sink.js";
 
 let cached: EmbeddingProvider | undefined;
 
-/** Drops the singleton. Tests only: in production the config does not change at runtime,
+/** Tests only: in production the config does not change at runtime,
  *  and recreating the provider mid-ingest would mix dimensions. */
 export function resetEmbeddingProvider(): void {
   cached = undefined;
@@ -18,8 +18,8 @@ export function resetEmbeddingProvider(): void {
 
 let warnedNanAlias = false;
 
-/** Reads the declared dimension and fails early when it is unusable: the dimension defines
- *  the vector schema, and an invalid value would go unnoticed until the first INSERT. */
+/** The dimension defines the vector schema: an invalid value would go unnoticed
+ *  until the first INSERT. */
 function requireDim(raw: string): number {
   const dim = Number(raw);
   if (!Number.isInteger(dim) || dim <= 0) {
@@ -64,7 +64,6 @@ export function getEmbeddingProvider(): EmbeddingProvider {
       break;
     }
     case "openai-compatible": {
-      // Any endpoint serving /v1/embeddings: NaN, Ollama, vLLM, TEI, LM Studio.
       // The dimension is MANDATORY: it cannot be guessed and it defines the vector schema.
       const apiKey = getEnv("EMBEDDINGS_API_KEY", "").trim();
       cached = new OpenAICompatibleEmbeddingProvider({
@@ -77,7 +76,7 @@ export function getEmbeddingProvider(): EmbeddingProvider {
     }
     case "voyage":
       // Voyage is OpenAI-compatible for embeddings: the same client is reused (with retries
-      // and unified usage reporting). Same env var, and the same failure when it is missing.
+      // and unified usage reporting).
       cached = new OpenAICompatibleEmbeddingProvider({
         apiKey: requireEnv("VOYAGE_API_KEY"),
         baseURL: "https://api.voyageai.com/v1",

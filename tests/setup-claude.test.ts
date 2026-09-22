@@ -220,7 +220,7 @@ describe("status", () => {
       join(home, ".claude/plugins/installed_plugins.json"),
       JSON.stringify({ version: 2, plugins: { "cortex@dinacode-cortex": [{ scope: "user" }] } }),
     );
-    await claudeCodeAdapter.apply(ctxWith({ noPlugin: true })); // deja hooks en settings
+    await claudeCodeAdapter.apply(ctxWith({ noPlugin: true }));
     const st = await claudeCodeAdapter.status(ctxWith());
     expect(st.installed).toBe(true);
     expect(st.details.join(" ")).toContain("captured twice");

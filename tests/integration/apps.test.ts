@@ -85,7 +85,7 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
 
     const denied = await save(prvForeign.name);
     expect(denied.status).toBe(403);
-    expect(await listEntries({ project: prvForeign.name })).toHaveLength(0); // it wrote nothing
+    expect(await listEntries({ project: prvForeign.name })).toHaveLength(0);
 
     const ok = await save(prvOwn.name);
     expect([200, 302]).toContain(ok.status); // a "Saved" page (200) or a redirect
@@ -101,7 +101,6 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
     const mine = `An entry visible in the listing ${RID}.`;
     await saveContext({ content: mine, project: prvOwn.name, createdBy: USER });
 
-    // ...and now 70 newer entries in a project this user CANNOT see.
     for (let i = 0; i < 70; i++) {
       await saveContext({ content: `Somebody else's noise ${RID} ${i}.`, project: prvForeign.name, createdBy: OWNER });
     }
@@ -155,7 +154,6 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
     const srv = createServerApp();
     const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
 
-    // With no slug and a type outside the enum → 400 with readable issues (zod validation).
     const bad = await srv.request("/capture", {
       method: "POST",
       headers,
@@ -167,7 +165,6 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
     expect(badBody.issues?.some((i) => i.path === "slug")).toBe(true);
     expect(badBody.issues?.some((i) => i.path === "type")).toBe(true);
 
-    // A valid body → 200 and the entry exists with attribution (created_by = the Bearer's email).
     const content = `API capture convention ${RID}: bodies are validated with zod.`;
     const ok = await srv.request("/capture", {
       method: "POST",
@@ -254,7 +251,7 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
     });
     expect(res.status).toBe(200);
     const bodyHtml = await res.text();
-    expect(bodyHtml).not.toContain(secretTok); // the other private project's title does NOT leak
+    expect(bodyHtml).not.toContain(secretTok);
   });
 
 

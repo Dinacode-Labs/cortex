@@ -25,7 +25,7 @@ describe("scrub — patterns added when centralising in shared", () => {
     const s = scrub(["GET /admin HTTP/1.1", "Cookie: session=abc123def456ghi789jkl", "Accept: */*"].join("\n"));
     expect(s).not.toContain("abc123def456ghi789jkl");
     expect(s).toContain("Cookie: [REDACTED]");
-    expect(s).toContain("Accept: */*"); // the rest of the request is preserved
+    expect(s).toContain("Accept: */*");
   });
 
   it("leaves alone prose that merely mentions cookies", () => {

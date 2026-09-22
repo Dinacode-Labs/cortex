@@ -5,9 +5,8 @@ import { wireLlm } from "@cortex/agents";
 import { createMcpHttpApp } from "./http-app.js";
 
 /**
- * Thin entrypoint for MCP over HTTP: environment + LLM + server. The app (sessions, auth and
- * routes) lives in `http-app.ts` with no side effects. The CLI (`cortex mcp-http`) imports
- * THIS file by path: importing it starts the server (the entrypoint's deliberate side effect).
+ * The CLI (`cortex mcp-http`) imports THIS file by path: importing it starts the server
+ * (the entrypoint's deliberate side effect).
  */
 loadEnv();
 wireLlm();

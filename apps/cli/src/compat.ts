@@ -107,10 +107,6 @@ export interface CompatOptions {
   now?: () => number;
 }
 
-/**
- * What the relationship is between this CLI and `server`, querying it at most once every 24 h.
- * `fetched` says whether this call went to the server or came from the cache.
- */
 export async function serverCompat(server: string, opts: CompatOptions = {}): Promise<{ compat: Compat; fetched: boolean }> {
   const key = normalizeServer(server);
   const now = opts.now?.() ?? Date.now();
@@ -127,7 +123,6 @@ export async function serverCompat(server: string, opts: CompatOptions = {}): Pr
   return { compat: classify(key, CLI_VERSION, cfg), fetched: true };
 }
 
-/** The line shown for each situation. `null` when there is nothing to say. */
 export function noticeLine(c: Compat): string | null {
   switch (c.kind) {
     case "blocked":
@@ -153,17 +148,10 @@ function checksDisabled(): boolean {
 }
 
 export interface NoticeOptions extends CompatOptions {
-  /** Whether there is a person in front. Defaults to `process.stdout.isTTY`. */
   tty?: boolean;
-  /** Where to write. Defaults to stderr. */
   write?: (line: string) => void;
 }
 
-/**
- * The passive notice: the dispatcher calls it when an interactive command finishes. One line to
- * stderr, at most once every 24 h per server, and only when there is a terminal in front: in a
- * script, in CI or in a pipe it says nothing. It never throws.
- */
 export async function printVersionNotice(opts: NoticeOptions = {}): Promise<void> {
   try {
     const tty = opts.tty ?? Boolean(process.stdout.isTTY);

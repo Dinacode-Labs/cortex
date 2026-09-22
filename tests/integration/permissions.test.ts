@@ -13,14 +13,14 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
     const prv = await createProject(`IT Prv ${RID}`, { visibility: "private", ownerEmail: "ana@example.com" });
 
     expect(await canAccessProject(pub, "cualquiera@example.com")).toBe(true);
-    expect(await canAccessProject(prv, "ana@example.com")).toBe(true); // the owner
-    expect(await canAccessProject(prv, "bob@example.com")).toBe(false); // an outsider
+    expect(await canAccessProject(prv, "ana@example.com")).toBe(true);
+    expect(await canAccessProject(prv, "bob@example.com")).toBe(false);
     expect(await canAccessProject(prv, "admin@example.com")).toBe(true); // admin (env)
 
     // The one adding is the owner: managing a project is no longer admin-only (ADR-0051).
     await addProjectMember(prv.slug!, "bob@example.com", "ana@example.com");
     const prv2 = (await findProjectBySlug(prv.slug!))!;
-    expect(await canAccessProject(prv2, "bob@example.com")).toBe(true); // now a member
+    expect(await canAccessProject(prv2, "bob@example.com")).toBe(true);
   });
 
   it("getEntryProject resolves an entry's project → it enables the per-entry-id gate", async () => {
@@ -33,10 +33,10 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
 
     const proj = await getEntryProject(entry!.id);
     expect(proj?.id).toBe(prv.id);
-    expect(await canAccessProject(proj!, "ana@example.com")).toBe(true); // the owner
-    expect(await canAccessProject(proj!, "ajeno@example.com")).toBe(false); // no access → blocked
+    expect(await canAccessProject(proj!, "ana@example.com")).toBe(true);
+    expect(await canAccessProject(proj!, "ajeno@example.com")).toBe(false);
 
-    expect(await getEntryProject("00000000-0000-0000-0000-000000000000")).toBeNull(); // an entry that does not exist
+    expect(await getEntryProject("00000000-0000-0000-0000-000000000000")).toBeNull();
   });
 
   it("searchContext with no project: restricted to accessible projects (P0, no leaking of other people's private ones)", async () => {
@@ -55,9 +55,7 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
         (h) => h.entry.content.includes(marker),
       );
 
-    // userB (an outsider) must NOT see the entry from userA's private project.
     expect(await foundBy(userB)).toBe(false);
-    // userA (the owner) does.
     expect(await foundBy(userA)).toBe(true);
     // With no opts (a trusted call, local stdio for instance) → it searches EVERYTHING → yes.
     const trusted = await searchContext({ query: marker, limit: 20 });
@@ -69,7 +67,7 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
     const child = await createProject(`IT Casc Child ${RID}`, { parentSlug: parent.slug! }); // public by default
     const c = (await findProjectBySlug(child.slug!))!;
     expect(c.visibility).toBe("public");
-    expect(await canAccessProject(c, "ana@example.com")).toBe(true); // the parent's owner
+    expect(await canAccessProject(c, "ana@example.com")).toBe(true);
     expect(await canAccessProject(c, "carlos@example.com")).toBe(false); // it inherits the parent's restriction
     expect(await canAccessProject(c, "admin@example.com")).toBe(true);
   });

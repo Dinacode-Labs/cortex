@@ -1,10 +1,5 @@
 import { execSync } from "node:child_process";
 
-/**
- * Prepares the test database: it creates it in the dev Postgres container (when missing) and
- * applies the migrations. It fails with a clear message when there is no Postgres
- * (`pnpm db:up`).
- */
 const TEST_DB = process.env.CORTEX_TEST_DATABASE_URL || "postgres://cortex:cortex@localhost:5433/cortex_test";
 const CONTAINER = process.env.CORTEX_PG_CONTAINER || "cortex-postgres";
 

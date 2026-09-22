@@ -230,7 +230,6 @@ const CLASSIFY_RULES: { type: ContextEntryType; re: RegExp }[] = [
   { type: "decision", re: /\b(decid|elig|optamos|se va a|usaremos|mantener|decisi[oó]n|decision|acordamos)/i },
 ];
 
-/** Heuristic classification of the entry type. Defaults to module_note. */
 export function classifyType(content: string): ContextEntryType {
   for (const rule of CLASSIFY_RULES) {
     if (rule.re.test(content)) return rule.type;
@@ -246,7 +245,6 @@ const TECHNOLOGIES = [
   "php", "python", "elasticsearch", "mongodb",
 ];
 
-// Common functional modules/areas worth recognising (Spanish and English spellings).
 const MODULE_KEYWORDS = [
   "facturaci[oó]n", "autenticaci[oó]n", "pagos", "billing", "auth", "payments",
   "usuarios", "notificaciones", "reporting", "documentos", "checkout",
@@ -280,10 +278,8 @@ export function extractEntities(content: string): ExtractedEntity[] {
 export function polarityTags(content: string): Set<string> {
   const tags = new Set<string>();
   const t = content.toLowerCase();
-  // Axis: keep vs remove/migrate
   if (/\b(mantener|conservar|no migrar|no eliminar|seguir usando|no tocar)\b/.test(t)) tags.add("keep");
   if (/\b(eliminar|migrar|quitar|retirar|deprecar|borrar|reemplazar)\b/.test(t)) tags.add("remove");
-  // Axis: on-prem vs cloud
   if (/\b(infraestructura propia|on-?prem|servidores propios)\b/.test(t)) tags.add("onprem");
   if (/\b(cloud p[uú]blico|proveedor cloud|nube p[uú]blica)\b/.test(t)) tags.add("cloud");
   return tags;

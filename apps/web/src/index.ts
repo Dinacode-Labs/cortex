@@ -4,11 +4,6 @@ import { loadEnv } from "@cortex/shared";
 import { wireLlm } from "@cortex/agents";
 import { createApp } from "./app.js";
 
-/**
- * Thin entrypoint for the web UI: environment + LLM + server. The whole app (session
- * middleware and routes) lives in `app.ts` with no side effects, so it can be tested with
- * `app.request()` without starting a server.
- */
 loadEnv();
 wireLlm();
 

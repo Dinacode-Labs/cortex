@@ -16,8 +16,8 @@ const OWNER = `ana-entries-${RID}@example.com`;
 const MARKER = `zxqmarker${RID}`; // an odd word: it appears in both entries and in nothing else
 
 let token: string;
-let other: ProjectRef; // privado de OWNER
-let own: ProjectRef; // privado de USER
+let other: ProjectRef;
+let own: ProjectRef;
 let ownId: string;
 let otherId: string;
 
@@ -92,7 +92,7 @@ describe("the read API: search and entries by id", () => {
     expect(res.status).toBe(200);
     const { hits } = (await res.json()) as { hits: { id: string }[] };
     const ids = hits.map((h) => h.id);
-    expect(ids).not.toContain(otherId); // the thing that matters
+    expect(ids).not.toContain(otherId);
   });
 
   it("GET /entries/:id — propia 200, ajena 403, inexistente 404", async () => {

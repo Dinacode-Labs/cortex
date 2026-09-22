@@ -64,7 +64,7 @@ describe("the life of a project_ (ADR-0051)", () => {
 
     const ajeno = await patch(tokOtro, { visibility: "private" });
     expect(ajeno.status).toBe(403);
-    expect((await findProjectBySlug(project_.slug!))!.visibility).toBe("public"); // it touched nothing
+    expect((await findProjectBySlug(project_.slug!))!.visibility).toBe("public");
 
     const propio = await patch(tokOwner, { visibility: "private" });
     expect(propio.status).toBe(200);
@@ -76,7 +76,6 @@ describe("the life of a project_ (ADR-0051)", () => {
     expect(await canAccessProject(p, OTRO)).toBe(false);
     expect(await canAccessProject(p, OWNER)).toBe(true);
 
-    // And opening it again undoes that.
     const srv = createServerApp();
     await srv.request(`/projects/${project_.slug}`, {
       method: "PATCH",
@@ -148,7 +147,7 @@ describe("the life of a project_ (ADR-0051)", () => {
       body: JSON.stringify({ parentSlug: b.slug }),
     });
     expect(res.status).toBe(400);
-    expect((await findProjectBySlug(a.slug!))!.parentId).toBeNull(); // it touched nothing
+    expect((await findProjectBySlug(a.slug!))!.parentId).toBeNull();
   }, 60_000);
 
   it("an empty project can be deleted: undoing a mistaken `link --create`", async () => {

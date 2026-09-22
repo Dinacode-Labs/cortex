@@ -109,7 +109,6 @@ describe("getLlmConfig — routing por rol", () => {
       model: "x-ai/grok-4.5",
       baseURL: "https://openrouter.ai/api/v1",
     });
-    // The rest stays on the base provider.
     expect(getLlmConfig("classifier")?.baseURL).toBe("https://api.nan.builders/v1");
   });
 
@@ -125,7 +124,7 @@ describe("getLlmConfig — routing por rol", () => {
     vi.stubEnv("LLM_PROVIDER", "openai-compatible");
     vi.stubEnv("LLM_BASE_URL", "https://api.nan.builders/v1");
     vi.stubEnv("LLM_API_KEY", "nan-key");
-    vi.stubEnv("CORTEX_MODEL_RETRIEVER", "openrouter:x-ai/grok-4.5"); // sin OPENROUTER_API_KEY
+    vi.stubEnv("CORTEX_MODEL_RETRIEVER", "openrouter:x-ai/grok-4.5");
     expect(getLlmConfig("retriever")).toBeNull();
   });
 });

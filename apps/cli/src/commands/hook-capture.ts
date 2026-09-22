@@ -61,7 +61,7 @@ export async function run(args: string[] = []): Promise<void> {
 
     const cwd = flag(args, "cwd") || input.cwd || process.cwd();
     const link = useProjectServer(cwd);
-    if (!link || link.ignore || !link.slug) return; // no slug link (use `cortex link`)
+    if (!link || link.ignore || !link.slug) return;
 
     const asked = flag(args, "platform") as CaptureAgent | undefined;
     if (asked && !PLATFORMS.includes(asked)) return;

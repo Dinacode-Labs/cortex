@@ -61,7 +61,7 @@ const captionCache = new Map<string, string | null>();
 async function captionImage(path: string, ext: string, cfg: LlmConfig): Promise<string | null> {
   const bytes = readFileSync(path);
   const hash = createHash("sha256").update(bytes).digest("hex");
-  if (captionCache.has(hash)) return captionCache.get(hash)!; // imagen ya vista → reusar
+  if (captionCache.has(hash)) return captionCache.get(hash)!;
   const mime = ext === "jpg" ? "jpeg" : ext;
   const c = await visionCall(`data:image/${mime};base64,${bytes.toString("base64")}`, CAPTION_PROMPT, 240, cfg);
   const v = c && !/^IRRELEVANT/i.test(c) ? c : null;
@@ -76,7 +76,6 @@ async function ocrImage(path: string, cfg: LlmConfig): Promise<string | null> {
 
 const MAX_OCR_PAGES = getEnvNum("CORTEX_OCR_MAX_PAGES", 10);
 
-/** OCR of a scanned PDF: it renders pages with pdftoppm (poppler) and runs them through vision. */
 async function ocrPdf(path: string, cfg: LlmConfig): Promise<string | null> {
   const dir = mkdtempSync(join(tmpdir(), "cortex-ocr-"));
   try {
@@ -89,7 +88,7 @@ async function ocrPdf(path: string, cfg: LlmConfig): Promise<string | null> {
     }
     return parts.join("\n\n").trim() || null;
   } catch {
-    return null; // pdftoppm unavailable, or it failed
+    return null;
   } finally {
     try {
       rmSync(dir, { recursive: true, force: true });
@@ -140,7 +139,7 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
       await execFileAsync("ffmpeg", ["-i", path, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "64k", "-y", temp], { maxBuffer: 1 << 26 });
       audioPath = temp;
     } catch {
-      return null; // ffmpeg unavailable, or an unreadable file
+      return null;
     }
   }
   let segDir: string | null = null;
@@ -148,7 +147,6 @@ async function transcribe(path: string, ext: string, kind: "audio" | "video", cf
     if (statSync(audioPath).size <= MAX_AUDIO_BYTES) {
       return await postWhisper(readFileSync(audioPath), cfg);
     }
-    // Long: split into mono 16 kHz mp3 segments and transcribe each one.
     segDir = mkdtempSync(join(tmpdir(), "cortex-seg-"));
     try {
       await execFileAsync(

@@ -1,9 +1,4 @@
 #!/usr/bin/env node
-// Sets the SAME version across the whole monorepo: root, packages, apps and the plugin's two
-// manifests. It also closes the CHANGELOG's [Unreleased] section with today's date.
-//
-//   node scripts/set-version.mjs 0.1.0
-//
 // The version is single and in lockstep on purpose: with one publishable artefact (the CLI) and
 // an image carrying everything else inside, versioning each package separately would be
 // ceremony with no benefit, and nobody would know which version they had deployed.
@@ -54,8 +49,6 @@ for (const p of market.plugins) if (p.name === "cortex") p.version = version;
 writeJson(marketFile, market);
 console.log(`  .claude-plugin/marketplace.json → ${version}`);
 
-// CHANGELOG: [Unreleased] becomes the version, with today's date, and a fresh empty
-// [Unreleased] is opened above it.
 const changelogFile = rel("CHANGELOG.md");
 let changelog = readFileSync(changelogFile, "utf8");
 if (changelog.includes(`## [${version}]`)) {

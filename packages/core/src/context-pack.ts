@@ -9,7 +9,6 @@ import { findProjectByName, projectIdsWithAncestors } from "./projects.js";
 import { rowToContextEntry, type Row } from "./map.js";
 import { vectorSearch, type SearchHit } from "./vectors.js";
 
-/** Changes an entry's validation status. Section 15.4. */
 export async function validateEntry(
   id: string,
   status: Extract<ContextEntryStatus, "validated" | "rejected" | "obsolete">,
@@ -63,7 +62,6 @@ export interface PackSection {
 export interface ContextPack {
   project: string;
   generatedAt: Date;
-  /** One per `PACK_SECTIONS` type that actually has entries. */
   sections: PackSection[];
   sensitiveModules: string[];
   relevantToArea: SearchHit[];
@@ -81,9 +79,7 @@ export interface ContextPack {
 }
 
 export interface EntryConflict {
-  /** The pack entry that receives the warning. */
   entryId: string;
-  /** A direct clash with another entry: there we do know who against whom. */
   entries: { label: string; recordedLater: boolean }[];
   /**
    * Areas this entry touches that are under dispute. It is phrased that way, rather than "this
@@ -95,10 +91,6 @@ export interface EntryConflict {
   areas: { entity: string; against: string[] }[];
 }
 
-/**
- * Builds a context pack for AI tools (Claude Code/Codex). Sections 12.10 and 15.3. By default
- * only CURRENT facts; `asOf` gives a point-in-time view.
- */
 export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
   const sql = getSql();
   // Resolved by slug or by name (#136); the pack carries the project's NAME, not whatever was
@@ -162,7 +154,6 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
  * "src/webhook.js"), which is the frequent case; there all we can say is that the area is
  * disputed, because an entry hanging off "README" does not necessarily contradict anything.
  */
-/** One side of an entry-to-entry clash, with its project: who says it matters. */
 export interface ContradictingSide {
   id: string;
   title: string;

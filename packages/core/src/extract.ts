@@ -7,12 +7,6 @@ import { extractText, getDocumentProxy } from "unpdf";
 import { getEnvNum, PLAIN_TEXT_EXTS } from "@cortex/shared";
 
 /**
- * File extraction layer, REUSABLE by every connector (the versatile idea: any source bringing
- * files -- Notion, GitHub, a folder -- gets them parsed and RAG-ready). Kinds: plain text /
- * Markdown (read directly), office documents (deterministic), .drawio diagrams (XML), and
- * **images** (captioned with the LLM provider's vision model). Video/audio (transcription)
- * likewise. See research/multimodal-ingestion.md.
- *
  * This module is DETERMINISTIC: the part that needs an LLM (image captioning, OCR of a
  * scanned PDF, whisper) is injected with setMediaExtractor() from @cortex/agents (media.ts,
  * wired in wireLlm) -- the same pattern as setClassifier/setReconciler. With no hook, those
@@ -49,12 +43,10 @@ export interface MediaExtractorHooks {
 
 let mediaExtractor: MediaExtractorHooks | null = null;
 
-/** Registers (or, with null, unregisters) the multimodal extractor. Wired by the entrypoints. */
 export function setMediaExtractor(hooks: MediaExtractorHooks | null): void {
   mediaExtractor = hooks;
 }
 
-/** Extracts text from a .drawio's labels (mxGraph XML; it handles compressed diagrams). */
 function extractDrawio(path: string): string {
   const raw = readFileSync(path, "utf8");
   const values = new Set<string>();
@@ -79,12 +71,10 @@ function extractDrawio(path: string): string {
   return [...values].join("\n");
 }
 
-/** Extracts text from a file. null when unsupported, empty, or on failure. */
 export async function extractFileText(path: string): Promise<ExtractedFile | null> {
   const ext = extname(path).slice(1).toLowerCase();
   try {
     if (TEXT_EXTS.includes(ext)) {
-      // Plain text / Markdown: read as is (it is already readable by humans and LLMs).
       return clean(readFileSync(path, "utf8"), ext);
     }
     if (ext === "docx") {
@@ -96,7 +86,6 @@ export async function extractFileText(path: string): Promise<ExtractedFile | nul
       const r = await extractText(pdf, { mergePages: true });
       const raw = Array.isArray(r.text) ? r.text.join("\n") : r.text;
       if (raw.trim().length >= OCR_MIN_TEXT) return clean(raw, ext);
-      // No text layer (scanned) -> vision OCR, when an extractor has been injected
       const ocr = mediaExtractor?.ocrPdf ? await mediaExtractor.ocrPdf(path) : null;
       return ocr ? clean(ocr, "pdf-ocr") : clean(raw, ext);
     }
@@ -108,7 +97,7 @@ export async function extractFileText(path: string): Promise<ExtractedFile | nul
       return clean(extractDrawio(path), "drawio");
     }
     if (IMAGE_EXTS.includes(ext)) {
-      if (statSync(path).size < MIN_IMAGE_BYTES) return null; // icon/noise
+      if (statSync(path).size < MIN_IMAGE_BYTES) return null;
       const caption = mediaExtractor?.captionImage ? await mediaExtractor.captionImage(path, ext) : null;
       return caption ? { text: caption, format: ext } : null;
     }

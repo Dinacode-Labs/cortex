@@ -46,7 +46,6 @@ function safe<T>(fn: () => T, fallback: T): T {
   }
 }
 
-// --- Codex: ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl ----------------------
 function walkJsonl(dir: string): string[] {
   const out: string[] = [];
   if (!existsSync(dir)) return out;
@@ -123,7 +122,7 @@ export function readCodexSessions(repoPath: string): RawSession[] {
   const sessions: RawSession[] = [];
   for (const file of walkJsonl(codexRoot())) {
     const s = readCodexFile(file);
-    if (!s || resolve(s.cwd || "") !== target) continue; // only sessions from this repo
+    if (!s || resolve(s.cwd || "") !== target) continue;
     sessions.push({ sessionId: s.sessionId, condensed: s.condensed });
   }
   return sessions;
@@ -148,8 +147,6 @@ async function loadSqlite(): Promise<any | null> {
   }
 }
 
-// --- OpenCode: SQLite (opencode.db) and, failing that, the old file store -----
-//
 // OpenCode moved sessions from `storage/{session,message,part}/*.json` into a SQLite database
 // (`opencode.db`, tables session/message/part). The file reader kept looking for the old
 // layout, found nothing, and capture failed silently: OpenCode looked configured and stored not
@@ -234,7 +231,7 @@ function collectOpenCodeFiles(target: string | null, wantedId: string | null): R
     for (const f of readdirSync(pdir)) {
       if (!f.endsWith(".json")) continue;
       const info = safe(() => JSON.parse(readFileSync(join(pdir, f), "utf8")) as { id?: string; directory?: string; parentID?: string }, null);
-      if (!info?.id || info.parentID) continue; // skip sub-agents
+      if (!info?.id || info.parentID) continue;
       if (wantedId && info.id !== wantedId) continue;
       if (target && info.directory && resolve(info.directory) !== target) continue;
       const sid = info.id;
@@ -265,7 +262,6 @@ function collectOpenCodeFiles(target: string | null, wantedId: string | null): R
   return out;
 }
 
-// --- Hermes: ~/.hermes/state.db (SQLite: sessions, messages) ------------------
 export async function readHermesSession(sessionId: string): Promise<RawSession | null> {
   if (!sessionId) return null;
   const all = await collectHermes(null, sessionId);
@@ -307,7 +303,6 @@ async function collectHermes(target: string | null, wantedId: string | null): Pr
   return out;
 }
 
-// --- Pi: ~/.pi/agent/sessions/<folder per cwd>/<ts>_<uuid>.jsonl -------------
 function piRoot(): string {
   return process.env.CORTEX_PI_DIR || join(homedir(), ".pi", "agent", "sessions");
 }

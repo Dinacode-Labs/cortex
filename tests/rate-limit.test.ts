@@ -21,7 +21,7 @@ describe("per-IP limit on sending codes", () => {
   it("each IP keeps its own count", () => {
     vi.stubEnv("CORTEX_AUTH_IP_MAX", "1");
     expect(tooManyRequests("1.1.1.1")).toBe(false);
-    expect(tooManyRequests("2.2.2.2")).toBe(false); // another IP, its own budget
+    expect(tooManyRequests("2.2.2.2")).toBe(false);
     expect(tooManyRequests("1.1.1.1")).toBe(true);
   });
 

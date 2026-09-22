@@ -5,8 +5,6 @@ import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
 
 /**
- * The interface's building blocks.
- *
  * Everything that repeats across more than one screen lives here, and the routes COMPOSE
  * instead of writing loose HTML. When every page drew itself, the same idea -- a card, a panel,
  * a warning -- came out differently in each place and the whole looked like the work of four
@@ -71,8 +69,6 @@ export function panel(title: string | null, body: Html, opts: PanelOptions = {})
 }
 
 /**
- * An empty state that says what to do.
- *
  * "There is nothing here" is useless information: whoever reads it can already see that. What
  * they need to know is whether that is fine, and what to do if it is not.
  */
@@ -110,8 +106,6 @@ export function hitCard(entry: ContextEntry, score: number, origin?: Html): Html
 }
 
 /**
- * The card a project is chosen from.
- *
  * It lives here rather than on the home page because a client shows it inside itself too, for
  * its repos: were they two different cards, picking "Acme Portal" from the home page and
  * picking it from "Acme" would look like two different things, and they are the same.

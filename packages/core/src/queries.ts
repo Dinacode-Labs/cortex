@@ -36,7 +36,6 @@ export interface ListEntriesFilter {
   accessibleProjectIds?: string[];
 }
 
-/** Lists context entries with optional filters, newest first. */
 export async function listEntries(filter: ListEntriesFilter = {}): Promise<ContextEntry[]> {
   const sql = getSql();
   let where = sql`WHERE true`;
@@ -117,10 +116,6 @@ export interface ProjectGraph {
   edges: GraphEdge[];
 }
 
-/**
- * A project's knowledge graph, for visualisation: entities plus (optionally) entries as nodes;
- * relations and mentions (entry -> entity) as edges.
- */
 export async function getProjectGraph(
   project: string,
   opts: { includeEntries?: boolean; maxEntries?: number } = {},

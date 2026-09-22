@@ -249,7 +249,6 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
   return c.html(layout(`${project.name} · What agents see`, body, { user }));
 });
 
-/** The same pack in markdown, which is how the agent receives it: to paste wherever needed. */
 projectRoutes.get("/p/:slug/agents.md", async (c) => {
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;

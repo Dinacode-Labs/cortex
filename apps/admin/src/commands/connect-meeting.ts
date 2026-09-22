@@ -50,7 +50,7 @@ async function runMeeting(slug: string | undefined, path: string | undefined): P
   let superseded = 0;
   let failed = 0;
   for (const file of files) {
-    const ex = await extractFileText(file); // transcribe (whisper + ffmpeg, with chunking)
+    const ex = await extractFileText(file);
     if (!ex || ex.text.length < 200) {
       console.log(`  ${basename(file)}: no usable transcription`);
       continue;

@@ -14,11 +14,8 @@
  */
 
 export interface DocChunk {
-  /** The fragment's text (including the overlap from the previous one, when it applies). */
   content: string;
-  /** The Markdown heading in force at the start of the chunk, if any. */
   section: string | null;
-  /** The chunk's index (0-based) within the document. */
   index: number;
   total: number;
 }
@@ -55,10 +52,6 @@ function splitOversized(text: string, max: number): string[] {
 
 interface Unit { text: string; heading: string | null }
 
-/**
- * Splits `raw` into structural chunks. Returns [] when the text is empty. For short
- * documents (<= target) it returns a single chunk (no overlap). Idempotent.
- */
 export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] {
   const target = opts.targetChars ?? 4000;
   const max = opts.maxChars ?? 5000;
@@ -66,8 +59,6 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
   const text = raw.replace(/\r\n?/g, "\n").trim();
   if (!text) return [];
 
-  // 1) Paragraphs (blank-line separated), tracking the heading in force. A paragraph
-  //    whose first line is a heading updates the section.
   const paras: Unit[] = [];
   let heading: string | null = null;
   for (const block of text.split(/\n\s*\n+/)) {
@@ -78,12 +69,10 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
     paras.push({ text: b, heading });
   }
 
-  // 2) Explode paragraphs above the cap into smaller units (sentences).
   const units: Unit[] = paras.flatMap((p) =>
     p.text.length <= max ? [p] : splitOversized(p.text, max).map((t) => ({ text: t, heading: p.heading })),
   );
 
-  // 3) Greedy packing up to `target` without going over `max`.
   const groups: Unit[] = [];
   let buf = "";
   let bufHeading: string | null = null;
@@ -106,8 +95,6 @@ export function chunkDocument(raw: string, opts: ChunkOptions = {}): DocChunk[] 
   }
   flush();
 
-  // 4) Overlap: prepend the tail of the previous chunk, trimmed to a word boundary
-  //    (not on the first one). Gives continuity without net content duplication.
   const out: DocChunk[] = [];
   let prevText = "";
   groups.forEach((g, index) => {

@@ -5,7 +5,6 @@ import { createUiTicket, requestOtp, revokeToken, verifyOtp } from "@cortex/core
 import { bearer, currentUser } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
-/** Authentication routes (email + OTP) and the session's lifecycle. */
 export const authRoutes = new Hono();
 
 const authRequestSchema = z.object({ email: z.string().min(1) });

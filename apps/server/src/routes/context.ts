@@ -112,7 +112,7 @@ contextRoutes.post("/capture", async (c) => {
       confidence: body.confidence ?? "low",
       sourceType: body.sourceType ?? "manual",
       sourceReference: body.sourceReference,
-      createdBy: user.email, // ATTRIBUTION: who put the data in
+      createdBy: user.email,
       metadata: body.metadata,
     },
     { useClassifier: false, detectImprovements: false, skipEmbedding: false },

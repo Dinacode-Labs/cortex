@@ -21,10 +21,8 @@ describe("walkRepo — ignores deps and framework caches", () => {
     return p;
   };
 
-  // Real code
   file("src/Controller/PaymentController.php");
   file("app/service.ts", "export const x = 1;\n");
-  // Generado / dependencias → excluir
   file("var/cache/local/translations/catalogue.es.php");
   file("var/log/prod.log", "log line");
   file("vendor/squizlabs/php_codesniffer/fixture.php");

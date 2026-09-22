@@ -30,13 +30,12 @@ const oldPaths: { path: string; section: string }[] = [
 for (const { path, section } of oldPaths) {
   redirectRoutes.get(path, async (c) => {
     const slug = await slugOf(c.req.query("project"));
-    if (!slug) return c.redirect("/", 302); // no identifiable project: go and pick one
+    if (!slug) return c.redirect("/", 302);
     const q = c.req.query("q");
     return c.redirect(`/p/${slug}${section}${q ? `?q=${encodeURIComponent(q)}` : ""}`, 301);
   });
 }
 
-/** The old project list is now the home page. */
 redirectRoutes.get("/projects", (c) => c.redirect("/", 301));
 
 /** Cost became an operator's concern. */

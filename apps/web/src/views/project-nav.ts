@@ -4,8 +4,6 @@ import type { ProjectPage } from "../middleware/access.js";
 import type { Html } from "./layout.js";
 
 /**
- * A project's header and tabs.
- *
  * The labels are written for whoever reads them, not for the system's insides: **Health**
  * rather than "Lint", **What agents see** rather than "Context pack". Someone opening the web
  * wants to know whether their memory is healthy and what their agent is being told; "lint" and
@@ -29,8 +27,6 @@ export function visibilityPill(v: "public" | "private"): Html {
 }
 
 /**
- * Breadcrumbs up to the root.
- *
  * A child does not make sense on its own: "Acme Portal" is a client's repo, and what the pack
  * tells an agent comes partly from that client. EVERY level is painted, not just the parent,
  * because the hierarchy need not be two deep. The ancestors are always visible to whoever can
@@ -47,8 +43,6 @@ function crumbs(ancestors: ProjectRef[], current: string): Html {
 }
 
 /**
- * The project's header plus its tabs.
- *
  * It takes what the guard already resolved (`requireProjectPage`) rather than five loose
  * arguments: who is looking, what it hangs off and what hangs off it are what decide which tabs
  * exist. `Settings` only shows for whoever manages it, and `Across this client` only when there

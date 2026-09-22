@@ -3,7 +3,7 @@ import { deleteCookie, setCookie } from "hono/cookie";
 import { redeemUiTicket } from "@cortex/core";
 import { loginPage, type WebEnv } from "../middleware/session.js";
 
-const WEB_COOKIE_TTL = 60 * 60 * 24 * 30; // 30 days
+const WEB_COOKIE_TTL = 60 * 60 * 24 * 30;
 
 /** Routes EXEMPT from the session gate (mounted before it in app.ts). */
 export const authRoutes = new Hono<WebEnv>();

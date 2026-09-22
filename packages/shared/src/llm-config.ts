@@ -70,7 +70,7 @@ function splitModelSpec(spec: string): { provider?: string; model: string } {
 function resolveProvider(provider: string, model: string, defaults: AliasDefaults): LlmConfig | null {
   if (provider === "openai-compatible") {
     const baseURL = (getEnv("LLM_BASE_URL", "").trim() || defaults.baseURL || "").trim();
-    if (!baseURL) return null; // no endpoint, no LLM
+    if (!baseURL) return null;
     // `||` and not `??`: an env var that is declared but EMPTY (`LLM_API_KEY=` in
     // .env.example) means "unset", so it must fall through to the next candidate.
     const apiKey = (process.env.LLM_API_KEY || defaults.apiKey || "").trim();

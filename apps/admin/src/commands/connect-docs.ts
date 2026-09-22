@@ -37,7 +37,7 @@ export function walk(dir: string): string[] {
 }
 
 export async function run(args: string[]): Promise<void> {
-  wireLlm(); // multimodal extract: caption/OCR/whisper through setMediaExtractor
+  wireLlm();
   const slug = args[0];
   const dir = args[1];
   if (!slug || !dir) {

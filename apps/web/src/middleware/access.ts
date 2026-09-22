@@ -31,7 +31,6 @@ const notFound = (c: Context<WebEnv>) =>
     404,
   );
 
-/** Access gate by project NAME (the single policy, `checkProjectAccess`). */
 export async function requireProject(c: Context<WebEnv>, name: string | undefined | null): Promise<Response | null> {
   if (!name) return null;
   const access = await checkProjectAccess(c.get("user")?.email ?? null, { name });
@@ -56,9 +55,6 @@ export interface ProjectPage {
 }
 
 /**
- * Resolves the project behind a `/p/<slug>/...` URL while applying the policy, and along the
- * way says whether the viewer can manage it.
- *
  * It returns a `Response` when the request must be stopped (404 or 403) and the project when it
  * may continue. The slug is the project's address on the web (ADR-0050), so this gate runs in
  * every section and is the only place where the decision is made.

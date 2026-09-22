@@ -17,10 +17,6 @@ import { graphRoutes } from "./routes/graph.js";
 import { redirectRoutes } from "./routes/redirects.js";
 
 /**
- * A minimal demo UI (section 16). Server-rendered (Hono), with no frontend build. It is a
- * second consumer of @cortex/core, showing that humans and agents share the same context layer
- * (section 5.4).
- *
  * This module has NO import-time effects (neither loadEnv nor serve): `createApp()` only
  * COMPOSES the app -- statics + exempt routes + the session gate + the routes (`routes/`, one
  * per resource) -- and the thin entrypoint (`index.ts`) starts it. That way the tests exercise
@@ -65,7 +61,6 @@ export function createApp(): Hono<WebEnv> {
   // registration order is the exemption.
   app.route("/", authRoutes);
 
-  // The gate: every other route requires a session (it resolves c.var.user from the cookie).
   app.use("*", sessionGate);
 
   // Redirects go FIRST: an old path must not fall into a new one's 404.

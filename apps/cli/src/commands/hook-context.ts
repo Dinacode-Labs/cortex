@@ -39,7 +39,6 @@ function argOf(name: string): string | undefined {
  */
 export async function run(): Promise<void> {
   try {
-    // Output format per agent: claude/codex (additionalContext) | hermes ({context}) | text.
     const format = (argOf("--format") || "claude").toLowerCase();
     // Whoever passes `--cwd` (Pi, OpenCode) has already said everything: reading stdin can
     // only hang them, because `execFile` leaves the pipe open and silent. See `readHookStdin`.
@@ -53,13 +52,13 @@ export async function run(): Promise<void> {
     }
     const cwd = argOf("--cwd") || input.cwd || process.cwd();
     const link = useProjectServer(cwd);
-    if (!link || link.ignore || !link.slug) return; // no slug link (use `cortex link`)
+    if (!link || link.ignore || !link.slug) return;
 
     // Through the authenticated API (it never touches the database): it respects permissions and exposes no inaccessible project.
     const res = await apiGet<{ project: string; text: string }>(
       `/context-pack?slug=${encodeURIComponent(link.slug)}&maxChars=${MAX_CTX}`,
     );
-    if (!res || !res.text.trim()) return; // no session, no server, no access, or an empty pack
+    if (!res || !res.text.trim()) return;
 
     // The header is the only place that tells the agent WHEN to write back, so its wording is
     // shared with the MCP's instructions and the skill (`capture-protocol.ts`), not written here.

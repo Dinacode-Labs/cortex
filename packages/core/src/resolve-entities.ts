@@ -17,8 +17,6 @@ import { canonicalize } from "./text.js";
  * not depend on the order Postgres happens to return rows in.
  */
 
-// Normalisation on top of the shared canonical base (NFD + diacritics stripped + lowercase +
-// trim + collapsed whitespace), also removing everything non-alphanumeric.
 function norm(s: string): string {
   return canonicalize(s).replace(/[^a-z0-9]+/g, "");
 }

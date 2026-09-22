@@ -1,9 +1,6 @@
 import { getBrandName, isDefaultBrand, markCells, MARK_GRID } from "@cortex/shared";
 
 /**
- * Splash for `cortex` (no arguments) and `cortex version`: the Cortex mark painted with block
- * characters, and next to it the name, the version and one line on what this is.
- *
  * Rules, because hooks and agents invoke this binary too:
  * - Only on an interactive terminal (`isTTY`), never in `hook-context` or `mcp`, whose stdout is
  *   protocol. Not in CI or with `TERM=dumb` either: a log full of escapes cannot be read.

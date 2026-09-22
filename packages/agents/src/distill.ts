@@ -6,11 +6,6 @@ import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
 
 /**
- * LLM distillation of a session transcript window into TYPED knowledge
- * (decisions/constraints/incidents/conventions...). It does not ingest the raw transcript: it
- * extracts only what is DURABLE and reusable, discarding noise. It is the "intelligent" part
- * of the session capture pipeline.
- *
  * Each item also carries its own `summary`. Without it the entry was summarised by the
  * heuristic over "Title. Body", so the summary of a 300-character distilled entry repeated
  * almost all of it, and that is what the pack hands the agent when a session opens.

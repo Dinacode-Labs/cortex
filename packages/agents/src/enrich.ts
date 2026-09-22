@@ -3,13 +3,6 @@ import type { EntityType, RelationType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
 
-/**
- * Graph extraction agent (section 7: Entity Resolution + Knowledge Graph Agents). Given a
- * knowledge entry, it extracts domain entities and the real relations between them (and with
- * the entry itself), to build the graph (section 6). Implemented as a Mastra Agent (role
- * "graph", see mastra.ts).
- */
-
 export interface ExtractedEntity {
   name: string;
   type: EntityType;
@@ -51,7 +44,6 @@ ${content.slice(0, 3500)}
 """`;
 }
 
-/** Extracts the graph from an entry. Returns null on failure (error tolerant). */
 export async function extractGraph(content: string): Promise<GraphExtraction | null> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {

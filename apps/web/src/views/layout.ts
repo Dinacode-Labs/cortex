@@ -49,8 +49,6 @@ export interface LayoutOptions {
 }
 
 /**
- * The whole document.
- *
  * The header carries **only what is genuinely global**: the brand, the search -- the one thing
  * that crosses projects -- and the way out. The sections hang off the project (ADR-0050).
  *

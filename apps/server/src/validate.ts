@@ -2,12 +2,6 @@ import type { Context } from "hono";
 import type { z } from "zod";
 
 /**
- * JSON body validation with zod (v3) at the HTTP edge. It replaces the manual parsing with
- * `as never` casts that used to live in app.ts: each router defines its REQUEST schema and
- * calls `parseBody`.
- */
-
-/**
  * Reads the JSON body and validates it against `schema`. When it does not validate, it returns
  * a 400 Response with a readable `{ error, issues }` (path + message); when it does, it returns
  * the typed data. Usage in handlers: `if (body instanceof Response) return body;`

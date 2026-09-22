@@ -71,7 +71,7 @@ export function writeText(ctx: SetupCtx, file: string, content: string): void {
 /** Somebody else's configuration JSON. When it does not parse it returns `null`: it is never overwritten blind. */
 export function readJson<T = Record<string, unknown>>(file: string): T | null | undefined {
   const raw = readText(file);
-  if (raw === null) return undefined; // no existe
+  if (raw === null) return undefined;
   try {
     return JSON.parse(raw) as T;
   } catch {

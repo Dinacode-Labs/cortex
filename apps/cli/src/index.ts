@@ -60,7 +60,6 @@ function usage(opts: { header?: boolean } = {}): void {
 async function main(): Promise<void> {
   const [sub, ...rest] = process.argv.slice(2);
   if (!sub && wantsSplash()) {
-    // No arguments, on a terminal: the mark, and the help below it. `--help` stays plain text.
     printSplash(CLI_VERSION);
     usage({ header: false });
     return;
@@ -88,7 +87,7 @@ async function main(): Promise<void> {
   }
   const mod = await cmd.load();
   if (cmd.managed === false) {
-    await mod.run(rest); // hooks: gestionan su propio exit
+    await mod.run(rest);
     return;
   }
   try {

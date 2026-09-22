@@ -2,8 +2,6 @@ import type { Context } from "hono";
 import { getEnvNum } from "@cortex/shared";
 
 /**
- * Per-IP limit on sending sign-in codes.
- *
  * `requestOtp` already limits **per email address**, which stops one person being hammered.
  * What it did not stop is a single IP requesting codes for many different addresses: each one
  * starts with a fresh allowance. With email sending switched on, those are real messages to
@@ -28,7 +26,7 @@ interface Window {
 const windows = new Map<string, Window>();
 
 /**
- * The client's IP. Behind our own proxy, `x-forwarded-for` ends with the real IP and **the
+ * Behind our own proxy, `x-forwarded-for` ends with the real IP and **the
  * last** one is taken, not the first: the first is written by the caller and can be made up,
  * so using it would turn the limit into decoration.
  */

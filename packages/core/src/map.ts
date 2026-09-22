@@ -1,6 +1,5 @@
 import type { ContextEntry, Entity, Source } from "@cortex/shared";
 
-/** A raw row as returned by postgres.js (snake_case columns). */
 export type Row = Record<string, any>;
 
 export function rowToContextEntry(row: Row): ContextEntry {

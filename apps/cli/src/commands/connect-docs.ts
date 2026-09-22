@@ -11,8 +11,6 @@ import {
 } from "@cortex/shared";
 
 /**
- * `cortex connect-docs` -- pulls a folder's documentation into the project's memory.
- *
  * This used to live only in `cortex-admin`, which is not published to npm, so ingesting a
  * documentation directory meant cloning the whole monorepo. Ingesting documentation is one of
  * the first things somebody wants to do when they meet Cortex, and asking them for a monorepo
@@ -27,8 +25,6 @@ import {
  * It chunks exactly like the operator connector (`chunkDocument`) and writes through the
  * authenticated API, so it respects permissions and attribution. It touches neither the
  * database nor any keys.
- *
- * Usage: cortex connect-docs "<slug>" <folder>
  */
 
 const MIN_CHARS = Number(process.env.CORTEX_DOCS_MIN_CHARS ?? "40");
@@ -146,7 +142,6 @@ export async function run(args: string[]): Promise<void> {
   }
   if (items.length) console.log(`\n${added} new, ${known} already known.`);
 
-  // What this CLI cannot read is stated, with its count and with a way out.
   if (found.heavy.length > 0) {
     const byType = new Map<string, number>();
     for (const f of found.heavy) {

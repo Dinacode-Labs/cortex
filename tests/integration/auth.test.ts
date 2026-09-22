@@ -38,19 +38,19 @@ describe("auth email + OTP (a real database)", () => {
     const redeemed = await redeemUiTicket(ticket!);
     expect(redeemed?.user.email).toBe(EMAIL);
     expect(redeemed!.token).not.toBe(token); // a fresh web session (not the CLI token)
-    expect(await redeemUiTicket(ticket!)).toBeNull(); // single use
+    expect(await redeemUiTicket(ticket!)).toBeNull();
   });
 
   it("a wrong code and a disallowed domain are both rejected", async () => {
     await otpFor(EMAIL);
     await expect(verifyOtp(EMAIL, "000000")).rejects.toThrow();
-    await expect(requestOtp("outsider@gmail.com")).rejects.toThrow(); // outside the allowlist
+    await expect(requestOtp("outsider@gmail.com")).rejects.toThrow();
   });
 
   it("rate limit: no more than CORTEX_OTP_RATE_MAX (default 5) codes per email in the window", async () => {
     const email = `rate-${RID}@example.com`;
-    for (let i = 0; i < 5; i++) await requestOtp(email); // 5 OK
-    await expect(requestOtp(email)).rejects.toThrow(/Too many codes/); // the 6th is cut off
+    for (let i = 0; i < 5; i++) await requestOtp(email);
+    await expect(requestOtp(email)).rejects.toThrow(/Too many codes/);
   });
 
   it("attempt lockout: after 5 wrong codes, not even the right one works", async () => {

@@ -99,7 +99,6 @@ describe("the project hierarchy in the UI", () => {
   }, 60_000);
 
   it("somebody else's private child_ does not show up by looking at the parent_", async () => {
-    // What crosses downwards filters by permission: seeing the client does not open its private repos.
     for (const path of [`/p/${cliente.slug}`, "/"]) {
       const html = await (await get(path)).text();
       expect(html, path).not.toContain(hijoPrivado.slug!);
@@ -115,7 +114,6 @@ describe("the project hierarchy in the UI", () => {
     // the first group on the page need not be ours.
     const group = html.split('class="project-group"').find((g) => g.includes(`href="/p/${cliente.slug}"`));
     expect(group, "the client must be painted as a group, not as a loose card").toBeTruthy();
-    // The child is painted INSIDE its parent's group, not loose in the top-level grid.
     expect(group!.split('class="project-children"')[1] ?? "").toContain(`href="/p/${child_.slug}"`);
   }, 120_000);
 

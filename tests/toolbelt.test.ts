@@ -89,7 +89,7 @@ describe("installToolbelt", () => {
     expect(report.warnings.join(" ")).toContain("TICKETS_API_KEY");
     const cfg = JSON.parse(readFileSync(join(home, ".config/opencode/opencode.json"), "utf8"));
     expect(cfg.mcp.tickets).toBeUndefined();
-    expect(cfg.mcp.wiki).toBeDefined(); // the one that can be installed, is
+    expect(cfg.mcp.wiki).toBeDefined();
   });
 
   it("respects the registry's agent filter", () => {

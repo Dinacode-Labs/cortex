@@ -10,7 +10,7 @@ describe("schemas de dominio (zod)", () => {
 
   it("rejects a type outside the enum", () => {
     const r = saveContextInput.safeParse({ content: "x", type: "note" });
-    expect(r.success).toBe(false); // 'note' is not a valid contextEntryType
+    expect(r.success).toBe(false);
   });
 
   it("accepts a valid type", () => {

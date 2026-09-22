@@ -41,7 +41,6 @@ describe("GET /metrics", () => {
       expect(res.headers.get("content-type")).toContain("text/plain");
 
       const texto = await res.text();
-      // Format: every metric with its HELP and its TYPE, which is what makes it readable.
       for (const m of ["cortex_up", "cortex_session_captures_total", "cortex_worker_heartbeat_age_seconds", "cortex_entries_total", "cortex_llm_tokens_total"]) {
         expect(texto, m).toContain(`# HELP ${m}`);
         expect(texto, m).toContain(`# TYPE ${m}`);
