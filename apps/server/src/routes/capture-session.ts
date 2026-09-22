@@ -135,7 +135,6 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
   return routes;
 }
 
-/** Runs one job from the queue and leaves the result recorded. */
 export function makeCaptureRunner(distill: DistillSessionFn) {
   return async (job: CaptureJob): Promise<void> => {
     await markSessionCapture(job.captureId, "running");

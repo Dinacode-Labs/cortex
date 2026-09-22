@@ -1,7 +1,6 @@
 import { resolve } from "node:path";
 import { indexRepo, registerUsageSink } from "@cortex/core";
 
-/** Indexes a local repo's code into a project. */
 export async function run(args: string[]): Promise<void> {
   registerUsageSink();
   const project = args[0];

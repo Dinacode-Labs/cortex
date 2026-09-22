@@ -31,7 +31,6 @@ function flag(args: string[], name: string): string | undefined {
   return args.find((a) => a.startsWith(`--${name}=`))?.split("=").slice(1).join("=");
 }
 
-/** The first argument that is neither an option nor an option's value. */
 function positional(args: string[]): string | undefined {
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;

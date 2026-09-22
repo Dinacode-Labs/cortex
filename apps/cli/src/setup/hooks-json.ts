@@ -106,7 +106,6 @@ export function removeHooks(obj: HooksHolder): { changed: string[] } {
   return { changed };
 }
 
-/** Is any Cortex hook installed? (used by `--status`). */
 export function hasCortexHooks(obj: HooksHolder): boolean {
   return Object.values(obj.hooks ?? {}).some((groups) => groups.some((g) => (g.hooks ?? []).some((h) => anyCortex(h.command))));
 }

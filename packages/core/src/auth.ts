@@ -33,12 +33,10 @@ export function isAllowedEmail(emailRaw: string): boolean {
   return domains.length === 0 || domains.some((d) => email.endsWith(`@${d}`));
 }
 
-/** Is this an admin? (configured through CORTEX_ADMIN_EMAIL, one or several). */
 export function isAdmin(email: string | null | undefined): boolean {
   return !!email && adminEmails().includes(normEmail(email));
 }
 
-/** The configured admins (for "ask X for access"). */
 export function listAdmins(): string[] {
   return adminEmails();
 }
@@ -126,7 +124,6 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
   return { id: rows[0].id as string, email: rows[0].email as string, admin: isAdmin(rows[0].email as string) };
 }
 
-/** Revokes a token (logout). */
 export async function revokeToken(token: string): Promise<void> {
   await getSql()`DELETE FROM auth_tokens WHERE token_hash = ${sha(token)}`;
 }

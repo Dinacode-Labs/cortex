@@ -32,7 +32,6 @@ export type { WebEnv } from "./middleware/session.js";
 // apps/web (it does not depend on the process's cwd).
 const PUBLIC_DIR = resolve(import.meta.dirname, "../public");
 
-/** Builds the whole web app (statics + session middleware + routes). No side effects. */
 export function createApp(): Hono<WebEnv> {
   const app = new Hono<WebEnv>();
   app.use("*", secureHeaders());

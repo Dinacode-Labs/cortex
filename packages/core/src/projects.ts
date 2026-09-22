@@ -185,7 +185,6 @@ export async function listProjectAncestors(projectId: string): Promise<ProjectRe
   return rows.map(toRef).filter((r): r is ProjectRef => r !== null);
 }
 
-/** The result of the single project-access guard. */
 export type AccessCheck =
   | { status: "ok"; project: ProjectRef }
   | { status: "not_found" }
@@ -233,7 +232,6 @@ export async function checkEntryAccess(
   return { status: "ok", project };
 }
 
-/** An accessible project with its entry count (for the UI's lists and selectors). */
 export interface AccessibleProject extends ProjectRef {
   entryCount: number;
 }
@@ -398,7 +396,6 @@ export async function removeProjectMember(slug: string, email: string, byEmail: 
   await getSql()`DELETE FROM project_members WHERE project_id = ${p.id} AND email = ${email.toLowerCase()}`;
 }
 
-/** A project's members (email addresses). */
 export async function listProjectMembers(slug: string): Promise<string[]> {
   const p = await findProjectBySlug(slug);
   if (!p) return [];

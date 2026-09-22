@@ -10,7 +10,6 @@ import type { ContextEntryType, EntityType } from "@cortex/shared";
  * language of this file; add a language here when a corpus in that language is ingested.
  */
 
-/** Normalises a name to its canonical form: lowercase, no accents, no extra whitespace. */
 export function canonicalize(name: string): string {
   return name
     .normalize("NFD")
@@ -142,7 +141,6 @@ function joinLines(lines: string[], dropFencedCode: boolean): string {
   return stripInline(out).replace(/\s+/g, " ").trim();
 }
 
-/** Derives a short title when the user gave none: the first sentence, trimmed. */
 export function deriveTitle(content: string): string {
   const firstLine = stripMarkdown(content).split(/(?<=[.!?])\s/)[0] ?? "";
   const title = firstLine.trim();
@@ -259,7 +257,6 @@ export interface ExtractedEntity {
   type: EntityType;
 }
 
-/** Extracts entities (technologies and modules) mentioned in the text. Heuristic. */
 export function extractEntities(content: string): ExtractedEntity[] {
   const found = new Map<string, ExtractedEntity>();
   const lower = content.toLowerCase();
@@ -297,7 +294,6 @@ const OPPOSING_AXES: [string, string][] = [
   ["onprem", "cloud"],
 ];
 
-/** Do the two polarity sets contradict each other on any axis? */
 export function polarityContradicts(a: Set<string>, b: Set<string>): boolean {
   return OPPOSING_AXES.some(([x, y]) => (a.has(x) && b.has(y)) || (a.has(y) && b.has(x)));
 }

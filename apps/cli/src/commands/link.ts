@@ -81,7 +81,6 @@ function requireExplicitServerToCreate(server: string | undefined): boolean {
   return false;
 }
 
-/** The "it exists but is private" message, with the admins to ask for access. */
 function askAccess(name: string, admins?: string[]): string {
   const quien = admins?.length ? ` (${admins.join(", ")})` : "";
   return `✗ The project "${name}" exists but is private and you do not have access.\n  Ask an administrator${quien} for access. Nothing was created.`;

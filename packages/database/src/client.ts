@@ -19,7 +19,6 @@ export function getSql(): Sql {
   return client;
 }
 
-/** Closes the connection. Useful in one-off scripts (migrate, seed). */
 export async function closeSql(): Promise<void> {
   if (client) {
     await client.end();
@@ -27,7 +26,6 @@ export async function closeSql(): Promise<void> {
   }
 }
 
-/** Serialises a JS vector into the literal pgvector understands: '[1,2,3]'. */
 export function toVectorLiteral(vec: readonly number[]): string {
   return `[${vec.join(",")}]`;
 }

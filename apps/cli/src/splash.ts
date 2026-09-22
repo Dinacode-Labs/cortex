@@ -66,7 +66,6 @@ export function renderMark(p: Paint): string[] {
   });
 }
 
-/** Mark plus the text column, as lines ready to print. */
 export function splashLines(version: string, env: NodeJS.ProcessEnv = process.env): string[] {
   const p = paint(env);
   const right: string[] = [

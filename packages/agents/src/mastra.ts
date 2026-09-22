@@ -65,7 +65,6 @@ const INSTRUCTIONS: Record<AgentRole, string> = {
 
 const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller", "reconciler"]);
 
-/** A fetch that forces response_format json_object on every OpenAI-compatible request. */
 const jsonFetch: typeof fetch = async (url, init) => {
   if (init?.body && typeof init.body === "string") {
     try {

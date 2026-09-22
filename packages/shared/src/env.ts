@@ -26,7 +26,6 @@ export function loadEnv(): void {
   if (hit) process.loadEnvFile(hit);
 }
 
-/** Returns an environment variable, or throws if it is missing. */
 export function requireEnv(name: string): string {
   loadEnv();
   const value = process.env[name];
@@ -36,7 +35,6 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-/** Returns an environment variable, or a default value. */
 export function getEnv(name: string, fallback: string): string {
   loadEnv();
   return process.env[name] ?? fallback;

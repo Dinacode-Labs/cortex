@@ -42,7 +42,6 @@ function assistantText(content: unknown): string {
   return "";
 }
 
-/** Reads a session .jsonl -> condensed dialogue (USER/ASSISTANT), free of noise and secrets. */
 export function condenseSession(file: string): string {
   const turns: string[] = [];
   for (const line of readFileSync(file, "utf8").split("\n")) {

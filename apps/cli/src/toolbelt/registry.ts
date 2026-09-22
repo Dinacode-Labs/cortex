@@ -66,7 +66,6 @@ export function resolveArgs(args: string[] | undefined, repo: string | null): st
   return out.map((a) => a.replaceAll("{REPO}", repo));
 }
 
-/** Declared variables that are NOT exported. */
 export function missingEnv(d: McpDef): string[] {
   return (d.env ?? []).filter((k) => !process.env[k]);
 }

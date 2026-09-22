@@ -3,17 +3,14 @@
  * local (the default, no keys), openai, voyage.
  */
 export interface EmbeddingProvider {
-  /** Model identifier; persisted alongside every vector. */
   readonly model: string;
   /** Embedding schema version (so things can be reindexed when it changes). */
   readonly version: string;
-  /** Dimension of the vectors it produces. */
   readonly dim: number;
   /** Produces one embedding per text, in the same order. */
   embed(texts: string[]): Promise<number[][]>;
 }
 
-/** Normalises a vector to L2 norm = 1 (for stable cosine similarity). */
 export function l2normalize(vec: number[]): number[] {
   let sum = 0;
   for (const v of vec) sum += v * v;

@@ -253,8 +253,6 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
   }));
 }
 
-/** The project's id plus all its ancestors' (parent hierarchy). For context inheritance. */
-
 async function entriesByType(
   sql: Sql,
   projectIds: string[],

@@ -8,7 +8,6 @@
  * replace, keeping secrets out of the context in the first place.
  */
 
-/** Strips secrets from a text before sending it to the LLM or storing it. */
 export function scrub(s: string): string {
   return (
     s

@@ -6,7 +6,6 @@ import { empty, hitCard, panel, searchForm } from "../views/components.js";
 import { requireProject } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
-/** Semantic search over the context. */
 export const searchRoutes = new Hono<WebEnv>();
 
 searchRoutes.get("/search", async (c) => {

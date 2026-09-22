@@ -41,7 +41,6 @@ interface Found {
   heavy: string[];
 }
 
-/** Walks the folder, separating what this CLI can read from what it cannot. */
 export function walk(dir: string, out: Found = { text: [], heavy: [] }): Found {
   for (const name of readdirSync(dir)) {
     if (name.startsWith(".") || name.startsWith("~$") || IGNORE_DIRS.has(name)) continue;

@@ -30,7 +30,6 @@ export interface AppDeps {
   captureConcurrency?: number;
 }
 
-/** Builds the whole HTTP API (auth + context + capture). No side effects. */
 export function createApp(deps: AppDeps = {}): Hono {
   const app = new Hono();
 

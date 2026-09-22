@@ -26,7 +26,6 @@ export interface NearestEntry {
   sourceType: string;
 }
 
-/** The project's entry most similar to the given text (or null). */
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
   const pid = await findProjectIdByName(getSql(), project);
   if (!pid) return null;

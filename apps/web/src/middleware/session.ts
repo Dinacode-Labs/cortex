@@ -5,10 +5,8 @@ import { validateToken, type AuthUser } from "@cortex/core";
 import { getBrandName } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 
-/** The web app's environment: the session's user (or null) in `c.var.user`. */
 export type WebEnv = { Variables: { user: AuthUser | null } };
 
-/** The login page: the gate's response when there is no session (and /auth/cli's and /logout's). */
 export function loginPage(msg = ""): Html {
   // There is no form on purpose: you sign in from the terminal, and the CLI's long-lived token
   // never travels through a URL (ADR-0025). So this screen has exactly one job, which is to

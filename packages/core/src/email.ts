@@ -153,7 +153,6 @@ export function validateEmailConfig(): string[] {
   return warnings;
 }
 
-/** Sends the single-use sign-in code. */
 export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const brand = getBrandName();
   await getEmailSender().send({

@@ -20,7 +20,6 @@ export interface Check {
   name: string;
   level: Level;
   detail: string;
-  /** What to do. Only when there is something to do. */
   fix?: string;
 }
 

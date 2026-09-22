@@ -44,7 +44,6 @@ const TYPE_COLORS: Record<string, string> = {
   architecture: "#6b3fa0",
 };
 
-/** A soft colour badge: the background at 10% of the colour, and the colour as ink. */
 export function badge(text: string, color: string): Html {
   return html`<span class="badge" style="color:${color};background:${color}14">${text}</span>`;
 }
@@ -55,9 +54,7 @@ export const confidenceBadge = (c: string): Html => badge(`conf: ${c}`, "#5b6673
 export const scoreBadge = (n: number): Html => badge(n.toFixed(2), "#1a6dff");
 
 export interface PanelOptions {
-  /** One line explaining what the section is about. Almost always needed. */
   help?: Html | string;
-  /** Actions to the right of the title (a link, a button). */
   actions?: Html;
 }
 

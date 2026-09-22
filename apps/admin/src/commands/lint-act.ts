@@ -1,6 +1,5 @@
 import { planLintActions } from "@cortex/core";
 
-/** An action plan (dry run) derived from the lint: open tasks, consolidate duplicates. */
 export async function run(args: string[]): Promise<void> {
   const project = args[0];
   if (!project) {

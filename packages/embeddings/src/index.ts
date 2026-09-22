@@ -28,11 +28,6 @@ function requireDim(raw: string): number {
   return dim;
 }
 
-/**
- * Returns the embedding provider configured through EMBEDDINGS_PROVIDER
- * (local | openai-compatible | openai | voyage). Defaults to "local" so it starts with no
- * keys. Lazy singleton.
- */
 export function getEmbeddingProvider(): EmbeddingProvider {
   if (cached) return cached;
   // `|| "local"`: a variable that is declared but empty counts as "unset" and must fall

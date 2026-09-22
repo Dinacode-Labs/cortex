@@ -15,7 +15,6 @@ import { badge, confidenceBadge, panel, statusBadge, typeBadge } from "../views/
 import { deniedPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
-/** Context entries: detail, validation and capture (/save). */
 export const entriesRoutes = new Hono<WebEnv>();
 
 entriesRoutes.get("/entry/:id", async (c) => {
