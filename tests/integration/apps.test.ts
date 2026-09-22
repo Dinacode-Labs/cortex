@@ -45,7 +45,7 @@ async function otpFor(email: string): Promise<string> {
 
 let token: string; // USER's session token (works as a Bearer and as the UI's cookie)
 let prvForeign: ProjectRef; // OWNER's private one: USER is not a member
-let prvOwn: ProjectRef; // privado de USER
+let prvOwn: ProjectRef;
 
 beforeAll(async () => {
   const code = await otpFor(USER);
@@ -91,7 +91,7 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
     expect([200, 302]).toContain(ok.status); // a "Saved" page (200) or a redirect
     const entries = await listEntries({ project: prvOwn.name });
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.createdBy).toBe(USER); // attribution: created_by = the session's email
+    expect(entries[0]!.createdBy).toBe(USER);
   });
 
   it("listing with access does not truncate: the filter goes in the query (ADR-0052)", async () => {
