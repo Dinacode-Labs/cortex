@@ -46,7 +46,7 @@ function ignoredFile(name: string): boolean {
     name.endsWith(".min.js") ||
     name.endsWith(".pb.ts") ||
     /\.(gen|generated)\.[tj]sx?$/.test(name) ||
-    name.startsWith("api-schema") || // clientes OpenAPI generados (yarn update-schema)
+    name.startsWith("api-schema") ||
     name === "pnpm-lock.yaml" ||
     name === "package-lock.json" ||
     name === "yarn.lock"
@@ -131,7 +131,7 @@ export function chunkFile(file: CodeFile): CodeChunk[] {
     const slice = lines.slice(i, i + CHUNK_LINES);
     let body = slice.join("\n");
     if (body.trim().length < 10) continue;
-    if (body.length > MAX_CHUNK_CHARS) body = body.slice(0, MAX_CHUNK_CHARS); // minified/huge lines
+    if (body.length > MAX_CHUNK_CHARS) body = body.slice(0, MAX_CHUNK_CHARS);
     const startLine = i + 1;
     const endLine = Math.min(i + CHUNK_LINES, lines.length);
     chunks.push({
@@ -223,7 +223,6 @@ export function renderCodeHits(hits: CodeHit[]): string {
 }
 
 function stripHeader(content: string): string {
-  // drops the "// path (lines ...)" header line so the code shows up clean
   const nl = content.indexOf("\n");
   return nl > 0 && content.startsWith("// ") ? content.slice(nl + 1) : content;
 }
@@ -247,7 +246,6 @@ export async function indexRepo(
   const skippedOverCap = Math.max(0, all.length - maxChunks);
   if (skippedOverCap > 0) all = all.slice(0, maxChunks);
 
-  // Clears this repo's previous code from the project (idempotent reindexing).
   await sql`DELETE FROM code_chunks WHERE project_id = ${projectId} AND repo = ${repoName}`;
 
   let i = 0;

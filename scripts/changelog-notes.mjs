@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-// Prints a version's CHANGELOG block, for the body of the GitHub Release.
-//
-//   node scripts/changelog-notes.mjs 0.1.0
-//
 // The notes come from the CHANGELOG and not from the commits on purpose: commits say what was
 // done, and release notes have to say what changes for whoever uses it.
 import { readFileSync } from "node:fs";

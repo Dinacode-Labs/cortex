@@ -17,7 +17,6 @@ export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]
 
 let reranker: Reranker | null = null;
 
-/** Registers (or, with null, unregisters) a reranker. Wired by the entrypoints. */
 export function setReranker(fn: Reranker | null): void {
   reranker = fn;
 }

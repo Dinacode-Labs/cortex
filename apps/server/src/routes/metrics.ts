@@ -3,8 +3,6 @@ import { getSql } from "@cortex/database";
 
 
 /**
- * `GET /metrics` -- numbers in Prometheus's text format.
- *
  * Why this rather than a dashboard of our own: this is a product other people deploy, and each
  * of them already has their own way of watching things. Our dashboard would force them to look
  * at it; a standard format is read by any stack -- Prometheus, Grafana Agent, Datadog, whatever

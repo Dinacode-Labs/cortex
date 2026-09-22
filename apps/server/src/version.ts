@@ -1,8 +1,6 @@
 import { createRequire } from "node:module";
 
 /**
- * The server's version and the minimum client version it accepts.
- *
  * It is read from the root `package.json` at runtime rather than baked into the build: that
  * way an image cannot end up announcing a version that is not its own. The depth is the same
  * from `src/` and from `dist/` (both hang off `apps/server/`).

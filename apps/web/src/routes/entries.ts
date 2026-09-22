@@ -19,7 +19,6 @@ export const entriesRoutes = new Hono<WebEnv>();
 
 entriesRoutes.get("/entry/:id", async (c) => {
   const id = c.req.param("id");
-  // Per-entry gate (checkEntryAccess): no access to the entry's project -> 403.
   const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const detail = access.status === "ok" ? await getEntryDetail(id) : null;
@@ -142,15 +141,6 @@ entriesRoutes.post("/save", async (c) => {
   return c.html(layout("Saved", body, c.get("user")));
 });
 
-/**
- * Correcting an entry.
- *
- * Until now you could only validate, reject or mark it obsolete: that is, say something was
- * wrong without being able to fix it. Since an agent writes almost everything, that left the
- * memory with no way to improve -- only to flag itself as suspect. The gate is the same as for
- * viewing the entry: whoever can read the project can correct it, just as they could already
- * validate it.
- */
 entriesRoutes.post("/entry/:id/edit", async (c) => {
   const id = c.req.param("id");
   const access = await checkEntryAccess(c.get("user")?.email ?? null, id);

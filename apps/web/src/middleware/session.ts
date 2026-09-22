@@ -25,9 +25,8 @@ cortex ui           # opens this UI, already signed in</pre>
 }
 
 /**
- * The session gate: it resolves the user from the cookie into `c.var.user`; with no valid
- * session it answers 401 with the login page. The EXEMPT routes (/auth/cli, /logout) and the
- * statics are mounted BEFORE this middleware in app.ts -- registration order is the exemption.
+ * The EXEMPT routes (/auth/cli, /logout) and the statics are mounted BEFORE this middleware in
+ * app.ts -- registration order is the exemption.
  */
 export const sessionGate: MiddlewareHandler<WebEnv> = async (c, next) => {
   const token = getCookie(c, "cortex_session");

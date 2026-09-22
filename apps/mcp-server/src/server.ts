@@ -23,8 +23,7 @@ import { z } from "zod";
 import { createRequire } from "node:module";
 
 /**
- * Construction of Cortex's MCP (the 8 tools), reusable by any transport (stdio in `index.ts`,
- * HTTP in `http.ts`). When `user` is passed (the authenticated HTTP transport), the tools
+ * When `user` is passed (the authenticated HTTP transport), the tools
  * **attribute** writes (`created_by`=email) and **apply permissions** (project access);
  * without `user` (local stdio) they behave as before.
  */

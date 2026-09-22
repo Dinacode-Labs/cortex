@@ -6,8 +6,7 @@ import { wireLlm } from "@cortex/agents";
 import { buildMcpServer } from "./server.js";
 
 /**
- * Cortex Knowledge MCP -- STDIO transport (local, per process). stdout is the protocol's
- * channel, so every log goes to stderr. The authenticated HTTP one lives in `http.ts`.
+ * stdout is the protocol's channel, so every log goes to stderr.
  */
 async function main(): Promise<void> {
   loadEnv();

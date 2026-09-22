@@ -68,7 +68,6 @@ export function createMcpProxy(opts: ProxyOptions): { server: Server; close: () 
   let client: Client | null = null;
   let connecting: Promise<Client> | null = null;
 
-  /** The client towards the server, created on demand and reused. */
   async function upstream(): Promise<Client> {
     if (client) return client;
     connecting ??= (async () => {

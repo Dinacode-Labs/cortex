@@ -5,7 +5,6 @@ import { slugify } from "./project-config.js";
 import { canonicalize } from "./text.js";
 import type { Row } from "./map.js";
 
-/** A reference to a project (an entity with type='project') with visibility and owner. */
 export interface ProjectRef {
   id: string;
   name: string;
@@ -54,7 +53,6 @@ export async function findProjectIdByName(sql: Sql, project: string): Promise<st
   return row ? (row.id as string) : null;
 }
 
-/** By slug only: used by the routes and the API, where the slug already is the identifier. */
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {
   const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND slug = ${slug} LIMIT 1`) as unknown as Row[];
   return toRef(rows[0]);
@@ -76,8 +74,6 @@ export async function getEntryProject(entryId: string): Promise<ProjectRef | nul
   return toRef(rows[0]);
 }
 
-/** Creates (or retrieves) a project. Public by default; `private` restricts it; `parentSlug`
- * hangs it under a parent (a client) -> it inherits context and permissions. */
 export async function createProject(
   name: string,
   opts?: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
@@ -109,7 +105,7 @@ export async function createProject(
     SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
     WHERE type = 'project' AND canonical_name = ${canonicalize(name)} LIMIT 1
   `) as unknown as Row[];
-  return toRef(byName[0])!; // it already existed (by name)
+  return toRef(byName[0])!;
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
@@ -131,7 +127,7 @@ export async function canAccessProject(project: ProjectRef, email: string | null
     )
     SELECT id, visibility, owner_email FROM c
   `) as unknown as Row[];
-  if (!chain.some((r) => (r.visibility as string) === "private")) return true; // all public
+  if (!chain.some((r) => (r.visibility as string) === "private")) return true;
   if (!email) return false;
   if (isAdmin(email)) return true;
   const e = email.toLowerCase();

@@ -122,7 +122,7 @@ describe("the UI's structure (ADR-0050)", () => {
 
   it("the brand is configurable in the buttons too, not only in the header", async () => {
     const html = await (await get(`/p/${project_.slug}?capture=1`)).text();
-    expect(html).toContain("Cortex"); // default
+    expect(html).toContain("Cortex");
     const body = html.split("<main>")[1]!;
     // If the brand changed, these texts must change with it: they cannot be hardcoded apart
     // from the header's `getBrandName()`.

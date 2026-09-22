@@ -3,12 +3,6 @@ import { getEnvNum } from "@cortex/shared";
 import { linkEntryToEntity, listEntries, relate, resolveEntity } from "@cortex/core";
 import { extractGraph } from "./enrich.js";
 
-/**
- * A project's graph enrichment pass (sections 7 and 12.4): it extracts entities and relations
- * with the LLM and builds the graph. Idempotent (find-or-create plus relate dedup). Reusable
- * from the CLI (`enrich-run`) and from maintenance (`maintain`).
- */
-
 const CONCURRENCY = getEnvNum("CORTEX_ENRICH_CONCURRENCY", 3);
 
 export interface EnrichResult {

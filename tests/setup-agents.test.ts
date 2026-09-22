@@ -241,7 +241,6 @@ describe("codex", () => {
     const toml = readFileSync(join(home, CFG), "utf8");
     expect(toml).not.toContain("@cortex/mcp-server");
     expect(toml).not.toContain("hook:context");
-    // Anything that is not Cortex's stays where it was.
     expect(toml).toContain("[mcp_servers.otro]");
     expect(toml).toContain("[hooks.state]");
     expect(report.changed.join(" ")).toContain("old Cortex blocks");

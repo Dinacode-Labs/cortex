@@ -49,7 +49,7 @@ describe("readCodexSessions (~/.codex/sessions/*.jsonl)", () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0]!.condensed).toContain("[user] Como configuro pgvector?");
     expect(sessions[0]!.condensed).toContain("[assistant] Usa pgvector");
-    expect(sessions[0]!.condensed).not.toContain("exec_command"); // tool call omitida
+    expect(sessions[0]!.condensed).not.toContain("exec_command");
   });
 
   it("ignores sessions from another repo (a different cwd)", () => {
@@ -87,7 +87,7 @@ describe("readOpenCodeSessions (the old file store)", () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0]!.condensed).toContain("[user] How do I add an endpoint?");
     expect(sessions[0]!.condensed).toContain("[assistant] Add the route");
-    expect(sessions[0]!.condensed).not.toContain("bash"); // parte tool omitida
+    expect(sessions[0]!.condensed).not.toContain("bash");
   });
 });
 
@@ -98,7 +98,6 @@ describe("readHermesSessions (SQLite)", () => {
   });
 });
 
-/** A Codex rollout with two turns, in the folder structure the agent uses. */
 function codexRollout(cwd = REPO): string {
   const dir = tmp("codex-one-");
   const day = join(dir, "2026/09/10");
@@ -140,7 +139,6 @@ describe("a single Codex session (what the hook needs)", () => {
 });
 
 describe("readPiSession / readPiSessions", () => {
-  /** Pi's format: a `session` line with the cwd and then messages with content[]. */
   function piSession(cwd = REPO): { dir: string; file: string } {
     const dir = tmp("pi-");
     const sub = join(dir, "--tmp-fake-repo-cortex--");
@@ -245,7 +243,7 @@ describe("readOpenCodeSessions (SQLite, the current format)", () => {
     expect(sessions[0]!.sessionId).toBe("ses1");
     expect(sessions[0]!.condensed).toContain("[user] Which backoff do we use?");
     expect(sessions[0]!.condensed).toContain("[assistant] Exponential, capped at 60s.");
-    expect(sessions[0]!.condensed).not.toContain("thinking out loud"); // reasoning left out
+    expect(sessions[0]!.condensed).not.toContain("thinking out loud");
 
     expect((await readOpenCodeSession("ses1"))!.condensed).toContain("backoff");
     expect(await readOpenCodeSession("ses-other")).not.toBeNull(); // by id there is no repo filter

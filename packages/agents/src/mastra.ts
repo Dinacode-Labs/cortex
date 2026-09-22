@@ -7,12 +7,6 @@ import { getLlmConfig, type LlmConfig, withLlmSlot } from "@cortex/shared";
 import { CortexTraceExporter } from "./trace-exporter.js";
 
 /**
- * Cortex's Mastra agents (section 7). One Agent per role of the intelligence pipeline:
- *   - classifier : ingestion/classification (type, title, summary, entities)
- *   - graph      : graph extraction (entities + relations)
- *   - reranker   : reordering of retrieval candidates
- *   - retriever  : synthesis of grounded answers
- *
  * They all talk to the LLM through an OpenAI-compatible provider. The roles that return JSON
  * use a `fetch` that forces `response_format:json_object` (some models do not honour Mastra's
  * `structuredOutput` reliably, but with json_object they are fast and valid -- see
@@ -112,7 +106,6 @@ function build(): Mastra | null {
   } as ConstructorParameters<typeof Mastra>[0]);
 }
 
-/** Returns the role's Agent, or null when no LLM is configured. */
 export function getAgent(role: AgentRole): Agent | null {
   if (mastra === undefined) mastra = build();
   return mastra ? (mastra.getAgent(role) as Agent) : null;
@@ -129,7 +122,6 @@ export async function shutdownObservability(): Promise<void> {
   }
 }
 
-/** Runs the role's agent and returns its text. Throws when there is no LLM. */
 export async function runAgent(
   role: AgentRole,
   prompt: string,

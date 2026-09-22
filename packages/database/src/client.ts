@@ -5,10 +5,6 @@ export type Sql = postgres.Sql;
 
 let client: Sql | undefined;
 
-/**
- * Shared Postgres client (postgres.js). A lazy singleton, so importing this module opens no
- * connections until it is actually used.
- */
 export function getSql(): Sql {
   if (!client) {
     client = postgres(getDatabaseUrl(), {
@@ -31,8 +27,8 @@ export function toVectorLiteral(vec: readonly number[]): string {
 }
 
 /**
- * Is the database answering? With a time cap, because a `/health` that hangs is worse than
- * one returning 503: the orchestrator restarts nothing and nobody finds out.
+ * With a time cap, because a `/health` that hangs is worse than one returning 503: the
+ * orchestrator restarts nothing and nobody finds out.
  */
 export async function pingDatabase(timeoutMs = 2000): Promise<boolean> {
   try {

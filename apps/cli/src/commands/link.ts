@@ -165,7 +165,6 @@ export async function run(args: string[]): Promise<void> {
     return;
   }
 
-  // With no arguments: the current state plus which projects are available.
   const link = useProjectServer(TARGET_CWD);
   if (!link) console.log("This folder is NOT linked to any project (there is no .cortex.json).");
   else if (link.ignore) console.log("This folder is marked as IGNORED for Cortex.");

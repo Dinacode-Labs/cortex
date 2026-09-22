@@ -44,7 +44,6 @@ export function renderDecisions(entries: ContextEntry[]): string {
 interface Section {
   title: string;
   blocks: string[];
-  /** How much budget it gets relative to the others. See `PACK_SECTIONS`. */
   weight: number;
 }
 

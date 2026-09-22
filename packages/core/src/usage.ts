@@ -33,7 +33,6 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "qwen3.6": { in: 0, out: 0 },
   "qwen3-embedding": { in: 0, out: 0 },
   whisper: { in: 0, out: 0 },
-  // OpenAI
   "gpt-4o-mini": { in: 0.15, out: 0.6 },
   "gpt-4o": { in: 2.5, out: 10 },
   "text-embedding-3-small": { in: 0.02, out: 0 },
@@ -44,7 +43,6 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "x-ai/grok-4.5": { in: 2.0, out: 6.0 },
   "anthropic/claude-sonnet-5": { in: 2.0, out: 10.0 },
   "qwen/qwen3.5-flash-02-23": { in: 0.07, out: 0.26 },
-  // Voyage
   "voyage-3": { in: 0.06, out: 0 },
   "voyage-3-lite": { in: 0.02, out: 0 },
 };
@@ -150,7 +148,6 @@ export async function getUsageSummary(): Promise<UsageSummary> {
   };
 }
 
-// --- AI traces (observability B: Mastra spans in ai_traces) -----------------
 export interface TraceSpan {
   spanId: string;
   parentSpanId: string | null;
@@ -172,7 +169,6 @@ export interface TraceTree {
   spans: TraceSpan[];
 }
 
-/** The last N traces (a span tree per trace_id), most recent first. */
 export async function getRecentTraces(limit = 15): Promise<TraceTree[]> {
   const sql = getSql();
   type R = Record<string, unknown>;

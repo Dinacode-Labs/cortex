@@ -33,7 +33,6 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-/** `version` is older than `min`. `dev` is never considered old. */
 export function isOlderThan(version: string, min: string): boolean {
   return compareVersions(version, min) < 0;
 }

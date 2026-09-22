@@ -31,7 +31,6 @@ export interface ClassifierResult {
   entities?: { name: string; type: EntityType }[];
 }
 
-/** LLM enrichment function. It returns null when it cannot classify. */
 export type Classifier = (content: string) => Promise<ClassifierResult | null>;
 
 let classifier: Classifier | null = null;
@@ -55,14 +54,9 @@ export interface ContextWarning {
 
 export interface SaveContextResult {
   entry: ContextEntry;
-  /** Signals from the improvement loop (duplicates/contradictions). Sections 12.1 and 12.5. */
   warnings: ContextWarning[];
 }
 
-/**
- * Stores a piece of context with low friction: it classifies, summarises, extracts entities,
- * generates the embedding and runs the detection loops. Sections 11 and 15.2.
- */
 export interface SaveContextOptions {
   /** When false, the LLM classifier is not invoked (the workflow uses this: it classifies in
    *  an earlier step and passes explicit type/title/summary). Defaults to true. */
@@ -287,7 +281,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, project);
   if (!projectId) throw new Error(`Project not found: "${project}".`);
-  if (!classifier) return { scanned: 0, reclassified: 0 }; // no LLM -> no-op
+  if (!classifier) return { scanned: 0, reclassified: 0 };
 
   const rows = (await sql`
     SELECT id, title, content, summary, type, metadata
@@ -320,7 +314,6 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   return { scanned: rows.length, reclassified };
 }
 
-/** The candidate summary for an entry, or null when what it already has must be kept. */
 function betterSummary(candidate: string | undefined, row: Row): string | null {
   const title = row.title as string;
   const content = row.content as string;
@@ -331,11 +324,8 @@ function betterSummary(candidate: string | undefined, row: Row): string | null {
 }
 
 export interface ResummarizeOptions {
-  /** Slug or name; with none, every project (and whatever has no project). */
   project?: string;
-  /** Computes and reports without writing. Defaults to false. */
   dryRun?: boolean;
-  /** Called for each entry whose summary changes, before it is written. */
   onRewrite?: (change: { id: string; title: string; before: string | null; after: string }) => void;
 }
 

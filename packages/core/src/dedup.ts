@@ -62,7 +62,6 @@ export async function recordCorroboration(entryId: string): Promise<void> {
   `;
 }
 
-/** UPDATE: replaces an entry's content (the result of the merge) and re-embeds it. */
 export async function updateEntryContent(entryId: string, content: string): Promise<void> {
   const sql = getSql();
   await sql`UPDATE context_entries SET content = ${content}, updated_at = now() WHERE id = ${entryId}`;
@@ -190,7 +189,7 @@ export async function saveWithReconciliation(
       return { action: "noop", entryId: near.id };
     }
     if (decision === "supersede") {
-      const { entry } = await saveContext(input, opts); // the new one becomes the current one
+      const { entry } = await saveContext(input, opts);
       if (near.sourceType === "agent_session") {
         await invalidateEntry(near.id, entry.id);
         return { action: "supersede", entryId: entry.id };

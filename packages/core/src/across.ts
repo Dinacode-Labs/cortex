@@ -30,24 +30,19 @@ import type { Row } from "./map.js";
  */
 const STACK_TYPES: EntityType[] = ["technology", "module", "service", "integration", "vendor"];
 
-/** An entity appearing in the memory of two or more children of the same client. */
 export interface SharedEntity {
   name: string;
   type: EntityType;
-  /** Which children it appears in. That count orders the list: shared by more goes on top. */
   projects: { name: string; slug: string | null }[];
-  /** How many current entries mention it in total. It breaks ties between equally shared things. */
   entries: number;
 }
 
-/** A clash between two current entries from DIFFERENT projects in the same subtree. */
 export interface CrossProjectContradiction {
   a: { id: string; title: string; project: { name: string; slug: string | null } };
   b: { id: string; title: string; project: { name: string; slug: string | null } };
 }
 
 export interface AcrossClient {
-  /** The children the asker can see. When empty, there is no view to show. */
   children: ProjectRef[];
   sharedStack: SharedEntity[];
   contradictions: CrossProjectContradiction[];

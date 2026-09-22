@@ -19,8 +19,6 @@ import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
 /**
- * The home page (the project list) and each project's settings.
- *
  * The home page used to be a list of entries from every project mixed together, which is the
  * question nobody asks: whoever opens the web arrives thinking about one project. Now the first
  * thing is to pick it, and each card says what is needed to pick -- how much it knows, whether
@@ -98,8 +96,6 @@ cortex setup --all</pre>
   return c.html(layout("Projects", body, { user, active: "projects" }));
 });
 
-// --- Project settings: visibility, owner and members (ADR-0051) ------------------------
-
 projectsRoutes.get("/p/:slug/settings", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
@@ -124,8 +120,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
 
   const members = await listProjectMembers(project.slug!);
   const notice = c.req.query("error");
-  // Parent candidates: any other accessible project with a slug. The cycle check is done by
-  // the domain, which is what knows the whole ancestor chain.
+  // The cycle check is done by the domain, which is what knows the whole ancestor chain.
   const others = (await listAccessibleProjects(user.email)).filter((o) => o.slug && o.id !== project.id);
 
   const body = html`

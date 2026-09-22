@@ -1,10 +1,5 @@
 import { enrichProject, shutdownObservability, wireLlm } from "@cortex/agents";
 
-/**
- * CLI for a project's graph enrichment pass (sections 7 and 12.4).
- * Usage: cortex-admin enrich "<Project>" [limit]
- * Env: CORTEX_ENRICH_ONLY_MISSING=1 to skip the ones already enriched.
- */
 export async function run(args: string[]): Promise<void> {
   wireLlm();
   try {

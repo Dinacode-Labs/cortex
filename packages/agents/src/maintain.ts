@@ -4,18 +4,10 @@ import { enrichProject } from "./enrich-project.js";
 import { shutdownObservability } from "./mastra.js";
 
 /**
- * Cortex's MAINTENANCE pipeline (the loops of section 12), meant to run periodically on the
- * server (see maintain-worker / cron). It chains, idempotently:
- *   1) reclassify (heuristic types -> LLM)   2) enrich (only-missing) per project
- *   3) resolve-entities (global)             4) temporal invalidation (global)
- *   5) curate + reconcile per project        6) lint (health) per project
- *
  * **Source sync does NOT belong here**: the developer triggers it by hand (they have the
  * context and the judgement). This is maintenance only, which happens entirely on the server.
  *
  * An exclusion lock (an advisory lock on a reserved connection) keeps runs from overlapping.
- *
- * CLI usage: tsx src/maintain.ts ["<Project>"]   (no argument = every project)
  */
 
 const LOCK_KEY = 4242421;

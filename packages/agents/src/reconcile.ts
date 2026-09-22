@@ -26,7 +26,6 @@ async function reconcile(existing: string, incoming: string): Promise<"noop" | "
 }
 
 let wired = false;
-/** Injects the LLM reconciler into core (idempotent). */
 export function wireReconciler(): void {
   if (wired) return;
   setReconciler({ decide: reconcile, merge: mergeKnowledge });

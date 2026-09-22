@@ -3,13 +3,6 @@ import type { ContextEntryType, EntityType } from "@cortex/shared";
 import { runAgent } from "./mastra.js";
 import { extractJson } from "./llm-json.js";
 
-/**
- * Classification / ingestion agent (section 7). Given free-form knowledge text, it proposes a
- * type, a title, a summary and the entities mentioned. It improves on @cortex/core's local
- * heuristics when an LLM is available. Implemented as a Mastra Agent (role "classifier", see
- * mastra.ts).
- */
-
 export interface ClassificationResult {
   type?: ContextEntryType;
   title?: string;

@@ -28,7 +28,7 @@ describe("chunkDocument", () => {
     const doc = Array.from({ length: 12 }, (_, i) => `## Section ${i}\n\n${para}`).join("\n\n");
     const r = chunkDocument(doc, { targetChars: 2000, maxChars: 2500, overlapChars: 200 });
     expect(r.length).toBeGreaterThan(1);
-    for (const c of r) expect(c.content.length).toBeLessThanOrEqual(2500 + 200 + 2); // tope + solape + "…\n\n"
+    for (const c of r) expect(c.content.length).toBeLessThanOrEqual(2500 + 200 + 2);
     r.forEach((c, i) => { expect(c.index).toBe(i); expect(c.total).toBe(r.length); });
   });
 

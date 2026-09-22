@@ -35,7 +35,7 @@ describe("the capture protocol has one wording", () => {
     const header = sessionMemoryHeader("Cortex", "Acme Portal", { skill: true });
     expect(header.length).toBeLessThan(300);
     const lines = header.split("\n");
-    expect(lines).toHaveLength(4); // title + what this is + read first + when to write back
+    expect(lines).toHaveLength(4);
     expect(lines[1]).toMatch(/memory/i);
     expect(lines[2]).toContain(CAPTURE_READ_FIRST);
     expect(lines[3]).toBe(`${captureTrigger()} ${CAPTURE_SKILL_POINTER}`);

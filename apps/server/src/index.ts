@@ -5,11 +5,6 @@ import { wireLlm } from "@cortex/agents";
 import { validateEmailConfig } from "@cortex/core";
 import { createApp } from "./app.js";
 
-/**
- * Thin entrypoint for the HTTP API: environment + LLM + server. The whole app (auth plus the
- * context endpoints) lives in `app.ts` with no side effects, so it can be tested with
- * `app.request()` without starting a server.
- */
 loadEnv();
 wireLlm(); // LLM hooks (reconciliation in /capture) plus the embedding usage sink
 

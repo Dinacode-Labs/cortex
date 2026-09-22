@@ -38,7 +38,7 @@ describe("estimateCostUsd", () => {
     vi.stubEnv("CORTEX_PRICING_JSON", '{"modelo-propio":{"in":1,"out":2},"x-ai/grok-4.5":{"in":0,"out":0}}');
     resetPricingCache();
     expect(estimateCostUsd("modelo-propio", 1_000_000, 1_000_000)).toBeCloseTo(3.0, 6);
-    expect(estimateCostUsd("x-ai/grok-4.5", 1_000_000, 1_000_000)).toBe(0); // sobreescrito
+    expect(estimateCostUsd("x-ai/grok-4.5", 1_000_000, 1_000_000)).toBe(0);
   });
 
   it("invalid JSON is ignored and the table in code keeps being used", () => {

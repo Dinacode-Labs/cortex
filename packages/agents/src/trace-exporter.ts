@@ -19,7 +19,7 @@ export class CortexTraceExporter {
       if (ev?.type !== "span_ended") return;
       const s = (ev.exportedSpan ?? ev.span) as Record<string, any> | undefined;
       if (!s || s.isEvent) return;
-      if (s.type === "model_chunk" || s.type === "model_step") return; // ruido por token
+      if (s.type === "model_chunk" || s.type === "model_step") return;
 
       const attrs = (s.attributes ?? {}) as Record<string, any>;
       const usage = (attrs.usage ?? {}) as Record<string, any>;

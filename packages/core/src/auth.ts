@@ -47,7 +47,6 @@ export interface AuthUser {
   admin: boolean;
 }
 
-/** Generates an OTP for the email and sends it (Brevo or dev-log). Invalidates earlier ones. */
 export async function requestOtp(emailRaw: string): Promise<void> {
   const email = normEmail(emailRaw);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("That does not look like an email address.");
@@ -69,7 +68,6 @@ export async function requestOtp(emailRaw: string): Promise<void> {
   await sendOtpEmail(email, code);
 }
 
-/** Verifies the OTP and, when correct, creates/updates the user and returns a token. */
 export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ token: string; user: AuthUser }> {
   const email = normEmail(emailRaw);
   const code = codeRaw.trim();
@@ -111,7 +109,6 @@ export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ to
   return { token: result.token, user: result.user };
 }
 
-/** Resolves the user behind a token (or null). Updates last_used_at. */
 export async function validateToken(token: string): Promise<AuthUser | null> {
   if (!token) return null;
   const sql = getSql();
@@ -157,7 +154,7 @@ export async function redeemUiTicket(ticket: string): Promise<{ token: string; u
   const urows = (await sql`SELECT email FROM users WHERE id = ${userId} LIMIT 1`) as unknown as Row[];
   if (!urows[0]) return null;
   const email = urows[0].email as string;
-  const token = randomBytes(32).toString("base64url"); // a fresh web session (not the CLI token)
+  const token = randomBytes(32).toString("base64url");
   await sql`
     INSERT INTO auth_tokens (token_hash, user_id, expires_at)
     VALUES (${sha(token)}, ${userId}, now() + make_interval(days => ${tokenTtlDays()}))

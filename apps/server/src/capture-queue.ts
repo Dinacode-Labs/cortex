@@ -1,6 +1,4 @@
 /**
- * In-memory queue for session distillations.
- *
  * Distilling is expensive and slow (several model calls per session), so the endpoint answers
  * `202` and the work happens behind it. Concurrency is capped because the inference provider
  * limits requests per key: with no queue, ten devs closing a session at once would produce a

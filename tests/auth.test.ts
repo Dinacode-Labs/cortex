@@ -10,7 +10,7 @@ describe("isAllowedEmail (whitelist de dominios)", () => {
   it("accepts the allowed domain and rejects the others", () => {
     process.env.CORTEX_AUTH_DOMAIN = "example.com";
     expect(isAllowedEmail("dev@example.com")).toBe(true);
-    expect(isAllowedEmail("ALGUIEN@Example.com")).toBe(true); // case-insensitive
+    expect(isAllowedEmail("ALGUIEN@Example.com")).toBe(true);
     expect(isAllowedEmail("hacker@gmail.com")).toBe(false);
   });
 

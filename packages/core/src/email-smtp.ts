@@ -4,9 +4,6 @@ import { getEnv, getEnvNum } from "@cortex/shared";
 /**
  * Generic SMTP transport. It lives in its own module so `email.ts` can import it lazily:
  * whoever uses `log` or `brevo` never loads nodemailer.
- *
- * Env: SMTP_HOST (required), SMTP_PORT (default 587), SMTP_USER, SMTP_PASS,
- *      SMTP_SECURE (1/true -> implicit TLS, the usual thing on port 465).
  */
 
 let transport: Transporter | undefined;

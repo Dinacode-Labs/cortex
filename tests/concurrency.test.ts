@@ -11,7 +11,6 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-/** A task that records the peak concurrency observed. */
 function tracker() {
   const state = { active: 0, peak: 0 };
   return {

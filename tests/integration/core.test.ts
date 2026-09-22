@@ -46,8 +46,8 @@ describe("persistence and search (a real database, local embeddings)", () => {
     await saveContext({ content: "Decision: the invoices endpoint uses cursor pagination.", project: child.name, type: "decision", confidence: "high" });
     const pack = await getContextPack(child.name);
     const text = pack.sections.flatMap((s) => s.entries).map((e) => e.content).join(" \n ");
-    expect(text).toMatch(/OAuth2/); // inherited from the parent
-    expect(text).toMatch(/invoices/); // the sub-project's own
+    expect(text).toMatch(/OAuth2/);
+    expect(text).toMatch(/invoices/);
   });
 });
 
@@ -72,12 +72,10 @@ describe("batch capture plus reconciliation (a real database)", () => {
       return { type: "business_rule", title: "Rule", summary: "s", entities: [] };
     });
     try {
-      // Without the flag -> the classifier is NOT called (a heuristic type).
       delete process.env.CORTEX_CAPTURE_LLM;
       await captureBatch(p.name, [{ content: "A loose document with no explicit type, alpha.", sourceType: "document", sourceReference: "cap-off" }], "dev@example.com");
       expect(calls).toBe(0);
 
-      // With the flag -> it is classified with the LLM and the classifier sets the type.
       process.env.CORTEX_CAPTURE_LLM = "1";
       await captureBatch(p.name, [{ content: "A loose document with no explicit type, beta.", sourceType: "document", sourceReference: "cap-on" }], "dev@example.com");
       expect(calls).toBe(1);
@@ -115,7 +113,6 @@ describe("batch capture plus reconciliation (a real database)", () => {
     expect(pack.conflicts).toHaveLength(2); // one per side: both receive the warning
 
     const text = renderContextPack(pack);
-    // BOTH are still in the pack: nothing was invalidated.
     expect(text).toContain("Fixed 30s backoff");
     expect(text).toContain("Capped exponential backoff");
     // And each one warns about the other, with the right direction.
@@ -194,7 +191,6 @@ describe("batch capture plus reconciliation (a real database)", () => {
       setReconciler(null);
     }
 
-    // And with no reconciler nothing is invented: it gets stored, as before.
     const c = await saveWithReconciliation({ content: echo, project: p.name, type: "decision", confidence: "low", sourceType: "agent_session", sourceReference: "session2" } as never, opts);
     expect(c.action).toBe("add");
   });
@@ -245,17 +241,16 @@ describe("deferred reclassification (maintain, a real database)", () => {
       return { type: "decision", title: "T", summary: "s", entities: [] };
     });
     try {
-      // An entry the LLM already classified → it must not be reprocessed.
       await saveContext({ content: "Something else entirely, classified by the LLM.", project: p.name, sourceReference: "rc-llm" } as never, { ...opts, useClassifier: true });
-      const callsAfterSaves = calls; // 1 (only the save with useClassifier:true)
+      const callsAfterSaves = calls;
 
       const rc = await reclassifyProject(p.name);
-      expect(rc.scanned).toBe(1); // only the heuristic one
+      expect(rc.scanned).toBe(1);
       expect(rc.reclassified).toBe(1);
-      expect(calls).toBe(callsAfterSaves + 1); // 1 extra call: only the heuristic one
+      expect(calls).toBe(callsAfterSaves + 1);
 
       const entries = await listEntries({ project: p.name });
-      expect(entries.find((e) => e.sourceReference === "rc-h")?.type).toBe("decision"); // re-typed
+      expect(entries.find((e) => e.sourceReference === "rc-h")?.type).toBe("decision");
       expect(entries.find((e) => e.sourceReference === "rc-llm")?.type).toBe("decision"); // it already was, left untouched
     } finally {
       setClassifier(null);
@@ -382,7 +377,7 @@ The frontend sends \`usedConfigurationId\` when the user picks a saved configura
     const dry = await resummarizeEntries({ project: p.name, dryRun: true });
     expect(dry.rewritten).toBe(1);
     const afterDry = await listEntries({ project: p.name });
-    expect(afterDry.find((e) => e.sourceReference === "rs1")?.summary).toMatch(/\|/); // nothing was written
+    expect(afterDry.find((e) => e.sourceReference === "rs1")?.summary).toMatch(/\|/);
 
     const r = await resummarizeEntries({ project: p.name });
     expect(r.rewritten).toBe(1);
@@ -516,7 +511,6 @@ describe("lint only looks at current entries (a real database)", () => {
     const p = await createProject(`IT Lint ${RID}`);
     const content = "The exports worker uses RabbitMQ with retries and a DLQ.";
     const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
-    // Two identical, CURRENT entries -> the lint sees them as a duplicate.
     const a = await saveContext({ content, project: p.name, type: "decision", sourceReference: "l1" } as never, opts);
     const b = await saveContext({ content, project: p.name, type: "decision", sourceReference: "l2" } as never, opts);
     const before = await lintProject(p.name);
@@ -526,9 +520,9 @@ describe("lint only looks at current entries (a real database)", () => {
     // Invalidate one (the way reconcile does) → it stops being current.
     await invalidateEntry(b.entry.id, a.entry.id);
     const after = await lintProject(p.name);
-    expect(after.duplicates.length).toBe(0); // the historical one no longer counts
-    expect(after.totalEntries).toBe(1); // only the current one
-    expect(after.staleHistorical).toBeGreaterThan(0); // but it does report it as historical
+    expect(after.duplicates.length).toBe(0);
+    expect(after.totalEntries).toBe(1);
+    expect(after.staleHistorical).toBeGreaterThan(0);
   });
 });
 
@@ -662,7 +656,7 @@ describe("graph integrity (the partial UNIQUE on active edges, D-5)", () => {
     const rows = (await sql`
       SELECT id FROM entities WHERE id IN (${vendor.id}, ${service.id})
     `) as unknown as { id: string }[];
-    expect(rows.length).toBe(2); // both are still alive
+    expect(rows.length).toBe(2);
   });
 });
 
@@ -698,7 +692,7 @@ describe("a project is created, not extracted (a real database)", () => {
     expect(rows.map((r) => r.type)).toEqual([]); // neither as a project nor moved to another type
     const listed = await listAccessibleProjects(null);
     expect(listed.map((x) => x.name)).not.toContain(ghost);
-    expect(listed.find((x) => x.id === p.id)?.slug).toBeTruthy(); // the real one is still there, with a slug
+    expect(listed.find((x) => x.id === p.id)?.slug).toBeTruthy();
     // The legitimate entity from the same response does get in.
     const ok = (await sql`SELECT 1 FROM entities WHERE canonical_name = ${`stripe ${RID}`} AND type = 'integration'`) as unknown as unknown[];
     expect(ok.length).toBe(1);
@@ -731,7 +725,6 @@ describe("the slug identifies the project when reading too (a real database)", (
     await saveContext({ content: "Decision: invoices are numbered by series and year.", project: p.slug!, type: "decision", title: "Invoice numbering" }, opts);
     expect((await listEntries({ project: p.name })).length).toBe(1);
 
-    // …and now reading with the slug sees the same as reading with the name.
     const pack = await getContextPack(p.slug!);
     expect(pack.project).toBe(p.name);
     expect(pack.sections.flatMap((s) => s.entries).map((e) => e.title)).toContain("Invoice numbering");
@@ -751,8 +744,8 @@ describe("the slug identifies the project when reading too (a real database)", (
   });
 
   it("when a name matches another project's slug, the slug wins: it is the identity", async () => {
-    const real = await createProject(`IT Collision ${RID}`); // slug it-collision-<rid>
-    const homonym = await createProject(`IT-Collision-${RID}-x`); // another project, another slug
+    const real = await createProject(`IT Collision ${RID}`);
+    const homonym = await createProject(`IT-Collision-${RID}-x`);
     expect(homonym.id).not.toBe(real.id);
     const access = await checkProjectAccess(null, { name: real.slug! });
     expect(access.status === "ok" && access.project.id).toBe(real.id);

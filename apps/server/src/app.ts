@@ -13,10 +13,6 @@ import { metricsRoutes } from "./routes/metrics.js";
 import { projectRoutes } from "./routes/projects.js";
 
 /**
- * Cortex's HTTP API (Hono). Email + OTP authentication plus authenticated context endpoints
- * (the hooks and connectors use these instead of touching the database directly): writes are
- * attributed to the user (created_by = email) and respect permissions. See docs/decisions.md.
- *
  * This module has NO import-time effects (neither loadEnv nor serve): `createApp()` only
  * COMPOSES the app -- health + routers (`routes/`, one per resource) + onError -- and the thin
  * entrypoint (`index.ts`) starts it. That way the tests can exercise the routes with

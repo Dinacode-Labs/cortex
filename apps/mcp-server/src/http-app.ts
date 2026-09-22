@@ -7,16 +7,6 @@ import { pingDatabase } from "@cortex/database";
 import { validateToken, type AuthUser } from "@cortex/core";
 import { buildMcpServer } from "./server.js";
 
-/**
- * Cortex MCP -- the AUTHENTICATED HTTP app (Streamable HTTP, Web-standard). MCP stops being
- * local-only (stdio): it is served over HTTP with sessions, requiring the same Bearer token as
- * the rest of the API (`cortex auth login`). One McpServer per session.
- *
- * This module has NO import-time effects (neither loadEnv nor serve): `createMcpHttpApp()`
- * builds the whole app (reading the environment config at that moment) and the thin entrypoint
- * (`http.ts`) starts it. That way the tests can exercise it with `app.request()`.
- */
-
 type McpSession = { transport: WebStandardStreamableHTTPServerTransport; email?: string; lastSeen: number };
 
 /** The authentication result: a user (valid Bearer), anonymous (no token) or invalid.
@@ -33,10 +23,10 @@ async function authUser(c: Context): Promise<{ user: AuthUser | null; invalidTok
 const rpcError = (c: Context, code: number, message: string, status: 400 | 401) =>
   c.json({ jsonrpc: "2.0", error: { code, message }, id: null }, status);
 
-/** Builds the MCP's HTTP app. The config is read from the environment WHEN THE APP IS BUILT
+/** The config is read from the environment WHEN THE APP IS BUILT
  *  (after the entrypoint's loadEnv, or the test's env), not when the module is imported. */
 export function createMcpHttpApp(): Hono {
-  const REQUIRE_AUTH = process.env.CORTEX_MCP_AUTH !== "off"; // por defecto: exige token
+  const REQUIRE_AUTH = process.env.CORTEX_MCP_AUTH !== "off";
   // Session sweep (M4): an inactivity TTL and a cap on live sessions, so clients that die
   // without closing (no DELETE/onclose) do not leave transports around forever.
   const SESSION_TTL_MS = Number(process.env.CORTEX_MCP_SESSION_TTL_SEC ?? 1800) * 1000;
@@ -81,14 +71,13 @@ export function createMcpHttpApp(): Hono {
     if (existing && REQUIRE_AUTH && existing.email !== user?.email) {
       return rpcError(c, -32001, "That session belongs to another user.", 401);
     }
-    if (existing) existing.lastSeen = Date.now(); // activity -> the session is still alive
+    if (existing) existing.lastSeen = Date.now();
     let transport = existing?.transport;
     let parsedBody: unknown;
 
     if (!transport) {
       if (c.req.method === "POST") parsedBody = await c.req.json().catch(() => undefined);
       if (!isInitializeRequest(parsedBody)) return rpcError(c, -32000, "Session not found, or 'initialize' is required.", 400);
-      // Session cap: above the limit, no new `initialize` is accepted.
       if (sessions.size >= MAX_SESSIONS) return rpcError(c, -32000, "Demasiadas sesiones MCP activas.", 400);
       const t = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: () => randomUUID(),

@@ -107,9 +107,7 @@ export async function hybridSearch(
     limit: number;
     excludeId?: string;
     includeArchived?: boolean;
-    /** Point-in-time query: facts valid on that date. */
     asOf?: Date;
-    /** Include already-invalidated facts (historical/superseded). Defaults to false. */
     includeHistorical?: boolean;
   },
 ): Promise<SearchHit[]> {
@@ -193,7 +191,6 @@ export async function vectorSearch(
     type?: ContextEntryType;
     limit: number;
     excludeId?: string;
-    /** Exclude rejected/obsolete entries by default. */
     includeArchived?: boolean;
     asOf?: Date;
     includeHistorical?: boolean;

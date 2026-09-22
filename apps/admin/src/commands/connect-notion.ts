@@ -31,9 +31,7 @@ function attachmentDir(file: string): string | null {
   for (const c of candidates) {
     try {
       if (existsSync(c) && statSync(c).isDirectory()) return c;
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   }
   return null;
 }
@@ -100,7 +98,7 @@ async function postBatch(slug: string, items: BatchItem[]): Promise<BatchResult[
 }
 
 export async function run(args: string[]): Promise<void> {
-  wireLlm(); // multimodal extract: caption/OCR/whisper through setMediaExtractor
+  wireLlm();
   const slug = args[0];
   const dir = args[1];
   if (!slug || !dir) {
@@ -121,7 +119,7 @@ export async function run(args: string[]): Promise<void> {
     return;
   }
 
-  // Phase 1 (local): parse pages + extract attachments (concurrency capped by the VLM/whisper).
+  // Concurrency capped by the VLM/whisper.
   const pageItems: BatchItem[] = [];
   const attItems: AttItem[] = [];
   let cursor = 0;
@@ -165,7 +163,6 @@ export async function run(args: string[]): Promise<void> {
   await Promise.all(Array.from({ length: PHASE1_CONCURRENCY }, () => worker()));
   console.log(`Extracted: ${pageItems.length} pages, ${attItems.length} attachments (${failed} failed). Uploading through the API...`);
 
-  // Phase 2: upload the pages (ref -> id), then the attachments, then link them.
   const pageId = new Map<string, string>();
   for (let i = 0; i < pageItems.length; i += CHUNK) {
     for (const x of await postBatch(slug, pageItems.slice(i, i + CHUNK))) if (x.ref) pageId.set(x.ref, x.id);

@@ -34,7 +34,6 @@ async function otpFor(email: string): Promise<string> {
   return m[1]!;
 }
 
-/** A fake distiller: it records what it was called with and returns fixed counters. */
 function stubDistill(): { fn: DistillSessionFn; calls: DistillSessionInput[] } {
   const calls: DistillSessionInput[] = [];
   const fn: DistillSessionFn = async (input) => {

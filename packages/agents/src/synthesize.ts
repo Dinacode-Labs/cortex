@@ -1,17 +1,11 @@
 import { getAgent, runAgent } from "./mastra.js";
 
-/**
- * Retrieval agent (section 7): it synthesises a prose answer grounded in the context retrieved
- * from Cortex. Implemented as a Mastra Agent (role "retriever", see mastra.ts).
- */
-
 export interface ContextSnippet {
   title: string;
   summary: string;
   type: string;
 }
 
-/** Synthesises an answer from context fragments. null when there is no LLM. */
 export async function synthesizeContextAnswer(
   question: string,
   snippets: ContextSnippet[],

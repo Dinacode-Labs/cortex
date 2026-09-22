@@ -17,7 +17,6 @@ import { CAPTURE_DO_NOT_SAVE, captureTrigger } from "../packages/shared/src/capt
  * it over a pair of linked transports, with no network and no Postgres.
  */
 
-/** A fake "remote" server with an `echo` tool. */
 function upstreamServer(): McpServer {
   const server = new McpServer({ name: "cortex-upstream", version: "0.0.0" });
   server.registerTool(
@@ -28,7 +27,6 @@ function upstreamServer(): McpServer {
   return server;
 }
 
-/** Stands up the proxy plus a test client. `connect` counts the upstream connections. */
 async function harness(connect: () => Promise<Transport>) {
   const { server, close } = createMcpProxy({ connect, log: () => {} });
   const [a, b] = InMemoryTransport.createLinkedPair();
@@ -38,7 +36,6 @@ async function harness(connect: () => Promise<Transport>) {
   return { client, close: async () => { await client.close(); await close(); } };
 }
 
-/** A transport linked to a freshly started `McpServer`. */
 async function linkedUpstream(server: McpServer): Promise<Transport> {
   const [toServer, toClient] = InMemoryTransport.createLinkedPair();
   await server.connect(toServer);
