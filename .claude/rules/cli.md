@@ -99,6 +99,11 @@ The CLI and the server are not in lockstep (ADR-0062): a 404 on a new endpoint m
 and degrades; a new field is read as optional. The only thing that blocks is `minClientVersion`,
 and only for writes (`apps/cli/src/compat.ts`, comparison in `apps/cli/src/version.ts`).
 
+The floor is raised on the server side, by the PR that breaks compatibility (see
+`api-http.md`, "When a change breaks older CLIs"), never from here. If a CLI change stops
+working against older servers, that is not a reason to raise it either: degrade, or say plainly
+that the server needs updating.
+
 ## Hooks and `cortex mcp`
 
 `managed: false`, and **stdout is protocol**: not one byte more, not even the version notice.

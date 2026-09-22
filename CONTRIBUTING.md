@@ -118,8 +118,11 @@ are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
   response field, the reading side must treat its absence as "this server does not have it yet",
   never as an error: type new fields as optional where they are read, treat a 404 on a new
   endpoint as an old server, and degrade (skip the feature, keep the old behaviour, or say so
-  plainly). If a change really does break old clients, raise `minClientVersion` on the server
-  and say so in the release notes; that is the only thing that blocks a client.
+  plainly). If a change really does break old clients — a route or field removed or renamed, a
+  schema tightened — the same PR raises the default of `MIN_CLIENT_VERSION` in
+  `apps/server/src/version.ts` to the version it ships in and says so in the CHANGELOG. That
+  is the only thing that blocks a client, and it is the author's job, not the operator's:
+  `CORTEX_MIN_CLIENT_VERSION` is an override for one deployment, not where breaks are recorded.
 - **Quality:** `pnpm typecheck` and `pnpm test` must pass. Tests live in `tests/`:
   - **Unit** (`pnpm test`): pure, deterministic logic — auth and permissions, project linking
     and slugs, session parsers, schemas. No database, no network.
@@ -180,6 +183,11 @@ CHANGELOG notes.
 
 **Every PR adds its line to `[Unreleased]`.** Write what changes for whoever uses it, not what
 you did: the release notes come from there, not from the commits.
+
+**Before tagging, check the floor.** If anything in `[Unreleased]` breaks CLIs older than this
+release, `MIN_CLIENT_VERSION` in `apps/server/src/version.ts` must already say this version
+([ADR-0062](./docs/decisions.md#adr-0062)); if it does not, the PR that broke it forgot, and the
+release is where it gets caught.
 
 While we are on `0.x`, a **minor** release may break compatibility. Two things are already
 marked for removal in `0.2.0`: the `LLM_PROVIDER=nan` alias and the `BREVO_SENDER` variable.
