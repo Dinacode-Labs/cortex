@@ -114,16 +114,18 @@ describe("deleting entries in bulk from the Memory screen", () => {
     expect(unstyled).toEqual([]);
   }, 60_000);
 
-  it("confirming deletes them and returns to the same filtered list, saying how many went", async () => {
+  it("confirming purges them and returns to the same filtered, sorted and grouped list, saying how many went", async () => {
     const ids = await seedEntries();
     const res = await post(`/p/${project_.slug}/purge`, [
       ...ids.map((id): [string, string] => ["ids", id]),
       ["status", "pending_validation"],
+      ["sort", "updated"],
+      ["group", "week"],
       ["confirm", "1"],
     ]);
     expect(res.status).toBe(302);
     const location = res.headers.get("location")!;
-    expect(location).toBe(`/p/${project_.slug}?status=pending_validation&purged=${ids.length}`);
+    expect(location).toBe(`/p/${project_.slug}?status=pending_validation&sort=updated&group=week&purged=${ids.length}`);
     expect(await stillThere(ids)).toEqual([]);
 
     const html = await (await get(location)).text();
