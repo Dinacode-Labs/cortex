@@ -56,8 +56,10 @@ and the second by accident (`/usage` is visible to everyone, unfiltered).
 These are settled and not up for renegotiation without an ADR:
 
 - **Server-rendered, no build step** ([ADR-0042](decisions.md#adr-0042)). Hono + `hono/html`
-  with autoescaping. One `graph.js` for the network view is the only client script, and the
-  only place a client-side library is acceptable.
+  with autoescaping. One `graph.js` for the network view is the only client script a page
+  depends on, and the only place a client-side library is acceptable. Anything else, like
+  `select.js` on the Memory screen, only enhances a page that works without it
+  ([ADR-0073](decisions.md#adr-0073)).
 - **The web talks to `core` directly**, not to the HTTP API. They are different clients of the
   same domain, not layers. Do not add a `fetch` to `/api/...` from a route handler.
 - **Sign-in happens in the terminal.** `cortex auth login` then `cortex ui`, which exchanges a
