@@ -36,6 +36,12 @@ const VERSION: string = (() => {
   }
 })();
 
+/**
+ * Claude Code defers MCP tools behind ToolSearch, and an agent that has to load a tool before
+ * calling it reaches for `Bash` instead. Only the read tools skip the queue (ADR-0075).
+ */
+const ALWAYS_LOAD_IN_CLAUDE_CODE = { "anthropic/alwaysLoad": true };
+
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
 
@@ -90,6 +96,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         " The repository holds the rules; this holds what the project learned the hard way, which " +
         "is not in the files. Pass `type` to read back what a context pack section left out.",
       inputSchema: searchContextInput.shape,
+      _meta: ALWAYS_LOAD_IN_CLAUDE_CODE,
     },
     async (args) => {
       try {
@@ -121,6 +128,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         area: z.string().optional().describe("Optional area or module, e.g. 'billing'"),
         asOf: z.string().optional().describe("ISO date (YYYY-MM-DD) to see the project as it was known then; defaults to now"),
       },
+      _meta: ALWAYS_LOAD_IN_CLAUDE_CODE,
     },
     async ({ project, area, asOf }) => {
       try {
@@ -144,6 +152,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         project: z.string().describe("Project slug or name"),
         limit: z.number().int().positive().max(50).optional(),
       },
+      _meta: ALWAYS_LOAD_IN_CLAUDE_CODE,
     },
     async ({ project, limit }) => {
       try {
@@ -198,6 +207,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         question: z.string().describe("The question, in plain language"),
         project: z.string().optional().describe("Project slug or name"),
       },
+      _meta: ALWAYS_LOAD_IN_CLAUDE_CODE,
     },
     async ({ question, project }) => {
       try {

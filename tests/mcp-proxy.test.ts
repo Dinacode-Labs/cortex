@@ -74,6 +74,29 @@ describe("createMcpProxy", () => {
     }
   });
 
+  /**
+   * The read tools reach Claude Code already loaded only because of their `_meta` (ADR-0075), and
+   * every Claude Code session goes through this proxy. Were the client-side schema to drop the keys
+   * it does not know, the server would declare them and no agent would ever see them.
+   */
+  it("forwards each tool's _meta untouched", async () => {
+    const up = new McpServer({ name: "cortex-upstream", version: "0.0.0" });
+    up.registerTool(
+      "read",
+      { description: "A read tool", inputSchema: { q: z.string() }, _meta: { "anthropic/alwaysLoad": true } },
+      async () => ({ content: [] }),
+    );
+    up.registerTool("write", { description: "A write tool", inputSchema: { q: z.string() } }, async () => ({ content: [] }));
+    const { client, close } = await harness(() => linkedUpstream(up));
+    try {
+      const { tools } = await client.listTools();
+      expect(tools.find((t) => t.name === "read")?._meta).toEqual({ "anthropic/alwaysLoad": true });
+      expect(tools.find((t) => t.name === "write")?._meta).toBeUndefined();
+    } finally {
+      await close();
+    }
+  });
+
   it("forwards the call and returns the server's result", async () => {
     const up = upstreamServer();
     const { client, close } = await harness(() => linkedUpstream(up));
