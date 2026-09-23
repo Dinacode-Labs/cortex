@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { globSync } from "node:fs";
 import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 
 /**
  * Somebody outside is going to read this repo's documentation. These checks are the ones that
@@ -20,7 +21,6 @@ const DOCS = [
   "config/README.md",
   ...SPANISH_DOCS,
   ...globSync("docs/**/*.md", { cwd: ROOT }),
-  ...globSync(".claude/rules/*.md", { cwd: ROOT }),
 ];
 
 const read = (p: string): string => readFileSync(resolve(ROOT, p), "utf8");
@@ -157,27 +157,21 @@ describe("documentation", () => {
   });
 
   /**
-   * The rules in `.claude/rules/` are loaded by the agent on its own (ADR-0065), and that is the
-   * trap: nothing fails when one stops being loaded. If somebody imports one from CLAUDE.md, the
-   * same text enters the context twice; if a `paths:` header points at a directory that was
-   * renamed, the rule exists, reads fine, and never applies.
+   * The agent rules left this repository (ADR-0071). Two things break that without anybody noticing:
+   * a `git add -f` or a `!.claude/` line that versions them again, and a document that still sends
+   * the reader to a `.claude/rules/` a clean clone does not have. The records of what happened —
+   * the ADRs and the CHANGELOG — are history and may name the old path.
    */
-  it("the rules load as rules: not imported twice, not pointing at nothing", () => {
-    const rules = globSync(".claude/rules/*.md", { cwd: ROOT }).map((f) => f.replaceAll("\\", "/"));
-    expect(rules.length, "there are no rules to load").toBeGreaterThan(0);
+  it("the agent rules are not versioned here, and no current document says they are", () => {
+    const tracked = execFileSync("git", ["ls-files", ".claude"], { cwd: ROOT, encoding: "utf8" }).trim();
+    expect(tracked, "files under .claude/ are versioned again").toBe("");
 
-    const imported = [...read("CLAUDE.md").matchAll(/^@(\S*\.claude\/rules\/\S+\.md)$/gm)].map((m) => m[1]!);
-    expect(imported, "CLAUDE.md imports them and the agent already loads them: they would enter twice").toEqual([]);
+    const reincluded = read(".gitignore").split("\n").filter((line) => line.startsWith("!.claude/"));
+    expect(reincluded, ".gitignore re-includes part of .claude/").toEqual([]);
 
-    // Only the literal part of each glob is checked: "apps/web/**/*.ts" -> "apps/web".
-    const orphans: string[] = [];
-    for (const rule of rules) {
-      const frontmatter = /^---\n([\s\S]*?)\n---/.exec(read(rule))?.[1];
-      for (const m of frontmatter?.matchAll(/^\s*-\s*"([^"]+)"/gm) ?? []) {
-        const base = m[1]!.split("*")[0]!.replace(/\/[^/]*$/, "");
-        if (base && !existsSync(resolve(ROOT, base))) orphans.push(`${rule} -> ${m[1]}`);
-      }
-    }
-    expect(orphans, "a paths: that does not exist is a rule that never applies").toEqual([]);
+    const history = new Set(["CHANGELOG.md", "docs/decisions.md"]);
+    const current = [...DOCS.filter((d) => !history.has(d)), "evals/README.md"];
+    const pointing = current.filter((d) => read(d).includes(".claude/rules"));
+    expect(pointing, "these documents point at a .claude/rules/ a clone does not have").toEqual([]);
   });
 });

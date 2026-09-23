@@ -47,15 +47,6 @@ config/skills/*/*.zip
 # repository (ADR-0059): whoever clones this and wants their own memory should not have to
 # fight a versioned file. `cortex link` creates it on its own.
 .cortex.json
-# What Cortex installs into Claude Code for THIS repo (rules, command and skill) IS versioned:
-# it is part of how the work is done here (ADR-0065). It has to be spelled out because the global
-# .gitignore on almost any machine ignores `.claude/`, and re-including a file does not work while
-# the directory holding it is still excluded: the directory has to be un-excluded first. Anything
-# personal (settings.local.json) stays out by not being on the list.
-!.claude/
-!.claude/rules/
-!.claude/rules/*.md
-!.claude/commands/
-!.claude/commands/*.md
-!.claude/skills/
-!.claude/skills/**
+# The agent rules for this repository are not versioned here (ADR-0071). A checkout that wants them
+# gets `.claude/` as a symlink or a copy, and nothing under it may be re-included.
+.claude/

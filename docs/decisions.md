@@ -67,6 +67,8 @@ explanations only its authors can read.
 an agent works by moved out of one long document and into a file per subject, some of which load
 only when the part of the tree they cover is opened, and two conventions that had been followed
 without ever being stated — formatting, and where `any` is allowed — were finally given an answer.
+Five days later the rule files left the repository for a private one ([0071](#adr-0071)); the
+decisions they carried stay recorded here.
 
 > **Why records 0036–0047 carry late numbers for early decisions.** They were written on the
 > dates above but never given a number, so nothing could cite them — two were already referred
@@ -1915,9 +1917,11 @@ without ever being stated — formatting, and where `any` is allowed — were fi
 
 ## ADR-0065 · Rules for agents live in `.claude/rules/`, and two unwritten conventions get an answer
 
-- **Status:** revised (2026-09-22). Points 2 and 3 stand as written. Point 1's count does not:
-  comments moved out of TypeScript style into an always-loaded rule of their own, so five files
-  load every session and four carry a `paths:` header ([0070](#adr-0070)).
+- **Status:** revised (2026-09-22, 2026-09-23). Points 2 and 3 stand as written, and this record
+  is now where they are written down. Point 1 does not: first its count changed — comments moved
+  out of TypeScript style into an always-loaded rule of their own ([0070](#adr-0070)) — and then
+  its premise did, because the rule files are no longer versioned in this repository
+  ([0071](#adr-0071)).
 - **Context:** `CLAUDE.md` was the only written guidance for an agent working in this repository,
   and it had grown to 11.6 KB while still leaving out most of what an agent actually needs to get
   right: how a route, a command or a screen is written here, when to throw and when to return,
@@ -2263,7 +2267,9 @@ without ever being stated — formatting, and where `any` is allowed — were fi
 
 ## ADR-0070 · Comments are a rule of their own, and the bar is Clean Code's
 
-- **Status:** accepted (2026-09-22).
+- **Status:** revised (2026-09-23). The bar stands as written. Where it is written does not: the
+  rule file left the repository with the rest ([0071](#adr-0071)), so the bar is recorded here and
+  nowhere else in the tree.
 - **Context:** what a comment is for was three bullets inside `typescript-style.md`, which carries
   `paths: "**/*.ts"`. Two problems followed from that. It loaded only when a TypeScript file was
   opened, so a migration, a shell script or a skill got no guidance at all; and, being three
@@ -2300,3 +2306,61 @@ without ever being stated — formatting, and where `any` is allowed — were fi
   rule then needs the examples it currently only gestures at; or the always-loaded set grows to the
   point where the rules themselves crowd out the context pack, at which point what loads always and
   what loads by path is the thing to redecide, not this.
+
+<a id="adr-0071"></a>
+
+## ADR-0071 · The agent rules are not versioned in this repository
+
+- **Status:** accepted (2026-09-23). Revises [0065](#adr-0065) point 1 and where [0070](#adr-0070)
+  is written down.
+- **Context:** since [0065](#adr-0065) the rules an agent works by lived in `.claude/rules/`, one
+  file per subject, versioned here and described as written "for anyone". Two symlinks sat next to
+  them, `.claude/skills/cortex-capture` and `.claude/commands/cortex-save.md`, pointing into
+  `plugin/claude-code/`. The maintainers decided to keep that directory with the rest of their
+  agents' configuration, in a private repository, rather than in this one. Versioning it had also
+  meant a `.gitignore` that un-excluded `.claude/` path by path, because most global ignore files
+  exclude it. This was decided knowing it reverses a record written five days earlier and revised
+  the day before, and that it takes out of a public repository rules written for anyone.
+- **Decision:**
+  1. `.claude/` is **not versioned**. Its content lives in a private repository, and a maintainer's
+     checkout sees it through a symlink. `CLAUDE.md`, `CONTRIBUTING.md` and the rest of the tree
+     stop sending the reader to a `.claude/rules/` a clone does not have.
+  2. It is ignored in **`.gitignore`**, as `.claude/`, and nothing under it is re-included. The
+     alternative was `.git/info/exclude`, which is what hides the worktree tooling's own
+     configuration ([0026](#adr-0026)). That one is local to each clone, and the difference is the
+     point: the entry has to hold for **anyone** who clones, so that a contributor's own `.claude/`
+     never shows up as untracked or gets committed by accident, and a line saying ".claude is not
+     ours to version" describes the repository, not how its maintainers operate.
+  3. A test keeps it that way: it fails if anything under `.claude/` is versioned again, if
+     `.gitignore` re-includes part of it, or if a current document — anything but this log and the
+     CHANGELOG, which record what happened — names `.claude/rules`. The test that guarded the rule
+     files themselves (none imported from `CLAUDE.md`, no `paths:` pointing at nothing) is gone:
+     with no files in the tree it would have passed over an empty set, checking nothing.
+- **Consequences:**
+  - A contributor, and any agent they run, **no longer receives the rules on clone**. What still
+    binds a change in the tree is `CONTRIBUTING.md`, this log — [0065](#adr-0065) keeps the
+    formatting and `any` conventions, [0070](#adr-0070) the bar for comments — and the tests. The
+    per-area detail (how a route, a command or a screen is written here) has no public copy.
+  - The rules are **not reviewed with the code**. A change to a convention and the code that
+    follows it can no longer land in one pull request, and nobody outside sees a rule change at
+    all.
+  - The skill and the command are no longer live in a checkout without installing the plugin,
+    which is what the two symlinks were for.
+  - **Worktrees.** A `git worktree` is a clean checkout, and what git ignores does not travel.
+    Until now the rules reached every worktree because they were versioned; the symlink in the main
+    checkout is not replicated either. The worktree tooling used here copies the files it is told
+    to from the main checkout when it creates one, so the rule files are on that list, next to its
+    own configuration, and a worktree starts with a copy of them. The list is per file and lives in
+    the private copy: **a new rule has to be added to it**, or worktrees silently work without it,
+    and nothing in this repository can check that.
+- **Alternatives:** keep `.claude/rules/` versioned ([0065](#adr-0065)) — the public option,
+  declined for the reasons above; ignore it in `.git/info/exclude` — it would not hold for anyone
+  else's clone, see point 2; move the rules' content into `CONTRIBUTING.md` — it would keep them
+  public, which is the opposite of the decision; a git submodule pointing at the private
+  repository — a clone would carry a reference it cannot resolve, and every checkout would have
+  to be told to skip it.
+- **Revisit when:** outside contributions arrive and diverge on something a rule covered, which is
+  the cost of the per-area detail having no public copy; a worktree turns out to have worked
+  without a rule that existed, which is the per-file list failing silently, at which point the
+  tooling should copy the directory rather than a list; or the rules stop changing faster than the
+  code, which removes the reason for keeping them apart.

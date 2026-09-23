@@ -63,8 +63,8 @@ CLI.
 cycle. The intelligence is **injected**: every entrypoint calls `wireLlm()` (from
 `@cortex/agents`) after `loadEnv()`, wiring `setClassifier` / `setReranker` / `setReconciler`
 and the embeddings usage sink. If an operation in core needs an LLM, define the hook in core
-and wire it in `wire.ts`. The full table — which package may import which, where side effects
-are allowed — is in [`CLAUDE.md`](./CLAUDE.md).
+and wire it in `wire.ts`. The boundary the CLI depends on — no Postgres, no Mastra, no embeddings
+— is held by `tests/client-package.test.ts`.
 
 ## Common recipes
 
@@ -155,11 +155,10 @@ Documentation is part of the work, not an extra:
 - **`docs/research/`** — the investigation behind decisions.
 - **`CLAUDE.md`** — the guide for AI agents working on this repository. Keep it current, and
   prune it now and then so it does not drift into noise.
-- **`.claude/rules/`** — one file per subject: architecture, language, tests and documentation,
-  plus one per area of the tree (TypeScript style, HTTP and MCP, CLI, web, the LLM layer), those
-  scoped by a `paths:` header. They are written for a coding agent, which loads them
-  automatically, but they hold for anyone ([ADR-0065](./docs/decisions.md#adr-0065)). A convention
-  that changes is changed there — and a rule that can be checked belongs in a test instead.
+- **Conventions** — in this guide. The maintainers' coding agents also work from a more detailed
+  set of rules kept outside this repository ([ADR-0071](./docs/decisions.md#adr-0071)); a clone
+  does not get them and does not need them. A convention that changes is changed here — and a rule
+  that can be checked belongs in a test instead.
 
 ## Publishing a release
 

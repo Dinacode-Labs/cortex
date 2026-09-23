@@ -45,8 +45,3 @@ installed -- with no access to the repo, for instance -- it falls back to hooks 
 `.cortex.json`, which `cortex link` creates. With no link, nothing is injected and nothing is
 captured.
 
-## In this repo itself
-
-`.claude/skills/cortex-capture` and `.claude/commands/cortex-save.md` are symlinks into
-`plugin/claude-code/`, so the skill can be worked on and seen live without installing the
-plugin.

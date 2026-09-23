@@ -22,7 +22,7 @@ a model, so they need a real provider, they cost money and minutes, and they are
 hand — CI never runs one. What does run on every commit is what guards them, with no model
 involved: `tests/eval-retrieval-score.test.ts` and `tests/eval-distill-matcher.test.ts` mark the
 markers, `tests/eval-retrieval-fixture.test.ts` and `tests/eval-distill-fixture.test.ts` mark
-these sets. How one of these is built, and what has to be true of it: `.claude/rules/evals.md`.
+these sets.
 
 ## Why an invented corpus and not the real memory
 
