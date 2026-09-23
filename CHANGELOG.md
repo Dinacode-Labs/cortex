@@ -9,6 +9,14 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **A project's memory can be ordered by when entries were added or last updated.** A row of pills
+  under the type and status filters on `/p/<slug>` picks newest or oldest added, and most or least
+  recently updated; each card shows the date it is ordered by, and the order survives a change of
+  filter (and the filters a change of order). The URL carries it as `?sort=created|updated&dir=asc|desc`;
+  without `sort` the page keeps its old order, newest added first. The order is applied in the
+  query, so "oldest added" is the oldest in the project, not the oldest of the 60 that fit on the
+  page. "Updated" means any write to the entry — validating it, recomputing its confidence or a
+  reconciliation — not only an edit by a person.
 - **An entry can be purged for good.** What should never have been remembered — a lab session
   distilled into a real project, entries about files that do not exist — no longer has to stay as
   `rejected`, still linked and still counted. Whoever manages the project purges it from the

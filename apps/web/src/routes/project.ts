@@ -3,9 +3,13 @@ import { html } from "hono/html";
 import {
   contextEntryStatus,
   contextEntryType,
+  entrySortField,
   getBrandName,
+  sortDirection,
   type ContextEntryStatus,
   type ContextEntryType,
+  type EntrySortField,
+  type SortDirection,
 } from "@cortex/shared";
 import {
   getAcrossClient,
@@ -15,6 +19,7 @@ import {
   listEntries,
   renderContextPack,
   searchProjectCode,
+  type EntrySort,
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
@@ -48,13 +53,24 @@ projectRoutes.get("/p/:slug", async (c) => {
   const type: ContextEntryType | undefined = typeParsed.success ? typeParsed.data : undefined;
   const statusParsed = contextEntryStatus.safeParse(c.req.query("status"));
   const status: ContextEntryStatus | undefined = statusParsed.success ? statusParsed.data : undefined;
+  const sortParsed = entrySortField.safeParse(c.req.query("sort"));
+  const sort: EntrySortField | undefined = sortParsed.success ? sortParsed.data : undefined;
+  const dirParsed = sortDirection.safeParse(c.req.query("dir"));
+  const dir: SortDirection | undefined = sort && dirParsed.success ? dirParsed.data : undefined;
+  const effectiveSort: EntrySort = { by: sort ?? "created", dir: dir ?? "desc" };
   const showCapture = c.req.query("capture") === "1";
 
-  const entries = await listEntries({ project: project.name, type, status, limit: 60 });
+  const entries = await listEntries({ project: project.name, type, status, sort: effectiveSort, limit: 60 });
   const healths = await Promise.all(children.map((h) => projectHealth(h.name)));
   const base = `/p/${project.slug}`;
   const withFilters = (extra: Record<string, string>) => {
-    const qs = new URLSearchParams({ ...(type ? { type } : {}), ...(status ? { status } : {}), ...extra });
+    const qs = new URLSearchParams({
+      ...(type ? { type } : {}),
+      ...(status ? { status } : {}),
+      ...(sort ? { sort } : {}),
+      ...(dir ? { dir } : {}),
+      ...extra,
+    });
     for (const [k, v] of [...qs]) if (!v) qs.delete(k);
     return qs.toString() ? `${base}?${qs}` : base;
   };
@@ -73,6 +89,17 @@ projectRoutes.get("/p/:slug", async (c) => {
       (x) => html`<a class="pill ${status === x ? "active" : ""}" href="${withFilters({ status: x })}">${x}</a>`,
     ),
   ];
+
+  const sortOptions: (EntrySort & { label: string })[] = [
+    { by: "created", dir: "desc", label: "Newest added" },
+    { by: "created", dir: "asc", label: "Oldest added" },
+    { by: "updated", dir: "desc", label: "Recently updated" },
+    { by: "updated", dir: "asc", label: "Least recently updated" },
+  ];
+  const sortPills = sortOptions.map(
+    (o) =>
+      html`<a class="pill ${effectiveSort.by === o.by && effectiveSort.dir === o.dir ? "active" : ""}" href="${withFilters({ sort: o.by, dir: o.dir })}">${o.label}</a>`,
+  );
 
   const captureForm = showCapture
     ? panel(
@@ -125,11 +152,12 @@ projectRoutes.get("/p/:slug", async (c) => {
     ${captureForm}
     <div class="filters">${joinHtml(typePills, "")}</div>
     <div class="filters">${joinHtml(statusPills, "")}</div>
+    <div class="filters">${joinHtml(sortPills, "")}</div>
     ${entries.length
-      ? html`<div class="grid">${entries.map(entryCard)}</div>`
+      ? html`<div class="grid">${entries.map((e) => entryCard(e, effectiveSort.by))}</div>`
       : empty(
           type ? html`Nothing of type <b>${type}</b> here yet.` : "Nothing here yet.",
-          type ? html`<a class="button secondary" href="${base}">Show all types</a>` : html`<a class="button" href="${base}?capture=1">Add the first entry</a>`,
+          type ? html`<a class="button secondary" href="${withFilters({ type: "" })}">Show all types</a>` : html`<a class="button" href="${base}?capture=1">Add the first entry</a>`,
         )}`;
   return c.html(layout(project.name, body, { user }));
 });

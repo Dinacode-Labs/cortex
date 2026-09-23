@@ -1,6 +1,6 @@
 import { html, raw } from "hono/html";
 import type { AccessibleProject } from "@cortex/core";
-import type { ContextEntry } from "@cortex/shared";
+import type { ContextEntry, EntrySortField } from "@cortex/shared";
 import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
 
@@ -83,13 +83,20 @@ export function warn(message: Html | string, kind: "notice" | "contradiction" = 
   return html`<div class="warn ${kind === "contradiction" ? "contradiction" : ""}">${message}</div>`;
 }
 
-export function entryCard(entry: ContextEntry): Html {
+export function entryCard(entry: ContextEntry, dated?: EntrySortField): Html {
   return html`<a class="card" href="/entry/${entry.id}">
     <div class="card-head">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)}</div>
     <h3>${entry.title}</h3>
     <p>${entry.summary ?? entry.content}</p>
+    ${dated ? entryDate(entry, dated) : ""}
     ${entry.sourceReference ? html`<div class="src">${entry.sourceReference}</div>` : ""}
   </a>`;
+}
+
+function entryDate(entry: ContextEntry, field: EntrySortField): Html {
+  const iso = (field === "updated" ? entry.updatedAt : entry.createdAt).toISOString();
+  const label = field === "updated" ? "Updated" : "Added";
+  return html`<div class="card-date">${label} <time datetime="${iso}">${iso.slice(0, 16).replace("T", " ")} UTC</time></div>`;
 }
 
 /**
