@@ -75,9 +75,8 @@ describe("createMcpProxy", () => {
   });
 
   /**
-   * The read tools reach Claude Code already loaded only because of their `_meta` (ADR-0075), and
-   * every Claude Code session goes through this proxy. Were the client-side schema to drop the keys
-   * it does not know, the server would declare them and no agent would ever see them.
+   * Every Claude Code session goes through this proxy: if the client schema dropped `_meta`, the
+   * server would mark the read tools and no agent would ever see it (ADR-0075).
    */
   it("forwards each tool's _meta untouched", async () => {
     const up = new McpServer({ name: "cortex-upstream", version: "0.0.0" });

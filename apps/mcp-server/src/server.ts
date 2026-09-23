@@ -22,11 +22,6 @@ import { askProjectContext } from "@cortex/agents";
 import { z } from "zod";
 import { createRequire } from "node:module";
 
-/**
- * When `user` is passed (the authenticated HTTP transport), the tools
- * **attribute** writes (`created_by`=email) and **apply permissions** (project access);
- * without `user` (local stdio) they behave as before.
- */
 /** The version the MCP announces comes from its own package.json: lying about it confuses the client. */
 const VERSION: string = (() => {
   try {
@@ -36,10 +31,7 @@ const VERSION: string = (() => {
   }
 })();
 
-/**
- * Claude Code defers MCP tools behind ToolSearch, and an agent that has to load a tool before
- * calling it reaches for `Bash` instead. Only the read tools skip the queue (ADR-0075).
- */
+// A deferred tool has to be found with ToolSearch first, and agents reached for Bash instead (ADR-0075).
 const ALWAYS_LOAD_IN_CLAUDE_CODE = { "anthropic/alwaysLoad": true };
 
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
@@ -51,10 +43,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   // which is why the wording is the shared one and not a second version of it.
   const server = new McpServer({ name: "cortex", version: VERSION }, { instructions: MCP_INSTRUCTIONS });
 
-  // Project access permission (only when there is an authenticated user; without `user` --
-  // local stdio -- no guards apply). It returns the denial message, or null when the call may
-  // proceed. On READS a non-existent project is rejected (`not_found`); WRITES by name pass
-  // `allowMissing` because save auto-creates the project (see the ADR).
+  // Writes pass `allowMissing` because saving to a project that does not exist yet creates it.
   const guard = async (project?: string, opts?: { allowMissing?: boolean }): Promise<string | null> => {
     if (!user || !project) return null;
     const access = await checkProjectAccess(user.email, { name: project });
@@ -102,9 +91,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       try {
         const denied = await guard(args.project);
         if (denied) return errorText(denied);
-        // With a user (authenticated HTTP) and no concrete project, the search is restricted
-        // to accessible projects (so other people's private ones do not leak). Without `user`
-        // (trusted local stdio) it searches everything, as before.
+        // With no project named, other people's private projects would leak into the results.
         const hits = user ? await searchContext(args, { restrictToAccessibleOf: user.email }) : await searchContext(args);
         return text(renderSearchHits(hits));
       } catch (e) {
@@ -213,9 +200,6 @@ export function buildMcpServer(user?: AuthUser): McpServer {
       try {
         const denied = await guard(project);
         if (denied) return errorText(denied);
-        // Orchestration shared with the web (/ask): retrieve plus synthesise (@cortex/agents).
-        // With a user and no concrete project it restricts to accessible projects (P0);
-        // `undefined` as the limit keeps the default (6). Without `user` (stdio), unchanged.
         const { answer, hits } = await askProjectContext(
           question,
           project,
