@@ -220,6 +220,16 @@ form.row input[type=text], form.row input[type=search], form.row input[type=emai
   font-family:var(--mono); font-size:var(--t-xs); color:var(--faint);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
+.card-select { position:relative; }
+.card-select .card { height:100%; }
+.card-select .card-head { padding-right:var(--s-5); }
+.card-pick { position:absolute; top:var(--s-4); right:var(--s-4); z-index:1; width:16px; height:16px;
+  margin:0; accent-color:var(--danger); cursor:pointer; }
+.card-select:has(.card-pick:checked) .card { border-color:var(--danger); background:var(--danger-soft); }
+.select-bar { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; margin-bottom:var(--s-3); }
+.select-bar button { margin-left:auto; }
+button:disabled { opacity:.5; cursor:not-allowed; }
+
 .empty {
   padding:var(--s-6) var(--s-5); text-align:center; color:var(--muted);
   background:var(--surface); border:1px dashed var(--line-strong); border-radius:var(--r-xl);

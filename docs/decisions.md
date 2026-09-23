@@ -2421,3 +2421,38 @@ decisions they carried stay recorded here.
   more than ids; purges turn out to be routine rather than exceptional, which would mean capture
   is letting in what it should not and the fix belongs there; or agents need to retract their
   own captures, which would be a narrower tool than this one.
+
+<a id="adr-0073"></a>
+
+## ADR-0073 · Deleting entries in bulk from the UI: a confirmation page, and scripts only as enhancement
+
+- **Status:** accepted (2026-09-23). Builds on the purge in core ([0072](#adr-0072)); relaxes the
+  "one client script" line of `docs/design.md` without touching [0042](#adr-0042).
+- **Context:** a project's memory filled with ~150 entries distilled from lab sessions, and the UI
+  could only reject them one at a time — which leaves them in place, linked and counted. The purge
+  exists in core; the Memory screen had no way to reach it for many entries at once. It is the
+  most destructive action the UI offers, and the design document said `graph.js` was the only
+  client script.
+- **Decision:**
+  1. Whoever **manages** the project ([0051](#adr-0051)) gets a checkbox on every card of the
+     Memory screen and a "Purge selected…" button. Nobody else sees them, and the route checks it
+     again on the server: a forged post from a reader gets a 403.
+  2. The confirmation is a **second post**, not a browser dialog. The first shows the titles about
+     to go, how many, and that it cannot be undone; only the second, carrying `confirm=1`,
+     purges. It lists only entries of the project in the URL, whatever ids the form carried.
+     Afterwards the list comes back with the same filters and says how many went.
+  3. It works with **no JavaScript**: a form with checkboxes, and "Select all visible" is a link
+     that reloads with every box ticked. `select.js` only adds the running count and makes the
+     toggle instant. A client script is acceptable when the page does its whole job without it;
+     `graph.js` remains the only one a page depends on.
+  4. No CSRF token: like every other form in the UI, it relies on the session cookie being
+     `SameSite=Lax`, so a post from another site arrives without it.
+- **Alternatives:** a `confirm()` dialog — it needs JavaScript, and "OK" on a dialog is easy to
+  press without reading which entries it means; a soft "archive" status — [0072](#adr-0072)
+  explains why a rejected entry is not enough for what should never have been remembered;
+  selecting across pages — there is no pagination yet (`docs/design.md` §5), so "all" means the
+  60 visible.
+- **Revisit when:** the list gets pagination and someone needs to select beyond one page; a second
+  destructive bulk action appears, at which point the confirmation page becomes a component; or
+  the session cookie stops being `SameSite=Lax`, which removes the only CSRF defence the forms
+  have.
