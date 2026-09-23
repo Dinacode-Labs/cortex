@@ -12,8 +12,8 @@ import { writeBlocker } from "../compat.js";
 import { describePurgeResult, isPurgeConfirmed, PURGE_CONFIRMATION } from "../purge.js";
 
 /**
- * `cortex mem` -- the project's memory from the command line: store, search, read an entry,
- * correct it and, when it should never have been remembered, purge it.
+ * `cortex mem` -- the project's memory from the command line: store, search, read an entry and
+ * correct it.
  *
  * It exists for two reasons. One, the API could write but not read: search was only available
  * over MCP, so from a terminal there was no way to query the memory. Two, it is the bridge the
@@ -26,7 +26,6 @@ import { describePurgeResult, isPurgeConfirmed, PURGE_CONFIRMATION } from "../pu
  *   cortex mem search "<query>" [--limit 10] [--all] [--type t] [--cwd dir] [--json]
  *   cortex mem get <id> [--json]
  *   cortex mem update <id> [--title t] [--content c] [--json]
- *   cortex mem purge <id> [<id>...] [--yes] [--json]
  */
 
 function flag(args: string[], name: string): string | undefined {
@@ -199,7 +198,6 @@ async function purge(args: string[], json: boolean): Promise<void> {
   if (block) return emit({ json, ok: false, data: { error: block }, text: `✗ ${block}` });
 
   if (!args.includes("--yes")) {
-    // Irreversible, so without a person at the keyboard to ask it takes an explicit `--yes`.
     if (json || !process.stdin.isTTY) {
       return emit({ json, ok: false, data: { error: "Purging is irreversible: pass --yes" }, text: "✗ Purging is irreversible: pass --yes to confirm." });
     }

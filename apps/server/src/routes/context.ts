@@ -241,11 +241,6 @@ contextRoutes.patch("/entries/:id", async (c) => {
   return c.json({ ok: true, id });
 });
 
-/**
- * Purging entries for good (ADR-0072). Reading the entry is not enough: it takes managing the
- * project of every one of them, and a single id that is missing, unreadable or not the
- * caller's to manage purges none.
- */
 contextRoutes.post("/entries/purge", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);

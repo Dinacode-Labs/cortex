@@ -1,7 +1,6 @@
 import type { ApiResult } from "@cortex/client";
 import type { PurgeEntriesResponse } from "@cortex/shared";
 
-/** What has to be typed back before anything is purged. A `y` is too easy to give by reflex. */
 export const PURGE_CONFIRMATION = "purge";
 
 export function isPurgeConfirmed(answer: string): boolean {
@@ -13,11 +12,6 @@ export interface PurgeOutcome {
   message: string;
 }
 
-/**
- * Reads the server's answer. The one case worth care is the 404: from a server that has the
- * endpoint it names the missing ids, and from one that predates it (ADR-0062) it carries no
- * `error` at all, which is not "those entries do not exist".
- */
 export function describePurgeResult(res: ApiResult<PurgeEntriesResponse | { error?: string; missing?: string[] }>): PurgeOutcome {
   const data = (res.data ?? {}) as Partial<PurgeEntriesResponse> & { error?: string; missing?: string[] };
   if (res.ok) {

@@ -23,15 +23,6 @@ import {
 import { createApp as createServerApp } from "../../apps/server/src/app.js";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 
-/**
- * Purging an entry (ADR-0072).
- *
- * A test project went from 182 to ~330 entries in two days, nearly all distilled from lab
- * sessions, and marking them rejected left every one of them linked, counted and searchable.
- * What is tested is that a purge leaves nothing that brings the entry back -- not search, not
- * the pack, not the map, not Health, not a row pointing at it -- and that only whoever manages
- * the project can do it.
- */
 const RID = Math.random().toString(36).slice(2, 8);
 const OWNER = `purge-owner-${RID}@example.com`;
 const MEMBER = `purge-member-${RID}@example.com`;
@@ -39,8 +30,6 @@ const OUTSIDER = `purge-outsider-${RID}@example.com`;
 const MARKER = `zqpurge${RID}`;
 
 async function tokenFor(email: string): Promise<string> {
-  // The code is looked for on THIS email's line: other integration files intercept
-  // `console.log` at the same time.
   let cap = "";
   const orig = console.log;
   console.log = ((...a: unknown[]) => {

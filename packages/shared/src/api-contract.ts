@@ -171,14 +171,8 @@ export const updateEntryRequest = z
   });
 export type UpdateEntryRequest = z.infer<typeof updateEntryRequest>;
 
-/** The most ids one purge takes: enough for a whole project gone wrong, not an unbounded body. */
 export const MAX_PURGE_IDS = 500;
 
-/**
- * `POST /entries/purge` -- deletes entries for good (ADR-0072). Irreversible, so the ids are
- * checked for shape here and the server answers 404 for any it cannot find, rather than
- * purging the rest.
- */
 export const purgeEntriesRequest = z.object({
   ids: z
     .array(z.string().uuid())

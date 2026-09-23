@@ -101,10 +101,6 @@ entriesRoutes.get("/entry/:id", async (c) => {
   return c.html(layout(entry.title, body, c.get("user")));
 });
 
-/**
- * A second step rather than a `confirm()`: purging cannot be undone, so the page says what it
- * does before the button that does it, and it works without a script.
- */
 function purgeConfirmation(entryId: string) {
   return panel(
     "Purge this entry for good?",
