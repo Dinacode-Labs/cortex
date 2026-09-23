@@ -9,6 +9,14 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **An entry can be purged for good.** What should never have been remembered — a lab session
+  distilled into a real project, entries about files that do not exist — no longer has to stay as
+  `rejected`, still linked and still counted. Whoever manages the project purges it from the
+  entry's page, with `cortex mem purge <id> [<id>…]` or with `POST /entries/purge`, and it is gone
+  from search, the context pack, the map and Health, with no relation, source or entity left
+  pointing at it. An entry it had superseded becomes current again and waits for review. Only who
+  purged what and when is kept, never the text. Members who can read a project cannot purge from
+  it, and agents cannot purge at all ([ADR-0072](docs/decisions.md#adr-0072)).
 - **Updating a host is one reviewable command.** `./deploy/update.sh 0.2.0` takes a backup, pins
   `CORTEX_VERSION` in `deploy/.env`, pulls that exact image, brings everything up waiting for each
   service to report healthy, and then checks that the host really answers: `/api/health`,

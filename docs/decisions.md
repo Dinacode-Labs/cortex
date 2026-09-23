@@ -2364,3 +2364,60 @@ decisions they carried stay recorded here.
   without a rule that existed, which is the per-file list failing silently, at which point the
   tooling should copy the directory rather than a list; or the rules stop changing faster than the
   code, which removes the reason for keeping them apart.
+
+<a id="adr-0072"></a>
+
+## ADR-0072 · Purging an entry deletes it for good, and leaves only who did it and when
+
+- **Status:** accepted (2026-09-23). A deliberate exception to "invalidating is not deleting"
+  ([0012](#adr-0012)), in the spirit of [0057](#adr-0057).
+- **Context:** a test project's memory went from 182 to about 330 entries in two days, nearly
+  all distilled from the sessions of an experiment: entries that contradict each other and entries
+  about files that do not exist in that repository. Everything Cortex offered for a wrong entry
+  keeps it: `rejected` and `obsolete` are statuses, the entry is still linked to its entities,
+  still an end of its relations, still counted by Health, still findable. That is right for
+  knowledge that was once true. It is wrong for what should never have been remembered, and a
+  memory whose owner cannot take something out of it is one people stop trusting.
+- **Decision:**
+  1. **`purgeEntries(ids, byEmail)`** in `core` deletes one or several entries in one
+     transaction. It takes **managing** the project of every entry — owner or administrator,
+     `canManageProject` ([0051](#adr-0051)); an entry with no project, administrator only — and
+     one refusal purges none. Reading is not enough: a member who can see an entry cannot purge
+     it. Ids that do not exist are skipped by `core`, so purging twice is harmless; the HTTP API
+     answers 404 naming them instead, and purges nothing.
+  2. **Nothing that could bring it back is left.** Embeddings and entity links cascade. What does
+     not is cleaned by hand in the same transaction: the entry's relations (polymorphic, no
+     foreign key), its `sources` row (whose `raw_content` is a copy of the text), and the
+     entities that only it mentioned and nothing relates to (their names come from its text).
+  3. **An entry it had superseded comes back** as current and `pending_validation`. It was closed
+     on the purged entry's word; with that word withdrawn, leaving it "superseded by nothing" is
+     a state no screen can explain, and keeping it closed would silently lose what may be the
+     right answer. It waits for a person rather than being trusted. A verdict a person gave it
+     since — `rejected`, `obsolete` — stands.
+  4. **A minimal audit trail**, `entry_purges`: the entry's id, project, type, source type and
+     creation date, who purged it and when. **Not** the title or the content: keeping those would
+     make the purge a soft delete with extra steps, and the usual reason to purge is that the text
+     should not be read again. It answers "where did entry X go?", which a system built on
+     traceability must be able to answer, and nothing more. No screen reads it yet.
+  5. Reached from the **API** (`POST /entries/purge`), the **CLI** (`cortex mem purge`, which asks
+     for the word `purge` to be typed back, or `--yes` when there is no terminal) and the **entry's
+     page** (a second step that says what happens, shown only to whoever may do it). **Not from
+     the MCP**: agents write the memory, people check it ([design](design.md)), and a tool that
+     lets an agent erase what it — or another agent — got wrong would remove the evidence of the
+     mistake along with the mistake.
+- **Consequences:** a purge cannot be undone except from a backup. Two traces remain outside its
+  reach, on purpose: relations *between entities* that the graph extractor derived from the purged
+  text (they are not attributable to one entry, and with no entry linking them they no longer
+  appear on any project's map), and the AI traces and usage records of the calls that processed
+  it, which are observability of the installation, not memory. A session that was distilled is
+  not distilled again because its entries were purged: `session_captures` still says it was done.
+- **Alternatives:** a new status such as `purged`, filtered everywhere — every query would have
+  to remember it, and the first one that forgot would bring the entry back; deleting only the
+  `context_entries` row and trusting the cascades — it would leave the source text, the relations
+  and the named entities behind; leaving an entry it superseded closed — safe, but it loses
+  knowledge because of knowledge that was declared worthless; keeping the title in the audit
+  trail — more useful to read, and exactly what the purge exists to remove.
+- **Revisit when:** somebody needs to know what a purge removed, which would argue for keeping
+  more than ids; purges turn out to be routine rather than exceptional, which would mean capture
+  is letting in what it should not and the fix belongs there; or agents need to retract their
+  own captures, which would be a narrower tool than this one.
