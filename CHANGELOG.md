@@ -25,6 +25,13 @@ fixes things.
   pointing at it. An entry it had superseded becomes current again and waits for review. Only who
   purged what and when is kept, never the text. Members who can read a project cannot purge from
   it, and agents cannot purge at all ([ADR-0072](docs/decisions.md#adr-0072)).
+- **Memory sorted by date reads like a photo gallery.** Once the list is ordered by when entries
+  were added or updated, it can be cut into blocks by day, week, month or year — or kept as one
+  list — each headed with its date and how many entries it holds (`?group=week`). The choice
+  survives the type, status and order filters. Weeks start on Monday and every boundary is taken
+  in UTC, the same zone the cards print, so a block does not move with the server's clock. When
+  the page limit cuts the last block in half the heading says so rather than counting what it
+  shows as if it were all, and a **Show more** link brings the rest, up to 600 entries.
 - **Updating a host is one reviewable command.** `./deploy/update.sh 0.2.0` takes a backup, pins
   `CORTEX_VERSION` in `deploy/.env`, pulls that exact image, brings everything up waiting for each
   service to report healthy, and then checks that the host really answers: `/api/health`,

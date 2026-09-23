@@ -146,8 +146,9 @@ still true, plus what the rework did not touch.
    screen does not use them yet.
 2. **No entity pages.** Entities appear as tags that run a search. `resolveEntity`, `relate`
    and the graph all know more than the UI shows.
-3. **No pagination anywhere.** Fixed limits (60 entries, 15 results, 10 code hits) with no
-   indication that there is more.
+3. **Almost no pagination.** Fixed limits (60 entries, 15 results, 10 code hits) with no
+   indication that there is more. The one exception is Memory sorted by date: it says when the
+   page stops short, marks a date block the limit cut in half, and offers more up to 600.
 4. **No dark mode.** The palette is light-only. The layout is responsive as of the rework, so
    a phone works; a dark room does not.
 5. **The shared stack shows what the extractor wrote, noise and all.** «Across this client»
