@@ -4,24 +4,12 @@ import { resolve } from "node:path";
 import { createProject, getEntryDetail, requestOtp, saveContext, verifyOtp, type ProjectRef } from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 
-/**
- * Deleting entries in bulk from a project's Memory screen.
- *
- * A project's memory filled up with ~150 captures from lab sessions and the only way out was one
- * entry at a time. The screen now lets whoever manages the project tick them and delete them in
- * one go -- which makes it the most dangerous button in the UI, so these tests hold the three
- * things that keep it safe: a non-manager cannot do it even by forging the post, nothing goes
- * without a confirmation that says how many and that it is final, and it works with no
- * JavaScript at all.
- */
 const RID = Math.random().toString(36).slice(2, 8);
 const OWNER = `purge-owner-${RID}@example.com`;
 const VISITOR = `purge-visitor-${RID}@example.com`;
 const CSS = readFileSync(resolve(import.meta.dirname, "../../apps/web/public/styles.css"), "utf8");
 
 async function otpDe(email: string): Promise<string> {
-  // The `log` sender prints `[email:log] (subject) to <email>: ...`. The code is looked for ON
-  // THIS EMAIL'S LINE: several integration files intercept `console.log` at once.
   let cap = "";
   const orig = console.log;
   console.log = ((...a: unknown[]) => {

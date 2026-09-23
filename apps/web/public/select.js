@@ -1,5 +1,3 @@
-// Progressive enhancement for the entry selection on a project's Memory screen. Without this
-// script the form still works: the count is simply not shown and "Select all visible" reloads.
 (() => {
   const form = document.querySelector("form[data-bulk-select]");
   if (!form) return;

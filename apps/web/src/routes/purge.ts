@@ -8,11 +8,6 @@ import { projectHeader } from "../views/project-nav.js";
 import { requireProjectPage, type ProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
-/**
- * Deleting several entries of a project at once, from its Memory screen. It takes two posts on
- * purpose: the first only shows what is about to go, the second (`confirm=1`) deletes. That is
- * the confirmation, and it needs no JavaScript.
- */
 export const purgeRoutes = new Hono<WebEnv>();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,7 +20,6 @@ function selectedIds(form: PurgeForm): string[] {
   return [...new Set(values.filter((v): v is string => typeof v === "string" && UUID.test(v)))];
 }
 
-/** Where the list was, so deleting from a filtered view does not throw the filter away. */
 function listFilters(form: PurgeForm): Record<string, string> {
   const type = contextEntryType.safeParse(form.type);
   const status = contextEntryStatus.safeParse(form.status);
@@ -71,8 +65,6 @@ purgeRoutes.post("/p/:slug/purge", async (c) => {
     }
   }
 
-  // Only what is in THIS project is offered for deletion: the ids come from a form, and one that
-  // names an entry from elsewhere must not turn a click here into a deletion there.
   const details = await Promise.all(ids.map(getEntryDetail));
   const entries = details.flatMap((d) => (d && d.entry.projectId === project.id ? [d.entry] : []));
   if (entries.length === 0) return c.redirect(memoryUrl(slug, filters));

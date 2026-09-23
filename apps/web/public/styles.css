@@ -220,8 +220,6 @@ form.row input[type=text], form.row input[type=search], form.row input[type=emai
   font-family:var(--mono); font-size:var(--t-xs); color:var(--faint);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
-/* A card that can be ticked for deletion. The box sits over the card's corner rather than inside
-   the link, and a ticked card takes the danger colour so what is about to go is visible. */
 .card-select { position:relative; }
 .card-select .card { height:100%; }
 .card-select .card-head { padding-right:var(--s-5); }
