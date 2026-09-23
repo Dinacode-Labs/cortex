@@ -103,26 +103,27 @@ export function readToolsSelect(): string {
 
 export interface FirstPromptLookupOptions {
   /**
-   * The agent loads MCP tools on demand (Claude Code's `ToolSearch`), so the order starts by
-   * loading them. Default: true.
+   * The agent may have the tools deferred (Claude Code's `ToolSearch`), so the order says how to
+   * load them if they are missing. Codex has them loaded and gets no such line. Default: true.
    */
   toolSearch?: boolean;
 }
 
 /**
- * What the first message of a session gets. Claude Code defers MCP tools, so asking the memory
- * takes two decisions (load, then call) while `Bash` is already at hand: the lookup came second.
- * Writing the first action out removes both decisions (ADR-0074).
+ * What the first message of a session gets. With the tools visible, most sessions still went to
+ * the repository first; with them deferred, loading them was a second decision that lost to a
+ * `Bash` already at hand. So the search is the first action, and loading is only the fallback for
+ * a server whose tools Claude Code still defers (ADR-0074).
  */
 export function firstPromptLookup(opts: FirstPromptLookupOptions = {}): string {
-  const search = `call \`${SEARCH_TOOL}\` with the user's own words from this message as the query.`;
-  const steps =
+  const loadIfMissing =
     opts.toolSearch === false
-      ? [`1. ${search.charAt(0).toUpperCase()}${search.slice(1)}`]
-      : [`1. Run ToolSearch with exactly this query: ${readToolsSelect()}`, `2. Then ${search}`];
+      ? []
+      : [`If \`${SEARCH_TOOL}\` is not among your tools, load it first with ToolSearch and exactly this query: ${readToolsSelect()}`];
   return [
     "CRITICAL FIRST ACTION — this project has a memory. Before any Bash, Read, Grep, Glob or Agent call, and before answering the user:",
-    ...steps,
+    `Call \`${SEARCH_TOOL}\` with the user's own words from this message as the query.`,
+    ...loadIfMissing,
     lookupTrigger(),
   ].join("\n");
 }

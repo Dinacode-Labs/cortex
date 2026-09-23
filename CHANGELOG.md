@@ -12,8 +12,8 @@ fixes things.
 - **The first question of a session asks the memory before the repository.** In Claude Code and
   Codex, a new plugin hook (`cortex hook-lookup`, on `UserPromptSubmit`) tells the agent, on the
   first prompt of each session in a linked project, to search the memory with your words before
-  running any command or reading any file; in Claude Code it spells out the `ToolSearch` that loads
-  Cortex's four read tools. Later prompts get nothing, folders with no linked project get nothing,
+  running any command or reading any file. If Claude Code has not loaded Cortex's tools, it also
+  spells out the `ToolSearch` that loads the four read tools. Later prompts get nothing, folders with no linked project get nothing,
   and it needs no network. `cortex setup --no-plugin` installs it in `settings.json` too
   ([ADR-0074](docs/decisions.md#adr-0074)).
 - **A project's memory can be ordered by when entries were added or last updated.** A row of pills

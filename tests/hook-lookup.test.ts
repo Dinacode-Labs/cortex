@@ -15,12 +15,13 @@ import {
 } from "../packages/shared/src/capture-protocol.js";
 
 /**
- * With the plugin's MCP tools deferred, agents asked the memory in most sessions but only rarely
- * BEFORE their first Bash/Read/Agent: loading the tool and then calling it lost to a Bash already
- * at hand. The lookup hook writes that first action out on the first prompt of a session
- * (ADR-0074). What breaks it in silence: speaking on every prompt, speaking with no project,
- * anything on stdout that is not the protocol, and a `select:` that names a tool that does not
- * exist or one that writes.
+ * Agents rarely asked the memory BEFORE their first Bash/Read/Agent: with the tools deferred,
+ * loading them lost to a Bash already at hand, and with them visible most sessions still went to
+ * the repository first. The lookup hook makes the search the first action on the first prompt of a
+ * session, with ToolSearch only as the fallback for deferred tools (ADR-0074). What breaks it in
+ * silence: speaking on every prompt, speaking with no project, anything on stdout that is not the
+ * protocol, an order that starts with ToolSearch (a wasted call once the tools load up front), and
+ * a `select:` that names a tool that does not exist or one that writes.
  */
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -74,13 +75,19 @@ describe("the first-prompt order", () => {
     expect(names.filter((n) => /save_|validate_|lint_/.test(n) || n.endsWith(SAVE_TOOL))).toEqual([]);
   });
 
-  it("names the first action and what comes before it, in the shared wording", () => {
+  it("names the search as the first action and what comes before it, in the shared wording", () => {
     const text = firstPromptLookup();
-    expect(text).toContain(readToolsSelect());
+    const firstInstruction = text.split("\n")[1];
+    expect(firstInstruction).toMatch(new RegExp(`^Call \`${SEARCH_TOOL}\` with the user's own words`));
     expect(text).toMatch(/before any Bash, Read/i);
     expect(text).toMatch(/before answering/i);
-    expect(text).toContain(`\`${SEARCH_TOOL}\` with the user's own words`);
     expect(text).toContain(lookupTrigger());
+  });
+
+  it("keeps ToolSearch only as the fallback for tools that are not loaded, after the search", () => {
+    const text = firstPromptLookup();
+    expect(text).toContain(`If \`${SEARCH_TOOL}\` is not among your tools, load it first with ToolSearch and exactly this query: ${readToolsSelect()}`);
+    expect(text.indexOf("ToolSearch")).toBeGreaterThan(text.indexOf(`Call \`${SEARCH_TOOL}\``));
   });
 
   it("the command takes the wording from @cortex/shared rather than writing it out", () => {
