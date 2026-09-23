@@ -25,6 +25,7 @@ export { resolveEntities, type ResolveResult } from "./resolve-entities.js";
 export { readCortexLink, type CortexLink } from "@cortex/client";
 export { slugify } from "./project-config.js";
 export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, updateProject, deleteProject, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects.js";
+export { purgeEntries, canManageEntryProject, type PurgeResult } from "./purge.js";
 export {
   isNearDuplicate,
   findNearest,
