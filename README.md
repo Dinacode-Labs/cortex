@@ -339,7 +339,8 @@ Cortex ships **its own** pieces, the MCP with the 8 tools, the `cortex-recall` a
 [Claude Code plugin](./plugin/claude-code), which
 `cortex setup` installs. Codex reads the same marketplace and takes the same plugin. The
 other agents are configured through their own native mechanism by the same command. The
-plugin also carries the two hooks that close the loop.
+plugin also carries the hooks that close the loop, and one that points the first question of a
+session at the memory.
 
 **The lookup protocol.** Injecting the memory is not the same as the agent using it. The pack is a
 sample, and it says so where it cannot be missed: its header gives both numbers
@@ -347,7 +348,10 @@ sample, and it says so where it cannot be missed: its header gives both numbers
 rest back — **+11 more** not shown (`type: "convention"`). The `cortex-recall` skill fires on a
 question about the project — including when the repository looks like it already answers, because
 `.claude/`, the README and the ADRs hold the **rules** while the memory holds what the project
-learned the hard way ([ADR-0069](./docs/decisions.md#adr-0069)).
+learned the hard way ([ADR-0069](./docs/decisions.md#adr-0069)). And because agents still
+reach for the files first, the first prompt of each session gets its first action written out —
+search the memory with the user's words, before any command or file read, loading Cortex's read
+tools first if Claude Code has not ([ADR-0074](./docs/decisions.md#adr-0074)).
 
 **The capture protocol.** Injecting the memory is the easy half. The other half is getting the
 agent to write back **at the moment it learns something**, which is when the reason is still on

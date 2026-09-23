@@ -15,6 +15,13 @@ fixes things.
   ask the memory anything. The write and maintenance tools stay deferred. It takes an updated
   server; the CLI needs no update, and other MCP clients ignore the marker
   ([ADR-0075](docs/decisions.md#adr-0075)).
+- **The first question of a session asks the memory before the repository.** In Claude Code and
+  Codex, a new plugin hook (`cortex hook-lookup`, on `UserPromptSubmit`) tells the agent, on the
+  first prompt of each session in a linked project, to search the memory with your words before
+  running any command or reading any file. If Claude Code has not loaded Cortex's tools, it also
+  spells out the `ToolSearch` that loads the four read tools. Later prompts get nothing, folders with no linked project get nothing,
+  and it needs no network. `cortex setup --no-plugin` installs it in `settings.json` too
+  ([ADR-0074](docs/decisions.md#adr-0074)).
 - **A project's memory can be ordered by when entries were added or last updated.** A row of pills
   under the type and status filters on `/p/<slug>` picks newest or oldest added, and most or least
   recently updated; each card shows the date it is ordered by, and the order survives a change of

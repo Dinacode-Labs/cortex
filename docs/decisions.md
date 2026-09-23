@@ -2457,12 +2457,71 @@ decisions they carried stay recorded here.
   the session cookie stops being `SameSite=Lax`, which removes the only CSRF defence the forms
   have.
 
+<a id="adr-0074"></a>
+
+## ADR-0074 · The first prompt of a session writes the lookup out as the agent's first action
+
+- **Status:** proposed (2026-09-23), a hypothesis awaiting its measurement. Builds on
+  [0069](#adr-0069). Its sister decision, 0075 (in its own change), marks the read tools
+  `alwaysLoad` on the MCP server.
+- **Context:** the injected material already asks for the lookup, and the `cortex-recall` skill
+  fires on questions about the project. With them, agents asked the memory at some point in most
+  sessions, but **before their first Bash, Read or Agent call** in only 2 sessions out of 25:
+  the typical order was text → Bash → ToolSearch → `search_project_context`, so the memory
+  arrived second, after the agent had already formed a view from the files. Claude Code defers MCP
+  tools, so asking the memory took two decisions (load the tool, then call it) that competed with
+  a Bash already at hand. A second run with the tools **visible from the start** (not deferred)
+  and no skill raised it to 11 out of 25 (Fisher p = 0.008), with no ToolSearch in any session:
+  deferral is the main barrier, and the sister decision 0075 removes it by marking the read tools
+  `alwaysLoad`. But 14 out of 25 still went to the repository first with the tools in plain
+  sight. That remainder is what this hook is for.
+- **Decision:**
+  1. A `UserPromptSubmit` hook, `cortex hook-lookup`, in the plugin and in `cortex setup`'s
+     settings.json mode. On the **first prompt of a session** in a linked project it injects,
+     through `additionalContext`, an imperative order whose first action is to call
+     `search_project_context` with the user's own words, before any Bash/Read/Grep/Glob/Agent and
+     before answering.
+  2. `ToolSearch` is only the **fallback**: if `search_project_context` is not among the agent's
+     tools, load it first with a literal `select:` of the four **read** tools
+     (`search_project_context`, `ask_project_context`, `get_project_context_pack`,
+     `list_project_decisions`). With 0075 deployed, starting with `ToolSearch` would
+     be a wasted call; against a server without it the tools are still deferred and the load is
+     still needed. One wording serves both.
+  3. The `select:` lists both of Claude Code's prefixes (`mcp__cortex__`, the MCP added by hand,
+     and `mcp__plugin_cortex_cortex__`, the plugin's): `select:` skips names that do not exist.
+     No write tool is loaded: the order is to read.
+  4. The action forced is a **search with the user's words**, not the pack: what is being chased
+     is the pack not holding the entry the question needs.
+  5. On every later prompt, nothing. The first prompt is known by a marker per session id in
+     the temp directory, created with `O_EXCL`: no network, no server, one `open` per prompt.
+     With no session id, nothing is said.
+  6. Only `additionalContext`: on this event a `systemMessage` is shown in the terminal and does
+     not reach the model. Codex installs the same plugin and has its MCP tools loaded, so it gets
+     the order without the fallback line.
+  7. The wording lives in `packages/shared/src/capture-protocol.ts` (`firstPromptLookup`), like
+     the rest of the protocol ([0066](#adr-0066)).
+- **Alternatives:** starting the order with `ToolSearch` (this decision's first version) — right
+  while the tools are deferred, a wasted call once they are not, and the second run showed
+  deferral is not the whole problem. The hook runs the search against the server and injects the
+  results — it removes the decision altogether, but it puts a network round trip in front of every
+  first message, needs the same timeout discipline as `hook-context`, and a query written by the
+  user is not always the best one; it is the next step if this one is not enough. Reminding on
+  every prompt — noise that trains the agent to skip it. Forcing the pack or every tool — the pack
+  is already injected at session start, and loading write tools invites writes nobody asked for.
+  Adding the tools to `permissions.allow` — a separate question, left out.
+- **Revisit when:** the next run is in: `alwaysLoad` (0075) plus this hook, against
+  a frozen memory. The metric is "asks Cortex before the first Bash/Read/Agent", 2 out of 25 with
+  the tools deferred and 11 out of 25 with them visible. If it does not clearly rise above 11, or
+  if the hook moves on to running the search on the server itself, this decision is revisited.
+  Also when every server a client talks to has 0075, which leaves the fallback line
+  with nothing to do.
+
 <a id="adr-0075"></a>
 
 ## ADR-0075 · The read tools load from the first turn in Claude Code, and only they do
 
 - **Status:** accepted as a hypothesis (2026-09-23), pending a measured batch. Complements the
-  first-prompt lookup hook, proposed separately; builds on [0069](#adr-0069).
+  first-prompt lookup hook of [0074](#adr-0074); builds on [0069](#adr-0069).
 - **Context:** Claude Code defers MCP tools: only their names reach the model, and a tool has to be
   loaded with `ToolSearch` before it can be called. In two batches of 25 sessions asking about a
   linked project, **every** session that consulted Cortex had called `ToolSearch` first, and
@@ -2492,10 +2551,11 @@ decisions they carried stay recorded here.
   - The CLI proxy adding the `_meta` itself, so it works against older servers — it would make the
     proxy know which tools exist and which read, which it deliberately does not (it forwards
     without knowing the tools in advance), and two places would decide the same thing.
-  - The first-prompt lookup hook is a complement, not an alternative: the hook asks for the
-    lookup, this removes the step that made the lookup cost two decisions. Where the tools are
-    already loaded, the hook's `ToolSearch` step is harmless.
-- **Revisit when:** the next batch — `alwaysLoad` plus the first-prompt hook, with the memory frozen —
+  - The first-prompt lookup hook ([0074](#adr-0074)) is a complement, not an alternative: the hook
+    asks for the lookup, this removes the step that made the lookup cost two decisions. The hook
+    keeps `ToolSearch` only for when the search tool is missing, which with this marker is an
+    older server.
+- **Revisit when:** the next batch — `alwaysLoad` plus the [0074](#adr-0074) hook, with the memory frozen —
   says whether consulting before the repository gets close to the 11/25 of undeferred tools, or
   goes past it. If it stays near 2–4/25, the marker is not reaching the agent or is not what
   mattered. Also when Claude Code changes how it reads `anthropic/alwaysLoad`, or when the MCP

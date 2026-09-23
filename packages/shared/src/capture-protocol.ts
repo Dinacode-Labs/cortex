@@ -87,3 +87,38 @@ export const MCP_INSTRUCTIONS = [
   captureTrigger(),
   CAPTURE_DO_NOT_SAVE,
 ].join(" ");
+
+/** None of them writes, so forcing them on an agent costs nothing but a call. */
+export const READ_TOOLS = [SEARCH_TOOL, "ask_project_context", "get_project_context_pack", "list_project_decisions"] as const;
+
+/**
+ * Claude Code names an MCP tool after where it was registered: `cortex mcp` added by hand, or the
+ * plugin. `ToolSearch` with `select:` skips the names that do not exist, so listing both is safe.
+ */
+export const CLAUDE_MCP_PREFIXES = ["mcp__cortex__", "mcp__plugin_cortex_cortex__"] as const;
+
+export function readToolsSelect(): string {
+  return `select:${CLAUDE_MCP_PREFIXES.flatMap((prefix) => READ_TOOLS.map((tool) => prefix + tool)).join(",")}`;
+}
+
+export interface FirstPromptLookupOptions {
+  /** Codex has the tools loaded and needs no line on loading them. Default: true. */
+  toolSearch?: boolean;
+}
+
+/**
+ * Search first: even with the tools visible most sessions went to the repository first. Loading
+ * them is only the fallback for a server whose tools Claude Code still defers (ADR-0074).
+ */
+export function firstPromptLookup(opts: FirstPromptLookupOptions = {}): string {
+  const loadIfMissing =
+    opts.toolSearch === false
+      ? []
+      : [`If \`${SEARCH_TOOL}\` is not among your tools, load it first with ToolSearch and exactly this query: ${readToolsSelect()}`];
+  return [
+    "CRITICAL FIRST ACTION — this project has a memory. Before any Bash, Read, Grep, Glob or Agent call, and before answering the user:",
+    `Call \`${SEARCH_TOOL}\` with the user's own words from this message as the query.`,
+    ...loadIfMissing,
+    lookupTrigger(),
+  ].join("\n");
+}
