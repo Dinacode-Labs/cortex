@@ -56,6 +56,12 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **A clone no longer brings the agent rules.** `.claude/` is not versioned any more and is
+  ignored in `.gitignore`: a contributor gets no `.claude/rules/` on clone, and the agent they run
+  here works from `CLAUDE.md`, `CONTRIBUTING.md`, the ADRs and the tests. A `.claude/` of your own
+  in the checkout is yours and never shows up as untracked. The skill and the command are no longer
+  symlinked into the checkout; install the plugin to use them
+  ([ADR-0071](docs/decisions.md#adr-0071)).
 - **The lint's duplicates are duplicates again, and it says how many entries nobody has ever
   reviewed.** An ingested file becomes several overlapping chunks, each one its own entry; they
   resemble each other by construction ("Doc (1/4)" against "Doc (2/4)"), so they took the top of

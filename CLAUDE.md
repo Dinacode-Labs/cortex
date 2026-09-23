@@ -21,16 +21,14 @@ a database or a model key.
 
 ## Rules
 
-What you have to respect when writing code here lives in `.claude/rules/`, one file per subject.
-Claude Code loads them by itself, so **do not import them from here and do not duplicate their
-content** (ADR-0065):
+The detailed rules for working here — one file per subject, some scoped to a part of the tree —
+are **not in this repository** (ADR-0071). The maintainers keep them privately, and a checkout of
+theirs sees them under `.claude/`, where Claude Code loads them by itself: do not import them from
+here and do not copy their content in. A plain clone has no `.claude/` at all.
 
-- Always: `architecture.md`, `comments.md`, `language.md`, `tests.md`, `documentation.md`.
-- Only when you touch what they cover (a `paths:` header): `typescript-style.md`, `api-http.md`,
-  `cli.md`, `web.md`, `llm-agents.md`, `evals.md`.
-
-If you work with another agent that does not read `.claude/rules/`, those files are still the
-reference: they are written for anyone.
+What binds a change is still in the tree either way: the conventions in `CONTRIBUTING.md`, the
+decisions in `docs/decisions.md`, and the tests, which hold every rule that can be checked. Where
+any of them disagrees with the code, the code wins.
 
 ## Stack (see `docs/decisions.md` for the why)
 
@@ -83,7 +81,7 @@ config/        # only the schema of the THIRD-PARTY registry (the organisation's
 tests/         # unit + integration (a real Postgres; see CONTRIBUTING.md)
 evals/         # the eval sets: retrieval/ (corpus + questions) and distill/<lang>/ (windows +
                # gold). NOT tests: they mark a model, need a provider and are launched by hand,
-               # so they live outside tests/ and CI never runs them (.claude/rules/evals.md)
+               # so they live outside tests/ and CI never runs them (evals/README.md)
 docs/
   decisions.md # a light ADR log: decisions = hypotheses to revisit
   design.md    # what the web UI is for and what it is not; read it BEFORE touching apps/web
@@ -93,7 +91,7 @@ docs/
 ```
 
 `@cortex/core` is deterministic (no LLM): the intelligence layer is **injected** from each
-entrypoint through `wireLlm()`. How and why, in `.claude/rules/architecture.md`.
+entrypoint through `wireLlm()`. How and why, in `CONTRIBUTING.md`.
 
 ## Commands
 
@@ -118,6 +116,6 @@ OpenAI/Voyage) when you want genuine quality.
 
 ## Keeping this alive
 
-Update this document and `.claude/rules/` when the stack, the structure or a convention changes, so
-the next agent is not working from stale information. And **prune them**: a short, truthful
-CLAUDE.md is worth more than a long, outdated one.
+Update this document when the stack, the structure or a convention changes, so the next agent is
+not working from stale information. And **prune it**: a short, truthful CLAUDE.md is worth more
+than a long, outdated one.
