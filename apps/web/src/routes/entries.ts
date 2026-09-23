@@ -2,10 +2,13 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import { contextEntryType, getBrandName, type ContextEntryStatus } from "@cortex/shared";
 import {
+  canManageEntryProject,
   checkEntryAccess,
   checkProjectAccess,
   findProjectByName,
   getEntryDetail,
+  NotAManagerError,
+  purgeEntries,
   saveContext,
   updateEntryFields,
   validateEntry,
@@ -43,6 +46,8 @@ entriesRoutes.get("/entry/:id", async (c) => {
   const project = projectName ? await findProjectByName(projectName) : null;
   const back = project?.slug ? `/p/${project.slug}` : "/";
   const editing = c.req.query("edit") === "1";
+  const canPurge = await canManageEntryProject(c.get("user")?.email ?? null, access.status === "ok" ? access.project : null);
+  const confirmingPurge = canPurge && c.req.query("purge") === "1";
 
   const body = html`
     <p><a class="back" href="${back}">← ${projectName ?? "Projects"}</a></p>
@@ -62,8 +67,12 @@ entriesRoutes.get("/entry/:id", async (c) => {
         )
       : html`<div class="page-head row-between">
             <h1>${entry.title}</h1>
-            <a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a>
+            <div class="row">
+              <a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a>
+              ${canPurge ? html`<a class="button danger" href="/entry/${entry.id}?purge=1">Purge</a>` : ""}
+            </div>
           </div>
+          ${confirmingPurge ? purgeConfirmation(entry.id) : ""}
           <div class="content-block">${entry.content}</div>`}
 
     ${panel("Metadata", html`<dl class="meta">
@@ -90,6 +99,41 @@ entriesRoutes.get("/entry/:id", async (c) => {
       { help: "An agent wrote this. Saying so is what makes the rest of the memory worth trusting." },
     )}`;
   return c.html(layout(entry.title, body, c.get("user")));
+});
+
+/**
+ * A second step rather than a `confirm()`: purging cannot be undone, so the page says what it
+ * does before the button that does it, and it works without a script.
+ */
+function purgeConfirmation(entryId: string) {
+  return panel(
+    "Purge this entry for good?",
+    html`<p>It will be deleted, not marked: it will not come back in search, in what agents see, in the map or in
+        Health, and it cannot be restored. Only who purged it and when is kept, not what it said.</p>
+      <p class="sub">If it is merely wrong or out of date, "No, it is wrong" or "It was, not any more" keeps the record.</p>
+      <form method="post" action="/entry/${entryId}/purge" class="row" style="margin-top:12px">
+        <button class="danger" type="submit">Purge permanently</button>
+        <a class="button quiet" href="/entry/${entryId}">Cancel</a>
+      </form>`,
+  );
+}
+
+entriesRoutes.post("/entry/:id/purge", async (c) => {
+  const id = c.req.param("id");
+  const user = c.get("user");
+  const access = await checkEntryAccess(user?.email ?? null, id);
+  if (access.status === "not_found") return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
+  if (access.status === "forbidden") return c.html(deniedPage(user), 403);
+  try {
+    await purgeEntries([id], user?.email ?? null);
+  } catch (e) {
+    if (!(e instanceof NotAManagerError)) throw e;
+    return c.html(
+      layout("Not allowed", html`<p><a class="back" href="/entry/${id}">← Back to the entry</a></p><div class="empty">${e.message}</div>`, user),
+      403,
+    );
+  }
+  return c.redirect(access.project?.slug ? `/p/${access.project.slug}` : "/");
 });
 
 entriesRoutes.post("/entry/:id/validate", async (c) => {
