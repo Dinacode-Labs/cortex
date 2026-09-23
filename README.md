@@ -160,6 +160,7 @@ cortex mem search "why did we drop the queue"   # add --all to search every proj
 cortex mem save "We cap uploads at 25MB (Caddy)" --title "Upload limit" --type constraint
 cortex mem get <id>                             # one entry in full, with where it came from
 cortex mem update <id> --content "…"            # fix something you got wrong
+cortex mem purge <id> [<id>…]                   # delete for good what should never have been remembered
 ```
 
 **What you get without doing anything else:** when you open a session, Cortex **injects** the
@@ -251,7 +252,10 @@ mistake you notice later.
 - **A knowledge graph.** Entities and relations extracted by an LLM, with variant resolution
   and a visualisation.
 - **Bi-temporal.** Every fact has a validity period. What becomes obsolete is **invalidated,
-  not deleted**, so you can ask what the project knew on a given date.
+  not deleted**, so you can ask what the project knew on a given date. The one exception is
+  **purging**, for what should never have been remembered at all: whoever manages the project
+  deletes the entry for good, from the CLI, the API or its page, and only who purged it and
+  when is kept ([ADR-0072](docs/decisions.md#adr-0072)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.
   Sub-projects **inherit** from their parent.
 - **Multimodal ingestion.** One `extract` layer for plain text and Markdown, Word, PDF and

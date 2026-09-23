@@ -169,8 +169,8 @@ button.secondary, .button.secondary {
 button.secondary:hover, .button.secondary:hover { color:var(--ink); background:var(--surface-2); border-color:var(--line-strong); }
 button.quiet, .button.quiet { color:var(--muted); background:transparent; border-color:transparent; }
 button.quiet:hover, .button.quiet:hover { color:var(--ink); background:var(--surface-2); }
-button.danger { color:var(--danger); background:var(--surface); border-color:var(--line-strong); }
-button.danger:hover { color:#fff; background:var(--danger); border-color:var(--danger); }
+button.danger, .button.danger { color:var(--danger); background:var(--surface); border-color:var(--line-strong); }
+button.danger:hover, .button.danger:hover { color:#fff; background:var(--danger); border-color:var(--danger); }
 
 /* --- Fields -------------------------------------------------------------- */
 

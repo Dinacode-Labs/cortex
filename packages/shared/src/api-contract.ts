@@ -171,6 +171,21 @@ export const updateEntryRequest = z
   });
 export type UpdateEntryRequest = z.infer<typeof updateEntryRequest>;
 
+export const MAX_PURGE_IDS = 500;
+
+export const purgeEntriesRequest = z.object({
+  ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(MAX_PURGE_IDS)
+    .transform((ids) => [...new Set(ids.map((id) => id.toLowerCase()))]),
+});
+export type PurgeEntriesRequest = z.input<typeof purgeEntriesRequest>;
+
+export interface PurgeEntriesResponse {
+  purged: string[];
+}
+
 /**
  * `GET /entries/:id` returns core's `EntryDetail` as is. The client does not need to know
  * its whole shape -- it uses it for display -- so only what is actually read by code is

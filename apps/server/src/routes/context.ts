@@ -6,13 +6,23 @@ import {
   checkProjectAccess,
   getContextPack,
   getEntryDetail,
+  NotAManagerError,
+  purgeEntries,
   relateEntries,
   renderContextPack,
   saveWithReconciliation,
   searchContext,
   updateEntryFields,
 } from "@cortex/core";
-import { confidenceLevel, contextEntryType, relationType, sourceType, updateEntryRequest } from "@cortex/shared";
+import {
+  confidenceLevel,
+  contextEntryType,
+  purgeEntriesRequest,
+  relationType,
+  sourceType,
+  updateEntryRequest,
+  type PurgeEntriesResponse,
+} from "@cortex/shared";
 import { currentUser } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
@@ -229,4 +239,25 @@ contextRoutes.patch("/entries/:id", async (c) => {
   const ok = await updateEntryFields(id, body);
   if (!ok) return c.json({ error: "Entry not found." }, 404);
   return c.json({ ok: true, id });
+});
+
+contextRoutes.post("/entries/purge", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const body = await parseBody(c, purgeEntriesRequest);
+  if (body instanceof Response) return body;
+  const missing: string[] = [];
+  for (const id of body.ids) {
+    const access = await checkEntryAccess(user.email, id);
+    if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
+    if (access.status === "not_found") missing.push(id);
+  }
+  if (missing.length) return c.json({ error: "Entry not found.", missing }, 404);
+  try {
+    const result: PurgeEntriesResponse = await purgeEntries(body.ids, user.email);
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
+    throw e;
+  }
 });
