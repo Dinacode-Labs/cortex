@@ -7,18 +7,14 @@ import { readCortexLink } from "@cortex/client";
 export interface FirstPromptInput {
   sessionId?: string;
   cwd: string;
-  /** Codex has every MCP tool loaded already, so the order skips loading them. Default: false. */
+  /** Codex has every MCP tool loaded already, so the order skips loading them. */
   codex?: boolean;
-  /** Where the "already asked" markers live. Default: `os.tmpdir()`. */
   stateDir?: string;
 }
 
 const markerName = (sessionId: string): string => `cortex-first-prompt-${sessionId.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, 128)}`;
 
-/**
- * True exactly once per session. `wx` creates the marker or fails if it is there, in one system
- * call: two prompts racing each other cannot both win, and every later prompt costs one `open`.
- */
+/** `wx` creates or fails in one system call: two prompts racing each other cannot both win. */
 export function claimFirstPrompt(sessionId: string, stateDir: string = tmpdir()): boolean {
   try {
     closeSync(openSync(join(stateDir, markerName(sessionId)), "wx"));
@@ -28,12 +24,9 @@ export function claimFirstPrompt(sessionId: string, stateDir: string = tmpdir())
   }
 }
 
-/**
- * The order to inject on a prompt, or null when there is nothing to say. With no session id there
- * is no way to tell the first prompt from the rest, and repeating the order on every one is worse
- * than not giving it.
- */
 export function firstPromptContext(input: FirstPromptInput): string | null {
+  // Without a session id every prompt looks like the first, and an order repeated on each one is
+  // worse than none.
   if (!input.sessionId) return null;
   const link = readCortexLink(input.cwd);
   if (!link || link.ignore || !link.slug) return null;

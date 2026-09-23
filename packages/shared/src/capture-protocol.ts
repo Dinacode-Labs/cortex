@@ -88,7 +88,7 @@ export const MCP_INSTRUCTIONS = [
   CAPTURE_DO_NOT_SAVE,
 ].join(" ");
 
-/** The tools that read the memory. None of them writes, so forcing them on an agent costs nothing but a call. */
+/** None of them writes, so forcing them on an agent costs nothing but a call. */
 export const READ_TOOLS = [SEARCH_TOOL, "ask_project_context", "get_project_context_pack", "list_project_decisions"] as const;
 
 /**
@@ -102,18 +102,13 @@ export function readToolsSelect(): string {
 }
 
 export interface FirstPromptLookupOptions {
-  /**
-   * The agent may have the tools deferred (Claude Code's `ToolSearch`), so the order says how to
-   * load them if they are missing. Codex has them loaded and gets no such line. Default: true.
-   */
+  /** Codex has the tools loaded and needs no line on loading them. Default: true. */
   toolSearch?: boolean;
 }
 
 /**
- * What the first message of a session gets. With the tools visible, most sessions still went to
- * the repository first; with them deferred, loading them was a second decision that lost to a
- * `Bash` already at hand. So the search is the first action, and loading is only the fallback for
- * a server whose tools Claude Code still defers (ADR-0074).
+ * Search first: even with the tools visible most sessions went to the repository first. Loading
+ * them is only the fallback for a server whose tools Claude Code still defers (ADR-0074).
  */
 export function firstPromptLookup(opts: FirstPromptLookupOptions = {}): string {
   const loadIfMissing =

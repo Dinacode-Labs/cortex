@@ -2,12 +2,7 @@ import { firstPromptContext } from "../first-prompt.js";
 import { readHookStdin } from "../hook-stdin.js";
 
 /**
- * The LOOKUP hook (Claude Code's and Codex's UserPromptSubmit). On the first prompt of a session
- * in a linked project it tells the agent to search the memory with the user's words before
- * exploring the repository (ADR-0074); on every other prompt it says nothing. No network: the
- * first prompt is known by a marker file per session id.
- *
- * Usage: the hook invokes it with the JSON on stdin. By hand:
+ * ADR-0074. By hand:
  * echo '{"session_id":"s1","cwd":"/path","prompt":"…"}' | cortex hook-lookup
  */
 export async function run(): Promise<void> {
