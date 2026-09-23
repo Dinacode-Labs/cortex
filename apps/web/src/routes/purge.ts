@@ -42,7 +42,7 @@ const onlyManagers = (c: Context<WebEnv>, page: ProjectPage) =>
     layout(
       "Not allowed",
       html`${projectHeader(page, "memory")}
-        ${empty("Only the owner of this project or an administrator can delete its entries.")}`,
+        ${empty("Only the owner of this project or an administrator can purge its entries.")}`,
       c.get("user"),
     ),
     403,
@@ -81,10 +81,11 @@ purgeRoutes.post("/p/:slug/purge", async (c) => {
   const body = html`
     ${projectHeader(page, "memory")}
     ${panel(
-      `Delete ${entries.length} ${noun} permanently?`,
+      `Purge ${entries.length} ${noun} for good?`,
       html`${warn(
-          html`This cannot be undone. They are removed from the memory, not marked obsolete, and no agent will
-            see them again. If an entry is only wrong, <b>No, it is wrong</b> on the entry keeps the record of it.`,
+          html`This cannot be undone. They are deleted, not marked: they will not come back in search, in what
+            agents see, in the map or in Health. Only who purged them and when is kept, not what they said. If an
+            entry is merely wrong, "No, it is wrong" on its page keeps the record.`,
           "contradiction",
         )}
         <ul class="findings">${entries.map((e) => html`<li><a href="/entry/${e.id}">${e.title}</a></li>`)}</ul>
@@ -92,9 +93,9 @@ purgeRoutes.post("/p/:slug/purge", async (c) => {
           ${entries.map((e) => html`<input type="hidden" name="ids" value="${e.id}">`)}
           ${Object.entries(filters).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
           <input type="hidden" name="confirm" value="1">
-          <button class="danger" type="submit">Delete ${entries.length} ${noun}</button>
+          <button class="danger" type="submit">Purge ${entries.length} ${noun} permanently</button>
           <a class="button quiet" href="${memoryUrl(slug, filters)}">Cancel</a>
         </form>`,
     )}`;
-  return c.html(layout(`${project.name} · Delete entries`, body, { user }));
+  return c.html(layout(`${project.name} · Purge entries`, body, { user }));
 });

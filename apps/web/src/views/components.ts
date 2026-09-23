@@ -117,7 +117,7 @@ export interface EntrySelectionOptions {
 }
 
 /**
- * The entry grid as a form that deletes what is ticked. The form works on its own; `select.js`
+ * The entry grid as a form that purges what is ticked. The form works on its own; `select.js`
  * only adds the running count and makes "Select all visible" instant.
  */
 export function entrySelection(entries: ContextEntry[], opts: EntrySelectionOptions): Html {
@@ -126,7 +126,7 @@ export function entrySelection(entries: ContextEntry[], opts: EntrySelectionOpti
       <div class="select-bar">
         <a class="button quiet" href="${opts.toggleHref}" data-select-toggle>${opts.allChecked ? "Clear selection" : "Select all visible"}</a>
         <span class="sub" data-selected-count hidden></span>
-        <button class="danger" type="submit">Delete selected…</button>
+        <button class="danger" type="submit">Purge selected…</button>
       </div>
       <div class="grid">${entries.map((e) => entryCard(e, { checked: opts.allChecked }))}</div>
     </form>

@@ -17,8 +17,8 @@ fixes things.
   pointing at it. An entry it had superseded becomes current again and waits for review. Only who
   purged what and when is kept, never the text. Members who can read a project cannot purge from
   it, and agents cannot purge at all ([ADR-0072](docs/decisions.md#adr-0072)).
-- **Several entries can be deleted at once from a project's Memory screen.** Whoever manages the
-  project ticks the cards (or "Select all visible"), presses "Delete selected…", sees the titles
+- **Several entries can be purged at once from a project's Memory screen.** Whoever manages the
+  project ticks the cards (or "Select all visible"), presses "Purge selected…", sees the titles
   about to go and that it cannot be undone, and confirms. They are purged for good, and the list
   comes back with the same filters and how many went. Nobody else sees the boxes, a forged request
   is refused, and it works without JavaScript ([ADR-0073](docs/decisions.md#adr-0073)).

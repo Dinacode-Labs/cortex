@@ -2435,7 +2435,7 @@ decisions they carried stay recorded here.
   client script.
 - **Decision:**
   1. Whoever **manages** the project ([0051](#adr-0051)) gets a checkbox on every card of the
-     Memory screen and a "Delete selected…" button. Nobody else sees them, and the route checks it
+     Memory screen and a "Purge selected…" button. Nobody else sees them, and the route checks it
      again on the server: a forged post from a reader gets a 403.
   2. The confirmation is a **second post**, not a browser dialog. The first shows the titles about
      to go, how many, and that it cannot be undone; only the second, carrying `confirm=1`,

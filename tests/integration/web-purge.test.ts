@@ -115,7 +115,7 @@ describe("deleting entries in bulk from the Memory screen", () => {
     const res = await post(`/p/${project_.slug}/purge`, ids.map((id) => ["ids", id]));
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain(`Delete ${ids.length} entries permanently?`);
+    expect(html).toContain(`Purge ${ids.length} entries for good?`);
     expect(html).toContain("cannot be undone");
     expect(html).toContain('name="confirm" value="1"');
     expect(await stillThere(ids)).toEqual(ids);
@@ -139,14 +139,14 @@ describe("deleting entries in bulk from the Memory screen", () => {
     expect(await stillThere(ids)).toEqual([]);
 
     const html = await (await get(location)).text();
-    expect(html).toContain(`${ids.length} entries deleted permanently.`);
+    expect(html).toContain(`${ids.length} entries purged.`);
     for (const id of ids) expect(html, id).not.toContain(id);
   }, 60_000);
 
   it("the confirmation only offers what belongs to this project, whatever ids the form carried", async () => {
     const ids = await seedEntries();
     const html = await (await post(`/p/${project_.slug}/purge`, [...ids, otherEntryId].map((id) => ["ids", id]))).text();
-    expect(html).toContain(`Delete ${ids.length} entries permanently?`);
+    expect(html).toContain(`Purge ${ids.length} entries for good?`);
     expect(html).not.toContain(otherEntryId);
     expect(await stillThere([otherEntryId])).toEqual([otherEntryId]);
   }, 60_000);

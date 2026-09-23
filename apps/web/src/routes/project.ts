@@ -127,7 +127,7 @@ projectRoutes.get("/p/:slug", async (c) => {
     ${captureForm}
     <div class="filters">${joinHtml(typePills, "")}</div>
     <div class="filters">${joinHtml(statusPills, "")}</div>
-    ${purged > 0 ? warn(`${purged} ${purged === 1 ? "entry" : "entries"} deleted permanently.`) : ""}
+    ${purged > 0 ? warn(`${purged} ${purged === 1 ? "entry" : "entries"} purged.`) : ""}
     ${entries.length
       ? res.manager
         ? entrySelection(entries, {
