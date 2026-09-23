@@ -32,6 +32,11 @@ fixes things.
   in UTC, the same zone the cards print, so a block does not move with the server's clock. When
   the page limit cuts the last block in half the heading says so rather than counting what it
   shows as if it were all, and a **Show more** link brings the rest, up to 600 entries.
+- **Several entries can be purged at once from a project's Memory screen.** Whoever manages the
+  project ticks the cards (or "Select all visible"), presses "Purge selected…", sees the titles
+  about to go and that it cannot be undone, and confirms. They are purged for good, and the list
+  comes back with the same filters and how many went. Nobody else sees the boxes, a forged request
+  is refused, and it works without JavaScript ([ADR-0073](docs/decisions.md#adr-0073)).
 - **Updating a host is one reviewable command.** `./deploy/update.sh 0.2.0` takes a backup, pins
   `CORTEX_VERSION` in `deploy/.env`, pulls that exact image, brings everything up waiting for each
   service to report healthy, and then checks that the host really answers: `/api/health`,

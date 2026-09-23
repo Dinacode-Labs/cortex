@@ -1,7 +1,7 @@
 import { html } from "hono/html";
 import type { ContextEntry, EntrySortField } from "@cortex/shared";
 import { dateGroupings, groupByDate, type DateBlock, type DateGrouping } from "../date-blocks.js";
-import { entryCard, joinHtml } from "./components.js";
+import { entryCard, joinHtml, type EntryPick } from "./components.js";
 import type { Html } from "./layout.js";
 
 export const ENTRIES_PAGE = 60;
@@ -35,10 +35,11 @@ export interface EntryListOptions {
   dateField: EntrySortField;
   grouping?: DateGrouping;
   moreHref: (limit: number) => string;
+  pick?: EntryPick;
 }
 
 export function entryList(fetched: ContextEntry[], opts: EntryListOptions): Html {
-  const card = (e: ContextEntry) => entryCard(e, opts.dateField);
+  const card = (e: ContextEntry) => entryCard(e, opts.dateField, opts.pick);
   const entries = fetched.slice(0, opts.pageLimit);
   const list =
     opts.grouping && opts.grouping !== "list"

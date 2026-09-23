@@ -3,6 +3,7 @@ import type { AccessibleProject } from "@cortex/core";
 import type { ContextEntry, EntrySortField } from "@cortex/shared";
 import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
+import { ASSET_VERSION } from "../version.js";
 
 /**
  * Everything that repeats across more than one screen lives here, and the routes COMPOSE
@@ -83,14 +84,43 @@ export function warn(message: Html | string, kind: "notice" | "contradiction" = 
   return html`<div class="warn ${kind === "contradiction" ? "contradiction" : ""}">${message}</div>`;
 }
 
-export function entryCard(entry: ContextEntry, dated?: EntrySortField): Html {
-  return html`<a class="card" href="/entry/${entry.id}">
+export interface EntryPick {
+  checked: boolean;
+}
+
+export function entryCard(entry: ContextEntry, dated?: EntrySortField, pick?: EntryPick): Html {
+  const card = html`<a class="card" href="/entry/${entry.id}">
     <div class="card-head">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)}</div>
     <h3>${entry.title}</h3>
     <p>${entry.summary ?? entry.content}</p>
     ${dated ? entryDate(entry, dated) : ""}
     ${entry.sourceReference ? html`<div class="src">${entry.sourceReference}</div>` : ""}
   </a>`;
+  if (!pick) return card;
+  return html`<div class="card-select">
+    <input class="card-pick" type="checkbox" name="ids" value="${entry.id}" aria-label="Select: ${entry.title}" ${pick.checked ? "checked" : ""}>
+    ${card}
+  </div>`;
+}
+
+export interface EntrySelectionOptions {
+  action: string;
+  hidden: Record<string, string>;
+  allChecked: boolean;
+  toggleHref: string;
+}
+
+export function entrySelection(list: Html, opts: EntrySelectionOptions): Html {
+  return html`<form method="post" action="${opts.action}" data-bulk-select>
+      ${Object.entries(opts.hidden).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
+      <div class="select-bar">
+        <a class="button quiet" href="${opts.toggleHref}" data-select-toggle>${opts.allChecked ? "Clear selection" : "Select all visible"}</a>
+        <span class="sub" data-selected-count hidden></span>
+        <button class="danger" type="submit">Purge selected…</button>
+      </div>
+      ${list}
+    </form>
+    <script src="/select.js?v=${ASSET_VERSION}" defer></script>`;
 }
 
 function entryDate(entry: ContextEntry, field: EntrySortField): Html {
