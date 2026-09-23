@@ -58,6 +58,7 @@ describe("the UI's styles", () => {
       "/",
       `/p/${project_.slug}`,
       `/p/${project_.slug}?capture=1`,
+      `/p/${project_.slug}?sort=created&group=week`,
       `/p/${project_.slug}/health`,
       `/p/${project_.slug}/agents`,
       `/p/${project_.slug}/settings`,

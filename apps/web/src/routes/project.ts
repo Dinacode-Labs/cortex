@@ -23,8 +23,10 @@ import {
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
-import { badge, empty, entryCard, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge } from "../views/components.js";
+import { badge, empty, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge } from "../views/components.js";
+import { parseDateGrouping } from "../date-blocks.js";
 import { projectHealth } from "../project-summary.js";
+import { ENTRIES_PAGE, entryList, groupingPills, parsePageLimit } from "../views/entry-list.js";
 import { mdLite } from "../views/md.js";
 import { projectHeader } from "../views/project-nav.js";
 import { requireProjectPage } from "../middleware/access.js";
@@ -58,9 +60,11 @@ projectRoutes.get("/p/:slug", async (c) => {
   const dirParsed = sortDirection.safeParse(c.req.query("dir"));
   const dir: SortDirection | undefined = sort && dirParsed.success ? dirParsed.data : undefined;
   const effectiveSort: EntrySort = { by: sort ?? "created", dir: dir ?? "desc" };
+  const grouping = sort ? parseDateGrouping(c.req.query("group")) : undefined;
+  const pageLimit = sort ? parsePageLimit(c.req.query("limit")) : ENTRIES_PAGE;
   const showCapture = c.req.query("capture") === "1";
 
-  const entries = await listEntries({ project: project.name, type, status, sort: effectiveSort, limit: 60 });
+  const entries = await listEntries({ project: project.name, type, status, sort: effectiveSort, limit: pageLimit + 1 });
   const healths = await Promise.all(children.map((h) => projectHealth(h.name)));
   const base = `/p/${project.slug}`;
   const withFilters = (extra: Record<string, string>) => {
@@ -69,6 +73,7 @@ projectRoutes.get("/p/:slug", async (c) => {
       ...(status ? { status } : {}),
       ...(sort ? { sort } : {}),
       ...(dir ? { dir } : {}),
+      ...(grouping ? { group: grouping } : {}),
       ...extra,
     });
     for (const [k, v] of [...qs]) if (!v) qs.delete(k);
@@ -153,8 +158,14 @@ projectRoutes.get("/p/:slug", async (c) => {
     <div class="filters">${joinHtml(typePills, "")}</div>
     <div class="filters">${joinHtml(statusPills, "")}</div>
     <div class="filters">${joinHtml(sortPills, "")}</div>
+    ${grouping ? groupingPills(grouping, (g) => withFilters({ group: g })) : ""}
     ${entries.length
-      ? html`<div class="grid">${entries.map((e) => entryCard(e, effectiveSort.by))}</div>`
+      ? entryList(entries, {
+          pageLimit,
+          dateField: effectiveSort.by,
+          grouping,
+          moreHref: (limit) => withFilters({ limit: String(limit) }),
+        })
       : empty(
           type ? html`Nothing of type <b>${type}</b> here yet.` : "Nothing here yet.",
           type ? html`<a class="button secondary" href="${withFilters({ type: "" })}">Show all types</a>` : html`<a class="button" href="${base}?capture=1">Add the first entry</a>`,
