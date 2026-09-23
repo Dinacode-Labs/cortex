@@ -1,16 +1,19 @@
+import { createInterface } from "node:readline/promises";
 import {
   capture,
   getEntry,
+  purgeEntries,
   readCortexLink,
   searchEntries,
   updateEntry,
   useProjectServer,
 } from "@cortex/client";
 import { writeBlocker } from "../compat.js";
+import { describePurgeResult, isPurgeConfirmed, PURGE_CONFIRMATION } from "../purge.js";
 
 /**
- * `cortex mem` -- the project's memory from the command line: store, search, read an entry and
- * correct it.
+ * `cortex mem` -- the project's memory from the command line: store, search, read an entry,
+ * correct it and, when it should never have been remembered, purge it.
  *
  * It exists for two reasons. One, the API could write but not read: search was only available
  * over MCP, so from a terminal there was no way to query the memory. Two, it is the bridge the
@@ -23,6 +26,7 @@ import { writeBlocker } from "../compat.js";
  *   cortex mem search "<query>" [--limit 10] [--all] [--type t] [--cwd dir] [--json]
  *   cortex mem get <id> [--json]
  *   cortex mem update <id> [--title t] [--content c] [--json]
+ *   cortex mem purge <id> [<id>...] [--yes] [--json]
  */
 
 function flag(args: string[], name: string): string | undefined {
@@ -157,6 +161,61 @@ async function update(args: string[], json: boolean): Promise<void> {
   emit({ json, ok: true, data: res.data, text: `✓ updated ${id}` });
 }
 
+function positionals(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === "--yes" || a === "--json") continue;
+    if (a.startsWith("--")) {
+      if (!a.includes("=") && args[i + 1] && !args[i + 1]!.startsWith("--")) i++;
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
+async function confirmPurge(ids: string[]): Promise<boolean> {
+  console.log(`About to purge ${ids.length === 1 ? "this entry" : `these ${ids.length} entries`} for good:`);
+  for (const id of ids) {
+    const res = await getEntry(id);
+    const title = res.ok ? res.data.entry.title || "(untitled)" : `(${(res.data as { error?: string })?.error ?? `HTTP ${res.status}`})`;
+    console.log(`  • ${title}\n    id: ${id}`);
+  }
+  console.log("It cannot be undone: no search, pack or screen will return them again.");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return isPurgeConfirmed(await rl.question(`Type "${PURGE_CONFIRMATION}" to confirm: `));
+  } finally {
+    rl.close();
+  }
+}
+
+async function purge(args: string[], json: boolean): Promise<void> {
+  const ids = positionals(args);
+  if (!ids.length) return emit({ json, ok: false, data: { error: "Missing id" }, text: "Usage: cortex mem purge <id> [<id>...] [--yes]" });
+  useProjectServer(flag(args, "cwd") || process.cwd());
+  const block = await writeBlocker();
+  if (block) return emit({ json, ok: false, data: { error: block }, text: `✗ ${block}` });
+
+  if (!args.includes("--yes")) {
+    // Irreversible, so without a person at the keyboard to ask it takes an explicit `--yes`.
+    if (json || !process.stdin.isTTY) {
+      return emit({ json, ok: false, data: { error: "Purging is irreversible: pass --yes" }, text: "✗ Purging is irreversible: pass --yes to confirm." });
+    }
+    if (!(await confirmPurge(ids))) return emit({ json, ok: false, data: { error: "Not confirmed" }, text: "Nothing purged." });
+  }
+
+  const res = await purgeEntries(ids);
+  const outcome = describePurgeResult(res);
+  emit({
+    json,
+    ok: outcome.ok,
+    data: outcome.ok ? res.data : { error: outcome.message },
+    text: `${outcome.ok ? "✓" : "✗"} ${outcome.message}`,
+  });
+}
+
 export async function run(args: string[] = []): Promise<void> {
   const json = args.includes("--json");
   const sub = args[0];
@@ -165,11 +224,13 @@ export async function run(args: string[] = []): Promise<void> {
   else if (sub === "search") await search(rest, json);
   else if (sub === "get") await get(rest, json);
   else if (sub === "update") await update(rest, json);
+  else if (sub === "purge") await purge(rest, json);
   else {
-    console.log("Usage: cortex mem <save|search|get|update> [--json]\n");
+    console.log("Usage: cortex mem <save|search|get|update|purge> [--json]\n");
     console.log('  cortex mem save "<content>" [--title t] [--type decision]');
     console.log('  cortex mem search "<query>" [--limit 10] [--all]');
     console.log("  cortex mem get <id>");
     console.log("  cortex mem update <id> [--title t] [--content c]");
+    console.log("  cortex mem purge <id> [<id>...] [--yes]");
   }
 }
