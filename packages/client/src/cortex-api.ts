@@ -7,6 +7,7 @@ import type {
   CreateProjectResponse,
   EntryDetailResponse,
   ProjectSummary,
+  PurgeEntriesResponse,
   SearchRequest,
   SearchResponse,
   UpdateEntryRequest,
@@ -134,4 +135,9 @@ export function getEntry(id: string): Promise<ApiResult<EntryDetailResponse>> {
 
 export function updateEntry(id: string, body: UpdateEntryRequest): Promise<ApiResult<{ ok: boolean; id: string }>> {
   return apiRequest<{ ok: boolean; id: string }>("PATCH", `/entries/${encodeURIComponent(id)}`, body);
+}
+
+/** Irreversible (ADR-0072). A 404 with no `error` in the body is a server that predates it. */
+export function purgeEntries(ids: string[]): Promise<ApiResult<PurgeEntriesResponse>> {
+  return apiRequest<PurgeEntriesResponse>("POST", "/entries/purge", { ids });
 }

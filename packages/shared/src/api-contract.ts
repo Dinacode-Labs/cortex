@@ -171,6 +171,27 @@ export const updateEntryRequest = z
   });
 export type UpdateEntryRequest = z.infer<typeof updateEntryRequest>;
 
+/** The most ids one purge takes: enough for a whole project gone wrong, not an unbounded body. */
+export const MAX_PURGE_IDS = 500;
+
+/**
+ * `POST /entries/purge` -- deletes entries for good (ADR-0072). Irreversible, so the ids are
+ * checked for shape here and the server answers 404 for any it cannot find, rather than
+ * purging the rest.
+ */
+export const purgeEntriesRequest = z.object({
+  ids: z
+    .array(z.string().uuid())
+    .min(1)
+    .max(MAX_PURGE_IDS)
+    .transform((ids) => [...new Set(ids.map((id) => id.toLowerCase()))]),
+});
+export type PurgeEntriesRequest = z.input<typeof purgeEntriesRequest>;
+
+export interface PurgeEntriesResponse {
+  purged: string[];
+}
+
 /**
  * `GET /entries/:id` returns core's `EntryDetail` as is. The client does not need to know
  * its whole shape -- it uses it for display -- so only what is actually read by code is
