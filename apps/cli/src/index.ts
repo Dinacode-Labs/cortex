@@ -44,6 +44,7 @@ const COMMANDS: Record<string, Cmd> = {
   "connect-github": { help: "ingest pull requests and issues from a GitHub repo", load: () => import("./commands/connect-github.js") },
   "connect-sessions": { help: "backfill past agent sessions into a project", load: () => import("./commands/connect-sessions.js") },
   "hook-context": { help: "session-start hook: emit the linked project's context pack", managed: false, load: () => import("./commands/hook-context.js") },
+  "hook-lookup": { help: "first-prompt hook: tell the agent to search the memory before exploring", managed: false, load: () => import("./commands/hook-lookup.js") },
   "hook-capture": { help: "session-end hook: send the session to Cortex to be distilled", managed: false, load: () => import("./commands/hook-capture.js") },
 };
 

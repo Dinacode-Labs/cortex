@@ -1,5 +1,5 @@
 {
-  "description": "Cortex hooks. They need the `cortex` CLI on your PATH (npm i -g @dinacodelabs/cortex) and a linked project (cortex link). The capture hook detects which agent it is running under, so this same plugin works in Claude Code and Codex. Everything is guarded so a missing CLI never breaks your session.",
+  "description": "Cortex hooks. They need the `cortex` CLI on your PATH (npm i -g @dinacodelabs/cortex) and a linked project (cortex link). The lookup hook speaks only on the first prompt of a session. The capture hook detects which agent it is running under, so this same plugin works in Claude Code and Codex. Everything is guarded so a missing CLI never breaks your session.",
   "hooks": {
     "SessionStart": [
       {
@@ -9,6 +9,17 @@
             "type": "command",
             "command": "command -v cortex >/dev/null 2>&1 && cortex hook-context || true",
             "timeout": 20
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v cortex >/dev/null 2>&1 && cortex hook-lookup || true",
+            "timeout": 5
           }
         ]
       }

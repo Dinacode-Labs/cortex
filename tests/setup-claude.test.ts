@@ -58,7 +58,8 @@ describe("cortex setup claude-code (modo settings)", () => {
     const report = await claudeCodeAdapter.apply(ctx);
 
     const hooks = readSettings().hooks;
-    expect(Object.keys(hooks)).toEqual(["SessionStart", "SessionEnd", "PreCompact"]);
+    expect(Object.keys(hooks)).toEqual(["SessionStart", "UserPromptSubmit", "SessionEnd", "PreCompact"]);
+    expect(hooks.UserPromptSubmit[0].hooks[0]).toEqual({ type: "command", command: "cortex hook-lookup", timeout: 5 });
     expect(hooks.SessionStart[0].matcher).toBe("startup|resume|clear|compact");
     expect(hooks.SessionStart[0].hooks[0].command).toBe("cortex hook-context");
     expect(hooks.SessionEnd[0].hooks[0].command).toBe("cortex hook-capture");
