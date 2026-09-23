@@ -9,6 +9,12 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Claude Code has Cortex's read tools from the first turn.** `search_project_context`,
+  `ask_project_context`, `get_project_context_pack` and `list_project_decisions` now declare
+  themselves always-loaded, so the agent no longer has to find them with `ToolSearch` before it can
+  ask the memory anything. The write and maintenance tools stay deferred. It takes an updated
+  server; the CLI needs no update, and other MCP clients ignore the marker
+  ([ADR-0075](docs/decisions.md#adr-0075)).
 - **A project's memory can be ordered by when entries were added or last updated.** A row of pills
   under the type and status filters on `/p/<slug>` picks newest or oldest added, and most or least
   recently updated; each card shows the date it is ordered by, and the order survives a change of

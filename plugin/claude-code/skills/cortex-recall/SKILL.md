@@ -56,6 +56,9 @@ They are prefixed per host: `mcp__cortex__search_project_context`, or
 
 ## If the tools are not loaded
 
+A current server marks the read tools to load from the first turn ([ADR-0075](../../../../docs/decisions.md#adr-0075)), so this
+is for an older one.
+
 Ask for them in your **first** batch of calls, not after it: `ToolSearch` waits for a server that
 is still connecting, so a Cortex still listed as connecting is not a reason to start without it.
 
