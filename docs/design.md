@@ -81,7 +81,7 @@ cannot be lost.
 [Cortex]   [ Search everything… ]              Projects · Admin* · you · Sign out
 
 /                       the projects you can reach — entries, visibility, health
-/p/<slug>               Memory           what is remembered, filtered, plus "Add"
+/p/<slug>               Memory           what is remembered, filtered and ordered, plus "Add"
 /p/<slug>/ask           Ask
 /p/<slug>/agents        What agents see  the pack, with every entry linked
 /p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked

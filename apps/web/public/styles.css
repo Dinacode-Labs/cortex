@@ -216,6 +216,8 @@ form.row input[type=text], form.row input[type=search], form.row input[type=emai
 .card h3 { margin-bottom:var(--s-2); line-height:1.35; }
 .card p { color:var(--muted); font-size:var(--t-sm);
   display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.card .card-date { margin-top:var(--s-3); font-size:var(--t-xs); color:var(--faint); }
+.card .card-date time { font-family:var(--mono); }
 .card .src { margin-top:var(--s-3); padding-top:var(--s-2); border-top:1px solid var(--line);
   font-family:var(--mono); font-size:var(--t-xs); color:var(--faint);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
