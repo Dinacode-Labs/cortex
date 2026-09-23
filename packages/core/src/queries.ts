@@ -34,8 +34,6 @@ export interface ListEntriesFilter {
   type?: ContextEntryType;
   status?: ContextEntryStatus;
   limit?: number;
-  /** Applied in the query, before the limit: sorting the 60 that came back would make "oldest"
-   *  mean the oldest of the 60 most recent. Defaults to the newest added first. */
   sort?: EntrySort;
   /**
    * Which projects the viewer can reach. **The filter goes inside the query**, before ordering
@@ -78,8 +76,6 @@ export async function listEntries(filter: ListEntriesFilter = {}): Promise<Conte
 
 function entryOrder(sql: Sql, sort: EntrySort) {
   const column = sort.by === "updated" ? sql`ce.updated_at` : sql`ce.created_at`;
-  // now() is the transaction's start time, so a batch capture writes rows with identical dates;
-  // without the id as a tiebreak they swap places between reloads.
   return sort.dir === "asc" ? sql`ORDER BY ${column} ASC, ce.id ASC` : sql`ORDER BY ${column} DESC, ce.id DESC`;
 }
 

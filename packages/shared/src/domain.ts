@@ -40,10 +40,6 @@ export const contextEntryStatus = z.enum([
 ]);
 export type ContextEntryStatus = z.infer<typeof contextEntryStatus>;
 
-/**
- * Which date a list of entries is ordered by. `updated` moves on ANY write to the row --
- * validating, recomputing confidence, reconciling -- not only when a person edits the text.
- */
 export const entrySortField = z.enum(["created", "updated"]);
 export type EntrySortField = z.infer<typeof entrySortField>;
 

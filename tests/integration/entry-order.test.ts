@@ -3,19 +3,10 @@ import { getSql } from "@cortex/database";
 import { createProject, listEntries, requestOtp, saveContext, verifyOtp, type EntrySort, type ProjectRef } from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 
-/**
- * Ordering a project's memory by when entries were added or last updated.
- *
- * It exists to clean up a memory that filled itself in two days of captures, so "oldest first"
- * has to mean the oldest in the project. Sorting in memory the 60 rows the page already fetched
- * would silently mean "the oldest of the 60 newest" -- which is why every assertion here uses a
- * limit smaller than the project.
- */
 const RID = Math.random().toString(36).slice(2, 8);
 const USER = `order-${RID}@example.com`;
 
 async function otpFor(email: string): Promise<string> {
-  // Looked for ON THIS EMAIL'S LINE: several integration files intercept `console.log` at once.
   let cap = "";
   const orig = console.log;
   console.log = ((...a: unknown[]) => {
@@ -62,7 +53,6 @@ beforeAll(async () => {
     type: "convention",
     createdBy: USER,
   });
-  // Any UPDATE moves updated_at through the trigger: the first one added becomes the last touched.
   await getSql()`UPDATE context_entries SET title = title WHERE id = ${first.entry.id}`;
 }, 180_000);
 

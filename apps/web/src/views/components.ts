@@ -83,7 +83,6 @@ export function warn(message: Html | string, kind: "notice" | "contradiction" = 
   return html`<div class="warn ${kind === "contradiction" ? "contradiction" : ""}">${message}</div>`;
 }
 
-/** `dated` is the date the list is ordered by: an order you cannot see reads as no order at all. */
 export function entryCard(entry: ContextEntry, dated?: EntrySortField): Html {
   return html`<a class="card" href="/entry/${entry.id}">
     <div class="card-head">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)}</div>
