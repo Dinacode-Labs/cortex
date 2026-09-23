@@ -11,7 +11,7 @@
  * added: duplicating them means distilling the same session twice.
  */
 
-export type HookKind = "context" | "capture";
+export type HookKind = "context" | "lookup" | "capture";
 
 export interface HookDef {
   event: string;
@@ -24,6 +24,7 @@ export interface HookDef {
 /** How a Cortex hook is recognised, including the syntaxes we have already retired. */
 export const HOOK_MARKERS: Record<HookKind, string[]> = {
   context: ["hook-context", "hook:context"],
+  lookup: ["hook-lookup"],
   capture: ["hook-capture", "hook:capture"],
 };
 
@@ -44,7 +45,7 @@ export interface HooksHolder {
 const isCortex = (cmd: unknown, kind: HookKind): boolean =>
   typeof cmd === "string" && HOOK_MARKERS[kind].some((m) => cmd.includes(m));
 
-const anyCortex = (cmd: unknown): boolean => isCortex(cmd, "context") || isCortex(cmd, "capture");
+const anyCortex = (cmd: unknown): boolean => (Object.keys(HOOK_MARKERS) as HookKind[]).some((kind) => isCortex(cmd, kind));
 
 /** Removes groups and events left empty, so no junk is left behind in the file. */
 function prune(obj: HooksHolder): void {

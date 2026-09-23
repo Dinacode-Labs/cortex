@@ -258,11 +258,11 @@ describe("the hooks and the MCP say NOTHING", () => {
   const SRC = join(RAIZ, "apps/cli/src");
 
   it("they neither import the notice nor have the dispatcher apply it (they are `managed: false`)", () => {
-    for (const f of ["commands/hook-context.ts", "commands/hook-capture.ts", "commands/mcp.ts", "mcp/proxy.ts", "mcp/upstream.ts"]) {
+    for (const f of ["commands/hook-context.ts", "commands/hook-lookup.ts", "first-prompt.ts", "commands/hook-capture.ts", "commands/mcp.ts", "mcp/proxy.ts", "mcp/upstream.ts"]) {
       expect(readFileSync(join(SRC, f), "utf8"), f).not.toMatch(/compat\.js/);
     }
     const index = readFileSync(join(SRC, "index.ts"), "utf8");
-    for (const cmd of ["mcp", "hook-context", "hook-capture"]) {
+    for (const cmd of ["mcp", "hook-context", "hook-lookup", "hook-capture"]) {
       expect(index, cmd).toMatch(new RegExp(`"?${cmd}"?: \\{[^}]*managed: false`));
     }
     // The notice comes AFTER the `return` of the `managed: false` ones.

@@ -36,15 +36,15 @@ describe("plugin de Claude Code", () => {
     expect(entry.version).toBe(plugin.version);
   });
 
-  it("brings the loop's three hooks, and all three call the published CLI", () => {
+  it("brings the loop's four hooks, and all of them call the published CLI", () => {
     const hooks = read<{ hooks: Record<string, { hooks: { command: string; timeout?: number }[] }[]> }>(
       "plugin/claude-code/hooks/hooks.json",
     ).hooks;
-    expect(Object.keys(hooks).sort()).toEqual(["PreCompact", "SessionEnd", "SessionStart"]);
+    expect(Object.keys(hooks).sort()).toEqual(["PreCompact", "SessionEnd", "SessionStart", "UserPromptSubmit"]);
     for (const [evento, grupos] of Object.entries(hooks)) {
       for (const h of grupos.flatMap((g) => g.hooks)) {
         // No paths into a repo clone: the hook uses the `cortex` on the PATH (ADR-0032)...
-        expect(h.command, evento).toMatch(/\bcortex hook-(context|capture)\b/);
+        expect(h.command, evento).toMatch(/\bcortex hook-(context|lookup|capture)\b/);
         expect(h.command, evento).not.toMatch(/\bpnpm\b|\btsx\b|dinacode-cortex/);
         // ...and when it is not installed, it does not blow up the agent's session.
         expect(h.command, evento).toContain("command -v cortex");

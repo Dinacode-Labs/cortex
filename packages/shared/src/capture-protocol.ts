@@ -87,3 +87,42 @@ export const MCP_INSTRUCTIONS = [
   captureTrigger(),
   CAPTURE_DO_NOT_SAVE,
 ].join(" ");
+
+/** The tools that read the memory. None of them writes, so forcing them on an agent costs nothing but a call. */
+export const READ_TOOLS = [SEARCH_TOOL, "ask_project_context", "get_project_context_pack", "list_project_decisions"] as const;
+
+/**
+ * Claude Code names an MCP tool after where it was registered: `cortex mcp` added by hand, or the
+ * plugin. `ToolSearch` with `select:` skips the names that do not exist, so listing both is safe.
+ */
+export const CLAUDE_MCP_PREFIXES = ["mcp__cortex__", "mcp__plugin_cortex_cortex__"] as const;
+
+export function readToolsSelect(): string {
+  return `select:${CLAUDE_MCP_PREFIXES.flatMap((prefix) => READ_TOOLS.map((tool) => prefix + tool)).join(",")}`;
+}
+
+export interface FirstPromptLookupOptions {
+  /**
+   * The agent loads MCP tools on demand (Claude Code's `ToolSearch`), so the order starts by
+   * loading them. Default: true.
+   */
+  toolSearch?: boolean;
+}
+
+/**
+ * What the first message of a session gets. Claude Code defers MCP tools, so asking the memory
+ * takes two decisions (load, then call) while `Bash` is already at hand: the lookup came second.
+ * Writing the first action out removes both decisions (ADR-0074).
+ */
+export function firstPromptLookup(opts: FirstPromptLookupOptions = {}): string {
+  const search = `call \`${SEARCH_TOOL}\` with the user's own words from this message as the query.`;
+  const steps =
+    opts.toolSearch === false
+      ? [`1. ${search.charAt(0).toUpperCase()}${search.slice(1)}`]
+      : [`1. Run ToolSearch with exactly this query: ${readToolsSelect()}`, `2. Then ${search}`];
+  return [
+    "CRITICAL FIRST ACTION — this project has a memory. Before any Bash, Read, Grep, Glob or Agent call, and before answering the user:",
+    ...steps,
+    lookupTrigger(),
+  ].join("\n");
+}
