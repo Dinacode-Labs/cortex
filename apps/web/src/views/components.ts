@@ -3,6 +3,7 @@ import type { AccessibleProject } from "@cortex/core";
 import type { ContextEntry } from "@cortex/shared";
 import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
+import { ASSET_VERSION } from "../version.js";
 
 /**
  * Everything that repeats across more than one screen lives here, and the routes COMPOSE
@@ -83,13 +84,53 @@ export function warn(message: Html | string, kind: "notice" | "contradiction" = 
   return html`<div class="warn ${kind === "contradiction" ? "contradiction" : ""}">${message}</div>`;
 }
 
-export function entryCard(entry: ContextEntry): Html {
-  return html`<a class="card" href="/entry/${entry.id}">
+export interface EntryPick {
+  /** Whether the box starts ticked: "Select all visible" without JavaScript is a reload with every box ticked. */
+  checked: boolean;
+}
+
+/** With `pick`, the card carries a checkbox named `ids` for the form it sits in. */
+export function entryCard(entry: ContextEntry, pick?: EntryPick): Html {
+  const card = html`<a class="card" href="/entry/${entry.id}">
     <div class="card-head">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)}</div>
     <h3>${entry.title}</h3>
     <p>${entry.summary ?? entry.content}</p>
     ${entry.sourceReference ? html`<div class="src">${entry.sourceReference}</div>` : ""}
   </a>`;
+  if (!pick) return card;
+  // Beside the link, not inside it: a checkbox inside an <a> is invalid HTML and the click opens the entry.
+  return html`<div class="card-select">
+    <input class="card-pick" type="checkbox" name="ids" value="${entry.id}" aria-label="Select: ${entry.title}" ${pick.checked ? "checked" : ""}>
+    ${card}
+  </div>`;
+}
+
+export interface EntrySelectionOptions {
+  /** Where the selected ids are posted. */
+  action: string;
+  /** Carried along with the ids, so the list comes back as it was. */
+  hidden: Record<string, string>;
+  /** Every box starts ticked. */
+  allChecked: boolean;
+  /** The same list with the opposite of `allChecked`: the no-JavaScript way to (un)select everything. */
+  toggleHref: string;
+}
+
+/**
+ * The entry grid as a form that deletes what is ticked. The form works on its own; `select.js`
+ * only adds the running count and makes "Select all visible" instant.
+ */
+export function entrySelection(entries: ContextEntry[], opts: EntrySelectionOptions): Html {
+  return html`<form method="post" action="${opts.action}" data-bulk-select>
+      ${Object.entries(opts.hidden).map(([k, v]) => html`<input type="hidden" name="${k}" value="${v}">`)}
+      <div class="select-bar">
+        <a class="button quiet" href="${opts.toggleHref}" data-select-toggle>${opts.allChecked ? "Clear selection" : "Select all visible"}</a>
+        <span class="sub" data-selected-count hidden></span>
+        <button class="danger" type="submit">Delete selected…</button>
+      </div>
+      <div class="grid">${entries.map((e) => entryCard(e, { checked: opts.allChecked }))}</div>
+    </form>
+    <script src="/select.js?v=${ASSET_VERSION}" defer></script>`;
 }
 
 /**

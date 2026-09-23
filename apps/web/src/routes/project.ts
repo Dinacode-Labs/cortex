@@ -18,7 +18,7 @@ import {
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
-import { badge, empty, entryCard, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge } from "../views/components.js";
+import { badge, empty, entryCard, entrySelection, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge, warn } from "../views/components.js";
 import { projectHealth } from "../project-summary.js";
 import { mdLite } from "../views/md.js";
 import { projectHeader } from "../views/project-nav.js";
@@ -49,6 +49,8 @@ projectRoutes.get("/p/:slug", async (c) => {
   const statusParsed = contextEntryStatus.safeParse(c.req.query("status"));
   const status: ContextEntryStatus | undefined = statusParsed.success ? statusParsed.data : undefined;
   const showCapture = c.req.query("capture") === "1";
+  const selectAll = c.req.query("select") === "all";
+  const purged = Number(c.req.query("purged") ?? 0);
 
   const entries = await listEntries({ project: project.name, type, status, limit: 60 });
   const healths = await Promise.all(children.map((h) => projectHealth(h.name)));
@@ -125,8 +127,16 @@ projectRoutes.get("/p/:slug", async (c) => {
     ${captureForm}
     <div class="filters">${joinHtml(typePills, "")}</div>
     <div class="filters">${joinHtml(statusPills, "")}</div>
+    ${purged > 0 ? warn(`${purged} ${purged === 1 ? "entry" : "entries"} deleted permanently.`) : ""}
     ${entries.length
-      ? html`<div class="grid">${entries.map(entryCard)}</div>`
+      ? res.manager
+        ? entrySelection(entries, {
+            action: `${base}/purge`,
+            hidden: { ...(type ? { type } : {}), ...(status ? { status } : {}) },
+            allChecked: selectAll,
+            toggleHref: selectAll ? withFilters({}) : withFilters({ select: "all" }),
+          })
+        : html`<div class="grid">${entries.map((e) => entryCard(e))}</div>`
       : empty(
           type ? html`Nothing of type <b>${type}</b> here yet.` : "Nothing here yet.",
           type ? html`<a class="button secondary" href="${base}">Show all types</a>` : html`<a class="button" href="${base}?capture=1">Add the first entry</a>`,
