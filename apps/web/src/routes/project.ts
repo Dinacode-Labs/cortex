@@ -23,7 +23,7 @@ import {
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
-import { badge, empty, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge } from "../views/components.js";
+import { badge, empty, entrySelection, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge, warn } from "../views/components.js";
 import { parseDateGrouping } from "../date-blocks.js";
 import { projectHealth } from "../project-summary.js";
 import { ENTRIES_PAGE, entryList, groupingPills, parsePageLimit } from "../views/entry-list.js";
@@ -63,19 +63,28 @@ projectRoutes.get("/p/:slug", async (c) => {
   const grouping = sort ? parseDateGrouping(c.req.query("group")) : undefined;
   const pageLimit = sort ? parsePageLimit(c.req.query("limit")) : ENTRIES_PAGE;
   const showCapture = c.req.query("capture") === "1";
+  const selectAll = c.req.query("select") === "all";
+  const purged = Number(c.req.query("purged") ?? 0);
 
   const entries = await listEntries({ project: project.name, type, status, sort: effectiveSort, limit: pageLimit + 1 });
   const healths = await Promise.all(children.map((h) => projectHealth(h.name)));
   const base = `/p/${project.slug}`;
+  const listState: Record<string, string> = {
+    ...(type ? { type } : {}),
+    ...(status ? { status } : {}),
+    ...(sort ? { sort } : {}),
+    ...(dir ? { dir } : {}),
+    ...(grouping ? { group: grouping } : {}),
+  };
+  const pageState: Record<string, string> = pageLimit !== ENTRIES_PAGE ? { limit: String(pageLimit) } : {};
+  const listOptions = {
+    pageLimit,
+    dateField: effectiveSort.by,
+    grouping,
+    moreHref: (limit: number) => withFilters({ limit: String(limit) }),
+  };
   const withFilters = (extra: Record<string, string>) => {
-    const qs = new URLSearchParams({
-      ...(type ? { type } : {}),
-      ...(status ? { status } : {}),
-      ...(sort ? { sort } : {}),
-      ...(dir ? { dir } : {}),
-      ...(grouping ? { group: grouping } : {}),
-      ...extra,
-    });
+    const qs = new URLSearchParams({ ...listState, ...extra });
     for (const [k, v] of [...qs]) if (!v) qs.delete(k);
     return qs.toString() ? `${base}?${qs}` : base;
   };
@@ -159,13 +168,16 @@ projectRoutes.get("/p/:slug", async (c) => {
     <div class="filters">${joinHtml(statusPills, "")}</div>
     <div class="filters">${joinHtml(sortPills, "")}</div>
     ${grouping ? groupingPills(grouping, (g) => withFilters({ group: g })) : ""}
+    ${purged > 0 ? warn(`${purged} ${purged === 1 ? "entry" : "entries"} purged.`) : ""}
     ${entries.length
-      ? entryList(entries, {
-          pageLimit,
-          dateField: effectiveSort.by,
-          grouping,
-          moreHref: (limit) => withFilters({ limit: String(limit) }),
-        })
+      ? res.manager
+        ? entrySelection(entryList(entries, { ...listOptions, pick: { checked: selectAll } }), {
+            action: `${base}/purge`,
+            hidden: { ...listState, ...pageState },
+            allChecked: selectAll,
+            toggleHref: withFilters({ ...pageState, ...(selectAll ? {} : { select: "all" }) }),
+          })
+        : entryList(entries, listOptions)
       : empty(
           type ? html`Nothing of type <b>${type}</b> here yet.` : "Nothing here yet.",
           type ? html`<a class="button secondary" href="${withFilters({ type: "" })}">Show all types</a>` : html`<a class="button" href="${base}?capture=1">Add the first entry</a>`,
