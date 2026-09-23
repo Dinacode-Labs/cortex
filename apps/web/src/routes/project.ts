@@ -64,7 +64,6 @@ projectRoutes.get("/p/:slug", async (c) => {
   const pageLimit = sort ? parsePageLimit(c.req.query("limit")) : ENTRIES_PAGE;
   const showCapture = c.req.query("capture") === "1";
 
-  // One entry past the page tells whether the last date block goes on beyond it.
   const entries = await listEntries({ project: project.name, type, status, sort: effectiveSort, limit: pageLimit + 1 });
   const healths = await Promise.all(children.map((h) => projectHealth(h.name)));
   const base = `/p/${project.slug}`;

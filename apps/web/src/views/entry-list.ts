@@ -31,13 +31,9 @@ export function groupingPills(active: DateGrouping, hrefFor: (grouping: DateGrou
 }
 
 export interface EntryListOptions {
-  /** How many entries the page shows; `fetched` carries one more when there are. Required. */
   pageLimit: number;
-  /** The date the list is sorted by, shown on each card and used for the blocks. Required. */
   dateField: EntrySortField;
-  /** Undefined when the list is not sorted by a date the viewer chose: one plain grid, as always. */
   grouping?: DateGrouping;
-  /** The same page asking for `limit` entries. Required. */
   moreHref: (limit: number) => string;
 }
 
@@ -75,7 +71,6 @@ function blockCount(block: DateBlock<unknown>): string {
   return `${n} ${n === 1 ? "entry" : "entries"}`;
 }
 
-/** Without `moreHref` the page is at its ceiling, and the way out is narrowing the filters. */
 function listMore(shown: number, moreHref?: string): Html {
   return html`<div class="list-more">
     <span>Showing the first ${shown}.</span>

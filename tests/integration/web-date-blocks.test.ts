@@ -3,21 +3,10 @@ import { getSql } from "@cortex/database";
 import { createProject, requestOtp, saveContext, verifyOtp, type ProjectRef } from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 
-/**
- * The Memory list sorted by date, in day/week/month/year blocks or as one list.
- *
- * Two ways for it to lie: a heading that counts what it shows as if it were everything, when the
- * page limit cut the block in half; and a grouping selector offered on a list whose order has
- * nothing to do with dates.
- */
 const RID = Math.random().toString(36).slice(2, 8);
 const USER = `date-blocks-${RID}@example.com`;
 
 async function otpDe(email: string): Promise<string> {
-  // The `log` sender prints `[email:log] (subject) to <email>: ...`. The code is looked for ON
-  // THIS EMAIL'S LINE, not the first six-digit number that goes by: several integration files
-  // intercept `console.log` at once and, without this, one takes another's code and fails with
-  // "Wrong code" somewhere entirely unrelated.
   let cap = "";
   const orig = console.log;
   console.log = ((...a: unknown[]) => {
@@ -40,8 +29,6 @@ let crowded: ProjectRef;
 
 const SUBJECTS = ["queues", "retries", "ledger", "webhooks", "invoices", "tenancy", "exports", "caching"];
 
-/** Always in the past: a date ahead of now would outrank what other files just saved and push it
- *  past their own limits, since every integration file shares one database. */
 async function saveAt(project: ProjectRef, n: number, createdAt: string): Promise<void> {
   const { entry } = await saveContext({
     content: `Entry ${n} ${RID}: we decided on ${SUBJECTS[n % SUBJECTS.length]} with key ${RID}${n}x${n * 7919}.`,

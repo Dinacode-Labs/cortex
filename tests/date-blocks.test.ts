@@ -1,11 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { dateBlockOf, groupByDate, parseDateGrouping } from "../apps/web/src/date-blocks.js";
 
-/**
- * The Memory list sorted by date is cut into day, week, month or year blocks. A boundary off by
- * one puts an entry under the wrong heading, which reads as a false claim about when it was
- * written; a block cut by the page limit with an honest-looking count reads as "that was all".
- */
 const at = (iso: string): Date => new Date(iso);
 const dates = (...isos: string[]): Date[] => isos.map(at);
 const keysOf = (blocks: { key: string; items: unknown[] }[]) => blocks.map((b) => `${b.key}:${b.items.length}`);
