@@ -40,6 +40,16 @@ export const contextEntryStatus = z.enum([
 ]);
 export type ContextEntryStatus = z.infer<typeof contextEntryStatus>;
 
+/**
+ * Which date a list of entries is ordered by. `updated` moves on ANY write to the row --
+ * validating, recomputing confidence, reconciling -- not only when a person edits the text.
+ */
+export const entrySortField = z.enum(["created", "updated"]);
+export type EntrySortField = z.infer<typeof entrySortField>;
+
+export const sortDirection = z.enum(["asc", "desc"]);
+export type SortDirection = z.infer<typeof sortDirection>;
+
 /** Confidence level in the information. Section 14, confidence */
 export const confidenceLevel = z.enum(["low", "medium", "high", "verified"]);
 export type ConfidenceLevel = z.infer<typeof confidenceLevel>;

@@ -1,5 +1,13 @@
 import { getSql, type Sql } from "@cortex/database";
-import type { ContextEntry, ContextEntryType, ContextEntryStatus, Entity, Source } from "@cortex/shared";
+import type {
+  ContextEntry,
+  ContextEntryType,
+  ContextEntryStatus,
+  Entity,
+  EntrySortField,
+  SortDirection,
+  Source,
+} from "@cortex/shared";
 import { findProjectIdByName } from "./projects.js";
 import { rowToContextEntry, rowToEntity, rowToSource, type Row } from "./map.js";
 
@@ -16,11 +24,19 @@ export async function listProjects(): Promise<{ entity: Entity; entryCount: numb
   return rows.map((r) => ({ entity: rowToEntity(r), entryCount: Number(r.entry_count) }));
 }
 
+export interface EntrySort {
+  by: EntrySortField;
+  dir: SortDirection;
+}
+
 export interface ListEntriesFilter {
   project?: string;
   type?: ContextEntryType;
   status?: ContextEntryStatus;
   limit?: number;
+  /** Applied in the query, before the limit: sorting the 60 that came back would make "oldest"
+   *  mean the oldest of the 60 most recent. Defaults to the newest added first. */
+  sort?: EntrySort;
   /**
    * Which projects the viewer can reach. **The filter goes inside the query**, before ordering
    * and limiting (ADR-0052).
@@ -54,10 +70,17 @@ export async function listEntries(filter: ListEntriesFilter = {}): Promise<Conte
   const rows = (await sql`
     SELECT ce.* FROM context_entries ce
     ${where}
-    ORDER BY ce.created_at DESC
+    ${entryOrder(sql, filter.sort ?? { by: "created", dir: "desc" })}
     LIMIT ${filter.limit ?? 100}
   `) as unknown as Row[];
   return rows.map(rowToContextEntry);
+}
+
+function entryOrder(sql: Sql, sort: EntrySort) {
+  const column = sort.by === "updated" ? sql`ce.updated_at` : sql`ce.created_at`;
+  // now() is the transaction's start time, so a batch capture writes rows with identical dates;
+  // without the id as a tiebreak they swap places between reloads.
+  return sort.dir === "asc" ? sql`ORDER BY ${column} ASC, ce.id ASC` : sql`ORDER BY ${column} DESC, ce.id DESC`;
 }
 
 export interface EntryDetail {
