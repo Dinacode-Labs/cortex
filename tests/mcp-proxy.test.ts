@@ -74,6 +74,28 @@ describe("createMcpProxy", () => {
     }
   });
 
+  /**
+   * Every Claude Code session goes through this proxy: if the client schema dropped `_meta`, the
+   * server would mark the read tools and no agent would ever see it (ADR-0075).
+   */
+  it("forwards each tool's _meta untouched", async () => {
+    const up = new McpServer({ name: "cortex-upstream", version: "0.0.0" });
+    up.registerTool(
+      "read",
+      { description: "A read tool", inputSchema: { q: z.string() }, _meta: { "anthropic/alwaysLoad": true } },
+      async () => ({ content: [] }),
+    );
+    up.registerTool("write", { description: "A write tool", inputSchema: { q: z.string() } }, async () => ({ content: [] }));
+    const { client, close } = await harness(() => linkedUpstream(up));
+    try {
+      const { tools } = await client.listTools();
+      expect(tools.find((t) => t.name === "read")?._meta).toEqual({ "anthropic/alwaysLoad": true });
+      expect(tools.find((t) => t.name === "write")?._meta).toBeUndefined();
+    } finally {
+      await close();
+    }
+  });
+
   it("forwards the call and returns the server's result", async () => {
     const up = upstreamServer();
     const { client, close } = await harness(() => linkedUpstream(up));

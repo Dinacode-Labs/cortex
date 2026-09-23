@@ -2457,6 +2457,8 @@ decisions they carried stay recorded here.
   the session cookie stops being `SameSite=Lax`, which removes the only CSRF defence the forms
   have.
 
+<a id="adr-0074"></a>
+
 ## ADR-0074 · The first prompt of a session writes the lookup out as the agent's first action
 
 - **Status:** proposed (2026-09-23), a hypothesis awaiting its measurement. Builds on
@@ -2513,3 +2515,49 @@ decisions they carried stay recorded here.
   if the hook moves on to running the search on the server itself, this decision is revisited.
   Also when every server a client talks to has 0075, which leaves the fallback line
   with nothing to do.
+
+<a id="adr-0075"></a>
+
+## ADR-0075 · The read tools load from the first turn in Claude Code, and only they do
+
+- **Status:** accepted as a hypothesis (2026-09-23), pending a measured batch. Complements the
+  first-prompt lookup hook of [0074](#adr-0074); builds on [0069](#adr-0069).
+- **Context:** Claude Code defers MCP tools: only their names reach the model, and a tool has to be
+  loaded with `ToolSearch` before it can be called. In two batches of 25 sessions asking about a
+  linked project, **every** session that consulted Cortex had called `ToolSearch` first, and
+  **none** of those that did not consult it had. Consulting Cortex before the first `Bash`, `Read`
+  or `Agent` call happened in 2/25 and 4/25. A third batch, the same as the first but with
+  deferral disabled for every tool (`ENABLE_TOOL_SEARCH=false`), consulted it before the
+  repository in 11/25 (Fisher p=0.008 against the first), consulted it at all in 18/25, used it as
+  the very first tool in 11/25, and nobody called `ToolSearch`. Deferral is the main barrier: a
+  lookup that takes two decisions (load, then call) loses to `Bash`, which is already at hand.
+- **Decision:** the four read tools — `search_project_context`, `ask_project_context`,
+  `get_project_context_pack`, `list_project_decisions` — carry
+  `_meta: { "anthropic/alwaysLoad": true }` in `apps/mcp-server/src/server.ts`. Claude Code reads
+  that key per tool from `tools/list` and loads the tool up front. The write tools
+  (`save_project_context`, `validate_context_entry`) and the maintenance ones
+  (`search_project_code`, `lint_project_context`) stay deferred: a tool loaded up front is context
+  every session pays for, and these are called rarely or only once work is done. `cortex mcp`
+  forwards the list as it comes, `_meta` included; a test checks it on both sides. `_meta` is an
+  optional field that an older client ignores, so the CLI and the server stay independent
+  ([0062](#adr-0062)).
+- **Alternatives:**
+  - `ENABLE_TOOL_SEARCH=false` — it produced the numbers above, but it turns deferral off for
+    **all** of the user's tools, from every server. That is the user's call about their whole
+    setup, not something a product sets for them.
+  - `alwaysLoad: true` on the server in the MCP config (`.mcp.json`) — it loads all eight tools,
+    writes included, and it also changes how the server is connected at startup. Too wide, and a
+    side effect on connection that has nothing to do with the goal.
+  - The CLI proxy adding the `_meta` itself, so it works against older servers — it would make the
+    proxy know which tools exist and which read, which it deliberately does not (it forwards
+    without knowing the tools in advance), and two places would decide the same thing.
+  - The first-prompt lookup hook ([0074](#adr-0074)) is a complement, not an alternative: the hook
+    asks for the lookup, this removes the step that made the lookup cost two decisions. The hook
+    keeps `ToolSearch` only for when the search tool is missing, which with this marker is an
+    older server.
+- **Revisit when:** the next batch — `alwaysLoad` plus the [0074](#adr-0074) hook, with the memory frozen —
+  says whether consulting before the repository gets close to the 11/25 of undeferred tools, or
+  goes past it. If it stays near 2–4/25, the marker is not reaching the agent or is not what
+  mattered. Also when Claude Code changes how it reads `anthropic/alwaysLoad`, or when the MCP
+  specification standardises a way to say the same thing.
+

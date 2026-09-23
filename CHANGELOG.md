@@ -9,6 +9,12 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Claude Code has Cortex's read tools from the first turn.** `search_project_context`,
+  `ask_project_context`, `get_project_context_pack` and `list_project_decisions` now declare
+  themselves always-loaded, so the agent no longer has to find them with `ToolSearch` before it can
+  ask the memory anything. The write and maintenance tools stay deferred. It takes an updated
+  server; the CLI needs no update, and other MCP clients ignore the marker
+  ([ADR-0075](docs/decisions.md#adr-0075)).
 - **The first question of a session asks the memory before the repository.** In Claude Code and
   Codex, a new plugin hook (`cortex hook-lookup`, on `UserPromptSubmit`) tells the agent, on the
   first prompt of each session in a linked project, to search the memory with your words before
