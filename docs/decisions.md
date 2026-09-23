@@ -2456,3 +2456,50 @@ decisions they carried stay recorded here.
   destructive bulk action appears, at which point the confirmation page becomes a component; or
   the session cookie stops being `SameSite=Lax`, which removes the only CSRF defence the forms
   have.
+
+## ADR-0074 · The first prompt of a session writes the lookup out as the agent's first action
+
+- **Status:** proposed (2026-09-23), a hypothesis awaiting its measurement. Builds on
+  [0069](#adr-0069).
+- **Context:** the injected material already asks for the lookup, and the `cortex-recall` skill
+  fires on questions about the project. With them, agents asked the memory at some point in most
+  sessions, but **before their first Bash, Read or Agent call** in only 2-4 sessions out of 25:
+  the typical order was text → Bash → ToolSearch → `search_project_context`, so the memory
+  arrived second, after the agent had already formed a view from the files. The likely cause is
+  that Claude Code defers MCP tools: asking the memory takes two decisions (load the tool, then
+  call it) that compete with a Bash already at hand. Where the search tool is native and always
+  visible, the lookup was the first tool in most sessions (another model, so it only points the
+  way). Other memory tools for coding agents hit the same wall and solved it by writing the
+  `ToolSearch` call out on the first message.
+- **Decision:**
+  1. A `UserPromptSubmit` hook, `cortex hook-lookup`, in the plugin and in `cortex setup`'s
+     settings.json mode. On the **first prompt of a session** in a linked project it injects,
+     through `additionalContext`, an imperative order: run `ToolSearch` with a literal
+     `select:` of the four **read** tools (`search_project_context`, `ask_project_context`,
+     `get_project_context_pack`, `list_project_decisions`), then call `search_project_context`
+     with the user's own words, before any Bash/Read/Agent and before answering.
+  2. The `select:` lists both of Claude Code's prefixes (`mcp__cortex__`, the MCP added by hand,
+     and `mcp__plugin_cortex_cortex__`, the plugin's): `select:` skips names that do not exist.
+     No write tool is loaded: the order is to read.
+  3. The action forced is a **search with the user's words**, not the pack: what is being chased
+     is the pack not holding the entry the question needs.
+  4. On every later prompt, nothing. The first prompt is known by a marker per session id in
+     the temp directory, created with `O_EXCL`: no network, no server, one `open` per prompt.
+     With no session id, nothing is said.
+  5. Only `additionalContext`: on this event a `systemMessage` is shown in the terminal and does
+     not reach the model. Codex installs the same plugin and has its MCP tools loaded, so it gets
+     the order without the `ToolSearch` step.
+  6. The wording lives in `packages/shared/src/capture-protocol.ts` (`firstPromptLookup`), like
+     the rest of the protocol ([0066](#adr-0066)).
+- **Alternatives:** the hook runs the search against the server and injects the results — it
+  removes the decision altogether, but it puts a network round trip in front of every first
+  message, needs the same timeout discipline as `hook-context`, and a query written by the user is
+  not always the best one; it is the next step if this one is not enough. Reminding on every
+  prompt — noise that trains the agent to skip it. Forcing the pack or every tool — the pack is
+  already injected at session start, and loading write tools invites writes nobody asked for.
+  Adding the tools to `permissions.allow` — a separate question, left out.
+- **Revisit when:** the run of the same controlled test with this hook is in. The metric is
+  "asks Cortex before the first Bash/Read/Agent", today 2-4 out of 25. If it does not clearly
+  rise, or if the hook moves on to running the search on the server itself, this decision is
+  revisited. Also when Claude Code stops deferring MCP tools, which removes the reason for the
+  `ToolSearch` step.
