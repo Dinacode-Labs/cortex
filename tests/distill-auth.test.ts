@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * stayed that way until somebody wondered why the memory was still empty.
  */
 const runAgent = vi.fn();
-vi.mock("../packages/agents/src/mastra.js", () => ({ runAgent: (...a: unknown[]) => runAgent(...a) }));
+vi.mock("../packages/agents/src/runtime/run-agent.js", () => ({ runAgent: (...a: unknown[]) => runAgent(...a) }));
 
 beforeEach(() => {
   runAgent.mockReset();
@@ -16,7 +16,7 @@ beforeEach(() => {
 });
 
 async function distill() {
-  return (await import("../packages/agents/src/distill.js")).distill;
+  return (await import("../packages/agents/src/agents/distiller/distill.js")).distill;
 }
 
 describe("distill facing a provider failure", () => {

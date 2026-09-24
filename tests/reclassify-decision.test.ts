@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decideReclassification } from "../packages/core/src/save.js";
+import { decideReclassification } from "../packages/core/src/knowledge/save.js";
 
 /**
  * `maintain` reclassified every heuristically typed entry and wrote the result back even when

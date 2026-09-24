@@ -43,7 +43,7 @@ vi.stubGlobal("fetch", fetchStub);
 afterAll(() => vi.unstubAllGlobals());
 
 async function runAgent() {
-  return (await import("../packages/agents/src/mastra.js")).runAgent;
+  return (await import("../packages/agents/src/runtime/run-agent.js")).runAgent;
 }
 
 function requestAt(i: number): Record<string, unknown> {

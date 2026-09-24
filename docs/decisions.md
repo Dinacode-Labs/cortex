@@ -1878,8 +1878,8 @@ decisions they carried stay recorded here.
      MRR 0.928 baseline was measured against them, so translating them would
      silently invalidate every comparison the eval exists to make. They match what users write,
      not the language of the file they live in.
-  2. The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in
-     `packages/agents/src/mastra.ts`). The prompts themselves are now English; what the agents
+   2. The **output language** of the LLM agents (`OUTPUT_LANGUAGE` in
+      `packages/agents/src/agents/language.ts`). The prompts themselves are now English; what the agents
      *produce* is knowledge entries stored next to a corpus that is already Spanish. Translating
      a prompt is a translation; changing the output language is a product decision, and it would
      split every existing memory in two.

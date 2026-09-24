@@ -12,9 +12,9 @@ import {
   packShowing,
   sessionMemoryHeader,
 } from "../packages/shared/src/capture-protocol.js";
-import { PACK_SECTIONS } from "../packages/core/src/context-pack.js";
-import { renderContextPack } from "../packages/core/src/render.js";
-import type { ContextPack } from "../packages/core/src/context-pack.js";
+import { PACK_SECTIONS } from "../packages/core/src/knowledge/context-pack.js";
+import { renderContextPack } from "../packages/core/src/knowledge/render.js";
+import type { ContextPack } from "../packages/core/src/knowledge/context-pack.js";
 import type { ContextEntry } from "@cortex/shared";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -140,7 +140,7 @@ describe("the read half reaches every agent", () => {
     ["apps/cli/src/commands/hook-context.ts", "sessionMemoryHeader("],
     ["apps/mcp-server/src/server.ts", "LOOKUP_WHEN"],
     ["apps/cli/src/mcp/proxy.ts", "MCP_INSTRUCTIONS"],
-    ["packages/core/src/render.ts", "packIsASample"],
+    ["packages/core/src/knowledge/render.ts", "packIsASample"],
   ])("%s takes the wording from @cortex/shared", (file, symbol) => {
     const src = read(file);
     expect(src).toContain(symbol);

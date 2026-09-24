@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { inferTypeFromQuery } from "../packages/core/src/query-intent.js";
+import { inferTypeFromQuery } from "../packages/core/src/knowledge/query-intent.js";
 
 /**
  * Inferring the type from the question came out of the eval: "what technical debt is there

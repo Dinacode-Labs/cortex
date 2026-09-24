@@ -202,7 +202,7 @@ mark**: mixed into one total, a gain in one language would hide a loss in the ot
 number would stop saying what happened.
 
 There is an asymmetry worth knowing before reading either number. **The distiller answers in
-Spanish whatever it is fed** -- `OUTPUT_LANGUAGE` in `packages/agents/src/mastra.ts` is fixed,
+Spanish whatever it is fed** -- `OUTPUT_LANGUAGE` in `packages/agents/src/agents/language.ts` is fixed,
 and changing it is a product decision, not a translation. So:
 
 - **`es`** is the session and the corpus in the same language: it measures the judgement alone.

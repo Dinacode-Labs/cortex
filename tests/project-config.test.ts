@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readCortexLink } from "../packages/client/src/project-config";
-import { slugify } from "../packages/core/src/project-config";
+import { slugify } from "../packages/core/src/projects/project-config";
 
 describe("slugify", () => {
   it("generates stable slugs (kebab-case, accents stripped)", () => {
