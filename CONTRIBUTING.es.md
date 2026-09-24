@@ -51,7 +51,7 @@ escrito nosotros**:
   de eval de `evals/` (la línea base se midió contra ellos). Casan con lo que escribe la gente,
   no con el idioma del fichero en el que viven.
 - **El idioma de salida de los agentes LLM** (`OUTPUT_LANGUAGE` en
-  `packages/agents/src/mastra.ts`). Los prompts están en inglés; lo que los agentes producen son
+  `packages/agents/src/agents/language.ts`). Los prompts están en inglés; lo que los agentes producen son
   entradas de conocimiento que se guardan junto a un corpus que ya es español, así que cambiarlo
   es una decisión de producto, no una traducción.
 

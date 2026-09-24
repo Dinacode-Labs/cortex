@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderContextPack } from "../packages/core/src/render.js";
-import type { ContextPack } from "../packages/core/src/context-pack.js";
+import { renderContextPack } from "../packages/core/src/knowledge/render.js";
+import type { ContextPack } from "../packages/core/src/knowledge/context-pack.js";
 import type { ContextEntry } from "@cortex/shared";
 
 /**

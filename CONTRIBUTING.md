@@ -77,12 +77,14 @@ and wire it in `wire.ts`. The boundary the CLI depends on — no Postgres, no Ma
   Reuse core's `extract` layer (multimodal) and write through the authenticated API
   (`/capture/batch`). Make it incremental by `sourceReference`. Register it in `COMMANDS`
   (`apps/cli/src/index.ts`).
-- **Support a new file format** → `packages/core/src/extract.ts` (`SUPPORTED_EXTS` plus a
+- **Support a new file format** → `packages/core/src/capture/extract.ts` (`SUPPORTED_EXTS` plus a
   branch in `extractFileText`). Every connector inherits it.
 - **Change the schema** → a new migration in `packages/database/migrations/NNNN_desc.sql`,
   idempotent (`IF NOT EXISTS`). The runner applies unregistered ones in order.
-- **Add an LLM agent role** → `AgentRole` + `INSTRUCTIONS` + the registration in
-  `packages/agents/src/mastra.ts` (`JSON_ROLES` if it returns JSON).
+- **Add an LLM agent role** → `AgentRole` (`packages/agents/src/runtime/roles.ts`), its
+  `packages/agents/src/agents/<role>/instructions.ts`, the registration in
+  `packages/agents/src/runtime/registry.ts`, and `JSON_ROLES`
+  (`packages/agents/src/runtime/model.ts`) if it returns JSON.
 - **Add a `cortex` subcommand** → create `apps/cli/src/commands/<cmd>.ts` exporting
   `run(args: string[])` — no `process.exit`, no side effects on import; the dispatcher owns
   the lifecycle — and register it in `COMMANDS`.
@@ -99,7 +101,7 @@ and wire it in `wire.ts`. The boundary the CLI depends on — no Postgres, no Ma
   Two things stay in Spanish, and both are **data rather than prose we wrote**: the patterns
   that match the corpus (the classification rules in `packages/core/src/text.ts`, the
   deictics in `domain.ts`, the eval fixtures) and the **output language** of the LLM agents
-  (`OUTPUT_LANGUAGE` in `packages/agents/src/mastra.ts`), because what they produce is stored
+  (`OUTPUT_LANGUAGE` in `packages/agents/src/agents/language.ts`), because what they produce is stored
   next to a corpus that is already Spanish. Each of those carries an English comment saying
   why. Translating a prompt is a translation; changing the output language is a product
   decision.

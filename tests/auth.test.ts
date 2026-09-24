@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { isAllowedEmail, isAdmin } from "../packages/core/src/auth";
+import { isAllowedEmail, isAdmin } from "../packages/core/src/identity/auth";
 
 // isAllowedEmail / isAdmin read the env LAZILY, so it can be adjusted per test.
 describe("isAllowedEmail (whitelist de dominios)", () => {
