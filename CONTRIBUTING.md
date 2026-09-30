@@ -66,6 +66,12 @@ and the embeddings usage sink. If an operation in core needs an LLM, define the 
 and wire it in `wire.ts`. The boundary the CLI depends on — no Postgres, no Mastra, no embeddings
 — is held by `tests/client-package.test.ts`.
 
+**Where the rules live.** Inside a `core` module that holds invariants, the rules and their
+repository port go in `<module>/domain/` (no SQL, no `@cortex/database`), and the pg adapter in
+`<module>/infrastructure/`; the use case keeps its name and its place, calling the port instead
+of `getSql()`. A module without invariants (usage, the row mappers) gets neither
+([ADR-0076](./docs/decisions.md#adr-0076)).
+
 ## Common recipes
 
 - **Add an MCP, skill or command to the toolbelt** → if it belongs to **the product** (anyone

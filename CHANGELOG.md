@@ -159,6 +159,11 @@ fixes things.
   generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
 
 ### Fixed
+- **A `supersedes` relation no longer makes maintenance fall over.** The bi-temporal pass that
+  closes a superseded entry wrote `validity = 'superseded'`, a value the table does not accept
+  (only `current`, `historical` and `unknown`), so the whole maintenance run aborted as soon as
+  one `supersedes` relation existed. It writes `historical` now, the same as every other
+  invalidation, and the path has a test it never had.
 - **Confidence is earned by corroboration, not by having been touched.** Almost every
   distilled entry was reaching medium confidence on the first `maintain` run without anything
   ever having confirmed it: promotion went by "has this entry been written to since it was
