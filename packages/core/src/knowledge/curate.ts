@@ -1,6 +1,6 @@
 import { getSql } from "@cortex/database";
 import { getEnvNum } from "@cortex/shared";
-import type { Row } from "../storage/map.js";
+import { PgContextEntryRepository } from "./infrastructure/context-entry.repository.js";
 
 /**
  * Auto-curation with NO human in the loop (it replaces "review" so as not to add friction;
@@ -25,21 +25,9 @@ export interface CurationResult {
 }
 
 export async function autoCurate(decayDays = getEnvNum("CORTEX_DECAY_DAYS", 120)): Promise<CurationResult> {
-  const sql = getSql();
-  const promoted = (await sql`
-    UPDATE context_entries SET confidence = 'medium'
-    WHERE confidence = 'low' AND source_type = 'agent_session'
-      AND status = 'pending_validation' AND valid_to IS NULL
-      AND cortex_corroborations(metadata) >= 1
-    RETURNING id
-  `) as unknown as Row[];
-  const decayed = (await sql`
-    UPDATE context_entries SET status = 'obsolete'
-    WHERE confidence = 'low' AND source_type = 'agent_session'
-      AND status = 'pending_validation' AND valid_to IS NULL
-      AND cortex_corroborations(metadata) = 0
-      AND created_at < now() - make_interval(days => ${decayDays})
-    RETURNING id
-  `) as unknown as Row[];
-  return { promoted: promoted.length, decayed: decayed.length };
+  const repository = new PgContextEntryRepository(getSql());
+  return {
+    promoted: await repository.promoteCorroborated(),
+    decayed: await repository.decayUncorroborated(decayDays),
+  };
 }

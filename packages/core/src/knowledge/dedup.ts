@@ -5,6 +5,7 @@ import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { saveContext } from "./save.js";
 import { findProjectIdByName } from "../projects/projects.js";
 import { relate } from "../graph/entities.js";
+import { PgContextEntryRepository } from "./infrastructure/context-entry.repository.js";
 
 /**
  * Write reconciliation (mem0 style: ADD / UPDATE / NOOP). Before storing auto-captured
@@ -27,10 +28,11 @@ export interface NearestEntry {
 }
 
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
-  const pid = await findProjectIdByName(getSql(), project);
+  const sql = getSql();
+  const pid = await findProjectIdByName(sql, project);
   if (!pid) return null;
   try {
-    const hits = await vectorSearch(getSql(), getEmbeddingProvider(), { queryText: text, projectId: pid, limit: 1 });
+    const hits = await vectorSearch(sql, getEmbeddingProvider(), { queryText: text, projectId: pid, limit: 1 });
     const h = hits[0];
     if (!h) return null;
     return { id: h.entry.id, title: h.entry.title, content: h.entry.content, score: h.score, sourceType: h.entry.sourceType };
@@ -49,22 +51,14 @@ export async function isNearDuplicate(project: string, text: string, threshold =
  * decided there was nothing to add (noop) or folded it in (update). It is the only signal
  * `autoCurate` promotes on (ADR-0067). Being WRITTEN to is not one: an entry gets reclassified,
  * re-embedded and corrected by hand without any of that making it truer.
- *
- * One statement rather than read-modify-write, because two sessions closing at the same time
- * would otherwise read the same value and store the same increment.
  */
 export async function recordCorroboration(entryId: string): Promise<void> {
-  await getSql()`
-    UPDATE context_entries
-       SET metadata = jsonb_set(metadata, '{corroborations}',
-                                to_jsonb(cortex_corroborations(metadata) + 1))
-     WHERE id = ${entryId}
-  `;
+  await new PgContextEntryRepository(getSql()).recordCorroboration(entryId);
 }
 
 export async function updateEntryContent(entryId: string, content: string): Promise<void> {
   const sql = getSql();
-  await sql`UPDATE context_entries SET content = ${content}, updated_at = now() WHERE id = ${entryId}`;
+  await new PgContextEntryRepository(sql).updateEntryContent(entryId, content);
   await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
 }
 
@@ -81,18 +75,10 @@ export async function updateEntryFields(
   entryId: string,
   fields: { title?: string; content?: string },
 ): Promise<boolean> {
-  const { title, content } = fields;
-  if (title === undefined && content === undefined) return false;
+  const { content } = fields;
   const sql = getSql();
-  const rows = (await sql`
-    UPDATE context_entries
-       SET title = COALESCE(${title ?? null}, title),
-           content = COALESCE(${content ?? null}, content),
-           updated_at = now()
-     WHERE id = ${entryId}
-     RETURNING id
-  `) as unknown as { id: string }[];
-  if (rows.length === 0) return false;
+  const ok = await new PgContextEntryRepository(sql).updateEntryFields(entryId, fields);
+  if (!ok) return false;
   if (content !== undefined) await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
   return true;
 }
@@ -100,11 +86,7 @@ export async function updateEntryFields(
 /** Bi-temporal DELETE (section 5.5: invalidating is not deleting): marks the entry as
  * historical and superseded by another. The same pattern as temporal invalidation. */
 export async function invalidateEntry(entryId: string, supersededById: string): Promise<void> {
-  await getSql()`
-    UPDATE context_entries
-    SET valid_to = now(), validity = 'historical', status = 'superseded', superseded_by = ${supersededById}
-    WHERE id = ${entryId} AND valid_to IS NULL
-  `;
+  await new PgContextEntryRepository(getSql()).invalidate(entryId, supersededById);
 }
 
 /** Injectable LLM reconciler (provided by @cortex/agents through setReconciler). Without it,
@@ -225,29 +207,13 @@ export async function reconcileProject(project: string, maxDistance = getEnvNum(
   const sql = getSql();
   const pid = await findProjectIdByName(sql, project);
   if (!pid) return { deduped: 0 };
-  const pairs = (await sql`
-    SELECT a.id AS keep, b.id AS drop
-    FROM embeddings ea
-    JOIN context_entries a ON a.id = ea.context_entry_id
-    JOIN embeddings eb ON eb.embedding_model = ea.embedding_model
-      AND eb.embedding_version = ea.embedding_version AND eb.chunk_index = ea.chunk_index
-    JOIN context_entries b ON b.id = eb.context_entry_id
-    WHERE a.project_id = ${pid} AND b.project_id = ${pid}
-      AND a.source_type = b.source_type
-      AND a.valid_to IS NULL AND b.valid_to IS NULL
-      AND a.status NOT IN ('rejected', 'obsolete', 'superseded')
-      AND b.status NOT IN ('rejected', 'obsolete', 'superseded')
-      AND coalesce(a.metadata->>'format', '') <> ALL(${NON_DEDUP_FORMATS})
-      AND coalesce(b.metadata->>'format', '') <> ALL(${NON_DEDUP_FORMATS})
-      AND a.created_at < b.created_at
-      AND (ea.vector <=> eb.vector) < ${maxDistance}
-    ORDER BY b.created_at ASC
-  `) as unknown as { keep: string; drop: string }[];
+  const repository = new PgContextEntryRepository(sql);
+  const pairs = await repository.findNearDuplicatePairs(pid, maxDistance, NON_DEDUP_FORMATS);
   const dropped = new Set<string>();
   let deduped = 0;
   for (const p of pairs) {
     if (dropped.has(p.drop) || dropped.has(p.keep)) continue; // already handled / the canonical one was invalidated
-    await invalidateEntry(p.drop, p.keep);
+    await repository.invalidate(p.drop, p.keep);
     dropped.add(p.drop);
     deduped++;
   }
