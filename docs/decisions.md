@@ -2561,3 +2561,54 @@ decisions they carried stay recorded here.
   mattered. Also when Claude Code changes how it reads `anthropic/alwaysLoad`, or when the MCP
   specification standardises a way to say the same thing.
 
+<a id="adr-0076"></a>
+
+## ADR-0076 · Domain modeling inside `core`, one module at a time
+
+- **Status:** accepted as a hypothesis (2026-09-24). Reopens, in part, [0041](#adr-0041).
+- **Context:** the module reorganization split `@cortex/core` from 30 flat files into
+  `knowledge/`, `graph/`, `projects/`, `capture/`, `identity/`, `observability/` and `storage/`,
+  with no change of logic. It made the real state visible rather than caused it: about two thirds
+  of the files call `getSql()` directly, so a use case, its persistence and its domain rules share
+  one file -- `knowledge/save.ts` inserts three rows, decides the classifier precedence and merges
+  entities in the same function. The rules the product leans on are prose, enforced by convention:
+  the validity window ([0012](#adr-0012)), confidence earned by corroboration
+  ([0067](#adr-0067)), a summary that is not a cut of the content ([0068](#adr-0068)), scrub
+  before classify, embed and persist, access ([0046](#adr-0046)) and hierarchy
+  ([0037](#adr-0037)) over projects. Forget one and nothing fails until a query returns too much,
+  a contradiction is missed, or a secret reaches the model -- and only by luck.
+- **Decision:** reopen the part of [0041](#adr-0041) that closed the door on domain modeling, and
+  only that part. Inside `@cortex/core`, a module **with invariants** grows a `domain/` next to
+  its functions: the aggregate (its invariants as methods), its value objects and the repository
+  **port** as an interface -- no SQL, no `@cortex/database`, no LLM -- plus an `infrastructure/`
+  with the pg adapter that implements the port. The module's use cases keep their names and their
+  barrel, and call the port instead of `getSql()`. It starts with the aggregates that already
+  exist as rows and rules: `ContextEntry` ([0012](#adr-0012), [0067](#adr-0067),
+  [0068](#adr-0068)), `Project` (owner, visibility, hierarchy and access: [0037](#adr-0037),
+  [0046](#adr-0046), [0051](#adr-0051)) and the `Entity` naming rule
+  ([0055](#adr-0055), [0060](#adr-0060)). A module without invariants -- usage, the row
+  mappers -- does not get a `domain/` just to look uniform. What [0041](#adr-0041) rejected
+  **stays rejected**: no ORM or query builder, no dependency-injection container, no service
+  layer between handlers and core, no new package, no microservices. The package boundary does
+  not move either: `core` stays deterministic and free of Mastra, the LLM keeps arriving through
+  `setClassifier`/`setReconciler`/`setMediaExtractor` ([0008](#adr-0008), [0045](#adr-0045)), and
+  `packages/core/src/index.ts` keeps exporting what it exports, so apps and tests do not change.
+- **Alternatives:**
+  - **Leave [0041](#adr-0041) as it is: folders, nothing more.** The reorganization already made
+    the code legible, and this is the smallest step. Rejected because legibility is not
+    enforcement: the invariants stay in comments, and the first bug from a forgotten rule is
+    exactly the one a domain object exists to prevent. [0041](#adr-0041) refused the abstraction
+    because the problems it saw were local, not skeletal; the boundary between a rule and its SQL
+    is not local, it repeats in every module.
+  - **Full hexagonal, a `domain/` and ports everywhere.** More files and more indirection than
+    there are invariants to protect. Rejected; it is the over-engineering [0041](#adr-0041)
+    refused, and it would put a port in front of code that has nothing to guard.
+  - **A `@cortex/domain` package.** The same answer as [0018](#adr-0018) gave for identity:
+    topological purity paid for with a package, a tsconfig, a test config and a larger graph.
+    Rejected.
+- **Revisit when:** a module's `domain/` stays thin enough that the invariant can be stated in a
+  test over its SQL instead of an object, in which case the object is ceremony and goes; or two
+  consecutive changes pass through the ports without catching a class of bug; or the dependency
+  rules get enforced by lint and the boundaries hold on their own, which was
+  [0018](#adr-0018)'s own trigger.
+
