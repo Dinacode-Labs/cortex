@@ -161,6 +161,18 @@ export class PgContextEntryRepository implements ContextEntryRepository {
     `) as unknown as { keep: string; drop: string }[];
   }
 
+  async findContradictionCandidates(entityIds: string[], excludeId: string): Promise<ContextEntry[]> {
+    const rows = (await this.sql`
+      SELECT DISTINCT ce.*
+      FROM context_entries ce
+      JOIN context_entry_entities cee ON cee.context_entry_id = ce.id
+      WHERE cee.entity_id IN ${this.sql(entityIds)}
+        AND ce.id <> ${excludeId}
+        AND ce.status NOT IN ('rejected', 'obsolete')
+    `) as unknown as Row[];
+    return rows.map(rowToContextEntry);
+  }
+
   async findIdBySourceReference(projectId: string, sourceReference: string): Promise<string | null> {
     const rows = (await this.sql`
       SELECT id FROM context_entries WHERE project_id = ${projectId} AND source_reference = ${sourceReference} LIMIT 1

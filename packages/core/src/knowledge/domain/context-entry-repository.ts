@@ -73,6 +73,8 @@ export interface ContextEntryRepository {
   updateEntryFields(entryId: string, fields: { title?: string; content?: string }): Promise<boolean>;
   updateEntryContent(entryId: string, content: string): Promise<void>;
   findNearDuplicatePairs(projectId: string, maxDistance: number, skipFormats: string[]): Promise<{ keep: string; drop: string }[]>;
+  /** Current entries that share an entity with these, for the contradiction check. */
+  findContradictionCandidates(entityIds: string[], excludeId: string): Promise<ContextEntry[]>;
   /**
    * Deferred reclassification and summary rebuilding. Which entries qualify and what is written
    * are decided in the use case; these load the candidates and apply one write each.

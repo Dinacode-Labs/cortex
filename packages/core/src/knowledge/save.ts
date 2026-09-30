@@ -2,7 +2,6 @@ import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { type ContextEntry, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "../graph/entities.js";
-import { rowToContextEntry, type Row } from "../storage/map.js";
 import { createProject, findProjectIdByName } from "../projects/projects.js";
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
@@ -177,16 +176,8 @@ async function detectImprovements(
   }
 
   if (newPolarity.size > 0 && entityIds.length > 0) {
-    const candidates = (await sql`
-      SELECT DISTINCT ce.*
-      FROM context_entries ce
-      JOIN context_entry_entities cee ON cee.context_entry_id = ce.id
-      WHERE cee.entity_id IN ${sql(entityIds)}
-        AND ce.id <> ${entry.id}
-        AND ce.status NOT IN ('rejected', 'obsolete')
-    `) as unknown as Row[];
-    for (const row of candidates) {
-      const cand = rowToContextEntry(row);
+    const candidates = await new PgContextEntryRepository(sql).findContradictionCandidates(entityIds, entry.id);
+    for (const cand of candidates) {
       if (seen.has(cand.id)) continue;
       if (polarityContradicts(newPolarity, polarityTags(cand.content))) {
         seen.add(cand.id);
