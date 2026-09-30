@@ -2,7 +2,7 @@ import { getSql, type Sql } from "@cortex/database";
 import type { Entity, EntityType } from "@cortex/shared";
 import { canonicalize } from "../../text.js";
 import { rowToEntity, type Row } from "../../storage/map.js";
-import type { EntityRepository, RelationInput } from "../domain/entity-repository.js";
+import type { EntityNameRow, EntityRepository, RelationInput } from "../domain/entity-repository.js";
 
 export class PgEntityRepository implements EntityRepository {
   constructor(private readonly sql: Sql = getSql()) {}
@@ -35,6 +35,72 @@ export class PgEntityRepository implements EntityRepository {
       VALUES (${args.sourceId}, ${args.sourceType}, ${args.targetId}, ${args.targetType},
               ${args.relationType}, ${args.confidence ?? "medium"})
       ON CONFLICT (source_id, target_id, relation_type) WHERE valid_to IS NULL DO NOTHING
+    `;
+  }
+
+  async listResolvable(): Promise<EntityNameRow[]> {
+    const rows = (await this.sql`SELECT id, name, type FROM entities WHERE type <> 'project'`) as unknown as Row[];
+    return rows.map((r) => ({ id: r.id as string, name: r.name as string, type: r.type as string }));
+  }
+
+  async linkCounts(): Promise<Map<string, number>> {
+    const rows = (await this.sql`SELECT entity_id, count(*)::int AS n FROM context_entry_entities GROUP BY entity_id`) as unknown as Row[];
+    return new Map(rows.map((r) => [r.entity_id as string, Number(r.n)]));
+  }
+
+  // One transaction per group, so a merge either re-points everything or nothing.
+  async mergeEntities(canonicalId: string, loserIds: string[]): Promise<void> {
+    await this.sql.begin(async (tx) => {
+      for (const loserId of loserIds) {
+        // Re-point links without violating the (entry, entity) PK.
+        await tx`
+          UPDATE context_entry_entities cee SET entity_id = ${canonicalId}
+          WHERE cee.entity_id = ${loserId}
+            AND NOT EXISTS (
+              SELECT 1 FROM context_entry_entities c2
+              WHERE c2.context_entry_id = cee.context_entry_id AND c2.entity_id = ${canonicalId})
+        `;
+        await tx`DELETE FROM context_entry_entities WHERE entity_id = ${loserId}`;
+        // Re-point relations without violating the partial UNIQUE `relations_active_unique`
+        // (source_id, target_id, relation_type) WHERE valid_to IS NULL. Each UPDATE re-points
+        // ONLY the loser's edges that, once the endpoint moves to `canonical`, would NOT
+        // collide with an already-current edge; the DELETE afterwards removes the ones that
+        // would have. source_id and target_id must be handled separately: a loser's edge can
+        // collide through either endpoint depending on which one is re-pointed.
+
+        // (a) Re-point source_id: edge (loserId, target, type) becomes (canonicalId, target, type).
+        await tx`
+          UPDATE relations r SET source_id = ${canonicalId}
+          WHERE r.source_id = ${loserId}
+            AND NOT EXISTS (
+              SELECT 1 FROM relations c2
+              WHERE c2.source_id = ${canonicalId} AND c2.target_id = r.target_id
+                AND c2.relation_type = r.relation_type AND c2.valid_to IS NULL)
+        `;
+        await tx`DELETE FROM relations WHERE source_id = ${loserId}`;
+
+        // (b) Re-point target_id: edge (source, loserId, type) becomes (source, canonicalId, type).
+        await tx`
+          UPDATE relations r SET target_id = ${canonicalId}
+          WHERE r.target_id = ${loserId}
+            AND NOT EXISTS (
+              SELECT 1 FROM relations c2
+              WHERE c2.target_id = ${canonicalId} AND c2.source_id = r.source_id
+                AND c2.relation_type = r.relation_type AND c2.valid_to IS NULL)
+        `;
+        await tx`DELETE FROM relations WHERE target_id = ${loserId}`;
+
+        await tx`DELETE FROM entities WHERE id = ${loserId}`;
+      }
+    });
+  }
+
+  async normalizeRelations(): Promise<void> {
+    await this.sql`DELETE FROM relations WHERE source_id = target_id`;
+    await this.sql`
+      DELETE FROM relations a USING relations b
+      WHERE a.id > b.id AND a.source_id = b.source_id
+        AND a.target_id = b.target_id AND a.relation_type = b.relation_type
     `;
   }
 }
