@@ -22,6 +22,24 @@ export interface NewContextEntry {
   metadata: Record<string, unknown>;
 }
 
+/** An entry a reclassification pass may retype, with what the pass needs to judge it. */
+export interface ReclassifiableEntry {
+  id: string;
+  title: string;
+  content: string;
+  summary: string | null;
+  type: ContextEntryType;
+  metadata: Record<string, unknown>;
+}
+
+/** An entry whose summary may be rebuilt from its content. */
+export interface SummarizableEntry {
+  id: string;
+  title: string;
+  content: string;
+  summary: string | null;
+}
+
 /**
  * The port the knowledge module writes through. It exists so the creation rules (ADR-0076) can
  * be read and tested without a database; the pg adapter lives in `infrastructure/`.
@@ -47,4 +65,13 @@ export interface ContextEntryRepository {
   updateEntryFields(entryId: string, fields: { title?: string; content?: string }): Promise<boolean>;
   updateEntryContent(entryId: string, content: string): Promise<void>;
   findNearDuplicatePairs(projectId: string, maxDistance: number, skipFormats: string[]): Promise<{ keep: string; drop: string }[]>;
+  /**
+   * Deferred reclassification and summary rebuilding. Which entries qualify and what is written
+   * are decided in the use case; these load the candidates and apply one write each.
+   */
+  findIdBySourceReference(projectId: string, sourceReference: string): Promise<string | null>;
+  findReclassifiable(projectId: string): Promise<ReclassifiableEntry[]>;
+  findSummariesToRebuild(projectId: string | null): Promise<SummarizableEntry[]>;
+  retype(id: string, change: { type: ContextEntryType; summary: string | null; metadata: Record<string, unknown> }): Promise<void>;
+  updateSummary(id: string, summary: string): Promise<void>;
 }
