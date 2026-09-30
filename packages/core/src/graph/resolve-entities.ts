@@ -1,25 +1,15 @@
 import { getSql } from "@cortex/database";
 import type { Row } from "../storage/map.js";
-import { canonicalize } from "../text.js";
+import { entityGroupKey, rankEntities } from "./domain/entity.js";
 
 /**
  * The entity resolution loop (section 12.4): merges variants of the same entity
  * (e.g. "Acme"/"Acme Corp"/"acme.com") into a canonical one, re-pointing links
  * (context_entry_entities) and relations, and deduplicating. Database only, no LLM.
  *
- * It groups by TYPE + normalised name (no accents/punctuation, lowercase), excluding
- * `project` (a project is never merged or deleted). The type is part of the key on purpose:
- * two same-named entities of different types are different things (the `vendor` "Stripe" and
- * the `service` "Stripe" must not collapse into one).
- *
- * The canonical one is the entity with the most links; tie-breaks: the more descriptive
- * (longer) name and, still tied, the lower `id` -- so the result is DETERMINISTIC and does
- * not depend on the order Postgres happens to return rows in.
+ * Which variants group and which one is canonical are rules of the `entity` domain
+ * (`entityGroupKey`, `rankEntities`); this only applies them inside one transaction per group.
  */
-
-function norm(s: string): string {
-  return canonicalize(s).replace(/[^a-z0-9]+/g, "");
-}
 
 export interface ResolveResult {
   groups: number;
@@ -37,9 +27,8 @@ export async function resolveEntities(): Promise<ResolveResult> {
 
   const groups = new Map<string, Row[]>();
   for (const e of entities) {
-    const normalized = norm(e.name);
-    if (normalized.length < 3) continue;
-    const key = `${e.type}:${normalized}`;
+    const key = entityGroupKey(e.type as string, e.name as string);
+    if (!key) continue;
     let bucket = groups.get(key);
     if (!bucket) {
       bucket = [];
@@ -52,18 +41,11 @@ export async function resolveEntities(): Promise<ResolveResult> {
   let groupsMerged = 0;
   for (const [, group] of groups) {
     if (group.length < 2) continue;
-    // Canonical: most links; tie-break by longer (more descriptive) name and, as a last
-    // resort, by id -- without that last one the winner depends on the row order Postgres
-    // returns, and the merge stops being reproducible.
-    group.sort((a, b) => {
-      const byLinks = (linkCounts.get(b.id) ?? 0) - (linkCounts.get(a.id) ?? 0);
-      if (byLinks !== 0) return byLinks;
-      const byLength = b.name.length - a.name.length;
-      if (byLength !== 0) return byLength;
-      return String(a.id).localeCompare(String(b.id));
-    });
-    const canonical = group[0]!;
-    const losers = group.slice(1);
+    const ranked = rankEntities(
+      group.map((e) => ({ id: e.id as string, name: e.name as string, linkCount: linkCounts.get(e.id) ?? 0 })),
+    );
+    const canonical = ranked[0]!;
+    const losers = ranked.slice(1);
 
     await sql.begin(async (tx) => {
       for (const x of losers) {
