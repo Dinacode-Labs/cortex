@@ -40,6 +40,14 @@ export interface SummarizableEntry {
   summary: string | null;
 }
 
+/** What a purge needs to know about an entry before it is deleted (ADR-0072). */
+export interface PurgeTarget {
+  id: string;
+  projectId: string | null;
+  projectSlug: string | null;
+  projectName: string | null;
+}
+
 /**
  * The port the knowledge module writes through. It exists so the creation rules (ADR-0076) can
  * be read and tested without a database; the pg adapter lives in `infrastructure/`.
@@ -74,4 +82,11 @@ export interface ContextEntryRepository {
   findSummariesToRebuild(projectId: string | null): Promise<SummarizableEntry[]>;
   retype(id: string, change: { type: ContextEntryType; summary: string | null; metadata: Record<string, unknown> }): Promise<void>;
   updateSummary(id: string, summary: string): Promise<void>;
+  /**
+   * Purging (ADR-0072): the entry is deleted for good, its superseded dependants become current
+   * again, and the sources and entities left with nothing pointing at them go too. The permission
+   * check is the use case's; `purgedBy` is the audit trail in `entry_purges`.
+   */
+  findPurgeTargets(ids: string[]): Promise<PurgeTarget[]>;
+  purge(ids: string[], purgedBy: string): Promise<string[]>;
 }

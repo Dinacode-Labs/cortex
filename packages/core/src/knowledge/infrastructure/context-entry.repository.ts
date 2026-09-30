@@ -5,6 +5,7 @@ import type {
   ContextEntryRepository,
   NewContextEntry,
   NewSource,
+  PurgeTarget,
   ReclassifiableEntry,
   SummarizableEntry,
 } from "../domain/context-entry-repository.js";
@@ -209,5 +210,79 @@ export class PgContextEntryRepository implements ContextEntryRepository {
 
   async updateSummary(id: string, summary: string): Promise<void> {
     await this.sql`UPDATE context_entries SET summary = ${summary} WHERE id = ${id}`;
+  }
+
+  async findPurgeTargets(ids: string[]): Promise<PurgeTarget[]> {
+    const rows = (await this.sql`
+      SELECT ce.id, ce.project_id, p.slug, p.name
+        FROM context_entries ce
+        LEFT JOIN entities p ON p.id = ce.project_id
+       WHERE ce.id = ANY(${ids}::uuid[])
+    `) as unknown as Row[];
+    return rows.map((r) => ({
+      id: r.id as string,
+      projectId: (r.project_id as string | null) ?? null,
+      projectSlug: (r.slug as string | null) ?? null,
+      projectName: (r.name as string | null) ?? null,
+    }));
+  }
+
+  async purge(ids: string[], purgedBy: string): Promise<string[]> {
+    return this.sql.begin(async (tx) => {
+      // FOR UPDATE holds the entries while the whole cleanup runs, so nobody edits one in the
+      // middle of it.
+      const entries = (await tx`
+        SELECT ce.id, ce.source_id, ce.project_id, ce.type, ce.source_type, ce.created_at
+          FROM context_entries ce
+         WHERE ce.id = ANY(${ids}::uuid[])
+           FOR UPDATE OF ce
+      `) as unknown as Row[];
+      const found = entries.map((e) => e.id as string);
+      if (found.length === 0) return [];
+      const sourceIds = entries.map((e) => e.source_id as string | null).filter((s): s is string => !!s);
+      const linkedEntities = (await tx`
+        SELECT DISTINCT entity_id FROM context_entry_entities WHERE context_entry_id = ANY(${found}::uuid[])
+      `) as unknown as Row[];
+
+      // An entry these had superseded becomes current again and waits for review.
+      await tx`
+        UPDATE context_entries
+           SET superseded_by = NULL, valid_to = NULL, validity = 'current',
+               status = CASE WHEN status IN ('rejected', 'obsolete') THEN status ELSE 'pending_validation' END
+         WHERE superseded_by = ANY(${found}::uuid[]) AND NOT (id = ANY(${found}::uuid[]))
+      `;
+      await tx`
+        DELETE FROM relations WHERE source_id = ANY(${found}::uuid[]) OR target_id = ANY(${found}::uuid[])
+      `;
+      for (const e of entries) {
+        await tx`
+          INSERT INTO entry_purges (entry_id, project_id, entry_type, entry_source_type, entry_created_at, purged_by)
+          VALUES (${e.id as string}, ${(e.project_id as string | null) ?? null}, ${e.type as string},
+                  ${e.source_type as string}, ${e.created_at as Date}, ${purgedBy.toLowerCase()})
+        `;
+      }
+      await tx`DELETE FROM context_entries WHERE id = ANY(${found}::uuid[])`;
+
+      if (sourceIds.length) {
+        await tx`
+          DELETE FROM sources s
+           WHERE s.id = ANY(${sourceIds}::uuid[])
+             AND NOT EXISTS (SELECT 1 FROM context_entries ce WHERE ce.source_id = s.id)
+        `;
+      }
+      const entityIds = linkedEntities.map((r) => r.entity_id as string);
+      if (entityIds.length) {
+        await tx`
+          DELETE FROM entities en
+           WHERE en.id = ANY(${entityIds}::uuid[])
+             AND en.type NOT IN ('project', 'client')
+             AND NOT EXISTS (SELECT 1 FROM context_entry_entities cee WHERE cee.entity_id = en.id)
+             AND NOT EXISTS (SELECT 1 FROM relations r WHERE r.source_id = en.id OR r.target_id = en.id)
+             AND NOT EXISTS (SELECT 1 FROM context_entries ce WHERE ce.project_id = en.id OR ce.client_id = en.id)
+             AND NOT EXISTS (SELECT 1 FROM entities child WHERE child.parent_id = en.id)
+        `;
+      }
+      return found;
+    });
   }
 }
