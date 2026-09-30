@@ -1,7 +1,13 @@
 import { getSql, type Sql } from "@cortex/database";
-import type { ContextEntry } from "@cortex/shared";
+import type { ContextEntry, ContextEntryType } from "@cortex/shared";
 import { rowToContextEntry, type Row } from "../../storage/map.js";
-import type { ContextEntryRepository, NewContextEntry, NewSource } from "../domain/context-entry-repository.js";
+import type {
+  ContextEntryRepository,
+  NewContextEntry,
+  NewSource,
+  ReclassifiableEntry,
+  SummarizableEntry,
+} from "../domain/context-entry-repository.js";
 
 type JsonValue = Parameters<Sql["json"]>[0];
 
@@ -152,5 +158,56 @@ export class PgContextEntryRepository implements ContextEntryRepository {
         AND (ea.vector <=> eb.vector) < ${maxDistance}
       ORDER BY b.created_at ASC
     `) as unknown as { keep: string; drop: string }[];
+  }
+
+  async findIdBySourceReference(projectId: string, sourceReference: string): Promise<string | null> {
+    const rows = (await this.sql`
+      SELECT id FROM context_entries WHERE project_id = ${projectId} AND source_reference = ${sourceReference} LIMIT 1
+    `) as unknown as Row[];
+    return rows[0] ? (rows[0].id as string) : null;
+  }
+
+  async findReclassifiable(projectId: string): Promise<ReclassifiableEntry[]> {
+    const rows = (await this.sql`
+      SELECT id, title, content, summary, type, metadata
+      FROM context_entries
+      WHERE project_id = ${projectId} AND valid_to IS NULL
+        AND COALESCE(metadata->>'enrichedBy', 'heuristic') NOT IN ('llm', 'distiller')
+    `) as unknown as Row[];
+    return rows.map((r) => ({
+      id: r.id as string,
+      title: r.title as string,
+      content: r.content as string,
+      summary: (r.summary as string | null) ?? null,
+      type: r.type as ContextEntryType,
+      metadata: (r.metadata as Record<string, unknown>) ?? {},
+    }));
+  }
+
+  async findSummariesToRebuild(projectId: string | null): Promise<SummarizableEntry[]> {
+    const rows = (await this.sql`
+      SELECT id, title, content, summary
+      FROM context_entries
+      WHERE valid_to IS NULL
+        ${projectId ? this.sql`AND project_id = ${projectId}` : this.sql``}
+    `) as unknown as Row[];
+    return rows.map((r) => ({
+      id: r.id as string,
+      title: r.title as string,
+      content: r.content as string,
+      summary: (r.summary as string | null) ?? null,
+    }));
+  }
+
+  async retype(id: string, change: { type: ContextEntryType; summary: string | null; metadata: Record<string, unknown> }): Promise<void> {
+    await this.sql`
+      UPDATE context_entries
+      SET type = ${change.type}, summary = ${change.summary}, metadata = ${this.sql.json(change.metadata as JsonValue)}
+      WHERE id = ${id}
+    `;
+  }
+
+  async updateSummary(id: string, summary: string): Promise<void> {
+    await this.sql`UPDATE context_entries SET summary = ${summary} WHERE id = ${id}`;
   }
 }

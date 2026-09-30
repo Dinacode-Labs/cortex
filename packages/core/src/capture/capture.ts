@@ -1,13 +1,13 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "../knowledge/save.js";
+import { PgContextEntryRepository } from "../knowledge/infrastructure/context-entry.repository.js";
 import { storeEmbeddingsBatch } from "../storage/vectors.js";
 import { findProjectIdByName } from "../projects/projects.js";
 import { relate } from "../graph/entities.js";
 import { type BatchItem, type RelationType, scrub } from "@cortex/shared";
 
 export type { BatchItem };
-import type { Row } from "../storage/map.js";
 
 /**
  * BATCH capture for connectors (through the authenticated API). It keeps ingestion in 2
@@ -32,6 +32,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, projectName);
   if (!projectId) throw new Error(`Project not found: ${projectName}`);
+  const repository = new PgContextEntryRepository(sql);
 
   const results: BatchItemResult[] = [];
   const toEmbed: { contextEntryId: string; text: string }[] = [];
@@ -44,9 +45,9 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
       title: rawItem.title ? scrub(rawItem.title) : rawItem.title,
     };
     if (it.sourceReference) {
-      const ex = (await sql`SELECT id FROM context_entries WHERE project_id = ${projectId} AND source_reference = ${it.sourceReference} LIMIT 1`) as unknown as Row[];
-      if (ex[0]) {
-        results.push({ ref: it.sourceReference, id: ex[0].id as string, action: "existing" });
+      const existingId = await repository.findIdBySourceReference(projectId, it.sourceReference);
+      if (existingId) {
+        results.push({ ref: it.sourceReference, id: existingId, action: "existing" });
         continue;
       }
     }

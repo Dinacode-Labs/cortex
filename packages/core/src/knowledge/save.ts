@@ -1,18 +1,13 @@
 import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
-import {
-  type ContextEntry,
-  type ContextEntryType,
-  type SaveContextInput,
-  saveContextInput,
-  scrub,
-} from "@cortex/shared";
+import { type ContextEntry, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "../graph/entities.js";
 import { rowToContextEntry, type Row } from "../storage/map.js";
 import { createProject, findProjectIdByName } from "../projects/projects.js";
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { ContextEntryDraft, decideReclassification, type ClassifierResult } from "./domain/context-entry.js";
+import type { SummarizableEntry } from "./domain/context-entry-repository.js";
 import { PgContextEntryRepository } from "./infrastructure/context-entry.repository.js";
 
 export { decideReclassification } from "./domain/context-entry.js";
@@ -235,43 +230,33 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   if (!projectId) throw new Error(`Project not found: "${project}".`);
   if (!classifier) return { scanned: 0, reclassified: 0 };
 
-  const rows = (await sql`
-    SELECT id, title, content, summary, type, metadata
-    FROM context_entries
-    WHERE project_id = ${projectId} AND valid_to IS NULL
-      AND COALESCE(metadata->>'enrichedBy', 'heuristic') NOT IN ('llm', 'distiller')
-  `) as unknown as Row[];
+  const repository = new PgContextEntryRepository(sql);
+  const rows = await repository.findReclassifiable(projectId);
 
   let reclassified = 0;
   for (const r of rows) {
-    const res = await classifier(r.content as string).catch(() => null);
+    const res = await classifier(r.content).catch(() => null);
     const proposed = res?.type;
-    const decision = decideReclassification(r.type as ContextEntryType, proposed);
+    const decision = decideReclassification(r.type, proposed);
     // Only asked of a classifier that answered: with none, the heuristic already ran on the
     // way in and re-running it here is not what this pass is for.
     const summary = res ? betterSummary(res.summary, r) : null;
     if (decision === "retype") {
       reclassified++;
       // `retype` is returned only for a type that is there and differs from the stored one.
-      const meta = { ...((r.metadata as Record<string, unknown>) ?? {}), enrichedBy: "llm" } as Parameters<typeof sql.json>[0];
-      await sql`
-        UPDATE context_entries
-        SET type = ${proposed!}, summary = ${summary ?? (r.summary as string | null)}, metadata = ${sql.json(meta)}
-        WHERE id = ${r.id}
-      `;
+      const metadata = { ...r.metadata, enrichedBy: "llm" };
+      await repository.retype(r.id, { type: proposed!, summary: summary ?? r.summary, metadata });
     } else if (summary) {
-      await sql`UPDATE context_entries SET summary = ${summary} WHERE id = ${r.id}`;
+      await repository.updateSummary(r.id, summary);
     }
   }
   return { scanned: rows.length, reclassified };
 }
 
-function betterSummary(candidate: string | undefined, row: Row): string | null {
-  const title = row.title as string;
-  const content = row.content as string;
-  const current = (row.summary as string | null) ?? null;
-  if (!isDerivedSummary(current, content, title)) return null;
-  const next = stripLeadingTitle((candidate ?? summarize(content)).trim(), title).trim();
+function betterSummary(candidate: string | undefined, entry: SummarizableEntry): string | null {
+  const current = entry.summary;
+  if (!isDerivedSummary(current, entry.content, entry.title)) return null;
+  const next = stripLeadingTitle((candidate ?? summarize(entry.content)).trim(), entry.title).trim();
   return next && next !== current ? next : null;
 }
 
@@ -306,23 +291,18 @@ export async function resummarizeEntries(opts: ResummarizeOptions = {}): Promise
     if (!projectId) throw new Error(`Project not found: "${opts.project}".`);
   }
 
-  const rows = (await sql`
-    SELECT id, title, content, summary
-    FROM context_entries
-    WHERE valid_to IS NULL
-      ${projectId ? sql`AND project_id = ${projectId}` : sql``}
-  `) as unknown as Row[];
+  const repository = new PgContextEntryRepository(sql);
+  const rows = await repository.findSummariesToRebuild(projectId);
 
   let rewritten = 0;
   for (const r of rows) {
-    const current = (r.summary as string | null) ?? null;
-    if (!isDerivedSummary(current, r.content as string, r.title as string)) continue;
-    const llm = classifier ? await classifier(r.content as string).catch(() => null) : null;
+    if (!isDerivedSummary(r.summary, r.content, r.title)) continue;
+    const llm = classifier ? await classifier(r.content).catch(() => null) : null;
     const next = betterSummary(llm?.summary, r);
     if (!next) continue;
     rewritten++;
-    opts.onRewrite?.({ id: r.id as string, title: r.title as string, before: current, after: next });
-    if (!opts.dryRun) await sql`UPDATE context_entries SET summary = ${next} WHERE id = ${r.id}`;
+    opts.onRewrite?.({ id: r.id, title: r.title, before: r.summary, after: next });
+    if (!opts.dryRun) await repository.updateSummary(r.id, next);
   }
   return { scanned: rows.length, rewritten };
 }
