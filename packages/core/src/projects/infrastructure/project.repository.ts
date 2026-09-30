@@ -2,7 +2,7 @@ import { getSql, type Sql } from "@cortex/database";
 import { canonicalize } from "../../text.js";
 import type { Row } from "../../storage/map.js";
 import type { ProjectChainNode, ProjectRef } from "../domain/project.js";
-import type { ProjectRepository } from "../domain/project-repository.js";
+import type { NewProject, ProjectChanges, ProjectRepository } from "../domain/project-repository.js";
 
 function toRef(r: Row | undefined): ProjectRef | null {
   if (!r) return null;
@@ -106,5 +106,62 @@ export class PgProjectRepository implements ProjectRepository {
   async entryCounts(): Promise<Map<string, number>> {
     const rows = (await this.sql`SELECT project_id, count(*)::int AS entry_count FROM context_entries WHERE project_id IS NOT NULL GROUP BY project_id`) as unknown as Row[];
     return new Map(rows.map((r) => [r.project_id as string, Number(r.entry_count)]));
+  }
+
+  async findByCanonicalName(name: string): Promise<ProjectRef | null> {
+    const rows = (await this.sql`
+      SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
+      WHERE type = 'project' AND canonical_name = ${canonicalize(name)} LIMIT 1
+    `) as unknown as Row[];
+    return toRef(rows[0]);
+  }
+
+  async insert(project: NewProject): Promise<ProjectRef | null> {
+    const rows = (await this.sql`
+      INSERT INTO entities (name, canonical_name, type, slug, visibility, owner_email, parent_id)
+      VALUES (${project.name}, ${canonicalize(project.name)}, 'project', ${project.slug},
+              ${project.visibility}, ${project.ownerEmail}, ${project.parentId})
+      ON CONFLICT (type, canonical_name) DO NOTHING
+      RETURNING id, name, slug, visibility, owner_email, parent_id
+    `) as unknown as Row[];
+    return toRef(rows[0]);
+  }
+
+  async parentIdOf(id: string): Promise<string | null> {
+    const rows = (await this.sql`SELECT parent_id FROM entities WHERE id = ${id}`) as unknown as Row[];
+    return (rows[0]?.parent_id as string | null) ?? null;
+  }
+
+  async update(id: string, changes: ProjectChanges): Promise<void> {
+    await this.sql`
+      UPDATE entities SET visibility = ${changes.visibility}, owner_email = ${changes.ownerEmail}, parent_id = ${changes.parentId}
+      WHERE id = ${id}`;
+  }
+
+  async countEntries(projectId: string): Promise<number> {
+    const [row] = (await this.sql`SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${projectId}`) as unknown as Row[];
+    return Number(row?.n ?? 0);
+  }
+
+  async countChildren(projectId: string): Promise<number> {
+    const [row] = (await this.sql`SELECT count(*)::int AS n FROM entities WHERE parent_id = ${projectId}`) as unknown as Row[];
+    return Number(row?.n ?? 0);
+  }
+
+  async remove(id: string): Promise<void> {
+    await this.sql`DELETE FROM entities WHERE id = ${id}`;
+  }
+
+  async addMember(projectId: string, email: string): Promise<void> {
+    await this.sql`INSERT INTO project_members (project_id, email) VALUES (${projectId}, ${email.toLowerCase()}) ON CONFLICT DO NOTHING`;
+  }
+
+  async removeMember(projectId: string, email: string): Promise<void> {
+    await this.sql`DELETE FROM project_members WHERE project_id = ${projectId} AND email = ${email.toLowerCase()}`;
+  }
+
+  async listMembers(projectId: string): Promise<string[]> {
+    const rows = (await this.sql`SELECT email FROM project_members WHERE project_id = ${projectId} ORDER BY email`) as unknown as Row[];
+    return rows.map((r) => r.email as string);
   }
 }
