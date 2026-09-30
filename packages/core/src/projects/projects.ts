@@ -4,74 +4,29 @@ import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
 import { canonicalize } from "../text.js";
 import type { Row } from "../storage/map.js";
+import { decideProjectAccess, type ProjectRef } from "./domain/project.js";
+import { PgProjectRepository } from "./infrastructure/project.repository.js";
 
-export interface ProjectRef {
-  id: string;
-  name: string;
-  slug: string | null;
-  visibility: "public" | "private";
-  ownerEmail: string | null;
-  parentId: string | null;
-}
+export type { ProjectRef } from "./domain/project.js";
 
-function toRef(r: Row | undefined): ProjectRef | null {
-  if (!r) return null;
-  return {
-    id: r.id as string,
-    name: r.name as string,
-    slug: (r.slug as string) ?? null,
-    visibility: ((r.visibility as string) ?? "public") === "private" ? "private" : "public",
-    ownerEmail: (r.owner_email as string) ?? null,
-    parentId: (r.parent_id as string) ?? null,
-  };
-}
-
-/**
- * The ONE resolution of a project from whatever somebody types into `project` (ADR-0043,
- * ADR-0061): by **slug** first -- the project's identity across the whole product:
- * `cortex link`, `.cortex.json`, `/p/<slug>`, the API -- and, failing that, by name with
- * CANONICAL semantics (lowercase, accents stripped). Writes used to resolve by slug
- * (`createProject`) and reads only by canonical name, and since `canonicalize` leaves hyphens
- * alone the same value worked on save and said "not found" on read (#136). When one project's
- * name matches another's slug, the slug wins: it is the identifier, the name is not.
- */
-async function findProjectRow(sql: Sql, ref: string): Promise<Row | undefined> {
-  const rows = (await sql`
-    SELECT id, name, slug, visibility, owner_email, parent_id
-      FROM entities
-     WHERE type = 'project' AND (slug = ${ref} OR canonical_name = ${canonicalize(ref)})
-     ORDER BY (slug = ${ref}) DESC
-     LIMIT 1
-  `) as unknown as Row[];
-  return rows[0];
-}
-
-/** A project's id by slug or canonical name (see `findProjectRow`). For data operations:
- * different casing or accents must not create new projects nor skip the dedup. */
+/** A project's id by slug or canonical name (see `PgProjectRepository.findByRef`). For data
+ * operations: different casing or accents must not create new projects nor skip the dedup. */
 export async function findProjectIdByName(sql: Sql, project: string): Promise<string | null> {
-  const row = await findProjectRow(sql, project);
-  return row ? (row.id as string) : null;
+  return new PgProjectRepository(sql).findIdByRef(project);
 }
 
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {
-  const rows = (await getSql()`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' AND slug = ${slug} LIMIT 1`) as unknown as Row[];
-  return toRef(rows[0]);
+  return new PgProjectRepository(getSql()).findBySlug(slug);
 }
 
-/** By slug or canonical name (see `findProjectRow`): what an agent or a person types into
- * `project`. It used to compare the EXACT name, so the MCP guard rejected what the data
- * operations did find (different casing, the slug). */
+/** By slug or canonical name: what an agent or a person types into `project`. It used to
+ * compare the EXACT name, so the MCP guard rejected what the data operations did find. */
 export async function findProjectByName(name: string): Promise<ProjectRef | null> {
-  return toRef(await findProjectRow(getSql(), name));
+  return new PgProjectRepository(getSql()).findByRef(name);
 }
 
 export async function getEntryProject(entryId: string): Promise<ProjectRef | null> {
-  const rows = (await getSql()`
-    SELECT p.id, p.name, p.slug, p.visibility, p.owner_email, p.parent_id
-    FROM context_entries ce JOIN entities p ON p.id = ce.project_id
-    WHERE ce.id = ${entryId} LIMIT 1
-  `) as unknown as Row[];
-  return toRef(rows[0]);
+  return (await new PgProjectRepository(getSql()).resolveEntryProject(entryId)).project;
 }
 
 export async function createProject(
@@ -100,17 +55,20 @@ export async function createProject(
     ON CONFLICT (type, canonical_name) DO NOTHING
     RETURNING id, name, slug, visibility, owner_email, parent_id
   `) as unknown as Row[];
-  if (inserted[0]) return toRef(inserted[0])!;
+  const ins = inserted[0];
+  if (ins) return toRef(ins);
   const byName = (await sql`
     SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
     WHERE type = 'project' AND canonical_name = ${canonicalize(name)} LIMIT 1
   `) as unknown as Row[];
-  return toRef(byName[0])!;
+  return toRef(byName[0]!);
 }
 
+// The mutations below still own their SQL: they are single writes with a manager check, and
+// moving them behind a port is a further slice.
+
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
-  const r = (await getSql()`SELECT 1 FROM project_members WHERE project_id = ${projectId} AND email = ${email.toLowerCase()} LIMIT 1`) as unknown as unknown[];
-  return r.length > 0;
+  return new PgProjectRepository(getSql()).isMember(projectId, email);
 }
 
 /**
@@ -119,23 +77,12 @@ export async function isProjectMember(projectId: string, email: string): Promise
  * the project or of any ancestor (membership of the parent "Acme" opens its sub-projects).
  */
 export async function canAccessProject(project: ProjectRef, email: string | null): Promise<boolean> {
-  const chain = (await getSql()`
-    WITH RECURSIVE c AS (
-      SELECT id, visibility, owner_email, parent_id FROM entities WHERE id = ${project.id}
-      UNION ALL
-      SELECT e.id, e.visibility, e.owner_email, e.parent_id FROM entities e JOIN c ON e.id = c.parent_id
-    )
-    SELECT id, visibility, owner_email FROM c
-  `) as unknown as Row[];
-  if (!chain.some((r) => (r.visibility as string) === "private")) return true;
-  if (!email) return false;
-  if (isAdmin(email)) return true;
-  const e = email.toLowerCase();
-  for (const r of chain) {
-    if (((r.owner_email as string) ?? "").toLowerCase() === e) return true;
-    if (await isProjectMember(r.id as string, e)) return true;
-  }
-  return false;
+  const repository = new PgProjectRepository(getSql());
+  const chain = await repository.chain(project.id);
+  return decideProjectAccess(chain, email, {
+    isAdmin: email ? isAdmin(email) : false,
+    isMember: (projectId) => repository.isMember(projectId, email!),
+  });
 }
 
 /**
@@ -144,41 +91,18 @@ export async function canAccessProject(project: ProjectRef, email: string | null
  * The context pack and search use it: a child project inherits what its client knows. Going up
  * is safe because `canAccessProject` looks at the entire chain -- if an ancestor is private the
  * child is restricted -- so having access to the child implies having it to all its parents.
- * Nothing can be seen through inheritance that could not be seen directly.
  */
 export async function projectIdsWithAncestors(projectId: string): Promise<string[]> {
-  const rows = (await getSql()`
-    WITH RECURSIVE chain AS (
-      SELECT id, parent_id FROM entities WHERE id = ${projectId}
-      UNION ALL
-      SELECT e.id, e.parent_id FROM entities e JOIN chain c ON e.id = c.parent_id
-    )
-    SELECT id FROM chain
-  `) as unknown as Row[];
-  return rows.map((r) => r.id as string);
+  return new PgProjectRepository(getSql()).idsWithAncestors(projectId);
 }
 
 /**
  * A project's ancestors, from the ROOT to the direct parent (the project itself is excluded).
- *
- * It is what a breadcrumb needs -- `Acme › Acme Portal` -- and what allows saying which project
- * an inherited entry came from. It deliberately does not filter by permissions:
- * `canAccessProject` looks at the entire chain, so access to the child implies access to all
+ * It deliberately does not filter by permissions: access to the child implies access to all
  * its parents.
  */
 export async function listProjectAncestors(projectId: string): Promise<ProjectRef[]> {
-  const rows = (await getSql()`
-    WITH RECURSIVE chain AS (
-      SELECT id, name, slug, visibility, owner_email, parent_id, 0 AS depth
-        FROM entities WHERE id = ${projectId}
-      UNION ALL
-      SELECT e.id, e.name, e.slug, e.visibility, e.owner_email, e.parent_id, c.depth + 1
-        FROM entities e JOIN chain c ON e.id = c.parent_id
-    )
-    SELECT id, name, slug, visibility, owner_email, parent_id FROM chain WHERE depth > 0
-     ORDER BY depth DESC
-  `) as unknown as Row[];
-  return rows.map(toRef).filter((r): r is ProjectRef => r !== null);
+  return new PgProjectRepository(getSql()).ancestors(projectId);
 }
 
 export type AccessCheck =
@@ -217,13 +141,8 @@ export async function checkEntryAccess(
   email: string | null,
   entryId: string,
 ): Promise<{ status: "ok"; project: ProjectRef | null } | { status: "not_found" } | { status: "forbidden" }> {
-  const rows = (await getSql()`
-    SELECT p.id, p.name, p.slug, p.visibility, p.owner_email, p.parent_id
-    FROM context_entries ce LEFT JOIN entities p ON p.id = ce.project_id
-    WHERE ce.id = ${entryId} LIMIT 1
-  `) as unknown as Row[];
-  if (rows.length === 0) return { status: "not_found" };
-  const project = rows[0]!.id ? toRef(rows[0]) : null;
+  const { found, project } = await new PgProjectRepository(getSql()).resolveEntryProject(entryId);
+  if (!found) return { status: "not_found" };
   if (project && !(await canAccessProject(project, email))) return { status: "forbidden" };
   return { status: "ok", project };
 }
@@ -238,14 +157,9 @@ export interface AccessibleProject extends ProjectRef {
  * (GROUP BY project_id) merged by id -- not one query per project.
  */
 export async function listAccessibleProjects(email: string | null): Promise<AccessibleProject[]> {
-  const sql = getSql();
-  const rows = (await sql`SELECT id, name, slug, visibility, owner_email, parent_id FROM entities WHERE type = 'project' ORDER BY name`) as unknown as Row[];
-  const countRows = (await sql`SELECT project_id, count(*)::int AS entry_count FROM context_entries WHERE project_id IS NOT NULL GROUP BY project_id`) as unknown as Row[];
-  const counts = new Map(countRows.map((r) => [r.project_id as string, Number(r.entry_count)]));
-  const refs = rows
-    .map(toRef)
-    .filter((r): r is ProjectRef => r !== null)
-    .map((r): AccessibleProject => ({ ...r, entryCount: counts.get(r.id) ?? 0 }));
+  const repository = new PgProjectRepository(getSql());
+  const counts = await repository.entryCounts();
+  const refs = (await repository.listAll()).map((r): AccessibleProject => ({ ...r, entryCount: counts.get(r.id) ?? 0 }));
   if (isAdmin(email)) return refs;
   const out: AccessibleProject[] = [];
   for (const r of refs) if (await canAccessProject(r, email)) out.push(r);
@@ -410,4 +324,16 @@ export async function resolveLinkedProject(cwd: string): Promise<ProjectRef | nu
   if (link.slug) return findProjectBySlug(link.slug);
   if (link.project) return findProjectByName(link.project);
   return null;
+}
+
+// `createProject` builds the ProjectRef it returns from the raw INSERT row.
+function toRef(r: Row): ProjectRef {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    slug: (r.slug as string) ?? null,
+    visibility: ((r.visibility as string) ?? "public") === "private" ? "private" : "public",
+    ownerEmail: (r.owner_email as string) ?? null,
+    parentId: (r.parent_id as string) ?? null,
+  };
 }
