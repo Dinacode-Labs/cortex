@@ -2,8 +2,6 @@ import { getSql, type Sql } from "@cortex/database";
 import { isAdmin } from "../identity/auth.js";
 import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
-import { canonicalize } from "../text.js";
-import type { Row } from "../storage/map.js";
 import { decideProjectAccess, type ProjectRef } from "./domain/project.js";
 import { PgProjectRepository } from "./infrastructure/project.repository.js";
 
@@ -33,7 +31,7 @@ export async function createProject(
   name: string,
   opts?: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
 ): Promise<ProjectRef> {
-  const sql = getSql();
+  const repository = new PgProjectRepository(getSql());
   let parentId: string | null = null;
   if (opts?.parentSlug) {
     const parent = await findProjectBySlug(opts.parentSlug);
@@ -48,24 +46,15 @@ export async function createProject(
   // The project is born whole, with its slug: the database does not accept a `project`
   // without one (#135), so inserting the name and filling in later is not an option. When the
   // canonical name already exists with a different slug, that one is returned as is, as before.
-  const visibility = opts?.visibility ?? "public";
-  const inserted = (await sql`
-    INSERT INTO entities (name, canonical_name, type, slug, visibility, owner_email, parent_id)
-    VALUES (${name}, ${canonicalize(name)}, 'project', ${slug}, ${visibility}, ${opts?.ownerEmail ?? null}, ${parentId})
-    ON CONFLICT (type, canonical_name) DO NOTHING
-    RETURNING id, name, slug, visibility, owner_email, parent_id
-  `) as unknown as Row[];
-  const ins = inserted[0];
-  if (ins) return toRef(ins);
-  const byName = (await sql`
-    SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
-    WHERE type = 'project' AND canonical_name = ${canonicalize(name)} LIMIT 1
-  `) as unknown as Row[];
-  return toRef(byName[0]!);
+  const inserted = await repository.insert({
+    name,
+    slug,
+    visibility: opts?.visibility ?? "public",
+    ownerEmail: opts?.ownerEmail ?? null,
+    parentId,
+  });
+  return inserted ?? (await repository.findByCanonicalName(name))!;
 }
-
-// The mutations below still own their SQL: they are single writes with a manager check, and
-// moving them behind a port is a further slice.
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
   return new PgProjectRepository(getSql()).isMember(projectId, email);
@@ -225,6 +214,7 @@ export async function updateProject(
   changes: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
   byEmail: string | null,
 ): Promise<ProjectRef> {
+  const repository = new PgProjectRepository(getSql());
   const p = await requireManager(slug, byEmail);
   const visibility = changes.visibility ?? p.visibility;
   const ownerEmail =
@@ -244,20 +234,16 @@ export async function updateProject(
       if (parent.id === p.id) throw new Error("A project cannot be its own parent.");
       // Permissions and the pack climb the ancestor chain: a cycle would leave them going round
       // forever, so it is checked before writing rather than after.
-      const sql = getSql();
       let cursor: string | null = parent.parentId;
       while (cursor) {
         if (cursor === p.id) throw new Error(`"${changes.parentSlug}" already hangs under "${slug}": that would be a cycle.`);
-        const rows = (await sql`SELECT parent_id FROM entities WHERE id = ${cursor}`) as unknown as Row[];
-        cursor = (rows[0]?.parent_id as string | null) ?? null;
+        cursor = await repository.parentIdOf(cursor);
       }
       parentId = parent.id;
     }
   }
 
-  await getSql()`
-    UPDATE entities SET visibility = ${visibility}, owner_email = ${ownerEmail}, parent_id = ${parentId}
-    WHERE id = ${p.id}`;
+  await repository.update(p.id, { visibility, ownerEmail, parentId });
   return { ...p, visibility, ownerEmail, parentId };
 }
 
@@ -273,17 +259,17 @@ export async function updateProject(
  * without writing to anybody, and there is nothing here to destroy.
  */
 export async function deleteProject(slug: string, byEmail: string | null): Promise<void> {
+  const repository = new PgProjectRepository(getSql());
   const p = await requireManager(slug, byEmail);
-  const sql = getSql();
-  const [entries] = (await sql`SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${p.id}`) as unknown as Row[];
-  if (Number(entries?.n ?? 0) > 0) {
-    throw new ProjectNotEmptyError(`"${slug}" has ${entries!.n} entries. Only an empty project can be deleted.`);
+  const entries = await repository.countEntries(p.id);
+  if (entries > 0) {
+    throw new ProjectNotEmptyError(`"${slug}" has ${entries} entries. Only an empty project can be deleted.`);
   }
-  const [children] = (await sql`SELECT count(*)::int AS n FROM entities WHERE parent_id = ${p.id}`) as unknown as Row[];
-  if (Number(children?.n ?? 0) > 0) {
-    throw new ProjectNotEmptyError(`"${slug}" still has ${children!.n} child project(s). Move them out first.`);
+  const children = await repository.countChildren(p.id);
+  if (children > 0) {
+    throw new ProjectNotEmptyError(`"${slug}" still has ${children} child project(s). Move them out first.`);
   }
-  await sql`DELETE FROM entities WHERE id = ${p.id}`;
+  await repository.remove(p.id);
 }
 
 /** Refuses to delete something that holds memory. It is a 409, not a server error. */
@@ -297,20 +283,19 @@ export class ProjectNotEmptyError extends Error {
 /** Adds a member. Owner or admin only (ADR-0051). */
 export async function addProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
   const p = await requireManager(slug, byEmail);
-  await getSql()`INSERT INTO project_members (project_id, email) VALUES (${p.id}, ${email.toLowerCase()}) ON CONFLICT DO NOTHING`;
+  await new PgProjectRepository(getSql()).addMember(p.id, email);
 }
 
 /** Removes a member. Owner or admin only (ADR-0051). */
 export async function removeProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
   const p = await requireManager(slug, byEmail);
-  await getSql()`DELETE FROM project_members WHERE project_id = ${p.id} AND email = ${email.toLowerCase()}`;
+  await new PgProjectRepository(getSql()).removeMember(p.id, email);
 }
 
 export async function listProjectMembers(slug: string): Promise<string[]> {
   const p = await findProjectBySlug(slug);
   if (!p) return [];
-  const rows = (await getSql()`SELECT email FROM project_members WHERE project_id = ${p.id} ORDER BY email`) as unknown as Row[];
-  return rows.map((r) => r.email as string);
+  return new PgProjectRepository(getSql()).listMembers(p.id);
 }
 
 /**
@@ -324,16 +309,4 @@ export async function resolveLinkedProject(cwd: string): Promise<ProjectRef | nu
   if (link.slug) return findProjectBySlug(link.slug);
   if (link.project) return findProjectByName(link.project);
   return null;
-}
-
-// `createProject` builds the ProjectRef it returns from the raw INSERT row.
-function toRef(r: Row): ProjectRef {
-  return {
-    id: r.id as string,
-    name: r.name as string,
-    slug: (r.slug as string) ?? null,
-    visibility: ((r.visibility as string) ?? "public") === "private" ? "private" : "public",
-    ownerEmail: (r.owner_email as string) ?? null,
-    parentId: (r.parent_id as string) ?? null,
-  };
 }
