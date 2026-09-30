@@ -3,7 +3,6 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
 import {
   type ContextEntry,
   type ContextEntryType,
-  type EntityType,
   type SaveContextInput,
   saveContextInput,
   scrub,
@@ -11,25 +10,13 @@ import {
 import { linkEntryToEntity, relate, resolveEntity } from "../graph/entities.js";
 import { rowToContextEntry, type Row } from "../storage/map.js";
 import { createProject, findProjectIdByName } from "../projects/projects.js";
-import {
-  canonicalize,
-  classifyType,
-  deriveTitle,
-  extractEntities,
-  isDerivedSummary,
-  polarityContradicts,
-  polarityTags,
-  stripLeadingTitle,
-  summarize,
-} from "../text.js";
+import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
+import { ContextEntryDraft, decideReclassification, type ClassifierResult } from "./domain/context-entry.js";
+import { PgContextEntryRepository } from "./infrastructure/context-entry.repository.js";
 
-export interface ClassifierResult {
-  type?: ContextEntryType;
-  title?: string;
-  summary?: string;
-  entities?: { name: string; type: EntityType }[];
-}
+export { decideReclassification } from "./domain/context-entry.js";
+export type { ClassifierResult, ReclassifyDecision } from "./domain/context-entry.js";
 
 export type Classifier = (content: string) => Promise<ClassifierResult | null>;
 
@@ -84,25 +71,25 @@ export async function saveContext(
   };
   const sql = getSql();
   const provider = getEmbeddingProvider();
+  // No DI container (ADR-0041): the use case builds the adapter. The port is what keeps the
+  // creation rules testable without a database, not what hides which adapter is in use.
+  const repository = new PgContextEntryRepository(sql);
 
   // Optional LLM layer: precedence is explicit input > LLM > heuristic.
   const useClassifier = opts.useClassifier ?? true;
   const llm = useClassifier && classifier ? await classifier(parsed.content).catch(() => null) : null;
-  const type = parsed.type ?? llm?.type ?? classifyType(parsed.content);
-  const title = parsed.title ?? llm?.title ?? deriveTitle(parsed.content);
-  // The summary sits right below the title in the pack and in the cards, so starting with the
-  // title spends budget on saying the same thing twice (ADR-0054).
-  const summary = stripLeadingTitle(parsed.summary ?? llm?.summary ?? summarize(parsed.content), title);
+  const draft = ContextEntryDraft.from(
+    {
+      content: parsed.content,
+      title: parsed.title,
+      type: parsed.type,
+      summary: parsed.summary,
+      metadata: parsed.metadata,
+    },
+    llm,
+  );
   const sourceType = parsed.sourceType ?? "manual";
-  const embedText = `${title}\n\n${parsed.content}`;
-  // metadata is zod-validated JSON; it is cast to the type sql.json expects.
-  const enrichedBy = llm ? "llm" : ((parsed.metadata?.enrichedBy as string | undefined) ?? "heuristic");
-  const meta = {
-    ...(parsed.metadata ?? {}),
-    enrichedBy,
-  } as Parameters<typeof sql.json>[0];
-
-  const detectedEntities = mergeEntities(extractEntities(parsed.content), llm?.entities ?? []);
+  const meta: Record<string, unknown> = { ...(parsed.metadata ?? {}), enrichedBy: draft.enrichedBy };
 
   let projectId: string | null = null;
   if (parsed.project) {
@@ -114,28 +101,25 @@ export async function saveContext(
     projectId = (await createProject(parsed.project, { ownerEmail: parsed.createdBy ?? null })).id;
   }
 
-  const sourceRows = (await sql`
-    INSERT INTO sources (source_type, raw_content, metadata)
-    VALUES (${sourceType}, ${parsed.content}, ${sql.json(meta)})
-    RETURNING id
-  `) as unknown as Row[];
-  const sourceId = sourceRows[0]!.id as string;
+  const sourceId = await repository.createSource({ sourceType, rawContent: draft.content, metadata: meta });
+  const entry = await repository.createEntry({
+    projectId,
+    sourceId,
+    title: draft.title,
+    content: draft.content,
+    summary: draft.summary,
+    type: draft.type,
+    confidence: parsed.confidence ?? "medium",
+    sourceType,
+    sourceReference: parsed.sourceReference ?? null,
+    createdBy: parsed.createdBy ?? null,
+    metadata: meta,
+  });
 
-  const entryRows = (await sql`
-    INSERT INTO context_entries
-      (project_id, source_id, title, content, summary, type, confidence,
-       source_type, source_reference, created_by, metadata)
-    VALUES (${projectId}, ${sourceId}, ${title}, ${parsed.content}, ${summary}, ${type},
-            ${parsed.confidence ?? "medium"}, ${sourceType}, ${parsed.sourceReference ?? null},
-            ${parsed.createdBy ?? null}, ${sql.json(meta)})
-    RETURNING *
-  `) as unknown as Row[];
-  const entry = rowToContextEntry(entryRows[0]!);
-
-  if (!opts.skipEmbedding) await storeEmbedding(sql, provider, entry.id, embedText);
+  if (!opts.skipEmbedding) await storeEmbedding(sql, provider, entry.id, draft.embedText);
 
   const entityIds: string[] = [];
-  for (const e of detectedEntities) {
+  for (const e of draft.entities) {
     const ent = await resolveEntity(sql, e.name, e.type);
     entityIds.push(ent.id);
     await linkEntryToEntity(sql, entry.id, ent.id);
@@ -153,7 +137,7 @@ export async function saveContext(
 
   const warnings =
     (opts.detectImprovements ?? true)
-      ? await detectImprovements(sql, entry, projectId, embedText, entityIds)
+      ? await detectImprovements(sql, entry, projectId, draft.embedText, entityIds)
       : [];
   return { entry, warnings };
 }
@@ -222,38 +206,6 @@ async function detectImprovements(
     }
   }
   return warnings;
-}
-
-function mergeEntities(
-  ...lists: { name: string; type: EntityType }[][]
-): { name: string; type: EntityType }[] {
-  const byKey = new Map<string, { name: string; type: EntityType }>();
-  for (const list of lists) {
-    for (const e of list) {
-      // A project is created, not extracted: wherever it comes from, it does not get in (#135).
-      if (e.type === "project") continue;
-      const key = `${e.type}:${canonicalize(e.name)}`;
-      if (!byKey.has(key)) byKey.set(key, e);
-    }
-  }
-  return [...byKey.values()];
-}
-
-export type ReclassifyDecision = "retype" | "confirmed" | "unclassified";
-
-/**
- * Whether reclassification WRITES to an entry. Only a type that really changes is worth an
- * UPDATE: storing the type the entry already had moves `updated_at` through the
- * `set_updated_at` trigger, and a movement there reads downstream as "something happened to
- * this entry" -- which is how auto-curation came to promote nearly every distilled entry in the
- * same maintenance pass (ADR-0067).
- */
-export function decideReclassification(
-  current: ContextEntryType,
-  proposed: ContextEntryType | null | undefined,
-): ReclassifyDecision {
-  if (!proposed) return "unclassified";
-  return proposed === current ? "confirmed" : "retype";
 }
 
 /**

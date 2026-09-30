@@ -17,6 +17,7 @@ import {
   resolveEntities,
   setClassifier,
   setReconciler,
+  applyTemporalInvalidation,
   autoCurate,
   lintProject,
   invalidateEntry,
@@ -503,6 +504,57 @@ describe("confidence is earned by corroboration (a real database)", () => {
     const after = (await listEntries({ project: p.name })).find((e) => e.id === stale.entry.id)!;
     expect(after.status).toBe("obsolete");
     expect(after.confidence).toBe("low");
+  });
+});
+
+describe("bi-temporal invalidation (a real database)", () => {
+  const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: false } as const;
+
+  it("closes the validity window of a migrated task, without deleting it", async () => {
+    const p = await createProject(`IT Temporal ${RID}`);
+    const legacy = await saveContext(
+      { project: p.name, type: "module_note", content: "A migrated task that is no longer current.", metadata: { state: "Histórico" } } as never,
+      opts,
+    );
+
+    const r = await applyTemporalInvalidation();
+    expect(r.historical).toBeGreaterThanOrEqual(1);
+
+    const after = (await listEntries({ project: p.name })).find((e) => e.id === legacy.entry.id)!;
+    expect(after.validTo).not.toBeNull();
+    expect(after.validity).toBe("historical");
+  });
+
+  /**
+   * The `supersedes` path wrote `validity = 'superseded'`, which the table's CHECK does not
+   * allow (only current/historical/unknown), so any supersedes relation made maintenance throw.
+   * This is the test that was missing.
+   */
+  it("closes the superseded entry and points it at the one that replaced it", async () => {
+    const p = await createProject(`IT TemporalSup ${RID}`);
+    const older = await saveContext(
+      { project: p.name, type: "decision", content: "Retries use a fixed 30-second backoff." } as never,
+      opts,
+    );
+    const newer = await saveContext(
+      { project: p.name, type: "decision", content: "Retries use exponential backoff capped at 60 seconds." } as never,
+      opts,
+    );
+    await relate(getSql(), {
+      sourceId: newer.entry.id,
+      sourceType: "context_entry",
+      targetId: older.entry.id,
+      targetType: "context_entry",
+      relationType: "supersedes",
+    });
+
+    const r = await applyTemporalInvalidation();
+    expect(r.superseded).toBeGreaterThanOrEqual(1);
+
+    const after = (await listEntries({ project: p.name })).find((e) => e.id === older.entry.id)!;
+    expect(after.validTo).not.toBeNull();
+    expect(after.validity).toBe("historical");
+    expect(after.supersededBy).toBe(newer.entry.id);
   });
 });
 
