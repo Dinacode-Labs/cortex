@@ -1,16 +1,16 @@
 import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
-import { type ContextEntry, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
+import { type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "../graph/entities.js";
 import { createProject, findProjectIdByName } from "../projects/projects.js";
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
-import { ContextEntryDraft, decideReclassification, type ClassifierResult } from "./domain/context-entry.js";
-import type { SummarizableEntry } from "./domain/context-entry-repository.js";
-import { PgContextEntryRepository } from "./infrastructure/context-entry.repository.js";
+import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "./domain/memo.js";
+import type { SummarizableMemo } from "./domain/memo-repository.js";
+import { PgMemoRepository } from "./infrastructure/memo.repository.js";
 
-export { decideReclassification } from "./domain/context-entry.js";
-export type { ClassifierResult, ReclassifyDecision } from "./domain/context-entry.js";
+export { decideReclassification } from "./domain/memo.js";
+export type { ClassifierResult, ReclassifyDecision } from "./domain/memo.js";
 
 export type Classifier = (content: string) => Promise<ClassifierResult | null>;
 
@@ -34,7 +34,7 @@ export interface ContextWarning {
 }
 
 export interface SaveContextResult {
-  entry: ContextEntry;
+  entry: Memo;
   warnings: ContextWarning[];
 }
 
@@ -67,12 +67,12 @@ export async function saveContext(
   const provider = getEmbeddingProvider();
   // No DI container (ADR-0041): the use case builds the adapter. The port is what keeps the
   // creation rules testable without a database, not what hides which adapter is in use.
-  const repository = new PgContextEntryRepository(sql);
+  const repository = new PgMemoRepository(sql);
 
   // Optional LLM layer: precedence is explicit input > LLM > heuristic.
   const useClassifier = opts.useClassifier ?? true;
   const llm = useClassifier && classifier ? await classifier(parsed.content).catch(() => null) : null;
-  const draft = ContextEntryDraft.from(
+  const draft = MemoDraft.from(
     {
       content: parsed.content,
       title: parsed.title,
@@ -96,7 +96,7 @@ export async function saveContext(
   }
 
   const sourceId = await repository.createSource({ sourceType, rawContent: draft.content, metadata: meta });
-  const entry = await repository.createEntry({
+  const entry = await repository.createMemo({
     projectId,
     sourceId,
     title: draft.title,
@@ -145,7 +145,7 @@ export async function saveContext(
  */
 async function detectImprovements(
   sql: Sql,
-  entry: ContextEntry,
+  entry: Memo,
   projectId: string | null,
   embedText: string,
   entityIds: string[],
@@ -176,7 +176,7 @@ async function detectImprovements(
   }
 
   if (newPolarity.size > 0 && entityIds.length > 0) {
-    const candidates = await new PgContextEntryRepository(sql).findContradictionCandidates(entityIds, entry.id);
+    const candidates = await new PgMemoRepository(sql).findContradictionCandidates(entityIds, entry.id);
     for (const cand of candidates) {
       if (seen.has(cand.id)) continue;
       if (polarityContradicts(newPolarity, polarityTags(cand.content))) {
@@ -221,7 +221,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   if (!projectId) throw new Error(`Project not found: "${project}".`);
   if (!classifier) return { scanned: 0, reclassified: 0 };
 
-  const repository = new PgContextEntryRepository(sql);
+  const repository = new PgMemoRepository(sql);
   const rows = await repository.findReclassifiable(projectId);
 
   let reclassified = 0;
@@ -244,7 +244,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   return { scanned: rows.length, reclassified };
 }
 
-function betterSummary(candidate: string | undefined, entry: SummarizableEntry): string | null {
+function betterSummary(candidate: string | undefined, entry: SummarizableMemo): string | null {
   const current = entry.summary;
   if (!isDerivedSummary(current, entry.content, entry.title)) return null;
   const next = stripLeadingTitle((candidate ?? summarize(entry.content)).trim(), entry.title).trim();
@@ -270,7 +270,7 @@ export interface ResummarizeResult {
  * mostly made of what was already stored: without this, the entries an agent reads today keep
  * the first 240 raw characters of themselves until somebody re-ingests the source.
  *
- * Writing moves `updated_at`, which the `context_entries` trigger sets on every UPDATE. That
+ * Writing moves `updated_at`, which the `memos` trigger sets on every UPDATE. That
  * movement decides nothing on its own -- confidence is counted from corroborations (ADR-0067) --
  * but it is a bulk write, which is what `dryRun` is for.
  */
@@ -282,7 +282,7 @@ export async function resummarizeEntries(opts: ResummarizeOptions = {}): Promise
     if (!projectId) throw new Error(`Project not found: "${opts.project}".`);
   }
 
-  const repository = new PgContextEntryRepository(sql);
+  const repository = new PgMemoRepository(sql);
   const rows = await repository.findSummariesToRebuild(projectId);
 
   let rewritten = 0;

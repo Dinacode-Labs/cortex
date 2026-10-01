@@ -23,7 +23,7 @@ export interface EntityNameRow {
 export interface EntityRepository {
   /** Finds or creates an entity by (type, canonical name). */
   resolve(name: string, type: EntityType): Promise<Entity>;
-  linkEntry(contextEntryId: string, entityId: string): Promise<void>;
+  linkMemo(memoId: string, entityId: string): Promise<void>;
   relate(args: RelationInput): Promise<void>;
   listResolvable(): Promise<EntityNameRow[]>;
   linkCounts(): Promise<Map<string, number>>;

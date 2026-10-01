@@ -21,10 +21,10 @@ export async function resolveEntity(
 
 export async function linkEntryToEntity(
   sql: Sql,
-  contextEntryId: string,
+  memoId: string,
   entityId: string,
 ): Promise<void> {
-  return new PgEntityRepository(sql).linkEntry(contextEntryId, entityId);
+  return new PgEntityRepository(sql).linkMemo(memoId, entityId);
 }
 
 /**

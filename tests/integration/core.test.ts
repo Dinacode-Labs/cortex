@@ -104,9 +104,9 @@ describe("batch capture plus reconciliation (a real database)", () => {
 
     await relate(getSql(), {
       sourceId: newer.entry.id,
-      sourceType: "context_entry",
+      sourceType: "memo",
       targetId: older.entry.id,
-      targetType: "context_entry",
+      targetType: "memo",
       relationType: "contradicts",
     });
 
@@ -139,7 +139,7 @@ describe("batch capture plus reconciliation (a real database)", () => {
     const sql = getSql();
     const readme = await resolveEntity(sql, `README ${RID}`, "module");
     const webhook = await resolveEntity(sql, `src/webhook.js ${RID}`, "module");
-    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entry_.entry.id}, ${readme.id}) ON CONFLICT DO NOTHING`;
+    await sql`INSERT INTO memo_entities (memo_id, entity_id) VALUES (${entry_.entry.id}, ${readme.id}) ON CONFLICT DO NOTHING`;
     await relate(sql, { sourceId: readme.id, sourceType: "entity", targetId: webhook.id, targetType: "entity", relationType: "contradicts" });
 
     const text = renderContextPack(await getContextPack(p.name));
@@ -149,7 +149,7 @@ describe("batch capture plus reconciliation (a real database)", () => {
 
     // And an entry is not warned that it clashes with itself: when it hangs off BOTH sides of
     // the dispute, it is not caught in the middle of the argument, it is the argument.
-    await sql`INSERT INTO context_entry_entities (context_entry_id, entity_id) VALUES (${entry_.entry.id}, ${webhook.id}) ON CONFLICT DO NOTHING`;
+    await sql`INSERT INTO memo_entities (memo_id, entity_id) VALUES (${entry_.entry.id}, ${webhook.id}) ON CONFLICT DO NOTHING`;
     const pack2 = await getContextPack(p.name);
     expect(pack2.conflicts.find((c) => c.entryId === entry_.entry.id)?.areas ?? []).toHaveLength(0);
   });
@@ -373,7 +373,7 @@ The frontend sends \`usedConfigurationId\` when the user picks a saved configura
     const derived = await saveContext({ content: chunk, project: p.name, title: "Configuration fields", sourceType: "document", sourceReference: "rs1" } as never, opts);
     const written = await saveContext({ content: chunk, project: p.name, title: "Configuration fields", summary: "Which fields travel and who computes them.", sourceType: "document", sourceReference: "rs2" } as never, opts);
     // The summary as the old heuristic stored it: the first 240 raw characters.
-    await sql`UPDATE context_entries SET summary = ${chunk.replace(/\s+/g, " ").slice(0, 240)} WHERE id = ${derived.entry.id}`;
+    await sql`UPDATE memos SET summary = ${chunk.replace(/\s+/g, " ").slice(0, 240)} WHERE id = ${derived.entry.id}`;
 
     const dry = await resummarizeEntries({ project: p.name, dryRun: true });
     expect(dry.rewritten).toBe(1);
@@ -497,7 +497,7 @@ describe("confidence is earned by corroboration (a real database)", () => {
     );
     // Born long ago and written to since (any UPDATE moves `updated_at` through the trigger):
     // the shape every reclassified entry had, and the one the old decay query could not see.
-    await getSql()`UPDATE context_entries SET created_at = now() - interval '200 days' WHERE id = ${stale.entry.id}`;
+    await getSql()`UPDATE memos SET created_at = now() - interval '200 days' WHERE id = ${stale.entry.id}`;
 
     const curation = await autoCurate(30);
     expect(curation.decayed).toBeGreaterThanOrEqual(1);
@@ -542,9 +542,9 @@ describe("bi-temporal invalidation (a real database)", () => {
     );
     await relate(getSql(), {
       sourceId: newer.entry.id,
-      sourceType: "context_entry",
+      sourceType: "memo",
       targetId: older.entry.id,
-      targetType: "context_entry",
+      targetType: "memo",
       relationType: "supersedes",
     });
 

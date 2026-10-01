@@ -1,4 +1,5 @@
-import type { ContextEntryType, EntityType } from "@cortex/shared";
+import type { EntityType } from "@cortex/shared";
+import type { MemoType } from "./knowledge/domain/memo.js";
 
 /**
  * Local heuristics (no LLM) for classifying and enriching knowledge. They are a deliberately
@@ -217,7 +218,7 @@ export function isDerivedSummary(summary: string | null, content: string, title:
 }
 
 // Classification rules in priority order (most specific first).
-const CLASSIFY_RULES: { type: ContextEntryType; re: RegExp }[] = [
+const CLASSIFY_RULES: { type: MemoType; re: RegExp }[] = [
   { type: "constraint", re: /\b(restricci|no (puede|permite|admite|podemos)|exige|pol[ií]tica|prohib|requisito|debe desplegarse|constraint|no se permite)/i },
   { type: "incident", re: /\b(error|fallo|bug|incidencia|ca[ií]d|se rompe|crash|incident|defecto)/i },
   { type: "technical_debt", re: /\b(deuda t[eé]cnica|legacy|refactor|technical debt|tech debt|c[oó]digo heredado)/i },
@@ -230,7 +231,7 @@ const CLASSIFY_RULES: { type: ContextEntryType; re: RegExp }[] = [
   { type: "decision", re: /\b(decid|elig|optamos|se va a|usaremos|mantener|decisi[oó]n|decision|acordamos)/i },
 ];
 
-export function classifyType(content: string): ContextEntryType {
+export function classifyType(content: string): MemoType {
   for (const rule of CLASSIFY_RULES) {
     if (rule.re.test(content)) return rule.type;
   }

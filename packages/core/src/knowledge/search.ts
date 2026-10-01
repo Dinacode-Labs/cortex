@@ -2,14 +2,14 @@ import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import {
   getEnvNum,
-  type ContextEntry,
   type SearchContextInput,
   searchContextInput,
 } from "@cortex/shared";
 import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../projects/projects.js";
-import { rowToContextEntry, type Row } from "../storage/map.js";
+import { rowToMemo, type Row } from "../storage/map.js";
 import { hybridSearch, type SearchHit } from "../storage/vectors.js";
 import { inferTypeFromQuery } from "./query-intent.js";
+import type { Memo } from "./domain/memo.js";
 
 export type { SearchHit } from "../storage/vectors.js";
 
@@ -110,16 +110,16 @@ export async function searchContext(
   return reranked.slice(0, parsed.limit);
 }
 
-export async function listDecisions(project: string, limit = 20): Promise<ContextEntry[]> {
+export async function listDecisions(project: string, limit = 20): Promise<Memo[]> {
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, project);
   if (!projectId) return [];
   const rows = (await sql`
-    SELECT * FROM context_entries
+    SELECT * FROM memos
     WHERE project_id = ${projectId} AND type = 'decision'
       AND status NOT IN ('rejected') AND valid_to IS NULL
     ORDER BY created_at DESC
     LIMIT ${limit}
   `) as unknown as Row[];
-  return rows.map(rowToContextEntry);
+  return rows.map(rowToMemo);
 }

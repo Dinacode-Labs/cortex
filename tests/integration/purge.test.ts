@@ -56,7 +56,7 @@ async function save(title: string, content: string, target: ProjectRef = project
     { content, title, project: target.name, type: "decision", createdBy: OWNER },
     { useClassifier: false },
   );
-  const [row] = (await getSql()`SELECT source_id FROM context_entries WHERE id = ${entry.id}`) as unknown as { source_id: string }[];
+  const [row] = (await getSql()`SELECT source_id FROM memos WHERE id = ${entry.id}`) as unknown as { source_id: string }[];
   return { id: entry.id, sourceId: row!.source_id };
 }
 
@@ -116,9 +116,9 @@ describe("purging an entry leaves nothing behind", () => {
 
     const dangling = {
       relations: await count(sql`SELECT count(*)::int n FROM relations WHERE source_id = ${doomed.id} OR target_id = ${doomed.id}`),
-      embeddings: await count(sql`SELECT count(*)::int n FROM embeddings WHERE context_entry_id = ${doomed.id}`),
-      entityLinks: await count(sql`SELECT count(*)::int n FROM context_entry_entities WHERE context_entry_id = ${doomed.id}`),
-      supersededBy: await count(sql`SELECT count(*)::int n FROM context_entries WHERE superseded_by = ${doomed.id}`),
+      embeddings: await count(sql`SELECT count(*)::int n FROM embeddings WHERE memo_id = ${doomed.id}`),
+      entityLinks: await count(sql`SELECT count(*)::int n FROM memo_entities WHERE memo_id = ${doomed.id}`),
+      supersededBy: await count(sql`SELECT count(*)::int n FROM memos WHERE superseded_by = ${doomed.id}`),
       source: await count(sql`SELECT count(*)::int n FROM sources WHERE id = ${doomed.sourceId}`),
       entityOnlyItNamed: await count(sql`SELECT count(*)::int n FROM entities WHERE id = ${onlyDoomed.id}`),
     };
@@ -134,7 +134,7 @@ describe("purging an entry leaves nothing behind", () => {
     await purgeEntries([doomed.id], OWNER);
 
     const [row] = (await getSql()`
-      SELECT status, validity, valid_to, superseded_by FROM context_entries WHERE id = ${older.id}
+      SELECT status, validity, valid_to, superseded_by FROM memos WHERE id = ${older.id}
     `) as unknown as { status: string; validity: string; valid_to: Date | null; superseded_by: string | null }[];
     expect(row).toEqual({ status: "pending_validation", validity: "current", valid_to: null, superseded_by: null });
   });

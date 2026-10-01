@@ -5,7 +5,7 @@ import { PgEntityRepository } from "./infrastructure/entity.repository.js";
 /**
  * The entity resolution loop (section 12.4): merges variants of the same entity
  * (e.g. "Acme"/"Acme Corp"/"acme.com") into a canonical one, re-pointing links
- * (context_entry_entities) and relations, and deduplicating. Database only, no LLM.
+ * (memo_entities) and relations, and deduplicating. Database only, no LLM.
  *
  * Which variants group and which one is canonical are rules of the `entity` domain
  * (`entityGroupKey`, `rankEntities`); the re-pointing SQL lives in the repository adapter.

@@ -1,18 +1,18 @@
 import { getSql, type Sql } from "@cortex/database";
-import type { ContextEntry, ContextEntryType } from "@cortex/shared";
-import { rowToContextEntry, type Row } from "../../storage/map.js";
+import { rowToMemo, type Row } from "../../storage/map.js";
 import type {
-  ContextEntryRepository,
-  NewContextEntry,
+  MemoRepository,
+  NewMemo,
   NewSource,
   PurgeTarget,
-  ReclassifiableEntry,
-  SummarizableEntry,
-} from "../domain/context-entry-repository.js";
+  ReclassifiableMemo,
+  SummarizableMemo,
+} from "../domain/memo-repository.js";
+import type { Memo, MemoType } from "../domain/memo.js";
 
 type JsonValue = Parameters<Sql["json"]>[0];
 
-export class PgContextEntryRepository implements ContextEntryRepository {
+export class PgMemoRepository implements MemoRepository {
   constructor(private readonly sql: Sql = getSql()) {}
 
   async createSource(source: NewSource): Promise<string> {
@@ -24,17 +24,17 @@ export class PgContextEntryRepository implements ContextEntryRepository {
     return rows[0]!.id as string;
   }
 
-  async createEntry(entry: NewContextEntry): Promise<ContextEntry> {
+  async createMemo(memo: NewMemo): Promise<Memo> {
     const rows = (await this.sql`
-      INSERT INTO context_entries
+      INSERT INTO memos
         (project_id, source_id, title, content, summary, type, confidence,
          source_type, source_reference, created_by, metadata)
-      VALUES (${entry.projectId}, ${entry.sourceId}, ${entry.title}, ${entry.content}, ${entry.summary},
-              ${entry.type}, ${entry.confidence}, ${entry.sourceType}, ${entry.sourceReference},
-              ${entry.createdBy}, ${this.sql.json(entry.metadata as JsonValue)})
+      VALUES (${memo.projectId}, ${memo.sourceId}, ${memo.title}, ${memo.content}, ${memo.summary},
+              ${memo.type}, ${memo.confidence}, ${memo.sourceType}, ${memo.sourceReference},
+              ${memo.createdBy}, ${this.sql.json(memo.metadata as JsonValue)})
       RETURNING *
     `) as unknown as Row[];
-    return rowToContextEntry(rows[0]!);
+    return rowToMemo(rows[0]!);
   }
 
   // Bi-temporal invalidation (the Zep/Graphiti pattern): close the validity window rather than
@@ -42,7 +42,7 @@ export class PgContextEntryRepository implements ContextEntryRepository {
   // Idempotent: only facts that are still current (valid_to IS NULL) are touched.
   async closeHistoricalStates(): Promise<number> {
     const rows = (await this.sql`
-      UPDATE context_entries
+      UPDATE memos
       SET valid_to = updated_at, validity = 'historical'
       WHERE metadata->>'state' = 'Histórico' AND valid_to IS NULL
       RETURNING id
@@ -56,13 +56,13 @@ export class PgContextEntryRepository implements ContextEntryRepository {
     // whenever a `supersedes` relation existed. Superseded-ness is `status` and `superseded_by`,
     // exactly as `invalidateEntry` does it.
     const rows = (await this.sql`
-      UPDATE context_entries b
+      UPDATE memos b
       SET valid_to = GREATEST(a.created_at, b.valid_from),
           validity = 'historical',
           superseded_by = a.id,
           status = CASE WHEN b.status = 'validated' THEN 'superseded' ELSE b.status END
       FROM relations r
-      JOIN context_entries a ON a.id = r.source_id
+      JOIN memos a ON a.id = r.source_id
       WHERE r.relation_type = 'supersedes'
         AND b.id = r.target_id
         AND a.id <> b.id
@@ -76,7 +76,7 @@ export class PgContextEntryRepository implements ContextEntryRepository {
   // confidence): promote what was corroborated, decay what was never confirmed (ADR-0067).
   async promoteCorroborated(): Promise<number> {
     const rows = (await this.sql`
-      UPDATE context_entries SET confidence = 'medium'
+      UPDATE memos SET confidence = 'medium'
       WHERE confidence = 'low' AND source_type = 'agent_session'
         AND status = 'pending_validation' AND valid_to IS NULL
         AND cortex_corroborations(metadata) >= 1
@@ -87,7 +87,7 @@ export class PgContextEntryRepository implements ContextEntryRepository {
 
   async decayUncorroborated(decayDays: number): Promise<number> {
     const rows = (await this.sql`
-      UPDATE context_entries SET status = 'obsolete'
+      UPDATE memos SET status = 'obsolete'
       WHERE confidence = 'low' AND source_type = 'agent_session'
         AND status = 'pending_validation' AND valid_to IS NULL
         AND cortex_corroborations(metadata) = 0
@@ -99,41 +99,41 @@ export class PgContextEntryRepository implements ContextEntryRepository {
 
   // One statement rather than read-modify-write, because two sessions closing at the same time
   // would otherwise read the same value and store the same increment.
-  async recordCorroboration(entryId: string): Promise<void> {
+  async recordCorroboration(memoId: string): Promise<void> {
     await this.sql`
-      UPDATE context_entries
+      UPDATE memos
          SET metadata = jsonb_set(metadata, '{corroborations}',
                                   to_jsonb(cortex_corroborations(metadata) + 1))
-       WHERE id = ${entryId}
+       WHERE id = ${memoId}
     `;
   }
 
   // Bi-temporal DELETE (section 5.5: invalidating is not deleting). `validity` stays within
   // current/historical/unknown: superseded-ness is `status` and `superseded_by`.
-  async invalidate(entryId: string, supersededById: string): Promise<void> {
+  async invalidate(memoId: string, supersededById: string): Promise<void> {
     await this.sql`
-      UPDATE context_entries
+      UPDATE memos
       SET valid_to = now(), validity = 'historical', status = 'superseded', superseded_by = ${supersededById}
-      WHERE id = ${entryId} AND valid_to IS NULL
+      WHERE id = ${memoId} AND valid_to IS NULL
     `;
   }
 
-  async updateEntryFields(entryId: string, fields: { title?: string; content?: string }): Promise<boolean> {
+  async updateMemoFields(memoId: string, fields: { title?: string; content?: string }): Promise<boolean> {
     const { title, content } = fields;
     if (title === undefined && content === undefined) return false;
     const rows = (await this.sql`
-      UPDATE context_entries
+      UPDATE memos
          SET title = COALESCE(${title ?? null}, title),
              content = COALESCE(${content ?? null}, content),
              updated_at = now()
-       WHERE id = ${entryId}
+       WHERE id = ${memoId}
        RETURNING id
     `) as unknown as { id: string }[];
     return rows.length > 0;
   }
 
-  async updateEntryContent(entryId: string, content: string): Promise<void> {
-    await this.sql`UPDATE context_entries SET content = ${content}, updated_at = now() WHERE id = ${entryId}`;
+  async updateMemoContent(memoId: string, content: string): Promise<void> {
+    await this.sql`UPDATE memos SET content = ${content}, updated_at = now() WHERE id = ${memoId}`;
   }
 
   async findNearDuplicatePairs(
@@ -144,10 +144,10 @@ export class PgContextEntryRepository implements ContextEntryRepository {
     return (await this.sql`
       SELECT a.id AS keep, b.id AS drop
       FROM embeddings ea
-      JOIN context_entries a ON a.id = ea.context_entry_id
+      JOIN memos a ON a.id = ea.memo_id
       JOIN embeddings eb ON eb.embedding_model = ea.embedding_model
         AND eb.embedding_version = ea.embedding_version AND eb.chunk_index = ea.chunk_index
-      JOIN context_entries b ON b.id = eb.context_entry_id
+      JOIN memos b ON b.id = eb.memo_id
       WHERE a.project_id = ${projectId} AND b.project_id = ${projectId}
         AND a.source_type = b.source_type
         AND a.valid_to IS NULL AND b.valid_to IS NULL
@@ -161,29 +161,29 @@ export class PgContextEntryRepository implements ContextEntryRepository {
     `) as unknown as { keep: string; drop: string }[];
   }
 
-  async findContradictionCandidates(entityIds: string[], excludeId: string): Promise<ContextEntry[]> {
+  async findContradictionCandidates(entityIds: string[], excludeId: string): Promise<Memo[]> {
     const rows = (await this.sql`
-      SELECT DISTINCT ce.*
-      FROM context_entries ce
-      JOIN context_entry_entities cee ON cee.context_entry_id = ce.id
-      WHERE cee.entity_id IN ${this.sql(entityIds)}
-        AND ce.id <> ${excludeId}
-        AND ce.status NOT IN ('rejected', 'obsolete')
+      SELECT DISTINCT m.*
+      FROM memos m
+      JOIN memo_entities me ON me.memo_id = m.id
+      WHERE me.entity_id IN ${this.sql(entityIds)}
+        AND m.id <> ${excludeId}
+        AND m.status NOT IN ('rejected', 'obsolete')
     `) as unknown as Row[];
-    return rows.map(rowToContextEntry);
+    return rows.map(rowToMemo);
   }
 
   async findIdBySourceReference(projectId: string, sourceReference: string): Promise<string | null> {
     const rows = (await this.sql`
-      SELECT id FROM context_entries WHERE project_id = ${projectId} AND source_reference = ${sourceReference} LIMIT 1
+      SELECT id FROM memos WHERE project_id = ${projectId} AND source_reference = ${sourceReference} LIMIT 1
     `) as unknown as Row[];
     return rows[0] ? (rows[0].id as string) : null;
   }
 
-  async findReclassifiable(projectId: string): Promise<ReclassifiableEntry[]> {
+  async findReclassifiable(projectId: string): Promise<ReclassifiableMemo[]> {
     const rows = (await this.sql`
       SELECT id, title, content, summary, type, metadata
-      FROM context_entries
+      FROM memos
       WHERE project_id = ${projectId} AND valid_to IS NULL
         AND COALESCE(metadata->>'enrichedBy', 'heuristic') NOT IN ('llm', 'distiller')
     `) as unknown as Row[];
@@ -192,15 +192,15 @@ export class PgContextEntryRepository implements ContextEntryRepository {
       title: r.title as string,
       content: r.content as string,
       summary: (r.summary as string | null) ?? null,
-      type: r.type as ContextEntryType,
+      type: r.type as MemoType,
       metadata: (r.metadata as Record<string, unknown>) ?? {},
     }));
   }
 
-  async findSummariesToRebuild(projectId: string | null): Promise<SummarizableEntry[]> {
+  async findSummariesToRebuild(projectId: string | null): Promise<SummarizableMemo[]> {
     const rows = (await this.sql`
       SELECT id, title, content, summary
-      FROM context_entries
+      FROM memos
       WHERE valid_to IS NULL
         ${projectId ? this.sql`AND project_id = ${projectId}` : this.sql``}
     `) as unknown as Row[];
@@ -212,24 +212,24 @@ export class PgContextEntryRepository implements ContextEntryRepository {
     }));
   }
 
-  async retype(id: string, change: { type: ContextEntryType; summary: string | null; metadata: Record<string, unknown> }): Promise<void> {
+  async retype(id: string, change: { type: MemoType; summary: string | null; metadata: Record<string, unknown> }): Promise<void> {
     await this.sql`
-      UPDATE context_entries
+      UPDATE memos
       SET type = ${change.type}, summary = ${change.summary}, metadata = ${this.sql.json(change.metadata as JsonValue)}
       WHERE id = ${id}
     `;
   }
 
   async updateSummary(id: string, summary: string): Promise<void> {
-    await this.sql`UPDATE context_entries SET summary = ${summary} WHERE id = ${id}`;
+    await this.sql`UPDATE memos SET summary = ${summary} WHERE id = ${id}`;
   }
 
   async findPurgeTargets(ids: string[]): Promise<PurgeTarget[]> {
     const rows = (await this.sql`
-      SELECT ce.id, ce.project_id, p.slug, p.name
-        FROM context_entries ce
-        LEFT JOIN entities p ON p.id = ce.project_id
-       WHERE ce.id = ANY(${ids}::uuid[])
+      SELECT m.id, m.project_id, p.slug, p.name
+        FROM memos m
+        LEFT JOIN entities p ON p.id = m.project_id
+       WHERE m.id = ANY(${ids}::uuid[])
     `) as unknown as Row[];
     return rows.map((r) => ({
       id: r.id as string,
@@ -244,21 +244,21 @@ export class PgContextEntryRepository implements ContextEntryRepository {
       // FOR UPDATE holds the entries while the whole cleanup runs, so nobody edits one in the
       // middle of it.
       const entries = (await tx`
-        SELECT ce.id, ce.source_id, ce.project_id, ce.type, ce.source_type, ce.created_at
-          FROM context_entries ce
-         WHERE ce.id = ANY(${ids}::uuid[])
-           FOR UPDATE OF ce
+        SELECT m.id, m.source_id, m.project_id, m.type, m.source_type, m.created_at
+          FROM memos m
+         WHERE m.id = ANY(${ids}::uuid[])
+           FOR UPDATE OF m
       `) as unknown as Row[];
       const found = entries.map((e) => e.id as string);
       if (found.length === 0) return [];
       const sourceIds = entries.map((e) => e.source_id as string | null).filter((s): s is string => !!s);
       const linkedEntities = (await tx`
-        SELECT DISTINCT entity_id FROM context_entry_entities WHERE context_entry_id = ANY(${found}::uuid[])
+        SELECT DISTINCT entity_id FROM memo_entities WHERE memo_id = ANY(${found}::uuid[])
       `) as unknown as Row[];
 
       // An entry these had superseded becomes current again and waits for review.
       await tx`
-        UPDATE context_entries
+        UPDATE memos
            SET superseded_by = NULL, valid_to = NULL, validity = 'current',
                status = CASE WHEN status IN ('rejected', 'obsolete') THEN status ELSE 'pending_validation' END
          WHERE superseded_by = ANY(${found}::uuid[]) AND NOT (id = ANY(${found}::uuid[]))
@@ -273,13 +273,13 @@ export class PgContextEntryRepository implements ContextEntryRepository {
                   ${e.source_type as string}, ${e.created_at as Date}, ${purgedBy.toLowerCase()})
         `;
       }
-      await tx`DELETE FROM context_entries WHERE id = ANY(${found}::uuid[])`;
+      await tx`DELETE FROM memos WHERE id = ANY(${found}::uuid[])`;
 
       if (sourceIds.length) {
         await tx`
           DELETE FROM sources s
            WHERE s.id = ANY(${sourceIds}::uuid[])
-             AND NOT EXISTS (SELECT 1 FROM context_entries ce WHERE ce.source_id = s.id)
+             AND NOT EXISTS (SELECT 1 FROM memos m WHERE m.source_id = s.id)
         `;
       }
       const entityIds = linkedEntities.map((r) => r.entity_id as string);
@@ -288,9 +288,9 @@ export class PgContextEntryRepository implements ContextEntryRepository {
           DELETE FROM entities en
            WHERE en.id = ANY(${entityIds}::uuid[])
              AND en.type NOT IN ('project', 'client')
-             AND NOT EXISTS (SELECT 1 FROM context_entry_entities cee WHERE cee.entity_id = en.id)
+             AND NOT EXISTS (SELECT 1 FROM memo_entities me WHERE me.entity_id = en.id)
              AND NOT EXISTS (SELECT 1 FROM relations r WHERE r.source_id = en.id OR r.target_id = en.id)
-             AND NOT EXISTS (SELECT 1 FROM context_entries ce WHERE ce.project_id = en.id OR ce.client_id = en.id)
+             AND NOT EXISTS (SELECT 1 FROM memos m WHERE m.project_id = en.id OR m.client_id = en.id)
              AND NOT EXISTS (SELECT 1 FROM entities child WHERE child.parent_id = en.id)
         `;
       }

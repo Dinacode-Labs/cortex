@@ -45,7 +45,7 @@ export async function run(args: string[]): Promise<void> {
   const items = JSON.parse(readFileSync(resolve(file), "utf8")) as IngestItem[];
   console.log(`Ingesting ${items.length} items into "${project}" (llm=${USE_LLM})...`);
 
-  const toEmbed: { contextEntryId: string; text: string }[] = [];
+  const toEmbed: { memoId: string; text: string }[] = [];
   let done = 0;
   let failed = 0;
   let cursor = 0;
@@ -68,7 +68,7 @@ export async function run(args: string[]): Promise<void> {
           },
           { useClassifier: USE_LLM, detectImprovements: false, skipEmbedding: true },
         );
-        toEmbed.push({ contextEntryId: entry.id, text: `${entry.title}\n\n${entry.content}` });
+        toEmbed.push({ memoId: entry.id, text: `${entry.title}\n\n${entry.content}` });
       } catch (e) {
         failed++;
         console.error(`  ✗ ${item.sourceReference ?? ""}: ${(e as Error).message}`);

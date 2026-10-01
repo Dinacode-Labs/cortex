@@ -1,22 +1,20 @@
 import { getSql, type Sql } from "@cortex/database";
 import type {
-  ContextEntry,
-  ContextEntryType,
-  ContextEntryStatus,
   Entity,
   EntrySortField,
   SortDirection,
   Source,
 } from "@cortex/shared";
 import { findProjectIdByName } from "../projects/projects.js";
-import { rowToContextEntry, rowToEntity, rowToSource, type Row } from "../storage/map.js";
+import { rowToMemo, rowToEntity, rowToSource, type Row } from "../storage/map.js";
+import type { Memo, MemoStatus, MemoType } from "./domain/memo.js";
 
 export async function listProjects(): Promise<{ entity: Entity; entryCount: number }[]> {
   const sql = getSql();
   const rows = (await sql`
-    SELECT e.*, count(ce.id)::int AS entry_count
+    SELECT e.*, count(m.id)::int AS entry_count
     FROM entities e
-    LEFT JOIN context_entries ce ON ce.project_id = e.id
+    LEFT JOIN memos m ON m.project_id = e.id
     WHERE e.type = 'project'
     GROUP BY e.id
     ORDER BY e.name
@@ -31,8 +29,8 @@ export interface EntrySort {
 
 export interface ListEntriesFilter {
   project?: string;
-  type?: ContextEntryType;
-  status?: ContextEntryStatus;
+  type?: MemoType;
+  status?: MemoStatus;
   limit?: number;
   sort?: EntrySort;
   /**
@@ -50,37 +48,37 @@ export interface ListEntriesFilter {
   accessibleProjectIds?: string[];
 }
 
-export async function listEntries(filter: ListEntriesFilter = {}): Promise<ContextEntry[]> {
+export async function listEntries(filter: ListEntriesFilter = {}): Promise<Memo[]> {
   const sql = getSql();
   let where = sql`WHERE true`;
   if (filter.project) {
     const projectId = await findProjectIdByName(sql, filter.project);
     if (!projectId) return [];
-    where = sql`${where} AND ce.project_id = ${projectId}`;
+    where = sql`${where} AND m.project_id = ${projectId}`;
   } else if (filter.accessibleProjectIds) {
     // An entry with no project is visible to anyone with a session: there is no project to
     // restrict it (the same rule as `checkEntryAccess`, which returns `ok` with `project: null`).
-    where = sql`${where} AND (ce.project_id IS NULL OR ce.project_id = ANY(${filter.accessibleProjectIds}))`;
+    where = sql`${where} AND (m.project_id IS NULL OR m.project_id = ANY(${filter.accessibleProjectIds}))`;
   }
-  if (filter.type) where = sql`${where} AND ce.type = ${filter.type}`;
-  if (filter.status) where = sql`${where} AND ce.status = ${filter.status}`;
+  if (filter.type) where = sql`${where} AND m.type = ${filter.type}`;
+  if (filter.status) where = sql`${where} AND m.status = ${filter.status}`;
 
   const rows = (await sql`
-    SELECT ce.* FROM context_entries ce
+    SELECT m.* FROM memos m
     ${where}
     ${entryOrder(sql, filter.sort ?? { by: "created", dir: "desc" })}
     LIMIT ${filter.limit ?? 100}
   `) as unknown as Row[];
-  return rows.map(rowToContextEntry);
+  return rows.map(rowToMemo);
 }
 
 function entryOrder(sql: Sql, sort: EntrySort) {
-  const column = sort.by === "updated" ? sql`ce.updated_at` : sql`ce.created_at`;
-  return sort.dir === "asc" ? sql`ORDER BY ${column} ASC, ce.id ASC` : sql`ORDER BY ${column} DESC, ce.id DESC`;
+  const column = sort.by === "updated" ? sql`m.updated_at` : sql`m.created_at`;
+  return sort.dir === "asc" ? sql`ORDER BY ${column} ASC, m.id ASC` : sql`ORDER BY ${column} DESC, m.id DESC`;
 }
 
 export interface EntryDetail {
-  entry: ContextEntry;
+  entry: Memo;
   source: Source | null;
   entities: Entity[];
   projectName: string | null;
@@ -88,10 +86,10 @@ export interface EntryDetail {
 
 export async function getEntryDetail(id: string): Promise<EntryDetail | null> {
   const sql = getSql();
-  const entryRows = (await sql`SELECT * FROM context_entries WHERE id = ${id} LIMIT 1`) as unknown as Row[];
+  const entryRows = (await sql`SELECT * FROM memos WHERE id = ${id} LIMIT 1`) as unknown as Row[];
   const row = entryRows[0];
   if (!row) return null;
-  const entry = rowToContextEntry(row);
+  const entry = rowToMemo(row);
 
   const sourceRows = row.source_id
     ? ((await sql`SELECT * FROM sources WHERE id = ${row.source_id} LIMIT 1`) as unknown as Row[])
@@ -99,8 +97,8 @@ export async function getEntryDetail(id: string): Promise<EntryDetail | null> {
 
   const entityRows = (await sql`
     SELECT e.* FROM entities e
-    JOIN context_entry_entities cee ON cee.entity_id = e.id
-    WHERE cee.context_entry_id = ${id}
+    JOIN memo_entities me ON me.entity_id = e.id
+    WHERE me.memo_id = ${id}
     ORDER BY e.type, e.name
   `) as unknown as Row[];
 
@@ -148,9 +146,9 @@ export async function getProjectGraph(
   const entityRows = (await sql`
     SELECT DISTINCT en.id, en.name, en.type
     FROM entities en
-    JOIN context_entry_entities cee ON cee.entity_id = en.id
-    JOIN context_entries ce ON ce.id = cee.context_entry_id
-    WHERE ce.project_id = ${projectId} AND en.id <> ${projectId}
+    JOIN memo_entities me ON me.entity_id = en.id
+    JOIN memos m ON m.id = me.memo_id
+    WHERE m.project_id = ${projectId} AND en.id <> ${projectId}
   `) as unknown as Row[];
 
   const nodeIds = new Set<string>();
@@ -162,10 +160,10 @@ export async function getProjectGraph(
 
   if (includeEntries) {
     const entryRows = (await sql`
-      SELECT ce.id, ce.title, ce.type
-      FROM context_entries ce
-      WHERE ce.project_id = ${projectId}
-      ORDER BY ce.created_at DESC
+      SELECT m.id, m.title, m.type
+      FROM memos m
+      WHERE m.project_id = ${projectId}
+      ORDER BY m.created_at DESC
       LIMIT ${maxEntries}
     `) as unknown as Row[];
     for (const r of entryRows) {
@@ -188,14 +186,14 @@ export async function getProjectGraph(
   }
   if (includeEntries) {
     const linkRows = (await sql`
-      SELECT cee.context_entry_id, cee.entity_id
-      FROM context_entry_entities cee
-      JOIN context_entries ce ON ce.id = cee.context_entry_id
-      WHERE ce.project_id = ${projectId} AND cee.entity_id <> ${projectId}
+      SELECT me.memo_id, me.entity_id
+      FROM memo_entities me
+      JOIN memos m ON m.id = me.memo_id
+      WHERE m.project_id = ${projectId} AND me.entity_id <> ${projectId}
     `) as unknown as Row[];
     for (const r of linkRows) {
-      if (nodeIds.has(r.context_entry_id) && nodeIds.has(r.entity_id)) {
-        edges.push({ from: r.context_entry_id, to: r.entity_id, kind: "mention" });
+      if (nodeIds.has(r.memo_id) && nodeIds.has(r.entity_id)) {
+        edges.push({ from: r.memo_id, to: r.entity_id, kind: "mention" });
       }
     }
   }

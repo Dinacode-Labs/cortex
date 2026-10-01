@@ -55,8 +55,9 @@ installs the CLI and signs in.
 
 ## 1. The unit of knowledge (and provenance)
 
-Everything Cortex knows is a **context entry** (`context_entries`). Each entry is **one
-fact**: a decision, a constraint, an incident, a convention. There are **14 types**:
+Everything Cortex knows is a **memo** (the `memos` table; the API and the MCP tools still
+call it a *context entry*). Each memo is **one fact**: a decision, a constraint, an incident, a
+convention. There are **14 types**:
 `decision`, `constraint`, `incident`, `architecture`, `module_note`, `technical_debt`,
 `convention`, `business_rule`, `integration_note`, `risk`, `how_to`, `meeting_summary`,
 `pr_summary`, `ticket_resolution`.

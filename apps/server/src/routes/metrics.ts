@@ -39,7 +39,7 @@ metricsRoutes.get("/metrics", async (c) => {
   const [captures = [], heartbeats = [], entries = [], projects = [], usage = []] = (await Promise.all([
     sql`SELECT status, count(*)::int AS n FROM session_captures GROUP BY status`,
     sql`SELECT name, extract(epoch FROM now() - beat_at)::int AS age FROM worker_heartbeats`,
-    sql`SELECT count(*)::int AS n FROM context_entries WHERE valid_to IS NULL`,
+    sql`SELECT count(*)::int AS n FROM memos WHERE valid_to IS NULL`,
     sql`SELECT count(*)::int AS n FROM entities WHERE type = 'project'`,
     sql`SELECT count(*)::int AS calls, coalesce(sum(input_tokens),0)::bigint AS input,
                coalesce(sum(output_tokens),0)::bigint AS output FROM llm_usage`,

@@ -126,7 +126,7 @@ export async function run(): Promise<void> {
   }
 
   console.log("Emptying the knowledge tables...");
-  await sql`TRUNCATE context_entry_entities, embeddings, relations, context_entries, sources, entities RESTART IDENTITY CASCADE`;
+  await sql`TRUNCATE memo_entities, embeddings, relations, memos, sources, entities RESTART IDENTITY CASCADE`;
 
   const client = await resolveEntity(sql, CLIENT, "client");
   const project = await createProject(PROJECT); // with a slug: the database rejects projects without one (#135)
