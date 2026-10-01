@@ -73,8 +73,8 @@ describe("the life of a project_ (ADR-0051)", () => {
 
   it("turning it private closes access at once, without touching the entries", async () => {
     const p = (await findProjectBySlug(project_.slug!))!;
-    expect(await canAccessProject(p, OTRO)).toBe(false);
-    expect(await canAccessProject(p, OWNER)).toBe(true);
+    expect(await canAccessProject(p, { email: OTRO })).toBe(false);
+    expect(await canAccessProject(p, { email: OWNER })).toBe(true);
 
     const srv = createServerApp();
     await srv.request(`/projects/${project_.slug}`, {
@@ -82,7 +82,7 @@ describe("the life of a project_ (ADR-0051)", () => {
       headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
       body: JSON.stringify({ visibility: "public" }),
     });
-    expect(await canAccessProject((await findProjectBySlug(project_.slug!))!, OTRO)).toBe(true);
+    expect(await canAccessProject((await findProjectBySlug(project_.slug!))!, { email: OTRO })).toBe(true);
   });
 
   it("the owner manages their members without being a global admin", async () => {
@@ -134,7 +134,7 @@ describe("the life of a project_ (ADR-0051)", () => {
       headers: { authorization: `Bearer ${tokOwner}`, "content-type": "application/json" },
       body: JSON.stringify({ visibility: "private" }),
     });
-    expect(await canAccessProject((await findProjectBySlug(huerfano.slug!))!, OTRO)).toBe(false);
+    expect(await canAccessProject((await findProjectBySlug(huerfano.slug!))!, { email: OTRO })).toBe(false);
   }, 60_000);
 
   it("a parent cycle cannot be built, which would leave the permissions going round", async () => {

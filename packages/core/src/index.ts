@@ -45,7 +45,8 @@ export {
   type ReconcileResult,
 } from "./knowledge/dedup.js";
 export { autoCurate, type CurationResult } from "./knowledge/curate.js";
-export { requestOtp, verifyOtp, validateToken, revokeToken, createUiTicket, redeemUiTicket, isAdmin, isAllowedEmail, listAdmins, type AuthUser } from "./identity/auth.js";
+export { requestOtp, verifyOtp, authenticate, authenticateAccount, revokeToken, createUiTicket, redeemUiTicket, isAdmin, listAdmins, type Account } from "./auth/auth.js";
+export type { SessionUser } from "./auth/session-user.js";
 export {
   sendOtpEmail,
   getEmailSender,
@@ -53,7 +54,7 @@ export {
   validateEmailConfig,
   type EmailSender,
   type EmailMessage,
-} from "./identity/email.js";
+} from "./auth/email.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture/capture.js";
 export { extractFileText, setMediaExtractor, type ExtractedFile, type MediaExtractorHooks } from "./capture/extract.js";
 export {

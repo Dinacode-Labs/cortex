@@ -77,7 +77,7 @@ contextRoutes.get("/context-pack", async (c) => {
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const slug = c.req.query("slug") ?? "";
   if (!slug) return c.json({ error: "Project not found." }, 404);
-  const access = await checkProjectAccess(user.email, { slug });
+  const access = await checkProjectAccess(user, { slug });
   if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
@@ -107,7 +107,7 @@ contextRoutes.post("/capture", async (c) => {
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const body = await parseBody(c, captureSchema);
   if (body instanceof Response) return body;
-  const access = await checkProjectAccess(user.email, { slug: body.slug });
+  const access = await checkProjectAccess(user, { slug: body.slug });
   if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
@@ -136,7 +136,7 @@ contextRoutes.post("/capture/batch", async (c) => {
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const body = await parseBody(c, captureBatchSchema);
   if (body instanceof Response) return body;
-  const access = await checkProjectAccess(user.email, { slug: body.slug });
+  const access = await checkProjectAccess(user, { slug: body.slug });
   if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const project = access.project;
@@ -153,7 +153,7 @@ contextRoutes.post("/relate", async (c) => {
   // Permission per entry (not by project name): BOTH must be accessible.
   // An entry with no project is allowed (there are no permissions to apply).
   for (const eid of [body.sourceId, body.targetId]) {
-    const access = await checkEntryAccess(user.email, eid);
+    const access = await checkEntryAccess(user, eid);
     if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
     if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   }
@@ -184,7 +184,7 @@ contextRoutes.get("/search", async (c) => {
   const slug = c.req.query("slug");
   let project: string | undefined;
   if (slug) {
-    const access = await checkProjectAccess(user.email, { slug });
+    const access = await checkProjectAccess(user, { slug });
     if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
     if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
     project = access.project.name;
@@ -194,7 +194,7 @@ contextRoutes.get("/search", async (c) => {
   // would be a way to read other people's private projects.
   const hits = await searchContext(
     { query: q, project, type: tipo.success ? tipo.data : undefined, limit },
-    project ? undefined : { restrictToAccessibleOf: user.email },
+    project ? undefined : { restrictToAccessibleOf: user },
   );
 
   return c.json({
@@ -217,7 +217,7 @@ contextRoutes.get("/entries/:id", async (c) => {
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const id = c.req.param("id");
   if (!ES_UUID(id)) return c.json({ error: "Entry not found." }, 404);
-  const access = await checkEntryAccess(user.email, id);
+  const access = await checkEntryAccess(user, id);
   if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const detail = await getEntryDetail(id);
@@ -233,7 +233,7 @@ contextRoutes.patch("/entries/:id", async (c) => {
   if (!ES_UUID(id)) return c.json({ error: "Entry not found." }, 404);
   const body = await parseBody(c, updateEntryRequest);
   if (body instanceof Response) return body;
-  const access = await checkEntryAccess(user.email, id);
+  const access = await checkEntryAccess(user, id);
   if (access.status === "not_found") return c.json({ error: "Entry not found." }, 404);
   if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
   const ok = await updateEntryFields(id, body);
@@ -248,13 +248,13 @@ contextRoutes.post("/entries/purge", async (c) => {
   if (body instanceof Response) return body;
   const missing: string[] = [];
   for (const id of body.ids) {
-    const access = await checkEntryAccess(user.email, id);
+    const access = await checkEntryAccess(user, id);
     if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
     if (access.status === "not_found") missing.push(id);
   }
   if (missing.length) return c.json({ error: "Entry not found.", missing }, 404);
   try {
-    const result: PurgeEntriesResponse = await purgeEntries(body.ids, user.email);
+    const result: PurgeEntriesResponse = await purgeEntries(body.ids, user);
     return c.json(result);
   } catch (e) {
     if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);

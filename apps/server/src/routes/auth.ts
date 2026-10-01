@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { clientIp, tooManyRequests } from "../rate-limit.js";
 import { z } from "zod";
 import { createUiTicket, requestOtp, revokeToken, verifyOtp } from "@cortex/core";
-import { bearer, currentUser } from "../auth-helpers.js";
+import { accountJson, bearer, currentAccount } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
 export const authRoutes = new Hono();
@@ -29,16 +29,16 @@ authRoutes.post("/auth/verify", async (c) => {
   const body = await parseBody(c, authVerifySchema);
   if (body instanceof Response) return body;
   try {
-    const { token, user } = await verifyOtp(body.email, body.code);
-    return c.json({ token, user });
+    const { token, account } = await verifyOtp(body.email, body.code);
+    return c.json({ token, user: accountJson(account) });
   } catch (e) {
     return c.json({ error: (e as Error).message }, 401);
   }
 });
 
 authRoutes.get("/auth/me", async (c) => {
-  const user = await currentUser(c);
-  return user ? c.json({ user }) : c.json({ error: "Not authenticated." }, 401);
+  const account = await currentAccount(c);
+  return account ? c.json({ user: accountJson(account) }) : c.json({ error: "Not authenticated." }, 401);
 });
 
 // Single-use ticket for opening the UI (cortex ui). The CLI token never travels in the URL.

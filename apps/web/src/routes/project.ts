@@ -195,7 +195,7 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
   let answerHtml: Html = html``;
   if (q) {
     const { answer, hits } = await askProjectContext(q, project.name, undefined, {
-      restrictToAccessibleOf: user.email,
+      restrictToAccessibleOf: user,
     });
     const sources = hits.length
       ? panel(
@@ -388,7 +388,7 @@ projectRoutes.get("/p/:slug/across", async (c) => {
   // whoever arrives by URL gets the same as someone asking for a section that does not exist.
   if (children.length === 0) return c.notFound();
 
-  const { sharedStack, contradictions } = await getAcrossClient(project, user.email);
+  const { sharedStack, contradictions } = await getAcrossClient(project, user);
   const projectLink = (p: { name: string; slug: string | null }): Html =>
     p.slug ? html`<a href="/p/${p.slug}">${p.name}</a>` : html`${p.name}`;
 

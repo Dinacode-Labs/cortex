@@ -19,15 +19,15 @@ searchRoutes.get("/search", async (c) => {
   // Reaching down into the children: only from the parent, only the children the searcher can
   // see, and only when asked for (ADR-0063). `listChildProjects` applies the permission filter,
   // so a private repo you are not a member of does not enter the search via the parent.
-  const email = c.get("user")?.email ?? null;
+  const viewer = c.get("user");
   const padre = c.req.query("children") === "1" && project ? await findProjectByName(project) : null;
-  const hijos = padre ? await listChildProjects(padre.id, email) : [];
+  const hijos = padre ? await listChildProjects(padre.id, viewer) : [];
   const hijoPorId = new Map(hijos.map((x) => [x.id, x]));
 
   const hits = q
     ? await searchContext(
         { query: q, project: project || undefined, limit: hijos.length ? 30 : 15 },
-        { restrictToAccessibleOf: email, alsoProjectIds: hijos.map((x) => x.id) },
+        { restrictToAccessibleOf: viewer, alsoProjectIds: hijos.map((x) => x.id) },
       )
     : [];
 

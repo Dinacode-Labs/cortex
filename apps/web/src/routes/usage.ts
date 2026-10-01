@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { html, raw } from "hono/html";
-import { getRecentTraces, getUsageSummary } from "@cortex/core";
+import { getRecentTraces, getUsageSummary, isAdmin } from "@cortex/core";
 import { layout, type Html } from "../views/layout.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -15,7 +15,7 @@ export const usageRoutes = new Hono<WebEnv>();
 
 usageRoutes.get("/admin/usage", async (c) => {
   const user = c.get("user")!;
-  if (!user.admin) {
+  if (!isAdmin(user)) {
     return c.html(
       layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Not found.</div>`, user),
       404,

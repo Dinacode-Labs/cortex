@@ -22,7 +22,7 @@ export const entriesRoutes = new Hono<WebEnv>();
 
 entriesRoutes.get("/entry/:id", async (c) => {
   const id = c.req.param("id");
-  const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
+  const access = await checkEntryAccess(c.get("user"), id);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const detail = access.status === "ok" ? await getEntryDetail(id) : null;
   if (!detail) return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
@@ -46,7 +46,7 @@ entriesRoutes.get("/entry/:id", async (c) => {
   const project = projectName ? await findProjectByName(projectName) : null;
   const back = project?.slug ? `/p/${project.slug}` : "/";
   const editing = c.req.query("edit") === "1";
-  const canPurge = await canManageEntryProject(c.get("user")?.email ?? null, access.status === "ok" ? access.project : null);
+  const canPurge = await canManageEntryProject(c.get("user"), access.status === "ok" ? access.project : null);
   const confirmingPurge = canPurge && c.req.query("purge") === "1";
 
   const body = html`
@@ -117,11 +117,11 @@ function purgeConfirmation(entryId: string) {
 entriesRoutes.post("/entry/:id/purge", async (c) => {
   const id = c.req.param("id");
   const user = c.get("user");
-  const access = await checkEntryAccess(user?.email ?? null, id);
+  const access = await checkEntryAccess(user, id);
   if (access.status === "not_found") return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(user), 403);
   try {
-    await purgeEntries([id], user?.email ?? null);
+    await purgeEntries([id], user);
   } catch (e) {
     if (!(e instanceof NotAManagerError)) throw e;
     return c.html(
@@ -136,7 +136,7 @@ entriesRoutes.post("/entry/:id/validate", async (c) => {
   const id = c.req.param("id");
   // The same gate as the detail view (GET /entry/:id): without access to the entry's project,
   // its status cannot be changed.
-  const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
+  const access = await checkEntryAccess(c.get("user"), id);
   if (access.status === "not_found") return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const form = await c.req.parseBody();
@@ -154,7 +154,7 @@ entriesRoutes.post("/save", async (c) => {
   // WRITE exception: a non-existent project is ALLOWED (saveContext auto-creates it, see the
   // ADR); only access to an existing restricted project is denied.
   if (project) {
-    const access = await checkProjectAccess(user.email, { name: project });
+    const access = await checkProjectAccess(user, { name: project });
     if (access.status === "forbidden") return c.html(deniedPage(user), 403);
   }
   // Form input validated against the domain enum (it used to be `as never`): invalid or empty
@@ -183,7 +183,7 @@ entriesRoutes.post("/save", async (c) => {
 
 entriesRoutes.post("/entry/:id/edit", async (c) => {
   const id = c.req.param("id");
-  const access = await checkEntryAccess(c.get("user")?.email ?? null, id);
+  const access = await checkEntryAccess(c.get("user"), id);
   if (access.status === "not_found")
     return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);

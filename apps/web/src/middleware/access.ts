@@ -8,12 +8,12 @@ import {
   listProjectAncestors,
   type AccessibleProject,
   type ProjectRef,
-  type AuthUser,
+  type SessionUser,
 } from "@cortex/core";
 import { layout, type Html } from "../views/layout.js";
 import type { WebEnv } from "./session.js";
 
-export const deniedPage = (user: AuthUser | null): Html =>
+export const deniedPage = (user: SessionUser | null): Html =>
   layout(
     "No access",
     html`<p><a class="back" href="/">← Projects</a></p>
@@ -33,7 +33,7 @@ const notFound = (c: Context<WebEnv>) =>
 
 export async function requireProject(c: Context<WebEnv>, name: string | undefined | null): Promise<Response | null> {
   if (!name) return null;
-  const access = await checkProjectAccess(c.get("user")?.email ?? null, { name });
+  const access = await checkProjectAccess(c.get("user"), { name });
   if (access.status === "not_found") return notFound(c);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   return null;
@@ -63,18 +63,18 @@ export async function requireProjectPage(
   c: Context<WebEnv>,
   slug: string,
 ): Promise<ProjectPage | Response> {
-  const email = c.get("user")?.email ?? null;
-  const access = await checkProjectAccess(email, { slug });
+  const viewer = c.get("user");
+  const access = await checkProjectAccess(viewer, { slug });
   if (access.status === "not_found") return notFound(c);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   // `listAccessibleProjects` brings the entry count from a single aggregate query; using that
   // list avoids an extra query just for the number in the header.
-  const accessible = await listAccessibleProjects(email);
+  const accessible = await listAccessibleProjects(viewer);
   const withCount = accessible.find((p) => p.slug === slug);
   const base = withCount ?? { ...(await findProjectBySlug(slug))!, entryCount: 0 };
   return {
     project: base,
-    manager: await canManageProject(email, slug),
+    manager: await canManageProject(viewer, slug),
     ancestors: base.parentId ? await listProjectAncestors(base.id) : [],
     children: accessible.filter((p) => p.parentId === base.id),
   };

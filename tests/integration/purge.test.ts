@@ -68,7 +68,7 @@ beforeAll(async () => {
   tokOutsider = await tokenFor(OUTSIDER);
   project = await createProject(`IT Purge ${RID}`, { visibility: "private", ownerEmail: OWNER });
   otherProject = await createProject(`IT Purge Other ${RID}`, { visibility: "public", ownerEmail: OUTSIDER });
-  await addProjectMember(project.slug!, MEMBER, OWNER);
+  await addProjectMember(project.slug!, MEMBER, { email: OWNER });
 }, 120_000);
 
 afterAll(async () => {
@@ -131,7 +131,7 @@ describe("purging an entry leaves nothing behind", () => {
     const older = await save(`Older ${MARKER} b`, `Decision ${MARKER}: builds run on the shared CI runner.`);
     await invalidateEntry(older.id, doomed.id);
 
-    await purgeEntries([doomed.id], OWNER);
+    await purgeEntries([doomed.id], { email: OWNER });
 
     const [row] = (await getSql()`
       SELECT status, validity, valid_to, superseded_by FROM memos WHERE id = ${older.id}
@@ -141,7 +141,7 @@ describe("purging an entry leaves nothing behind", () => {
 
   it("keeps who purged what and when, and not what it said", async () => {
     const doomed = await save(`Audited ${MARKER}`, `Decision ${MARKER}: a secret-looking sentence that must not survive.`);
-    await purgeEntries([doomed.id], OWNER);
+    await purgeEntries([doomed.id], { email: OWNER });
     const rows = (await getSql()`SELECT * FROM entry_purges WHERE entry_id = ${doomed.id}`) as unknown as Record<string, unknown>[];
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ project_id: project.id, purged_by: OWNER, entry_type: "decision" });
@@ -160,7 +160,7 @@ describe("who may purge", () => {
   it("one entry the caller cannot manage stops the whole batch", async () => {
     const mine = await save(`Mine ${MARKER}`, `Decision ${MARKER}: the owner's own entry.`);
     const theirs = await save(`Theirs ${MARKER}`, `Decision ${MARKER}: someone else's public project.`, otherProject);
-    await expect(purgeEntries([mine.id, theirs.id], OWNER)).rejects.toBeInstanceOf(NotAManagerError);
+    await expect(purgeEntries([mine.id, theirs.id], { email: OWNER })).rejects.toBeInstanceOf(NotAManagerError);
     expect((await api(tokOwner, [mine.id, theirs.id])).status).toBe(403);
     expect(await getEntryDetail(mine.id)).not.toBeNull();
     expect(await getEntryDetail(theirs.id)).not.toBeNull();

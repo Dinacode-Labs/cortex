@@ -49,7 +49,7 @@ export function captureSessionRoutes(deps: { distill: DistillSessionFn; queue: C
       return c.json({ error: `Transcript too large (${body.condensed.length} > ${maxChars} characters).` }, 413);
     }
 
-    const access = await checkProjectAccess(user.email, { slug: body.slug });
+    const access = await checkProjectAccess(user, { slug: body.slug });
     if (access.status === "not_found") return c.json({ error: "Project not found." }, 404);
     if (access.status === "forbidden") return c.json({ error: "No access to this project." }, 403);
     const project = access.project;

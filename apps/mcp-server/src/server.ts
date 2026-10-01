@@ -16,7 +16,7 @@ import {
   saveContext,
   searchContext,
   validateEntry,
-  type AuthUser,
+  type SessionUser,
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { z } from "zod";
@@ -37,7 +37,7 @@ const ALWAYS_LOAD_IN_CLAUDE_CODE = { "anthropic/alwaysLoad": true };
 const text = (s: string) => ({ content: [{ type: "text" as const, text: s }] });
 const errorText = (s: string) => ({ content: [{ type: "text" as const, text: s }], isError: true });
 
-export function buildMcpServer(user?: AuthUser): McpServer {
+export function buildMcpServer(user?: SessionUser): McpServer {
   // `instructions` is what the client puts in front of the model on connecting. For an agent with
   // no plugin — Hermes, an editor speaking MCP — it is the only place the capture protocol reaches,
   // which is why the wording is the shared one and not a second version of it.
@@ -46,7 +46,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
   // Writes pass `allowMissing` because saving to a project that does not exist yet creates it.
   const guard = async (project?: string, opts?: { allowMissing?: boolean }): Promise<string | null> => {
     if (!user || !project) return null;
-    const access = await checkProjectAccess(user.email, { name: project });
+    const access = await checkProjectAccess(user, { name: project });
     if (access.status === "forbidden") return `No access to project "${project}".`;
     if (access.status === "not_found" && !opts?.allowMissing) return `Project not found: "${project}".`;
     return null;
@@ -92,7 +92,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         const denied = await guard(args.project);
         if (denied) return errorText(denied);
         // With no project named, other people's private projects would leak into the results.
-        const hits = user ? await searchContext(args, { restrictToAccessibleOf: user.email }) : await searchContext(args);
+        const hits = user ? await searchContext(args, { restrictToAccessibleOf: user }) : await searchContext(args);
         return text(renderSearchHits(hits));
       } catch (e) {
         return errorText(`Search failed: ${(e as Error).message}`);
@@ -167,7 +167,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
         // This tool works by entry id, not by project name -> the per-project `guard` does not
         // cover it: access is checked through the entry (checkEntryAccess).
         if (user) {
-          const access = await checkEntryAccess(user.email, id);
+          const access = await checkEntryAccess(user, id);
           if (access.status === "not_found") return errorText(`No entry with id ${id}.`);
           if (access.status === "forbidden") return errorText(`No access to entry ${id}.`);
         }
@@ -204,7 +204,7 @@ export function buildMcpServer(user?: AuthUser): McpServer {
           question,
           project,
           undefined,
-          user ? { restrictToAccessibleOf: user.email } : undefined,
+          user ? { restrictToAccessibleOf: user } : undefined,
         );
         return text(answer ? `${answer}\n\n---\nSources:\n${renderSearchHits(hits)}` : renderSearchHits(hits));
       } catch (e) {

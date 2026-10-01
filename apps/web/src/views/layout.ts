@@ -1,5 +1,6 @@
 import { html, raw } from "hono/html";
 import type { HtmlEscapedString } from "hono/utils/html";
+import { isAdmin, type SessionUser } from "@cortex/core";
 import { getBrandLogoSvg, getBrandName, markSvg } from "@cortex/shared";
 import { ASSET_VERSION } from "../version.js";
 
@@ -9,11 +10,6 @@ import { ASSET_VERSION } from "../version.js";
  * `isEscaped`).
  */
 export type Html = HtmlEscapedString | Promise<HtmlEscapedString>;
-
-export interface User {
-  email: string;
-  admin: boolean;
-}
 
 /**
  * The default mark, "Relay": two pieces that change places and a centre that stays. The drawing
@@ -42,7 +38,7 @@ function brandMark(play: boolean): Html {
 }
 
 export interface LayoutOptions {
-  user?: User | null;
+  user?: SessionUser | null;
   active?: "projects" | "admin";
   /** The text in the global search box, so it is not lost when the results appear. */
   q?: string;
@@ -58,7 +54,7 @@ export interface LayoutOptions {
  * the interface shows up half painted. It happened, and from outside it looks as though the
  * redesign was never deployed.
  */
-export function layout(title: string, body: Html, opts: LayoutOptions | User | null = {}): Html {
+export function layout(title: string, body: Html, opts: LayoutOptions | SessionUser | null = {}): Html {
   const o: LayoutOptions = opts && "email" in opts ? { user: opts } : ((opts ?? {}) as LayoutOptions);
   const user = o.user;
   const brand = getBrandName();
@@ -87,9 +83,9 @@ export function layout(title: string, body: Html, opts: LayoutOptions | User | n
     <nav>
       ${user
         ? html`<a class="${o.active === "projects" ? "on" : ""}" href="/">Projects</a>
-            ${user.admin ? html`<a class="${o.active === "admin" ? "on" : ""}" href="/admin/usage">Admin</a>` : ""}
+            ${isAdmin(user) ? html`<a class="${o.active === "admin" ? "on" : ""}" href="/admin/usage">Admin</a>` : ""}
             <span class="whoami">
-              <span class="email">${user.email}</span>${user.admin ? html`<span class="pill tiny">admin</span>` : ""}
+              <span class="email">${user.email}</span>${isAdmin(user) ? html`<span class="pill tiny">admin</span>` : ""}
             </span>
             <a href="/logout">Sign out</a>`
         : ""}

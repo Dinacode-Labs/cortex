@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { isAllowedEmail, isAdmin } from "../packages/core/src/identity/auth";
+import { isAllowedEmail, isAdmin } from "../packages/core/src/auth/auth";
 
 // isAllowedEmail / isAdmin read the env LAZILY, so it can be adjusted per test.
 describe("isAllowedEmail (whitelist de dominios)", () => {
@@ -40,15 +40,14 @@ describe("isAdmin (uno o varios)", () => {
 
   it("recognises several admins and rejects everyone else", () => {
     process.env.CORTEX_ADMIN_EMAIL = "dev@example.com, alex@example.com";
-    expect(isAdmin("dev@example.com")).toBe(true);
-    expect(isAdmin("ALEX@example.com")).toBe(true);
-    expect(isAdmin("bob@example.com")).toBe(false);
+    expect(isAdmin({ email: "dev@example.com" })).toBe(true);
+    expect(isAdmin({ email: "ALEX@example.com" })).toBe(true);
+    expect(isAdmin({ email: "bob@example.com" })).toBe(false);
   });
 
-  it("null/undefined/sin config → false", () => {
+  it("no session or no admins configured → false", () => {
     expect(isAdmin(null)).toBe(false);
-    expect(isAdmin(undefined)).toBe(false);
     process.env.CORTEX_ADMIN_EMAIL = "";
-    expect(isAdmin("dev@example.com")).toBe(false);
+    expect(isAdmin({ email: "dev@example.com" })).toBe(false);
   });
 });

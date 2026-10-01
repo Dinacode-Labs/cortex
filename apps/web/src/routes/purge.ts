@@ -61,7 +61,7 @@ purgeRoutes.post("/p/:slug/purge", async (c) => {
 
   if (form.confirm === "1") {
     try {
-      const { purged } = await purgeEntries(ids, user.email);
+      const { purged } = await purgeEntries(ids, user);
       return c.redirect(memoryUrl(slug, { ...filters, purged: String(purged.length) }));
     } catch (e) {
       if (e instanceof NotAManagerError) return onlyManagers(c, page);

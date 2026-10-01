@@ -16,7 +16,7 @@ graphRoutes.get("/graph.json", async (c) => {
   const project = c.req.query("project") ?? "";
   // Consumed by `/p/<slug>/map`: the same policy, a JSON response.
   if (project) {
-    const access = await checkProjectAccess(c.get("user")?.email ?? null, { name: project });
+    const access = await checkProjectAccess(c.get("user"), { name: project });
     if (access.status === "not_found") return c.json({ error: "project not found" }, 404);
     if (access.status === "forbidden") return c.json({ error: "no access" }, 403);
   }

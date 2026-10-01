@@ -1,4 +1,4 @@
-import { searchContext, type SearchHit } from "@cortex/core";
+import { searchContext, type SearchHit, type SessionUser } from "@cortex/core";
 import { synthesizeContextAnswer } from "../agents/retriever/synthesize.js";
 
 /**
@@ -18,7 +18,7 @@ export async function askProjectContext(
   question: string,
   project?: string,
   limit = 6,
-  opts?: { restrictToAccessibleOf?: string | null },
+  opts?: { restrictToAccessibleOf?: SessionUser | null },
 ): Promise<AskResult> {
   // Security scoping: propagated as is to searchContext (see its docs). Without `opts` it is
   // a trusted call (it searches everything); with it, it restricts to accessible projects.

@@ -1,11 +1,11 @@
 import type { MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 import { html } from "hono/html";
-import { validateToken, type AuthUser } from "@cortex/core";
+import { authenticate, type SessionUser } from "@cortex/core";
 import { getBrandName } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 
-export type WebEnv = { Variables: { user: AuthUser | null } };
+export type WebEnv = { Variables: { user: SessionUser | null } };
 
 export function loginPage(msg = ""): Html {
   // There is no form on purpose: you sign in from the terminal, and the CLI's long-lived token
@@ -30,7 +30,7 @@ cortex ui           # opens this UI, already signed in</pre>
  */
 export const sessionGate: MiddlewareHandler<WebEnv> = async (c, next) => {
   const token = getCookie(c, "cortex_session");
-  const user = token ? await validateToken(token) : null;
+  const user = token ? await authenticate(token) : null;
   c.set("user", user);
   if (!user) return c.html(loginPage(), 401);
   await next();
