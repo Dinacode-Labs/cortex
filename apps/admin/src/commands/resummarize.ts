@@ -9,7 +9,7 @@ import { shutdownObservability, wireLlm } from "@cortex/agents";
  * It is for what is ALREADY stored: a memory is mostly made of entries nobody is going to
  * re-ingest, and the summary is what the agent reads when a session opens.
  *
- * Every rewrite moves the entry's `updated_at`, which the `context_entries` trigger sets on
+ * Every rewrite moves the entry's `updated_at`, which the `memos` trigger sets on
  * any UPDATE. That movement no longer decides anything by itself -- confidence is counted from
  * corroborations (ADR-0067) -- but this is a bulk write over a whole project, so --dry-run
  * first.

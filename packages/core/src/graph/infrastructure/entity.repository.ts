@@ -18,10 +18,10 @@ export class PgEntityRepository implements EntityRepository {
     return rowToEntity(rows[0]!);
   }
 
-  async linkEntry(contextEntryId: string, entityId: string): Promise<void> {
+  async linkMemo(memoId: string, entityId: string): Promise<void> {
     await this.sql`
-      INSERT INTO context_entry_entities (context_entry_id, entity_id)
-      VALUES (${contextEntryId}, ${entityId})
+      INSERT INTO memo_entities (memo_id, entity_id)
+      VALUES (${memoId}, ${entityId})
       ON CONFLICT DO NOTHING
     `;
   }
@@ -44,7 +44,7 @@ export class PgEntityRepository implements EntityRepository {
   }
 
   async linkCounts(): Promise<Map<string, number>> {
-    const rows = (await this.sql`SELECT entity_id, count(*)::int AS n FROM context_entry_entities GROUP BY entity_id`) as unknown as Row[];
+    const rows = (await this.sql`SELECT entity_id, count(*)::int AS n FROM memo_entities GROUP BY entity_id`) as unknown as Row[];
     return new Map(rows.map((r) => [r.entity_id as string, Number(r.n)]));
   }
 
@@ -54,13 +54,13 @@ export class PgEntityRepository implements EntityRepository {
       for (const loserId of loserIds) {
         // Re-point links without violating the (entry, entity) PK.
         await tx`
-          UPDATE context_entry_entities cee SET entity_id = ${canonicalId}
-          WHERE cee.entity_id = ${loserId}
+          UPDATE memo_entities me SET entity_id = ${canonicalId}
+          WHERE me.entity_id = ${loserId}
             AND NOT EXISTS (
-              SELECT 1 FROM context_entry_entities c2
-              WHERE c2.context_entry_id = cee.context_entry_id AND c2.entity_id = ${canonicalId})
+              SELECT 1 FROM memo_entities c2
+              WHERE c2.memo_id = me.memo_id AND c2.entity_id = ${canonicalId})
         `;
-        await tx`DELETE FROM context_entry_entities WHERE entity_id = ${loserId}`;
+        await tx`DELETE FROM memo_entities WHERE entity_id = ${loserId}`;
         // Re-point relations without violating the partial UNIQUE `relations_active_unique`
         // (source_id, target_id, relation_type) WHERE valid_to IS NULL. Each UPDATE re-points
         // ONLY the loser's edges that, once the endpoint moves to `canonical`, would NOT

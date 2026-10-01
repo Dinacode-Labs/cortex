@@ -1,4 +1,4 @@
-import type { ContextEntryType } from "@cortex/shared";
+import type { MemoType } from "./domain/memo.js";
 
 /**
  * When the question names a domain category, infer it.
@@ -21,7 +21,7 @@ import type { ContextEntryType } from "@cortex/shared";
  * type, not the language of this file.
  */
 
-const PATTERNS: [RegExp, ContextEntryType][] = [
+const PATTERNS: [RegExp, MemoType][] = [
   [/\bdeuda[s]?\s+t[eé]cnica[s]?\b|\btechnical\s+debt\b/i, "technical_debt"],
   [/\bregla[s]?\s+de\s+negocio\b|\bbusiness\s+rule[s]?\b/i, "business_rule"],
   [/\bdecisi[oó]n(es)?\b|\bdecision[s]?\b/i, "decision"],
@@ -37,7 +37,7 @@ const PATTERNS: [RegExp, ContextEntryType][] = [
  * The first matching pattern wins: they run from most specific to least, because "technical
  * debt" also contains words that could sound like something else.
  */
-export function inferTypeFromQuery(query: string): ContextEntryType | null {
+export function inferTypeFromQuery(query: string): MemoType | null {
   for (const [pattern, type] of PATTERNS) if (pattern.test(query)) return type;
   return null;
 }

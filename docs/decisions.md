@@ -2612,3 +2612,44 @@ decisions they carried stay recorded here.
   rules get enforced by lint and the boundaries hold on their own, which was
   [0018](#adr-0018)'s own trigger.
 
+
+<a id="adr-0077"></a>
+
+## ADR-0077 · A unit of knowledge is a memo: `core` and the schema say so, the contract does not
+
+- **Status:** accepted as a hypothesis (2026-10-01).
+- **Context:** [0076](#adr-0076) gave the unit of knowledge an aggregate of its own, and with it a
+  name that every new file now repeats: `ContextEntry`, in a table called `context_entries`. The
+  name says nothing the type does not -- everything in a context memory is a context entry --
+  and it reads worse the more domain code is written in it. Meanwhile the word the product uses
+  for the whole is already fixed: the README, the UI and the MCP tools speak of *the memory*.
+- **Decision:** the aggregate is a **memo**, one piece of the memory; *memory* stays the name of
+  the whole. Inside `@cortex/core` the aggregate and its port and adapter are `MemoDraft`,
+  `MemoRepository` and `PgMemoRepository`, and `Memo`, `MemoType` and `MemoStatus` are aliases of
+  the contract types rather than types of their own, because the shape is the same and a copy
+  would be a second definition to keep in step. Migration `0022_memos.sql` renames the tables
+  (`memos`, `memo_entities`), the `context_entry_id` columns (`memo_id`), the indexes, constraints
+  and triggers named after them, and the `'context_entry'` discriminator in `relations`.
+  **The public contract does not move**: `packages/shared` keeps `ContextEntry`, the MCP tools
+  keep their names (`validate_context_entry`), the HTTP routes and the JSON fields stay as they
+  are, and the `core` barrel keeps every name it exported, so an installed CLI, agent or HTTP
+  client does not notice. The functions the barrel exports (`listEntries`, `purgeEntries`…) keep
+  their names for the same reason.
+- **Alternatives:**
+  - **Memory.** Read in Spanish it is *memoria*, the whole, and "the memory" already names the
+    set in the README, the UI and the MCP. One word for the part and the whole would be worse
+    than the generic name it replaces. Rejected.
+  - **Note.** Collides with `module_note` and `integration_note`, which are values of the public
+    contract. Rejected.
+  - **MemoryFragment.** Accurate and too long for a name that appears in every signature.
+    Rejected.
+  - **Engram.** Has to be explained to every reader. Rejected.
+  - **Learning, KnowledgeItem, Fact.** A memo is not always something learned, *item* is as
+    generic as *entry*, and a fact excludes what a memo often is: a decision, a risk, a
+    convention that may be revised. Rejected.
+  - **Rename the contract as well.** Would break every CLI and agent already installed for a
+    word nobody outside `core` reads ([0062](#adr-0062)). Rejected for now.
+- **Revisit when:** the contract gets a version that can break anyway, at which point
+  `ContextEntry`, `validate_context_entry` and `/entries` can follow; or the aliases start to
+  diverge from the contract, which is the moment `Memo` needs a type of its own and a translation
+  at the edge.

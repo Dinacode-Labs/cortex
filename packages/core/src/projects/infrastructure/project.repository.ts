@@ -43,8 +43,8 @@ export class PgProjectRepository implements ProjectRepository {
   async resolveEntryProject(entryId: string): Promise<{ found: boolean; project: ProjectRef | null }> {
     const rows = (await this.sql`
       SELECT p.id, p.name, p.slug, p.visibility, p.owner_email, p.parent_id
-      FROM context_entries ce LEFT JOIN entities p ON p.id = ce.project_id
-      WHERE ce.id = ${entryId} LIMIT 1
+      FROM memos m LEFT JOIN entities p ON p.id = m.project_id
+      WHERE m.id = ${entryId} LIMIT 1
     `) as unknown as Row[];
     if (rows.length === 0) return { found: false, project: null };
     return { found: true, project: rows[0]!.id ? toRef(rows[0]) : null };
@@ -104,7 +104,7 @@ export class PgProjectRepository implements ProjectRepository {
   }
 
   async entryCounts(): Promise<Map<string, number>> {
-    const rows = (await this.sql`SELECT project_id, count(*)::int AS entry_count FROM context_entries WHERE project_id IS NOT NULL GROUP BY project_id`) as unknown as Row[];
+    const rows = (await this.sql`SELECT project_id, count(*)::int AS entry_count FROM memos WHERE project_id IS NOT NULL GROUP BY project_id`) as unknown as Row[];
     return new Map(rows.map((r) => [r.project_id as string, Number(r.entry_count)]));
   }
 
@@ -139,7 +139,7 @@ export class PgProjectRepository implements ProjectRepository {
   }
 
   async countEntries(projectId: string): Promise<number> {
-    const [row] = (await this.sql`SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${projectId}`) as unknown as Row[];
+    const [row] = (await this.sql`SELECT count(*)::int AS n FROM memos WHERE project_id = ${projectId}`) as unknown as Row[];
     return Number(row?.n ?? 0);
   }
 

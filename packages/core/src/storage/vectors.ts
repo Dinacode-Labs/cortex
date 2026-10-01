@@ -1,21 +1,22 @@
 import { toVectorLiteral, type Sql } from "@cortex/database";
 import type { EmbeddingProvider } from "@cortex/embeddings";
-import type { ContextEntry, ContextEntryType } from "@cortex/shared";
-import { rowToContextEntry, type Row } from "./map.js";
+
+import { rowToMemo, type Row } from "./map.js";
+import type { Memo, MemoType } from "../knowledge/domain/memo.js";
 
 export async function storeEmbedding(
   sql: Sql,
   provider: EmbeddingProvider,
-  contextEntryId: string,
+  memoId: string,
   text: string,
 ): Promise<void> {
   const vectors = await provider.embed([text]);
   const vec = vectors[0]!;
   await sql`
-    INSERT INTO embeddings (context_entry_id, embedding_model, embedding_version, dim, vector, chunk_index)
-    VALUES (${contextEntryId}, ${provider.model}, ${provider.version}, ${provider.dim},
+    INSERT INTO embeddings (memo_id, embedding_model, embedding_version, dim, vector, chunk_index)
+    VALUES (${memoId}, ${provider.model}, ${provider.version}, ${provider.dim},
             ${toVectorLiteral(vec)}::vector, 0)
-    ON CONFLICT (context_entry_id, embedding_model, embedding_version, chunk_index)
+    ON CONFLICT (memo_id, embedding_model, embedding_version, chunk_index)
     DO UPDATE SET vector = EXCLUDED.vector, dim = EXCLUDED.dim, created_at = now()
   `;
 }
@@ -27,7 +28,7 @@ export async function storeEmbedding(
 export async function storeEmbeddingsBatch(
   sql: Sql,
   provider: EmbeddingProvider,
-  rows: { contextEntryId: string; text: string }[],
+  rows: { memoId: string; text: string }[],
   opts: { batchSize?: number; onProgress?: (done: number) => void } = {},
 ): Promise<void> {
   const batchSize = opts.batchSize ?? 32;
@@ -37,10 +38,10 @@ export async function storeEmbeddingsBatch(
     for (let j = 0; j < chunk.length; j++) {
       const vec = vectors[j]!;
       await sql`
-        INSERT INTO embeddings (context_entry_id, embedding_model, embedding_version, dim, vector, chunk_index)
-        VALUES (${chunk[j]!.contextEntryId}, ${provider.model}, ${provider.version}, ${provider.dim},
+        INSERT INTO embeddings (memo_id, embedding_model, embedding_version, dim, vector, chunk_index)
+        VALUES (${chunk[j]!.memoId}, ${provider.model}, ${provider.version}, ${provider.dim},
                 ${toVectorLiteral(vec)}::vector, 0)
-        ON CONFLICT (context_entry_id, embedding_model, embedding_version, chunk_index)
+        ON CONFLICT (memo_id, embedding_model, embedding_version, chunk_index)
         DO UPDATE SET vector = EXCLUDED.vector, dim = EXCLUDED.dim, created_at = now()
       `;
     }
@@ -49,7 +50,7 @@ export async function storeEmbeddingsBatch(
 }
 
 export interface SearchHit {
-  entry: ContextEntry;
+  entry: Memo;
   /** Relevance in [0,1]. In hybrid it is normalised RRF; in vector search, cosine. */
   score: number;
 }
@@ -103,7 +104,7 @@ export async function hybridSearch(
      * to ZERO rows (a user with no accessible projects gets nothing).
      */
     projectIds?: string[] | null;
-    type?: ContextEntryType;
+    type?: MemoType;
     limit: number;
     excludeId?: string;
     includeArchived?: boolean;
@@ -113,30 +114,30 @@ export async function hybridSearch(
 ): Promise<SearchHit[]> {
   const pool = Math.max(args.limit * 4, 40);
 
-  // Common filters (applied to both branches; the table is always aliased `ce`).
+  // Common filters (applied to both branches; the table is always aliased `m`).
   let filters = sql``;
   if (args.projectId) {
-    filters = sql`${filters} AND ce.project_id = ${args.projectId}`;
+    filters = sql`${filters} AND m.project_id = ${args.projectId}`;
   } else if (args.projectIds) {
     // No concrete project but scoped to the accessible ones: restrict to that set.
     // An empty array -> `= ANY('{}')` matches nothing -> zero rows (fail-closed).
-    filters = sql`${filters} AND ce.project_id = ANY(${args.projectIds})`;
+    filters = sql`${filters} AND m.project_id = ANY(${args.projectIds})`;
   }
-  if (args.type) filters = sql`${filters} AND ce.type = ${args.type}`;
-  if (args.excludeId) filters = sql`${filters} AND ce.id <> ${args.excludeId}`;
-  if (!args.includeArchived) filters = sql`${filters} AND ce.status NOT IN ('rejected', 'obsolete')`;
+  if (args.type) filters = sql`${filters} AND m.type = ${args.type}`;
+  if (args.excludeId) filters = sql`${filters} AND m.id <> ${args.excludeId}`;
+  if (!args.includeArchived) filters = sql`${filters} AND m.status NOT IN ('rejected', 'obsolete')`;
   if (args.asOf) {
-    filters = sql`${filters} AND ce.valid_from <= ${args.asOf} AND (ce.valid_to IS NULL OR ce.valid_to > ${args.asOf})`;
+    filters = sql`${filters} AND m.valid_from <= ${args.asOf} AND (m.valid_to IS NULL OR m.valid_to > ${args.asOf})`;
   } else if (!args.includeHistorical) {
-    filters = sql`${filters} AND ce.valid_to IS NULL`;
+    filters = sql`${filters} AND m.valid_to IS NULL`;
   }
 
   const vectors = await provider.embed([args.queryText]);
   const lit = toVectorLiteral(vectors[0]!);
   const vecRows = (await sql`
-    SELECT ce.id, (e.vector <=> ${lit}::vector) AS distance
+    SELECT m.id, (e.vector <=> ${lit}::vector) AS distance
     FROM embeddings e
-    JOIN context_entries ce ON ce.id = e.context_entry_id
+    JOIN memos m ON m.id = e.memo_id
     WHERE e.embedding_model = ${provider.model} AND e.embedding_version = ${provider.version}
     ${filters}
     ORDER BY distance ASC
@@ -144,9 +145,9 @@ export async function hybridSearch(
   `) as unknown as Row[];
 
   const ftsRows = (await sql`
-    SELECT ce.id, ts_rank(ce.content_tsv, plainto_tsquery('spanish', ${args.queryText})) AS rank
-    FROM context_entries ce
-    WHERE ce.content_tsv @@ plainto_tsquery('spanish', ${args.queryText})
+    SELECT m.id, ts_rank(m.content_tsv, plainto_tsquery('spanish', ${args.queryText})) AS rank
+    FROM memos m
+    WHERE m.content_tsv @@ plainto_tsquery('spanish', ${args.queryText})
     ${filters}
     ORDER BY rank DESC
     LIMIT ${pool}
@@ -162,13 +163,13 @@ export async function hybridSearch(
   const maxRrf = ranked[0]!.rrf || 1;
 
   const ids = ranked.map((s) => s.id);
-  const rows = (await sql`SELECT * FROM context_entries WHERE id IN ${sql(ids)}`) as unknown as Row[];
+  const rows = (await sql`SELECT * FROM memos WHERE id IN ${sql(ids)}`) as unknown as Row[];
   const byId = new Map(rows.map((r) => [r.id as string, r]));
 
   return ranked
     .filter((s) => byId.has(s.id))
     .map((s) => ({
-      entry: rowToContextEntry(byId.get(s.id)!),
+      entry: rowToMemo(byId.get(s.id)!),
       score: s.cosine ?? s.rrf / maxRrf,
     }));
 }
@@ -188,7 +189,7 @@ export async function vectorSearch(
      * applies when there is no `projectId`. An EMPTY array -> zero rows.
      */
     projectIds?: string[] | null;
-    type?: ContextEntryType;
+    type?: MemoType;
     limit: number;
     excludeId?: string;
     includeArchived?: boolean;
@@ -201,31 +202,31 @@ export async function vectorSearch(
 
   let where = sql`WHERE e.embedding_model = ${provider.model} AND e.embedding_version = ${provider.version}`;
   if (args.projectId) {
-    where = sql`${where} AND ce.project_id = ${args.projectId}`;
+    where = sql`${where} AND m.project_id = ${args.projectId}`;
   } else if (args.projectIds) {
     // An empty array -> `= ANY('{}')` matches nothing -> zero rows (fail-closed).
-    where = sql`${where} AND ce.project_id = ANY(${args.projectIds})`;
+    where = sql`${where} AND m.project_id = ANY(${args.projectIds})`;
   }
-  if (args.type) where = sql`${where} AND ce.type = ${args.type}`;
-  if (args.excludeId) where = sql`${where} AND ce.id <> ${args.excludeId}`;
-  if (!args.includeArchived) where = sql`${where} AND ce.status NOT IN ('rejected', 'obsolete')`;
+  if (args.type) where = sql`${where} AND m.type = ${args.type}`;
+  if (args.excludeId) where = sql`${where} AND m.id <> ${args.excludeId}`;
+  if (!args.includeArchived) where = sql`${where} AND m.status NOT IN ('rejected', 'obsolete')`;
   if (args.asOf) {
-    where = sql`${where} AND ce.valid_from <= ${args.asOf} AND (ce.valid_to IS NULL OR ce.valid_to > ${args.asOf})`;
+    where = sql`${where} AND m.valid_from <= ${args.asOf} AND (m.valid_to IS NULL OR m.valid_to > ${args.asOf})`;
   } else if (!args.includeHistorical) {
-    where = sql`${where} AND ce.valid_to IS NULL`;
+    where = sql`${where} AND m.valid_to IS NULL`;
   }
 
   const rows = (await sql`
-    SELECT ce.*, e.vector <=> ${lit}::vector AS distance
+    SELECT m.*, e.vector <=> ${lit}::vector AS distance
     FROM embeddings e
-    JOIN context_entries ce ON ce.id = e.context_entry_id
+    JOIN memos m ON m.id = e.memo_id
     ${where}
     ORDER BY distance ASC
     LIMIT ${args.limit}
   `) as unknown as Row[];
 
   return rows.map((row) => ({
-    entry: rowToContextEntry(row),
+    entry: rowToMemo(row),
     score: 1 - Number(row.distance),
   }));
 }

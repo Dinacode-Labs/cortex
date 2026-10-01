@@ -1,8 +1,8 @@
 import { getSql } from "@cortex/database";
 import { isAdmin } from "../identity/auth.js";
 import { canManageProject, NotAManagerError, type ProjectRef } from "./projects.js";
-import type { PurgeTarget } from "../knowledge/domain/context-entry-repository.js";
-import { PgContextEntryRepository } from "../knowledge/infrastructure/context-entry.repository.js";
+import type { PurgeTarget } from "../knowledge/domain/memo-repository.js";
+import { PgMemoRepository } from "../knowledge/infrastructure/memo.repository.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -29,7 +29,7 @@ export async function purgeEntries(ids: string[], byEmail: string | null): Promi
   const wanted = [...new Set(ids.filter((id) => UUID.test(id)).map((id) => id.toLowerCase()))];
   if (wanted.length === 0) return { purged: [] };
 
-  const repository = new PgContextEntryRepository(getSql());
+  const repository = new PgMemoRepository(getSql());
   const targets = await repository.findPurgeTargets(wanted);
   if (targets.length === 0) return { purged: [] };
 

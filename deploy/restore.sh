@@ -47,7 +47,7 @@ gunzip -c "$BACKUP" | $COMPOSE exec -T postgres psql -v ON_ERROR_STOP=1 -U "$PGU
 
 if [ -n "$TARGET" ]; then
   echo "→ Drill: the \"$DB\" database is restored next to the real one."
-  psql_run -d "$DB" -c "select count(*) as entries from context_entries;"
+  psql_run -d "$DB" -c "select count(*) as memos from memos;"
   echo "  Once you have checked it:  docker compose -f deploy/docker-compose.yml exec postgres dropdb -U $PGUSER $DB"
   exit 0
 fi

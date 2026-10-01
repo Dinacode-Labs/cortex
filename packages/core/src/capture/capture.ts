@@ -1,7 +1,7 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "../knowledge/save.js";
-import { PgContextEntryRepository } from "../knowledge/infrastructure/context-entry.repository.js";
+import { PgMemoRepository } from "../knowledge/infrastructure/memo.repository.js";
 import { storeEmbeddingsBatch } from "../storage/vectors.js";
 import { findProjectIdByName } from "../projects/projects.js";
 import { relate } from "../graph/entities.js";
@@ -32,10 +32,10 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, projectName);
   if (!projectId) throw new Error(`Project not found: ${projectName}`);
-  const repository = new PgContextEntryRepository(sql);
+  const repository = new PgMemoRepository(sql);
 
   const results: BatchItemResult[] = [];
-  const toEmbed: { contextEntryId: string; text: string }[] = [];
+  const toEmbed: { memoId: string; text: string }[] = [];
   for (const rawItem of items) {
     // Scrubbed here and not only inside `saveContext` because the embedding text (`toEmbed`)
     // is built from the item, not from the persisted entry.
@@ -65,7 +65,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
       } as never,
       { useClassifier, detectImprovements: false, skipEmbedding: true },
     );
-    toEmbed.push({ contextEntryId: entry.id, text: `${it.title ?? ""}\n\n${it.content}` });
+    toEmbed.push({ memoId: entry.id, text: `${it.title ?? ""}\n\n${it.content}` });
     results.push({ ref: it.sourceReference ?? null, id: entry.id, action: "added" });
   }
   if (toEmbed.length) await storeEmbeddingsBatch(sql, getEmbeddingProvider(), toEmbed, { batchSize: 32 });
@@ -73,5 +73,5 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
 }
 
 export async function relateEntries(sourceId: string, targetId: string, relationType: RelationType): Promise<void> {
-  await relate(getSql(), { sourceId, sourceType: "context_entry", targetId, targetType: "context_entry", relationType });
+  await relate(getSql(), { sourceId, sourceType: "memo", targetId, targetType: "memo", relationType });
 }

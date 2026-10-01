@@ -1,15 +1,24 @@
-import type { ContextEntryType, EntityType } from "@cortex/shared";
+import type { ContextEntry, ContextEntryStatus, ContextEntryType, EntityType } from "@cortex/shared";
 import { canonicalize, classifyType, deriveTitle, extractEntities, stripLeadingTitle, summarize } from "../../text.js";
 
 /**
- * The `ContextEntry` aggregate in its creation state: the rules that turn a piece of knowledge
- * into an entry live here, away from the SQL and the classifier (ADR-0076). The caller scrubs
- * first -- a secret never reaches the classifier or the embedding -- and classifies second;
- * this only resolves what the entry becomes.
+ * A memo is one piece of the memory (ADR-0077). Aliases rather than a type of its own: the
+ * HTTP contract still calls it `ContextEntry` and has the same shape, so a copy here would only
+ * be a second definition to keep in step.
+ */
+export type Memo = ContextEntry;
+export type MemoType = ContextEntryType;
+export type MemoStatus = ContextEntryStatus;
+
+/**
+ * The `Memo` aggregate in its creation state: the rules that turn a piece of knowledge into a
+ * memo live here, away from the SQL and the classifier (ADR-0076). The caller scrubs first -- a
+ * secret never reaches the classifier or the embedding -- and classifies second; this only
+ * resolves what the memo becomes.
  */
 
 export interface ClassifierResult {
-  type?: ContextEntryType;
+  type?: MemoType;
   title?: string;
   summary?: string;
   entities?: { name: string; type: EntityType }[];
@@ -20,16 +29,16 @@ export interface DraftInput {
   content: string;
   /** Already scrubbed. */
   title?: string;
-  type?: ContextEntryType;
+  type?: MemoType;
   summary?: string;
   metadata?: Record<string, unknown>;
 }
 
-export class ContextEntryDraft {
+export class MemoDraft {
   readonly content: string;
   readonly title: string;
   readonly summary: string;
-  readonly type: ContextEntryType;
+  readonly type: MemoType;
   readonly entities: { name: string; type: EntityType }[];
   readonly enrichedBy: string;
 
@@ -45,8 +54,8 @@ export class ContextEntryDraft {
     this.enrichedBy = llm ? "llm" : ((input.metadata?.enrichedBy as string | undefined) ?? "heuristic");
   }
 
-  static from(input: DraftInput, llm: ClassifierResult | null): ContextEntryDraft {
-    return new ContextEntryDraft(input, llm);
+  static from(input: DraftInput, llm: ClassifierResult | null): MemoDraft {
+    return new MemoDraft(input, llm);
   }
 
   /** The title over the content, so the title weighs in retrieval. */
@@ -73,15 +82,15 @@ function mergeEntities(
 export type ReclassifyDecision = "retype" | "confirmed" | "unclassified";
 
 /**
- * Whether reclassification WRITES to an entry. Only a type that really changes is worth an
- * UPDATE: storing the type the entry already had moves `updated_at` through the
+ * Whether reclassification WRITES to a memo. Only a type that really changes is worth an
+ * UPDATE: storing the type the memo already had moves `updated_at` through the
  * `set_updated_at` trigger, and a movement there reads downstream as "something happened to
- * this entry" -- which is how auto-curation came to promote nearly every distilled entry in the
+ * this memo" -- which is how auto-curation came to promote nearly every distilled memo in the
  * same maintenance pass (ADR-0067).
  */
 export function decideReclassification(
-  current: ContextEntryType,
-  proposed: ContextEntryType | null | undefined,
+  current: MemoType,
+  proposed: MemoType | null | undefined,
 ): ReclassifyDecision {
   if (!proposed) return "unclassified";
   return proposed === current ? "confirmed" : "retype";

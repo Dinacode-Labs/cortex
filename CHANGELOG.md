@@ -97,6 +97,11 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **For operators: the `context_entries` table is now `memos`.** Migration `0022_memos.sql`
+  renames it, `context_entry_entities` becomes `memo_entities` and the `context_entry_id` columns
+  become `memo_id`; relations to a memo say `'memo'`. Nothing changes for the CLI, the MCP tools or
+  the HTTP API, but any SQL script of your own that reads `context_entries` stops working and has
+  to use the new names ([ADR-0077](docs/decisions.md#adr-0077)).
 - **A clone no longer brings the agent rules.** `.claude/` is not versioned any more and is
   ignored in `.gitignore`: a contributor gets no `.claude/rules/` on clone, and the agent they run
   here works from `CLAUDE.md`, `CONTRIBUTING.md`, the ADRs and the tests. A `.claude/` of your own

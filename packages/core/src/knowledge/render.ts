@@ -1,7 +1,8 @@
-import { getBrandName, packIsASample, packShowing, type ContextEntry } from "@cortex/shared";
+import { getBrandName, packIsASample, packShowing } from "@cortex/shared";
 import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "../storage/vectors.js";
+import type { Memo } from "./domain/memo.js";
 
 /**
  * Markdown renderers: this is what the MCP tools return and what the hook injects when a
@@ -10,7 +11,7 @@ import type { SearchHit } from "../storage/vectors.js";
  * language it was written in; what is translated is the scaffolding.
  */
 
-function entryLine(e: ContextEntry): string {
+function entryLine(e: Memo): string {
   const ref = e.sourceReference ? ` · source: ${e.sourceReference}` : "";
   return `- **${e.title}** _(confidence: ${e.confidence}, status: ${e.status})_\n  ${e.summary ?? e.content}${ref}`;
 }
@@ -36,7 +37,7 @@ export function renderSearchHits(hits: SearchHit[]): string {
     .join("\n");
 }
 
-export function renderDecisions(entries: ContextEntry[]): string {
+export function renderDecisions(entries: Memo[]): string {
   if (entries.length === 0) return "No decisions recorded for this project yet.";
   return entries.map(entryLine).join("\n");
 }
@@ -134,7 +135,7 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
     }
     if (lines.length > 0) warnings.set(c.entryId, lines.join("\n"));
   }
-  const line = (e: ContextEntry): string => {
+  const line = (e: Memo): string => {
     const warning = warnings.get(e.id);
     return warning ? `${entryLine(e)}\n${warning}` : entryLine(e);
   };

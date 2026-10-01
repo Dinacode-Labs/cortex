@@ -24,9 +24,9 @@ export async function enrichProject(
   if (opts.onlyMissing) {
     const enriched = new Set(
       ((await sql`
-        SELECT DISTINCT cee.context_entry_id AS id
-        FROM context_entry_entities cee
-        JOIN entities en ON en.id = cee.entity_id AND en.type <> 'project'
+        SELECT DISTINCT me.memo_id AS id
+        FROM memo_entities me
+        JOIN entities en ON en.id = me.entity_id AND en.type <> 'project'
       `) as unknown as { id: string }[]).map((r) => r.id),
     );
     const before = entries.length;
@@ -60,7 +60,7 @@ export async function enrichProject(
             if (!sourceId || !targetId || sourceId === targetId) continue;
             await relate(sql, {
               sourceId,
-              sourceType: isEntry ? "context_entry" : "entity",
+              sourceType: isEntry ? "memo" : "entity",
               targetId,
               targetType: "entity",
               relationType: rel.type,

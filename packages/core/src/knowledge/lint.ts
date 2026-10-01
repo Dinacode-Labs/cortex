@@ -44,7 +44,7 @@ export async function lintProject(project: string): Promise<LintReport> {
   if (!pid) throw new Error(`Project not found: "${project}".`);
 
   const totalEntries = Number(
-    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
+    ((await sql`SELECT count(*)::int n FROM memos WHERE project_id=${pid} AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
 
   const contraRows = (await sql`
@@ -52,13 +52,13 @@ export async function lintProject(project: string): Promise<LintReport> {
            ces.id AS a_id, cet.id AS b_id
     FROM relations r
     LEFT JOIN entities es ON es.id=r.source_id
-    LEFT JOIN context_entries ces ON ces.id=r.source_id
+    LEFT JOIN memos ces ON ces.id=r.source_id
     LEFT JOIN entities et ON et.id=r.target_id
-    LEFT JOIN context_entries cet ON cet.id=r.target_id
+    LEFT JOIN memos cet ON cet.id=r.target_id
     WHERE r.relation_type='contradicts'
       AND (ces.project_id=${pid} OR cet.project_id=${pid}
-           OR es.id IN (SELECT cee.entity_id FROM context_entry_entities cee JOIN context_entries c ON c.id=cee.context_entry_id WHERE c.project_id=${pid})
-           OR et.id IN (SELECT cee.entity_id FROM context_entry_entities cee JOIN context_entries c ON c.id=cee.context_entry_id WHERE c.project_id=${pid}))
+           OR es.id IN (SELECT me.entity_id FROM memo_entities me JOIN memos c ON c.id=me.memo_id WHERE c.project_id=${pid})
+           OR et.id IN (SELECT me.entity_id FROM memo_entities me JOIN memos c ON c.id=me.memo_id WHERE c.project_id=${pid}))
     LIMIT 50
   `) as unknown as Row[];
 
@@ -75,16 +75,16 @@ export async function lintProject(project: string): Promise<LintReport> {
   const dupRows = (await sql`
     WITH current_entries AS (
       SELECT id, title, type, NULLIF(COALESCE(metadata->>'file', source_reference), '') AS doc_key
-      FROM context_entries
+      FROM memos
       WHERE project_id=${pid} AND valid_to IS NULL
     )
     SELECT ca.title AS a, cb.title AS b, ca.id AS a_id, cb.id AS b_id,
            (1 - (a.vector <=> b.vector)) AS score
     FROM embeddings a
-    JOIN embeddings b ON a.context_entry_id < b.context_entry_id
+    JOIN embeddings b ON a.memo_id < b.memo_id
       AND a.embedding_model = b.embedding_model
-    JOIN current_entries ca ON ca.id=a.context_entry_id
-    JOIN current_entries cb ON cb.id=b.context_entry_id
+    JOIN current_entries ca ON ca.id=a.memo_id
+    JOIN current_entries cb ON cb.id=b.memo_id
     -- Threshold per type: across different types a high similarity is usually legitimate (the
     -- incident that prompted a decision looks a lot like the decision, and neither is
     -- redundant), so the bar stays high there. Within the same type it drops to 0.85, because
@@ -102,34 +102,34 @@ export async function lintProject(project: string): Promise<LintReport> {
   const orphanRows = (await sql`
     SELECT en.name, en.type
     FROM entities en
-    JOIN context_entry_entities cee ON cee.entity_id=en.id
-    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid} AND ce.valid_to IS NULL
+    JOIN memo_entities me ON me.entity_id=en.id
+    JOIN memos m ON m.id=me.memo_id AND m.project_id=${pid} AND m.valid_to IS NULL
     WHERE en.type<>'project'
       AND NOT EXISTS (SELECT 1 FROM relations r WHERE r.source_id=en.id OR r.target_id=en.id)
     GROUP BY en.id, en.name, en.type
-    HAVING count(DISTINCT cee.context_entry_id)=1
+    HAVING count(DISTINCT me.memo_id)=1
     LIMIT 40
   `) as unknown as Row[];
 
   const neverReviewed = Number(
-    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND status='pending_validation' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
+    ((await sql`SELECT count(*)::int n FROM memos WHERE project_id=${pid} AND status='pending_validation' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
   const lowConfidence = Number(
-    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND confidence='low' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
+    ((await sql`SELECT count(*)::int n FROM memos WHERE project_id=${pid} AND confidence='low' AND valid_to IS NULL`) as unknown as Row[])[0]!.n,
   );
   const staleHistorical = Number(
-    ((await sql`SELECT count(*)::int n FROM context_entries WHERE project_id=${pid} AND (validity='historical' OR metadata->>'state'='Histórico')`) as unknown as Row[])[0]!.n, // 'Histórico' is Plane's own value
+    ((await sql`SELECT count(*)::int n FROM memos WHERE project_id=${pid} AND (validity='historical' OR metadata->>'state'='Histórico')`) as unknown as Row[])[0]!.n, // 'Histórico' is Plane's own value
   );
 
   const gapRows = (await sql`
-    SELECT en.name, en.type, count(*) FILTER (WHERE ce.type='incident') AS incidents
+    SELECT en.name, en.type, count(*) FILTER (WHERE m.type='incident') AS incidents
     FROM entities en
-    JOIN context_entry_entities cee ON cee.entity_id=en.id
-    JOIN context_entries ce ON ce.id=cee.context_entry_id AND ce.project_id=${pid} AND ce.valid_to IS NULL
+    JOIN memo_entities me ON me.entity_id=en.id
+    JOIN memos m ON m.id=me.memo_id AND m.project_id=${pid} AND m.valid_to IS NULL
     WHERE en.type IN ('module','service')
     GROUP BY en.id, en.name, en.type
-    HAVING count(*) FILTER (WHERE ce.type='incident') >= 2
-       AND count(*) FILTER (WHERE ce.type='decision') = 0
+    HAVING count(*) FILTER (WHERE m.type='incident') >= 2
+       AND count(*) FILTER (WHERE m.type='decision') = 0
     ORDER BY incidents DESC
     LIMIT 15
   `) as unknown as Row[];

@@ -83,18 +83,18 @@ export async function getAcrossClient(parent: ProjectRef, email: string | null):
 async function sharedStackOf(childIds: string[], limit = 40): Promise<SharedEntity[]> {
   const rows = (await getSql()`
     SELECT e.name, e.type,
-           count(DISTINCT ce.id)::int AS entries,
+           count(DISTINCT m.id)::int AS entries,
            json_agg(DISTINCT jsonb_build_object('name', p.name, 'slug', p.slug)) AS projects
     FROM entities e
-    JOIN context_entry_entities cee ON cee.entity_id = e.id
-    JOIN context_entries ce ON ce.id = cee.context_entry_id
-      AND ce.valid_to IS NULL AND ce.status NOT IN ('rejected', 'obsolete')
-      AND ce.project_id = ANY(${childIds})
-    JOIN entities p ON p.id = ce.project_id
+    JOIN memo_entities me ON me.entity_id = e.id
+    JOIN memos m ON m.id = me.memo_id
+      AND m.valid_to IS NULL AND m.status NOT IN ('rejected', 'obsolete')
+      AND m.project_id = ANY(${childIds})
+    JOIN entities p ON p.id = m.project_id
     WHERE e.type = ANY(${STACK_TYPES})
     GROUP BY e.id, e.name, e.type
-    HAVING count(DISTINCT ce.project_id) >= 2
-    ORDER BY count(DISTINCT ce.project_id) DESC, count(DISTINCT ce.id) DESC, e.name
+    HAVING count(DISTINCT m.project_id) >= 2
+    ORDER BY count(DISTINCT m.project_id) DESC, count(DISTINCT m.id) DESC, e.name
     LIMIT ${limit}
   `) as unknown as Row[];
   return rows.map((r) => ({

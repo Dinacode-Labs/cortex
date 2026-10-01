@@ -53,7 +53,7 @@ beforeAll(async () => {
     type: "convention",
     createdBy: USER,
   });
-  await getSql()`UPDATE context_entries SET title = title WHERE id = ${first.entry.id}`;
+  await getSql()`UPDATE memos SET title = title WHERE id = ${first.entry.id}`;
 }, 180_000);
 
 const titlesOf = async (sort: EntrySort, limit = 1) =>

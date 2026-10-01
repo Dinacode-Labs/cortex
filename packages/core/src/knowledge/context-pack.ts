@@ -1,23 +1,19 @@
 import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
-import {
-  type ContextEntry,
-  type ContextEntryType,
-  type ContextEntryStatus,
-} from "@cortex/shared";
 import { findProjectByName, projectIdsWithAncestors } from "../projects/projects.js";
-import { rowToContextEntry, type Row } from "../storage/map.js";
+import { rowToMemo, type Row } from "../storage/map.js";
 import { vectorSearch, type SearchHit } from "../storage/vectors.js";
+import type { Memo, MemoStatus, MemoType } from "./domain/memo.js";
 
 export async function validateEntry(
   id: string,
-  status: Extract<ContextEntryStatus, "validated" | "rejected" | "obsolete">,
-): Promise<ContextEntry | null> {
+  status: Extract<MemoStatus, "validated" | "rejected" | "obsolete">,
+): Promise<Memo | null> {
   const sql = getSql();
   const rows = (await sql`
-    UPDATE context_entries SET status = ${status} WHERE id = ${id} RETURNING *
+    UPDATE memos SET status = ${status} WHERE id = ${id} RETURNING *
   `) as unknown as Row[];
-  return rows[0] ? rowToContextEntry(rows[0]) : null;
+  return rows[0] ? rowToMemo(rows[0]) : null;
 }
 
 /**
@@ -38,7 +34,7 @@ export async function validateEntry(
  * The weight splits the budget: what governs today's work weighs twice what merely accompanies
  * it. See ADR-0054.
  */
-export const PACK_SECTIONS: { type: ContextEntryType; title: string; weight: number }[] = [
+export const PACK_SECTIONS: { type: MemoType; title: string; weight: number }[] = [
   { type: "decision", title: "Decisions in force", weight: 2 },
   { type: "constraint", title: "Active constraints", weight: 2 },
   { type: "risk", title: "Known risks", weight: 2 },
@@ -53,10 +49,10 @@ export const PACK_SECTIONS: { type: ContextEntryType; title: string; weight: num
 ];
 
 export interface PackSection {
-  type: ContextEntryType;
+  type: MemoType;
   title: string;
   weight: number;
-  entries: ContextEntry[];
+  entries: Memo[];
 }
 
 export interface ContextPack {
@@ -110,14 +106,14 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   const moduleRows = (await sql`
     SELECT DISTINCT e.name
     FROM entities e
-    JOIN context_entry_entities cee ON cee.entity_id = e.id
-    JOIN context_entries ce ON ce.id = cee.context_entry_id
-    WHERE e.type = 'module' AND ce.project_id = ${projectId}
+    JOIN memo_entities me ON me.entity_id = e.id
+    JOIN memos m ON m.id = me.memo_id
+    WHERE e.type = 'module' AND m.project_id = ${projectId}
   `) as unknown as Row[];
   const sensitiveModules = moduleRows.map((r) => r.name as string);
 
   const countRows = (await sql`
-    SELECT count(*)::int AS n FROM context_entries WHERE project_id = ${projectId}
+    SELECT count(*)::int AS n FROM memos WHERE project_id = ${projectId}
   `) as unknown as Row[];
   const totalEntries = Number(countRows[0]!.n);
 
@@ -178,8 +174,8 @@ export async function contradictingEntryPairs(
     SELECT ca.id AS a_id, ca.title AS a_title, ca.created_at AS a_at, ca.project_id AS a_project,
            cb.id AS b_id, cb.title AS b_title, cb.created_at AS b_at, cb.project_id AS b_project
     FROM relations r
-    JOIN context_entries ca ON ca.id = r.source_id AND ca.valid_to IS NULL
-    JOIN context_entries cb ON cb.id = r.target_id AND cb.valid_to IS NULL
+    JOIN memos ca ON ca.id = r.source_id AND ca.valid_to IS NULL
+    JOIN memos cb ON cb.id = r.target_id AND cb.valid_to IS NULL
     WHERE r.relation_type = 'contradicts'
       AND ca.project_id = ANY(${projectIds}) AND cb.project_id = ANY(${projectIds})
     LIMIT ${limit}
@@ -211,16 +207,16 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
   //    the middle of the argument, they are the argument, and warning them about themselves
   //    says nothing.
   const withEntities = (await sql`
-    SELECT ce.id AS entry_id, mine.name AS area, other.name AS against
+    SELECT m.id AS entry_id, mine.name AS area, other.name AS against
     FROM relations r
     JOIN entities mine  ON mine.id  IN (r.source_id, r.target_id)
     JOIN entities other ON other.id IN (r.source_id, r.target_id) AND other.id <> mine.id
-    JOIN context_entry_entities cee ON cee.entity_id = mine.id
-    JOIN context_entries ce ON ce.id = cee.context_entry_id
-      AND ce.valid_to IS NULL AND ce.project_id = ANY(${projectIds})
+    JOIN memo_entities me ON me.entity_id = mine.id
+    JOIN memos m ON m.id = me.memo_id
+      AND m.valid_to IS NULL AND m.project_id = ANY(${projectIds})
     WHERE r.relation_type = 'contradicts' AND mine.type <> 'project' AND other.type <> 'project'
       AND NOT EXISTS (
-        SELECT 1 FROM context_entry_entities x WHERE x.context_entry_id = ce.id AND x.entity_id = other.id
+        SELECT 1 FROM memo_entities x WHERE x.memo_id = m.id AND x.entity_id = other.id
       )
     LIMIT 200
   `) as unknown as Row[];
@@ -247,15 +243,15 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
 async function entriesByType(
   sql: Sql,
   projectIds: string[],
-  type: ContextEntryType,
+  type: MemoType,
   asOf?: Date,
   limit = 20,
-): Promise<ContextEntry[]> {
+): Promise<Memo[]> {
   const temporal = asOf
     ? sql`AND valid_from <= ${asOf} AND (valid_to IS NULL OR valid_to > ${asOf})`
     : sql`AND valid_to IS NULL`;
   const rows = (await sql`
-    SELECT * FROM context_entries
+    SELECT * FROM memos
     WHERE project_id = ANY(${projectIds}) AND type = ${type}
       AND status NOT IN ('rejected', 'obsolete')
       ${temporal}
@@ -263,5 +259,5 @@ async function entriesByType(
              created_at DESC
     LIMIT ${limit}
   `) as unknown as Row[];
-  return rows.map(rowToContextEntry);
+  return rows.map(rowToMemo);
 }

@@ -3,6 +3,7 @@ export * from "./knowledge/search.js";
 export * from "./knowledge/context-pack.js";
 export * from "./knowledge/queries.js";
 export * from "./knowledge/render.js";
+export type { Memo, MemoStatus, MemoType } from "./knowledge/domain/memo.js";
 export { lintProject, renderLintReport, type LintReport } from "./knowledge/lint.js";
 export { planLintActions, type LintAction } from "./knowledge/lint-act.js";
 export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./capture/code.js";

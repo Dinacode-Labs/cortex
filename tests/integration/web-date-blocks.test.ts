@@ -36,7 +36,7 @@ async function saveAt(project: ProjectRef, n: number, createdAt: string): Promis
     createdBy: USER,
     type: "decision",
   });
-  await getSql()`UPDATE context_entries SET created_at = ${createdAt} WHERE id = ${entry.id}`;
+  await getSql()`UPDATE memos SET created_at = ${createdAt} WHERE id = ${entry.id}`;
 }
 
 beforeAll(async () => {

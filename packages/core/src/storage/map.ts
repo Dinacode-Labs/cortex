@@ -1,8 +1,9 @@
-import type { ContextEntry, Entity, Source } from "@cortex/shared";
+import type { Entity, Source } from "@cortex/shared";
+import type { Memo } from "../knowledge/domain/memo.js";
 
 export type Row = Record<string, any>;
 
-export function rowToContextEntry(row: Row): ContextEntry {
+export function rowToMemo(row: Row): Memo {
   return {
     id: row.id,
     projectId: row.project_id ?? null,

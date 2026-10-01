@@ -1,6 +1,6 @@
 import { getSql } from "@cortex/database";
 import { getEnvNum } from "@cortex/shared";
-import { PgContextEntryRepository } from "./infrastructure/context-entry.repository.js";
+import { PgMemoRepository } from "./infrastructure/memo.repository.js";
 
 /**
  * Auto-curation with NO human in the loop (it replaces "review" so as not to add friction;
@@ -25,7 +25,7 @@ export interface CurationResult {
 }
 
 export async function autoCurate(decayDays = getEnvNum("CORTEX_DECAY_DAYS", 120)): Promise<CurationResult> {
-  const repository = new PgContextEntryRepository(getSql());
+  const repository = new PgMemoRepository(getSql());
   return {
     promoted: await repository.promoteCorroborated(),
     decayed: await repository.decayUncorroborated(decayDays),
