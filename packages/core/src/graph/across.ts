@@ -4,6 +4,7 @@ import { contradictingEntryPairs } from "../knowledge/context-pack.js";
 import { listChildProjects } from "../projects/projects.js";
 import type { ProjectRef } from "../projects/projects.js";
 import type { Row } from "../storage/map.js";
+import type { SessionUser } from "../auth/session-user.js";
 
 /**
  * What can only be seen by looking at a WHOLE client: what its repos share, and where they
@@ -52,12 +53,12 @@ export interface AcrossClient {
  * A client's cross-cutting view, already filtered by permissions.
  *
  * The filter lives here rather than in the interface because it is the easy part to forget: a
- * private child that `email` is not a member of must appear neither in the shared stack nor in
+ * private child that `viewer` is not a member of must appear neither in the shared stack nor in
  * the contradictions, even when the parent is visible. Everything that crosses over comes from
  * `listChildProjects`.
  */
-export async function getAcrossClient(parent: ProjectRef, email: string | null): Promise<AcrossClient> {
-  const children = await listChildProjects(parent.id, email);
+export async function getAcrossClient(parent: ProjectRef, viewer: SessionUser | null): Promise<AcrossClient> {
+  const children = await listChildProjects(parent.id, viewer);
   if (children.length === 0) return { children: [], sharedStack: [], contradictions: [] };
 
   const childIds = children.map((c) => c.id);

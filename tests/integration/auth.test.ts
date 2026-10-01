@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { closeSql } from "@cortex/database";
-import { requestOtp, verifyOtp, validateToken, createUiTicket, redeemUiTicket } from "@cortex/core";
+import { requestOtp, verifyOtp, authenticate, createUiTicket, redeemUiTicket } from "@cortex/core";
 
 const RID = Date.now().toString(36);
 const EMAIL = `dev-${RID}@example.com`;
@@ -26,17 +26,17 @@ async function otpFor(email: string): Promise<string> {
 }
 
 describe("auth email + OTP (a real database)", () => {
-  it("the whole flow: OTP → token → validate → single-use ticket", async () => {
+  it("the whole flow: OTP → token → authenticate → single-use ticket", async () => {
     const code = await otpFor(EMAIL);
-    const { token, user } = await verifyOtp(EMAIL, code);
-    expect(user.email).toBe(EMAIL);
+    const { token, account } = await verifyOtp(EMAIL, code);
+    expect(account.user.email).toBe(EMAIL);
 
-    expect((await validateToken(token))?.email).toBe(EMAIL);
+    expect(await authenticate(token)).toEqual({ email: EMAIL });
 
     const ticket = await createUiTicket(token);
     expect(ticket).toBeTruthy();
     const redeemed = await redeemUiTicket(ticket!);
-    expect(redeemed?.user.email).toBe(EMAIL);
+    expect(redeemed?.account.user.email).toBe(EMAIL);
     expect(redeemed!.token).not.toBe(token); // a fresh web session (not the CLI token)
     expect(await redeemUiTicket(ticket!)).toBeNull();
   });

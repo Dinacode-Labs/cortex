@@ -12,15 +12,15 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
     const pub = await createProject(`IT Pub ${RID}`, { visibility: "public", ownerEmail: "ana@example.com" });
     const prv = await createProject(`IT Prv ${RID}`, { visibility: "private", ownerEmail: "ana@example.com" });
 
-    expect(await canAccessProject(pub, "cualquiera@example.com")).toBe(true);
-    expect(await canAccessProject(prv, "ana@example.com")).toBe(true);
-    expect(await canAccessProject(prv, "bob@example.com")).toBe(false);
-    expect(await canAccessProject(prv, "admin@example.com")).toBe(true); // admin (env)
+    expect(await canAccessProject(pub, { email: "cualquiera@example.com" })).toBe(true);
+    expect(await canAccessProject(prv, { email: "ana@example.com" })).toBe(true);
+    expect(await canAccessProject(prv, { email: "bob@example.com" })).toBe(false);
+    expect(await canAccessProject(prv, { email: "admin@example.com" })).toBe(true); // admin (env)
 
     // The one adding is the owner: managing a project is no longer admin-only (ADR-0051).
-    await addProjectMember(prv.slug!, "bob@example.com", "ana@example.com");
+    await addProjectMember(prv.slug!, "bob@example.com", { email: "ana@example.com" });
     const prv2 = (await findProjectBySlug(prv.slug!))!;
-    expect(await canAccessProject(prv2, "bob@example.com")).toBe(true);
+    expect(await canAccessProject(prv2, { email: "bob@example.com" })).toBe(true);
   });
 
   it("getEntryProject resolves an entry's project → it enables the per-entry-id gate", async () => {
@@ -33,8 +33,8 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
 
     const proj = await getEntryProject(entry!.id);
     expect(proj?.id).toBe(prv.id);
-    expect(await canAccessProject(proj!, "ana@example.com")).toBe(true);
-    expect(await canAccessProject(proj!, "ajeno@example.com")).toBe(false);
+    expect(await canAccessProject(proj!, { email: "ana@example.com" })).toBe(true);
+    expect(await canAccessProject(proj!, { email: "ajeno@example.com" })).toBe(false);
 
     expect(await getEntryProject("00000000-0000-0000-0000-000000000000")).toBeNull();
   });
@@ -51,7 +51,7 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
     await saveContext({ content: `Secret: the key is ${marker}.`, project: prv.name, type: "constraint" });
 
     const foundBy = async (email: string | null) =>
-      (await searchContext({ query: marker, limit: 20 }, { restrictToAccessibleOf: email })).some(
+      (await searchContext({ query: marker, limit: 20 }, { restrictToAccessibleOf: email ? { email } : null })).some(
         (h) => h.entry.content.includes(marker),
       );
 
@@ -67,9 +67,9 @@ describe("project permissions (public/private, admin, members, cascade)", () => 
     const child = await createProject(`IT Casc Child ${RID}`, { parentSlug: parent.slug! }); // public by default
     const c = (await findProjectBySlug(child.slug!))!;
     expect(c.visibility).toBe("public");
-    expect(await canAccessProject(c, "ana@example.com")).toBe(true);
-    expect(await canAccessProject(c, "carlos@example.com")).toBe(false); // it inherits the parent's restriction
-    expect(await canAccessProject(c, "admin@example.com")).toBe(true);
+    expect(await canAccessProject(c, { email: "ana@example.com" })).toBe(true);
+    expect(await canAccessProject(c, { email: "carlos@example.com" })).toBe(false); // it inherits the parent's restriction
+    expect(await canAccessProject(c, { email: "admin@example.com" })).toBe(true);
   });
 });
 

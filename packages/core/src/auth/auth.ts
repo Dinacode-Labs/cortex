@@ -3,10 +3,11 @@ import { getSql } from "@cortex/database";
 import { getEnvNum } from "@cortex/shared";
 import { sendOtpEmail } from "./email.js";
 import type { Row } from "../storage/map.js";
+import type { SessionUser } from "./session-user.js";
 
 /**
  * Email + OTP authentication (no passwords). `requestOtp` generates a code and sends it;
- * `verifyOtp` validates it and issues a session token (Bearer); `validateToken` resolves the
+ * `verifyOtp` validates it and issues a session token (Bearer); `authenticate` resolves the
  * user behind a token. Codes and tokens are stored HASHED. A user IS their email address.
  */
 const MAX_ATTEMPTS = 5;
@@ -33,19 +34,22 @@ export function isAllowedEmail(emailRaw: string): boolean {
   return domains.length === 0 || domains.some((d) => email.endsWith(`@${d}`));
 }
 
-export function isAdmin(email: string | null | undefined): boolean {
-  return !!email && adminEmails().includes(normEmail(email));
+export function isAdmin(user: SessionUser | null): boolean {
+  return !!user && adminEmails().includes(normEmail(user.email));
 }
 
 export function listAdmins(): string[] {
   return adminEmails();
 }
 
-export interface AuthUser {
-  id: string;
-  email: string;
-  admin: boolean;
+/** The user row behind a session. The id only matters to auth itself (it keys tokens and tickets)
+ * and to the HTTP contract that has always returned it, so it stays out of `SessionUser`. */
+export interface Account {
+  readonly id: string;
+  readonly user: SessionUser;
 }
+
+const accountOf = (row: Row): Account => ({ id: row.id as string, user: { email: row.email as string } });
 
 export async function requestOtp(emailRaw: string): Promise<void> {
   const email = normEmail(emailRaw);
@@ -68,7 +72,7 @@ export async function requestOtp(emailRaw: string): Promise<void> {
   await sendOtpEmail(email, code);
 }
 
-export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ token: string; user: AuthUser }> {
+export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ token: string; account: Account }> {
   const email = normEmail(emailRaw);
   const code = codeRaw.trim();
   const sql = getSql();
@@ -96,20 +100,20 @@ export async function verifyOtp(emailRaw: string, codeRaw: string): Promise<{ to
       ON CONFLICT (email) DO UPDATE SET last_login_at = now()
       RETURNING id, email
     `) as unknown as Row[];
-    const user: AuthUser = { id: urows[0]!.id as string, email: urows[0]!.email as string, admin: isAdmin(urows[0]!.email as string) };
+    const account = accountOf(urows[0]!);
 
     const token = randomBytes(32).toString("base64url");
     await tx`
       INSERT INTO auth_tokens (token_hash, user_id, expires_at)
-      VALUES (${sha(token)}, ${user.id}, now() + make_interval(days => ${tokenTtlDays()}))
+      VALUES (${sha(token)}, ${account.id}, now() + make_interval(days => ${tokenTtlDays()}))
     `;
-    return { ok: true as const, token, user };
+    return { ok: true as const, token, account };
   });
   if (!result.ok) throw new Error(result.error);
-  return { token: result.token, user: result.user };
+  return { token: result.token, account: result.account };
 }
 
-export async function validateToken(token: string): Promise<AuthUser | null> {
+export async function authenticateAccount(token: string): Promise<Account | null> {
   if (!token) return null;
   const sql = getSql();
   const rows = (await sql`
@@ -118,7 +122,12 @@ export async function validateToken(token: string): Promise<AuthUser | null> {
   `) as unknown as Row[];
   if (!rows[0]) return null;
   await sql`UPDATE auth_tokens SET last_used_at = now() WHERE token_hash = ${sha(token)}`;
-  return { id: rows[0].id as string, email: rows[0].email as string, admin: isAdmin(rows[0].email as string) };
+  return accountOf(rows[0]);
+}
+
+/** The single way a request's token becomes the caller every other part of core works with. */
+export async function authenticate(token: string): Promise<SessionUser | null> {
+  return (await authenticateAccount(token))?.user ?? null;
 }
 
 export async function revokeToken(token: string): Promise<void> {
@@ -130,18 +139,18 @@ const TICKET_TTL_SEC = getEnvNum("CORTEX_UI_TICKET_TTL_SEC", 90);
 /** Issues a short, single-use ticket for the `cortex ui` handshake. It needs a valid CLI
  * token. The ticket is NOT the token: the web exchanges it for a session of its own. */
 export async function createUiTicket(cliToken: string): Promise<string | null> {
-  const user = await validateToken(cliToken);
-  if (!user) return null;
+  const account = await authenticateAccount(cliToken);
+  if (!account) return null;
   const ticket = randomBytes(24).toString("base64url");
   await getSql()`
     INSERT INTO ui_tickets (ticket_hash, user_id, expires_at)
-    VALUES (${sha(ticket)}, ${user.id}, now() + make_interval(secs => ${TICKET_TTL_SEC}))
+    VALUES (${sha(ticket)}, ${account.id}, now() + make_interval(secs => ${TICKET_TTL_SEC}))
   `;
   return ticket;
 }
 
 /** Exchanges a ticket (atomic -> single use) for a NEW web session. null when invalid. */
-export async function redeemUiTicket(ticket: string): Promise<{ token: string; user: AuthUser } | null> {
+export async function redeemUiTicket(ticket: string): Promise<{ token: string; account: Account } | null> {
   if (!ticket) return null;
   const sql = getSql();
   const claim = (await sql`
@@ -151,13 +160,12 @@ export async function redeemUiTicket(ticket: string): Promise<{ token: string; u
   `) as unknown as Row[];
   if (!claim[0]) return null;
   const userId = claim[0].user_id as string;
-  const urows = (await sql`SELECT email FROM users WHERE id = ${userId} LIMIT 1`) as unknown as Row[];
+  const urows = (await sql`SELECT id, email FROM users WHERE id = ${userId} LIMIT 1`) as unknown as Row[];
   if (!urows[0]) return null;
-  const email = urows[0].email as string;
   const token = randomBytes(32).toString("base64url");
   await sql`
     INSERT INTO auth_tokens (token_hash, user_id, expires_at)
     VALUES (${sha(token)}, ${userId}, now() + make_interval(days => ${tokenTtlDays()}))
   `;
-  return { token, user: { id: userId, email, admin: isAdmin(email) } };
+  return { token, account: accountOf(urows[0]) };
 }

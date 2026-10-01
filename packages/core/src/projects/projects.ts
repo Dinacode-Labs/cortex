@@ -1,5 +1,6 @@
 import { getSql, type Sql } from "@cortex/database";
-import { isAdmin } from "../identity/auth.js";
+import { isAdmin } from "../auth/auth.js";
+import type { SessionUser } from "../auth/session-user.js";
 import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
 import { decideProjectAccess, type ProjectRef } from "./domain/project.js";
@@ -61,16 +62,16 @@ export async function isProjectMember(projectId: string, email: string): Promise
 }
 
 /**
- * Can `email` access the project? It cascades through the hierarchy: if the project OR any
+ * Can `viewer` access the project? It cascades through the hierarchy: if the project OR any
  * ANCESTOR is private -> restricted; access is granted by being an admin, or owner/member of
  * the project or of any ancestor (membership of the parent "Acme" opens its sub-projects).
  */
-export async function canAccessProject(project: ProjectRef, email: string | null): Promise<boolean> {
+export async function canAccessProject(project: ProjectRef, viewer: SessionUser | null): Promise<boolean> {
   const repository = new PgProjectRepository(getSql());
   const chain = await repository.chain(project.id);
-  return decideProjectAccess(chain, email, {
-    isAdmin: email ? isAdmin(email) : false,
-    isMember: (projectId) => repository.isMember(projectId, email!),
+  return decideProjectAccess(chain, viewer, {
+    isAdmin: isAdmin(viewer),
+    isMember: (projectId) => repository.isMember(projectId, viewer!.email),
   });
 }
 
@@ -109,13 +110,13 @@ export type AccessCheck =
  * Neither `name` nor `slug` is a caller bug -> Error.
  */
 export async function checkProjectAccess(
-  email: string | null,
+  viewer: SessionUser | null,
   ref: { name?: string; slug?: string },
 ): Promise<AccessCheck> {
   if (!ref.slug && !ref.name) throw new Error("checkProjectAccess: 'name' or 'slug' is required (caller bug).");
   const project = ref.slug ? await findProjectBySlug(ref.slug) : await findProjectByName(ref.name!);
   if (!project) return { status: "not_found" };
-  if (!(await canAccessProject(project, email))) return { status: "forbidden" };
+  if (!(await canAccessProject(project, viewer))) return { status: "forbidden" };
   return { status: "ok", project };
 }
 
@@ -127,12 +128,12 @@ export async function checkProjectAccess(
  * - the entry's project without permission -> `forbidden`.
  */
 export async function checkEntryAccess(
-  email: string | null,
+  viewer: SessionUser | null,
   entryId: string,
 ): Promise<{ status: "ok"; project: ProjectRef | null } | { status: "not_found" } | { status: "forbidden" }> {
   const { found, project } = await new PgProjectRepository(getSql()).resolveEntryProject(entryId);
   if (!found) return { status: "not_found" };
-  if (project && !(await canAccessProject(project, email))) return { status: "forbidden" };
+  if (project && !(await canAccessProject(project, viewer))) return { status: "forbidden" };
   return { status: "ok", project };
 }
 
@@ -141,22 +142,22 @@ export interface AccessibleProject extends ProjectRef {
 }
 
 /**
- * Projects visible to `email`: an admin sees them all; everyone else sees the public ones plus
+ * Projects visible to `viewer`: an admin sees them all; everyone else sees the public ones plus
  * the private ones they own or were given. It includes `entryCount` from ONE aggregate query
  * (GROUP BY project_id) merged by id -- not one query per project.
  */
-export async function listAccessibleProjects(email: string | null): Promise<AccessibleProject[]> {
+export async function listAccessibleProjects(viewer: SessionUser | null): Promise<AccessibleProject[]> {
   const repository = new PgProjectRepository(getSql());
   const counts = await repository.entryCounts();
   const refs = (await repository.listAll()).map((r): AccessibleProject => ({ ...r, entryCount: counts.get(r.id) ?? 0 }));
-  if (isAdmin(email)) return refs;
+  if (isAdmin(viewer)) return refs;
   const out: AccessibleProject[] = [];
-  for (const r of refs) if (await canAccessProject(r, email)) out.push(r);
+  for (const r of refs) if (await canAccessProject(r, viewer)) out.push(r);
   return out;
 }
 
 /**
- * The DIRECT children of a project that `email` can see.
+ * The DIRECT children of a project that `viewer` can see.
  *
  * Going down the hierarchy is not the same as going up: inheritance goes up (a child reads the
  * client's knowledge) because access to the child already implies access to the parent. The
@@ -164,8 +165,8 @@ export async function listAccessibleProjects(email: string | null): Promise<Acce
  * become visible by looking at the parent -- so anything crossing downwards goes through here
  * and inherits `listAccessibleProjects`'s filter.
  */
-export async function listChildProjects(parentId: string, email: string | null): Promise<AccessibleProject[]> {
-  return (await listAccessibleProjects(email)).filter((p) => p.parentId === parentId);
+export async function listChildProjects(parentId: string, viewer: SessionUser | null): Promise<AccessibleProject[]> {
+  return (await listAccessibleProjects(viewer)).filter((p) => p.parentId === parentId);
 }
 
 /**
@@ -179,11 +180,11 @@ export async function listChildProjects(parentId: string, email: string | null):
  * Managing means changing visibility, transferring ownership and touching the member list. It
  * is not reading: that is decided by `canAccessProject`, which is a different question.
  */
-export async function canManageProject(email: string | null, slug: string): Promise<boolean> {
-  if (!email) return false;
-  if (isAdmin(email)) return true;
+export async function canManageProject(actor: SessionUser | null, slug: string): Promise<boolean> {
+  if (!actor) return false;
+  if (isAdmin(actor)) return true;
   const p = await findProjectBySlug(slug);
-  return !!p && p.ownerEmail?.toLowerCase() === email.toLowerCase();
+  return !!p && p.ownerEmail?.toLowerCase() === actor.email.toLowerCase();
 }
 
 /** What `canManageProject` allows, so the message is not repeated in every caller. */
@@ -194,10 +195,10 @@ export class NotAManagerError extends Error {
   }
 }
 
-async function requireManager(slug: string, byEmail: string | null): Promise<ProjectRef> {
+async function requireManager(slug: string, actor: SessionUser | null): Promise<ProjectRef> {
   const p = await findProjectBySlug(slug);
   if (!p) throw new Error(`Project "${slug}" not found.`);
-  if (!(await canManageProject(byEmail, slug))) throw new NotAManagerError(slug);
+  if (!(await canManageProject(actor, slug))) throw new NotAManagerError(slug);
   return p;
 }
 
@@ -212,10 +213,10 @@ async function requireManager(slug: string, byEmail: string | null): Promise<Pro
 export async function updateProject(
   slug: string,
   changes: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
-  byEmail: string | null,
+  actor: SessionUser | null,
 ): Promise<ProjectRef> {
   const repository = new PgProjectRepository(getSql());
-  const p = await requireManager(slug, byEmail);
+  const p = await requireManager(slug, actor);
   const visibility = changes.visibility ?? p.visibility;
   const ownerEmail =
     changes.ownerEmail === undefined ? p.ownerEmail : changes.ownerEmail ? changes.ownerEmail.toLowerCase() : null;
@@ -258,9 +259,9 @@ export async function updateProject(
  * The owner can do it, not only an admin: someone who mistypes a name should be able to fix it
  * without writing to anybody, and there is nothing here to destroy.
  */
-export async function deleteProject(slug: string, byEmail: string | null): Promise<void> {
+export async function deleteProject(slug: string, actor: SessionUser | null): Promise<void> {
   const repository = new PgProjectRepository(getSql());
-  const p = await requireManager(slug, byEmail);
+  const p = await requireManager(slug, actor);
   const entries = await repository.countEntries(p.id);
   if (entries > 0) {
     throw new ProjectNotEmptyError(`"${slug}" has ${entries} entries. Only an empty project can be deleted.`);
@@ -281,14 +282,14 @@ export class ProjectNotEmptyError extends Error {
 }
 
 /** Adds a member. Owner or admin only (ADR-0051). */
-export async function addProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
-  const p = await requireManager(slug, byEmail);
+export async function addProjectMember(slug: string, email: string, actor: SessionUser | null): Promise<void> {
+  const p = await requireManager(slug, actor);
   await new PgProjectRepository(getSql()).addMember(p.id, email);
 }
 
 /** Removes a member. Owner or admin only (ADR-0051). */
-export async function removeProjectMember(slug: string, email: string, byEmail: string | null): Promise<void> {
-  const p = await requireManager(slug, byEmail);
+export async function removeProjectMember(slug: string, email: string, actor: SessionUser | null): Promise<void> {
+  const p = await requireManager(slug, actor);
   await new PgProjectRepository(getSql()).removeMember(p.id, email);
 }
 

@@ -20,21 +20,21 @@ describe("who can access a project", () => {
   });
 
   it("lets an admin into anything private", async () => {
-    expect(await decideProjectAccess([privateNode("p")], "someone@acme.com", { isAdmin: true, isMember: async () => false })).toBe(true);
+    expect(await decideProjectAccess([privateNode("p")], { email: "someone@acme.com" }, { isAdmin: true, isMember: async () => false })).toBe(true);
   });
 
   it("lets the owner in, case-insensitively", async () => {
-    expect(await decideProjectAccess([privateNode("p", "Owner@Acme.com")], "owner@acme.com", noMembers)).toBe(true);
+    expect(await decideProjectAccess([privateNode("p", "Owner@Acme.com")], { email: "owner@acme.com" }, noMembers)).toBe(true);
   });
 
   it("lets a member of an ancestor in: membership cascades down", async () => {
     const chain = [privateNode("child"), privateNode("parent")];
     const member = { isAdmin: false, isMember: async (id: string) => id === "parent" };
-    expect(await decideProjectAccess(chain, "dev@acme.com", member)).toBe(true);
+    expect(await decideProjectAccess(chain, { email: "dev@acme.com" }, member)).toBe(true);
   });
 
   it("denies a stranger as soon as one ancestor is private", async () => {
     const chain: ProjectChainNode[] = [{ id: "child", visibility: "public", ownerEmail: null }, privateNode("parent")];
-    expect(await decideProjectAccess(chain, "stranger@acme.com", noMembers)).toBe(false);
+    expect(await decideProjectAccess(chain, { email: "stranger@acme.com" }, noMembers)).toBe(false);
   });
 });

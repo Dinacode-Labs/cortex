@@ -2653,3 +2653,46 @@ decisions they carried stay recorded here.
   `ContextEntry`, `validate_context_entry` and `/entries` can follow; or the aliases start to
   diverge from the contract, which is the moment `Memo` needs a type of its own and a translation
   at the edge.
+
+<a id="adr-0078"></a>
+
+## ADR-0078 · `identity` becomes `auth`, and core's caller is a `SessionUser`
+
+- **Status:** accepted as a hypothesis (2026-10-01).
+- **Context:** `core` asked "who is calling?" with a loose `email: string | null`, threaded under
+  half a dozen names (`email`, `byEmail`, `restrictToAccessibleOf`) through `projects/`,
+  `graph/` and `knowledge/`. Nothing told that email apart from the emails that are data about
+  somebody else -- the member being added, the stored owner, the `created_by` written to a row --
+  and each app reached it differently (`user.email`, `c.get("user")?.email ?? null`). Meanwhile
+  `identity/` handed the apps an `AuthUser { id, email, admin }`: the id is only needed by auth to
+  key tokens and tickets, and `admin` is not a fact about the user but the answer to a policy,
+  computed from `CORTEX_ADMIN_EMAIL` every time anyway.
+- **Decision:** `packages/core/src/identity/` becomes `packages/core/src/auth/`, and its central
+  concept is `SessionUser { readonly email: string }`: whoever the authenticated request belongs
+  to. It carries only the email on purpose -- it is the type that grows when a session needs to
+  say more. `authenticate(token)` is the one way a token becomes a `SessionUser`, and every app
+  calls it in exactly one place (`currentUser`/`currentAccount` in `apps/server`, the session
+  middleware in `apps/web`, the Bearer check in `apps/mcp-server`). Every function in `core` whose
+  parameter means "who asks or acts" takes a `SessionUser | null` named `viewer` or `actor`;
+  an email that is data about someone else stays a `string`. Being an admin is a policy of auth,
+  `isAdmin(user)`, not a field. `null` keeps both of its meanings: a trusted call (stdio MCP,
+  the admin CLI, maintenance) or an anonymous visitor, depending on the function. The row id
+  stays out of `SessionUser`: auth returns it beside the user, as an `Account`, only where the
+  HTTP contract needs it. **That contract does not move** ([0062](#adr-0062)): `POST
+  /auth/verify` and `GET /auth/me` still answer `{ token?, user: { id, email, admin } }`, composed
+  by the route from the account and `isAdmin`, and an integration test pins the shape.
+- **Alternatives:**
+  - **Keep `AuthUser` and pass the whole object down.** The smallest change, but it hands core an
+    id it never reads and an `admin` flag frozen at sign-in, and ties core's signature to the
+    HTTP shape -- so the day the contract or the session grows, the other has to follow. Rejected.
+  - **Extract auth into a package of its own.** Already answered by [0018](#adr-0018): topology
+    paid for with a package, a tsconfig and a test config, with nothing at stake. Its trigger --
+    token rotation, SSO, multi-tenancy -- has not arrived. Rejected.
+  - **Make `admin` a field of `SessionUser`.** It is what `AuthUser` did. It looks cheaper at each
+    call site, but it is a cached answer to a policy question: whoever builds a `SessionUser` by
+    hand (a test, a maintenance job) has to know to compute it, and a change to who counts as an
+    admin should not depend on how the session object was assembled. Rejected.
+- **Revisit when:** `SessionUser` needs a second field and it turns out to be something only one
+  app knows, which would mean it belongs to that app and not to core; or a policy beyond
+  `isAdmin` appears (roles, teams), at which point auth grows a policy module rather than more
+  booleans on the user; or [0018](#adr-0018)'s trigger arrives and auth leaves core.

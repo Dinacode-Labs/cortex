@@ -4,7 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { pingDatabase } from "@cortex/database";
-import { validateToken, type AuthUser } from "@cortex/core";
+import { authenticate, type SessionUser } from "@cortex/core";
 import { buildMcpServer } from "./server.js";
 
 type McpSession = { transport: WebStandardStreamableHTTPServerTransport; email?: string; lastSeen: number };
@@ -13,10 +13,10 @@ type McpSession = { transport: WebStandardStreamableHTTPServerTransport; email?:
  * Telling "no token" from "invalid token" matters with auth off: a token that is present but
  * expired must give a 401 (the client believes it is authenticated), not silently degrade to
  * anonymous with no attribution. */
-async function authUser(c: Context): Promise<{ user: AuthUser | null; invalidToken: boolean }> {
+async function authUser(c: Context): Promise<{ user: SessionUser | null; invalidToken: boolean }> {
   const m = (c.req.header("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
   if (!m) return { user: null, invalidToken: false };
-  const user = await validateToken(m[1]!.trim());
+  const user = await authenticate(m[1]!.trim());
   return { user, invalidToken: !user };
 }
 

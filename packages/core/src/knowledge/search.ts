@@ -6,6 +6,7 @@ import {
   searchContextInput,
 } from "@cortex/shared";
 import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../projects/projects.js";
+import type { SessionUser } from "../auth/session-user.js";
 import { rowToMemo, type Row } from "../storage/map.js";
 import { hybridSearch, type SearchHit } from "../storage/vectors.js";
 import { inferTypeFromQuery } from "./query-intent.js";
@@ -26,7 +27,7 @@ export function setReranker(fn: Reranker | null): void {
  *
  * SECURITY SCOPING (P0): without `input.project`, the default is to search across ALL
  * projects (trusted local behaviour, e.g. stdio MCP). Network-exposed callers (authenticated
- * MCP, web) must pass `opts.restrictToAccessibleOf` with the user's email (or null) to limit
+ * MCP, web) must pass `opts.restrictToAccessibleOf` with the session user (or null) to limit
  * the search to accessible projects and avoid leaking content from other people's private
  * projects. With a concrete `input.project` the behaviour is unchanged (the caller's guard
  * already controls access to that project).
@@ -44,7 +45,7 @@ const TYPE_BOOST = getEnvNum("CORTEX_SEARCH_TYPE_BOOST", 0.15);
 export async function searchContext(
   input: SearchContextInput,
   opts?: {
-    restrictToAccessibleOf?: string | null;
+    restrictToAccessibleOf?: SessionUser | null;
     /**
      * EXTRA projects to include besides the one asked for and its ancestors. This is how one
      * searches downwards from a parent (ADR-0063): a deliberate operation, not inheritance,

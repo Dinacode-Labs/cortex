@@ -37,7 +37,7 @@ const toSummary = (p: ProjectRef): ProjectSummary => ({
 projectRoutes.get("/projects", async (c) => {
   const user = await currentUser(c);
   if (!user) return c.json({ error: "Not authenticated." }, 401);
-  const projects = await listAccessibleProjects(user.email);
+  const projects = await listAccessibleProjects(user);
   return c.json({ projects: projects.map(toSummary) });
 });
 
@@ -51,7 +51,7 @@ projectRoutes.get("/projects/:slug", async (c) => {
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const project = await findProjectBySlug(c.req.param("slug"));
   if (!project) return c.json({ error: "Project not found." }, 404);
-  if (!(await canAccessProject(project, user.email))) {
+  if (!(await canAccessProject(project, user))) {
     return c.json({ error: "This project is private. Ask an administrator for access.", admins: listAdmins() }, 403);
   }
   return c.json({ project: toSummary(project) });
@@ -72,7 +72,7 @@ projectRoutes.post("/projects", async (c) => {
 
   const existing = await findProjectBySlug(slugify(body.name));
   if (existing) {
-    if (!(await canAccessProject(existing, user.email))) {
+    if (!(await canAccessProject(existing, user))) {
       return c.json(
         { error: `A project "${existing.name}" already exists and is private: ask for access.`, admins: listAdmins() },
         403,
@@ -110,9 +110,9 @@ projectRoutes.patch("/projects/:slug", async (c) => {
   const slug = c.req.param("slug");
   // A project you cannot even see answers 404, not 403: the opposite would reveal it exists.
   const project = await findProjectBySlug(slug);
-  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  if (!project || !(await canAccessProject(project, user))) return c.json({ error: "Project not found." }, 404);
   try {
-    return c.json({ project: toSummary(await updateProject(slug, body, user.email)) });
+    return c.json({ project: toSummary(await updateProject(slug, body, user)) });
   } catch (e) {
     if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
     return c.json({ error: (e as Error).message }, 400);
@@ -125,8 +125,8 @@ projectRoutes.get("/projects/:slug/members", async (c) => {
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const slug = c.req.param("slug");
   const project = await findProjectBySlug(slug);
-  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
-  if (!(await canManageProject(user.email, slug))) return c.json({ error: new NotAManagerError(slug).message }, 403);
+  if (!project || !(await canAccessProject(project, user))) return c.json({ error: "Project not found." }, 404);
+  if (!(await canManageProject(user, slug))) return c.json({ error: new NotAManagerError(slug).message }, 403);
   return c.json({ members: await listProjectMembers(slug) });
 });
 
@@ -137,9 +137,9 @@ projectRoutes.post("/projects/:slug/members", async (c) => {
   if (body instanceof Response) return body;
   const slug = c.req.param("slug");
   const project = await findProjectBySlug(slug);
-  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  if (!project || !(await canAccessProject(project, user))) return c.json({ error: "Project not found." }, 404);
   try {
-    await addProjectMember(slug, body.email, user.email);
+    await addProjectMember(slug, body.email, user);
   } catch (e) {
     if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
     throw e;
@@ -154,9 +154,9 @@ projectRoutes.delete("/projects/:slug/members", async (c) => {
   if (body instanceof Response) return body;
   const slug = c.req.param("slug");
   const project = await findProjectBySlug(slug);
-  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  if (!project || !(await canAccessProject(project, user))) return c.json({ error: "Project not found." }, 404);
   try {
-    await removeProjectMember(slug, body.email, user.email);
+    await removeProjectMember(slug, body.email, user);
   } catch (e) {
     if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
     throw e;
@@ -176,9 +176,9 @@ projectRoutes.delete("/projects/:slug", async (c) => {
   if (!user) return c.json({ error: "Not authenticated." }, 401);
   const slug = c.req.param("slug");
   const project = await findProjectBySlug(slug);
-  if (!project || !(await canAccessProject(project, user.email))) return c.json({ error: "Project not found." }, 404);
+  if (!project || !(await canAccessProject(project, user))) return c.json({ error: "Project not found." }, 404);
   try {
-    await deleteProject(slug, user.email);
+    await deleteProject(slug, user);
   } catch (e) {
     if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
     if (e instanceof ProjectNotEmptyError) return c.json({ error: e.message }, 409);

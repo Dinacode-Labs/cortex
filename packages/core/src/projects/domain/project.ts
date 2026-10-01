@@ -1,3 +1,5 @@
+import type { SessionUser } from "../../auth/session-user.js";
+
 /**
  * The `Project` aggregate as the apps see it, plus the access policy that used to be tangled
  * with the recursive SQL that loads the ancestor chain (ADR-0076).
@@ -20,20 +22,20 @@ export interface ProjectChainNode {
 }
 
 /**
- * Can `email` access a project whose ancestor chain is `chain`? It cascades: if the project or
+ * Can `viewer` access a project whose ancestor chain is `chain`? It cascades: if the project or
  * any ancestor is private the whole thing is restricted; access is granted by being an admin,
  * or owner/member of the project or of any ancestor (membership of the parent "Acme" opens its
  * sub-projects). Public everywhere -> open to anyone.
  */
 export async function decideProjectAccess(
   chain: ProjectChainNode[],
-  email: string | null,
+  viewer: SessionUser | null,
   deps: { isAdmin: boolean; isMember: (projectId: string) => Promise<boolean> },
 ): Promise<boolean> {
   if (!chain.some((node) => node.visibility === "private")) return true;
-  if (!email) return false;
+  if (!viewer) return false;
   if (deps.isAdmin) return true;
-  const e = email.toLowerCase();
+  const e = viewer.email.toLowerCase();
   for (const node of chain) {
     if ((node.ownerEmail ?? "").toLowerCase() === e) return true;
     if (await deps.isMember(node.id)) return true;

@@ -93,7 +93,7 @@ const get = (ruta: string) => createWebApp().request(ruta, { headers: { cookie }
 
 describe("the client_ view (core)", () => {
   it("the shared stack is entities from two or more children, without the client/project/repository noise", async () => {
-    const { sharedStack } = await getAcrossClient(client_, USER);
+    const { sharedStack } = await getAcrossClient(client_, { email: USER });
     const names = sharedStack.map((e) => e.name);
     expect(names).toContain(`Kubernetes${RID}`);
     // The client's name hangs off both repos, so a naive cross-reference would surface it as
@@ -105,25 +105,25 @@ describe("the client_ view (core)", () => {
   }, 120_000);
 
   it("a private child contributes nothing to the cross-view of somebody who cannot see it", async () => {
-    const deFuera = await getAcrossClient(client_, USER);
+    const deFuera = await getAcrossClient(client_, { email: USER });
     // `Redis` only appears in public repo A and in the private one: with no access to the
     // private one there is a single origin, so it is not "shared" and must not show up at all.
     expect(deFuera.sharedStack.map((e) => e.name)).not.toContain(`Redis${RID}`);
     expect(deFuera.children.map((c) => c.id)).not.toContain(privateRepo.id);
 
-    const delDueno = await getAcrossClient(client_, OWNER);
+    const delDueno = await getAcrossClient(client_, { email: OWNER });
     expect(delDueno.sharedStack.map((e) => e.name)).toContain(`Redis${RID}`);
   }, 120_000);
 
   it("the contradictions that cross projects, which no per-project lint sees", async () => {
-    const { contradictions } = await getAcrossClient(client_, USER);
+    const { contradictions } = await getAcrossClient(client_, { email: USER });
     const pair = contradictions.find((x) => [x.a.id, x.b.id].includes(entryA));
     expect(pair, "the clash between the two repos must show up").toBeTruthy();
     expect([pair!.a.project.name, pair!.b.project.name].sort()).toEqual([repoA.name, repoB.name].sort());
   }, 120_000);
 
   it("a project with no children has no cross-cutting view to show", async () => {
-    const empty_ = await getAcrossClient(suelto, USER);
+    const empty_ = await getAcrossClient(suelto, { email: USER });
     expect(empty_).toEqual({ children: [], sharedStack: [], contradictions: [] });
   }, 60_000);
 });

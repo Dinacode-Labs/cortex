@@ -28,7 +28,7 @@ export const projectsRoutes = new Hono<WebEnv>();
 
 projectsRoutes.get("/", async (c) => {
   const user = c.get("user")!;
-  const projects = await listAccessibleProjects(user.email);
+  const projects = await listAccessibleProjects(user);
 
   // `/?project=<name>` used to be a project's home page; now `/p/<slug>` is (ADR-0050).
   const old = c.req.query("project");
@@ -121,7 +121,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const members = await listProjectMembers(project.slug!);
   const notice = c.req.query("error");
   // The cycle check is done by the domain, which is what knows the whole ancestor chain.
-  const others = (await listAccessibleProjects(user.email)).filter((o) => o.slug && o.id !== project.id);
+  const others = (await listAccessibleProjects(user)).filter((o) => o.slug && o.id !== project.id);
 
   const body = html`
     ${projectHeader(res, "settings")}
@@ -220,7 +220,7 @@ projectsRoutes.post("/p/:slug/settings/visibility", async (c) => {
   const v = String((await c.req.parseBody()).visibility ?? "");
   if (v !== "public" && v !== "private") return c.redirect(`/p/${slug}/settings`);
   try {
-    await updateProject(slug, { visibility: v }, user.email);
+    await updateProject(slug, { visibility: v }, user);
   } catch (e) {
     return c.redirect(backWithError(slug, e));
   }
@@ -231,7 +231,7 @@ projectsRoutes.post("/p/:slug/settings/delete", async (c) => {
   const user = c.get("user")!;
   const slug = c.req.param("slug");
   try {
-    await deleteProject(slug, user.email);
+    await deleteProject(slug, user);
   } catch (e) {
     if (e instanceof NotAManagerError || e instanceof ProjectNotEmptyError) {
       return c.redirect(`/p/${slug}/settings?error=${encodeURIComponent((e as Error).message)}`);
@@ -246,7 +246,7 @@ projectsRoutes.post("/p/:slug/settings/parent", async (c) => {
   const slug = c.req.param("slug");
   const parentSlug = String((await c.req.parseBody()).parentSlug ?? "").trim() || null;
   try {
-    await updateProject(slug, { parentSlug }, user.email);
+    await updateProject(slug, { parentSlug }, user);
   } catch (e) {
     if (e instanceof NotAManagerError) return c.redirect(backWithError(slug, e));
     // A non-existent parent or a cycle: the reason is shown, not swallowed.
@@ -260,7 +260,7 @@ projectsRoutes.post("/p/:slug/settings/owner", async (c) => {
   const slug = c.req.param("slug");
   const email = String((await c.req.parseBody()).ownerEmail ?? "").trim();
   try {
-    await updateProject(slug, { ownerEmail: email || null }, user.email);
+    await updateProject(slug, { ownerEmail: email || null }, user);
   } catch (e) {
     return c.redirect(backWithError(slug, e));
   }
@@ -272,7 +272,7 @@ projectsRoutes.post("/p/:slug/members", async (c) => {
   const slug = c.req.param("slug");
   const email = String((await c.req.parseBody()).email ?? "").trim();
   try {
-    if (email) await addProjectMember(slug, email, user.email);
+    if (email) await addProjectMember(slug, email, user);
   } catch (e) {
     return c.redirect(backWithError(slug, e));
   }
@@ -284,7 +284,7 @@ projectsRoutes.post("/p/:slug/members/remove", async (c) => {
   const slug = c.req.param("slug");
   const email = String((await c.req.parseBody()).email ?? "").trim();
   try {
-    if (email) await removeProjectMember(slug, email, user.email);
+    if (email) await removeProjectMember(slug, email, user);
   } catch (e) {
     return c.redirect(backWithError(slug, e));
   }

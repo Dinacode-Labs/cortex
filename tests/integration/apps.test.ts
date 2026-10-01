@@ -105,7 +105,7 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
       await saveContext({ content: `Somebody else's noise ${RID} ${i}.`, project: prvForeign.name, createdBy: OWNER });
     }
 
-    const accessible = (await listAccessibleProjects(USER)).map((p) => p.id);
+    const accessible = (await listAccessibleProjects({ email: USER })).map((p) => p.id);
     const seen = await listEntries({ limit: 60, accessibleProjectIds: accessible });
     expect(seen.some((e) => e.content === mine), "your own fell outside the limit").toBe(true);
     expect(seen.some((e) => e.content.includes("Somebody else's noise"))).toBe(false);
@@ -118,6 +118,44 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
     expect((await srv.request("/context-pack?slug=whatever")).status).toBe(401);
     expect((await srv.request(`/context-pack?slug=does-not-exist-${RID}`, { headers: auth })).status).toBe(404);
     expect((await srv.request(`/context-pack?slug=${prvForeign.slug}`, { headers: auth })).status).toBe(403);
+  });
+
+  /**
+   * Core's caller is a `SessionUser` now, with no id and no admin flag (ADR-0078), but the CLI
+   * already installed on laptops reads `{ token, user: { id, email, admin } }` from these two
+   * routes and does not update in lockstep with the server (ADR-0062). The shape is pinned here
+   * so that SessionUser growing never reshapes the answer by accident.
+   */
+  it("server: POST /auth/verify and GET /auth/me still answer { user: { id, email, admin } }", async () => {
+    const srv = createServerApp();
+    const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const signIn = async (email: string) => {
+      const code = await otpFor(email);
+      const res = await srv.request("/auth/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as { token: string; user: { id: string; email: string; admin: boolean } };
+    };
+
+    for (const [email, admin] of [
+      [`verify-shape-${RID}@example.com`, false],
+      ["admin@example.com", true],
+    ] as const) {
+      const verified = await signIn(email);
+      expect(Object.keys(verified)).toEqual(["token", "user"]);
+      expect(Object.keys(verified.user)).toEqual(["id", "email", "admin"]);
+      expect(verified.user).toEqual({ id: expect.stringMatching(UUID), email, admin });
+
+      const me = await srv.request("/auth/me", { headers: { authorization: `Bearer ${verified.token}` } });
+      expect(me.status).toBe(200);
+      const body = (await me.json()) as { user: Record<string, unknown> };
+      expect(Object.keys(body)).toEqual(["user"]);
+      expect(Object.keys(body.user)).toEqual(["id", "email", "admin"]);
+      expect(body.user).toEqual(verified.user);
+    }
   });
 
   it("server: POST /auth/request — the same IP cannot request codes unchecked", async () => {
