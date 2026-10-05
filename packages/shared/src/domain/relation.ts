@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { confidenceLevel } from "./memo.js";
 
-/** Relation type between entities or entries. Section 14, relations.relation_type */
 export const relationType = z.enum([
   "belongs_to",
   "affects",
@@ -16,7 +15,6 @@ export const relationType = z.enum([
 ]);
 export type RelationType = z.infer<typeof relationType>;
 
-/** A relation between entities/entries. Section 14, relations */
 export const relation = z.object({
   id: z.string().uuid(),
   sourceId: z.string().uuid(),

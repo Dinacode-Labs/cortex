@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-/** Where a piece of knowledge came from. Section 14, sources.source_type */
 export const sourceType = z.enum([
   "manual",
   "claude_code",
@@ -17,7 +16,6 @@ export const sourceType = z.enum([
 ]);
 export type SourceType = z.infer<typeof sourceType>;
 
-/** The original source of an entry. Section 14, sources */
 export const source = z.object({
   id: z.string().uuid(),
   sourceType: sourceType,
