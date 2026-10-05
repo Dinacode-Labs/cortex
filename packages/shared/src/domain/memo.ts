@@ -1,0 +1,95 @@
+import { z } from "zod";
+import { sourceType } from "./source.js";
+
+export const contextEntryType = z.enum([
+  "decision",
+  "constraint",
+  "incident",
+  "architecture",
+  "technical_debt",
+  "convention",
+  "business_rule",
+  "integration_note",
+  "risk",
+  "how_to",
+  "meeting_summary",
+  "pr_summary",
+  "ticket_resolution",
+  "other",
+]);
+export type ContextEntryType = z.infer<typeof contextEntryType>;
+
+const RENAMED_TYPES = new Map<string, ContextEntryType>([["module_note", "other"]]);
+
+export const contextEntryTypeInput = z.preprocess(
+  (value) => (typeof value === "string" ? (RENAMED_TYPES.get(value) ?? value) : value),
+  contextEntryType,
+);
+
+export const contextEntryStatus = z.enum([
+  "draft",
+  "pending_validation",
+  "validated",
+  "rejected",
+  "obsolete",
+  "superseded",
+]);
+export type ContextEntryStatus = z.infer<typeof contextEntryStatus>;
+
+export const entrySortField = z.enum(["created", "updated"]);
+export type EntrySortField = z.infer<typeof entrySortField>;
+
+export const sortDirection = z.enum(["asc", "desc"]);
+export type SortDirection = z.infer<typeof sortDirection>;
+
+export const confidenceLevel = z.enum(["low", "medium", "high", "verified"]);
+export type ConfidenceLevel = z.infer<typeof confidenceLevel>;
+
+export const validity = z.enum(["current", "historical", "unknown"]);
+export type Validity = z.infer<typeof validity>;
+
+export const contextEntry = z.object({
+  id: z.string().uuid(),
+  projectId: z.string().uuid().nullable(),
+  clientId: z.string().uuid().nullable(),
+  title: z.string(),
+  content: z.string(),
+  summary: z.string().nullable(),
+  type: contextEntryType,
+  status: contextEntryStatus,
+  confidence: confidenceLevel,
+  validity: validity,
+  sourceType: sourceType,
+  sourceReference: z.string().nullable(),
+  createdBy: z.string().nullable(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  supersededBy: z.string().uuid().nullable(),
+  metadata: z.record(z.unknown()),
+  validFrom: z.date(),
+  validTo: z.date().nullable(),
+  observedAt: z.date(),
+});
+export type ContextEntry = z.infer<typeof contextEntry>;
+
+export const saveContextInput = z.object({
+  content: z.string().min(1, "content cannot be empty"),
+  project: z.string().min(1).optional().describe("Project slug (what `cortex link` shows) or name; a new project is created if neither matches"),
+  title: z.string().optional(),
+  type: contextEntryTypeInput.optional(),
+  summary: z.string().optional(),
+  confidence: confidenceLevel.optional(),
+  sourceType: sourceType.optional(),
+  sourceReference: z.string().optional(),
+  createdBy: z.string().optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
+export type SaveContextInput = z.infer<typeof saveContextInput>;
+
+export const searchContextInput = z.object({
+  query: z.string().min(1),
+  project: z.string().optional().describe("Project slug (what `cortex link` shows) or name"),
+  type: contextEntryTypeInput.optional(),
+  limit: z.number().int().positive().max(50).default(10),
+});
+export type SearchContextInput = z.infer<typeof searchContextInput>;

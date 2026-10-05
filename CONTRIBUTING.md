@@ -46,7 +46,7 @@ CLI.
 | --- | --- |
 | Domain operations (capture, search, pack, lint, projects, auth) | `packages/core/src/` — **deterministic, no LLM** |
 | The LLM layer (classify, graph, rerank, synthesise, distil, merge, reconcile) | `packages/agents/src/` (Mastra agents) |
-| The domain model (types, enums, zod schemas) | `packages/shared/src/domain.ts` |
+| The domain model (types, enums, zod schemas), one file per aggregate | `packages/shared/src/domain/` |
 | Schema, SQL, Postgres client | `packages/database/` (migrations in `migrations/`) |
 | The embeddings provider | `packages/embeddings/` |
 | MCP server · web UI · API and auth · CLI | `apps/mcp-server` · `apps/web` · `apps/server` · `apps/cli` |
@@ -106,7 +106,7 @@ of `getSql()`. A module without invariants (usage, the row mappers) gets neither
 
   Two things stay in Spanish, and both are **data rather than prose we wrote**: the patterns
   that match the corpus (the classification rules in `packages/core/src/text.ts`, the
-  deictics in `domain.ts`, the eval fixtures) and the **output language** of the LLM agents
+  deictics in `domain/entity.ts`, the eval fixtures) and the **output language** of the LLM agents
   (`OUTPUT_LANGUAGE` in `packages/agents/src/agents/language.ts`), because what they produce is stored
   next to a corpus that is already Spanish. Each of those carries an English comment saying
   why. Translating a prompt is a translation; changing the output language is a product
