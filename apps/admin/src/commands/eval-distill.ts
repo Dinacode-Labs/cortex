@@ -31,10 +31,8 @@ const PROJECT = "Nébula";
  * runs this without arguments gets. It is still explicit in the path rather than being the
  * directory with no suffix: no language is the implicit one, whichever goes first.
  *
- * Worth knowing when reading its numbers: the eval belongs to no project, so the agents write in
- * the server's default language (`CORTEX_DEFAULT_LANGUAGE`, Spanish unless set, ADR-0081). With
- * that default, the default set measures a session that is NOT in the language of the
- * corpus. `--lang es` is the one that measures the two matching.
+ * The eval belongs to no project, so the agents write in `CORTEX_DEFAULT_LANGUAGE` (ADR-0081): with
+ * it at `es`, this set measures a session that crosses languages and `--lang es` one that does not.
  */
 const DEFAULT_LANGUAGE = "en";
 

@@ -71,11 +71,7 @@ export async function saveContext(
 
   let projectId: string | null = null;
   if (parsed.project) {
-    // A project born from a `save` goes through the same place as `cortex link --create`: with
-    // a slug and an owner (ADR-0051). It used to be created with `resolveEntity`, which only
-    // sets the name, and ended up with no slug, no owner and public: impossible to link, to
-    // adopt or to close. `createProject` returns an existing one untouched, so this changes
-    // nothing about the projects already there.
+    // Through `createProject`, so a project born from a save gets a slug and an owner (ADR-0051).
     projectId = (await createProject(parsed.project, { ownerEmail: parsed.createdBy ?? null })).id;
   }
 

@@ -87,9 +87,8 @@ describe("what runAgent asks the provider for", () => {
 });
 
 /**
- * Every agent wrote Spanish through a constant, whatever project it wrote for. A project now
- * chooses (ADR-0081), and the choice only counts if it reaches the system message the provider
- * receives: the agents are registered once, so it has to travel with each call.
+ * The agents are registered once, so a project's language only counts if it reaches the system
+ * message of each call (ADR-0081).
  */
 describe("the language the agents write in", () => {
   const systemMessage = (i: number): string => {

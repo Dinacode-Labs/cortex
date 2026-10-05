@@ -218,14 +218,7 @@ async function requireManager(slug: string, actor: SessionUser | null): Promise<
   return p;
 }
 
-/**
- * Changes what a project can change after birth: its visibility and its owner.
- *
- * The absence of this was ADR-0036's big hole: a project created public stayed public forever,
- * in every interface, because the repository's only `UPDATE ... visibility` ran at creation
- * time. Turning it private takes effect immediately and affects everything -- search, packs,
- * listings -- because the policy consults them live; it touches no entry.
- */
+/** Access is decided live, so going private takes effect at once everywhere and touches no memo. */
 export async function updateProject(
   slug: string,
   changes: {

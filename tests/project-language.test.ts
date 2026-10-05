@@ -3,10 +3,8 @@ import { defaultLanguage } from "../packages/shared/src/env";
 import { effectiveLanguage } from "../packages/core/src/projects/domain/project";
 
 /**
- * A project's language is inherited the way the rest of the hierarchy is (ADR-0081): a child
- * that sets none writes in its parent's, and only a chain that sets none falls back to the
- * server. Getting the order wrong would make a client's sub-project write in the server's
- * language while its parent says otherwise.
+ * Getting the inheritance order wrong would make a sub-project write in the server's language
+ * while its parent says otherwise (ADR-0081).
  */
 describe("the language a project writes in", () => {
   it("is its own when it has one, whatever its ancestors say", () => {

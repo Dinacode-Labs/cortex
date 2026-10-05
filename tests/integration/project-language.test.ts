@@ -51,10 +51,8 @@ afterAll(async () => {
 });
 
 /**
- * Every agent wrote Spanish, for every project, through a constant. A project now chooses, and
- * a child with no choice of its own writes in its parent's (ADR-0081). The choice only counts
- * if it reaches the hooks that call the agents, so that is checked here, through the paths a
- * memo really takes.
+ * A project's language only counts if it reaches the hooks that call the agents, through the
+ * paths a memo really takes; a child with none writes in its parent's (ADR-0081).
  */
 describe("the language a project writes in", () => {
   it("is inherited from the parent, overridden by the child, and back to inherited when cleared", async () => {
