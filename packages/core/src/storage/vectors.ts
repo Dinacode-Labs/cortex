@@ -1,4 +1,4 @@
-import { toVectorLiteral, type Sql } from "@cortex/database";
+import { toVectorLiteral, type Sql, type SqlFragment } from "@cortex/database";
 import type { EmbeddingProvider } from "@cortex/embeddings";
 
 import { rowToMemo, type Row } from "./map.js";
@@ -87,11 +87,28 @@ export function rrfFuse(
 }
 
 /**
- * HYBRID search: it combines vector candidates (pgvector) and lexical ones (Postgres FTS,
- * 'spanish' configuration, which matches the corpus) and fuses them with Reciprocal Rank
- * Fusion (RRF). The lexical side brings precision on ids, proper nouns and jargon; the vector
- * side brings meaning.
+ * Each memo is indexed in its own language (ADR-0082) and the query's is unknown, so the query
+ * is stemmed both ways: a Spanish stem matches Spanish memos, an English one English memos.
  */
+export async function lexicalMatches(
+  sql: Sql,
+  queryText: string,
+  filters: SqlFragment,
+  limit: number,
+): Promise<{ id: string; rank: number }[]> {
+  const query = sql`(plainto_tsquery('spanish', ${queryText}) || plainto_tsquery('english', ${queryText}))`;
+  const rows = (await sql`
+    SELECT m.id, ts_rank(m.content_tsv, ${query}) AS rank
+    FROM memos m
+    WHERE m.content_tsv @@ ${query}
+    ${filters}
+    ORDER BY rank DESC
+    LIMIT ${limit}
+  `) as unknown as Row[];
+  return rows.map((r) => ({ id: r.id as string, rank: Number(r.rank) }));
+}
+
+/** The lexical side brings precision on ids, proper nouns and jargon; the vector side, meaning. */
 export async function hybridSearch(
   sql: Sql,
   provider: EmbeddingProvider,
@@ -144,18 +161,11 @@ export async function hybridSearch(
     LIMIT ${pool}
   `) as unknown as Row[];
 
-  const ftsRows = (await sql`
-    SELECT m.id, ts_rank(m.content_tsv, plainto_tsquery('spanish', ${args.queryText})) AS rank
-    FROM memos m
-    WHERE m.content_tsv @@ plainto_tsquery('spanish', ${args.queryText})
-    ${filters}
-    ORDER BY rank DESC
-    LIMIT ${pool}
-  `) as unknown as Row[];
+  const ftsRows = await lexicalMatches(sql, args.queryText, filters, pool);
 
   const ranked = rrfFuse(
     vecRows as unknown as { id: string; distance?: number | string }[],
-    ftsRows as unknown as { id: string }[],
+    ftsRows,
     args.limit,
   );
   if (ranked.length === 0) return [];

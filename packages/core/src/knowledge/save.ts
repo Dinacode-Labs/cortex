@@ -75,12 +75,11 @@ export async function saveContext(
     projectId = (await createProject(parsed.project, { ownerEmail: parsed.createdBy ?? null })).id;
   }
 
+  const { effective: language } = await languageOfProject(projectId);
+
   // Optional LLM layer: precedence is explicit input > LLM > heuristic.
   const useClassifier = opts.useClassifier ?? true;
-  const llm =
-    useClassifier && classifier
-      ? await classifier(parsed.content, { language: (await languageOfProject(projectId)).effective }).catch(() => null)
-      : null;
+  const llm = useClassifier && classifier ? await classifier(parsed.content, { language }).catch(() => null) : null;
   const draft = MemoDraft.from(
     {
       content: parsed.content,
@@ -108,6 +107,7 @@ export async function saveContext(
     sourceReference: parsed.sourceReference ?? null,
     createdBy: parsed.createdBy ?? null,
     metadata: meta,
+    language,
   });
 
   if (!opts.skipEmbedding) await storeEmbedding(sql, provider, entry.id, draft.embedText);
