@@ -28,10 +28,10 @@ export class PgMemoRepository implements MemoRepository {
     const rows = (await this.sql`
       INSERT INTO memos
         (project_id, source_id, title, content, summary, type, confidence,
-         source_type, source_reference, created_by, metadata)
+         source_type, source_reference, created_by, metadata, language)
       VALUES (${memo.projectId}, ${memo.sourceId}, ${memo.title}, ${memo.content}, ${memo.summary},
               ${memo.type}, ${memo.confidence}, ${memo.sourceType}, ${memo.sourceReference},
-              ${memo.createdBy}, ${this.sql.json(memo.metadata as JsonValue)})
+              ${memo.createdBy}, ${this.sql.json(memo.metadata as JsonValue)}, ${memo.language})
       RETURNING *
     `) as unknown as Row[];
     return rowToMemo(rows[0]!);

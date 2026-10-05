@@ -150,8 +150,10 @@ Results come back ordered from nearest to furthest.
 Vector search is excellent at **meaning** and weak at **literals**. If you search for
 `TICKET-4821` or `OAuth2 PKCE`, you want that **exact** token, and the vector may not nail
 it. That is what **lexical search** is for. Postgres keeps a full-text index of the words in
-each entry, with Spanish stemming, so "facturación", "facturar" and "factura" share a root,
-and it matches on terms.
+each entry, stemmed in the language the memo was written in, so "facturación", "facturar" and
+"factura" share a root in a Spanish memo, and "restarted" and "restarting" in an English one.
+The question's language is unknown, so it is stemmed both ways and either side can match
+([ADR-0082](decisions.md#adr-0082)).
 
 - **Vector** captures *sense*: paraphrases, synonyms.
 - **Lexical** captures *precision*: IDs, proper nouns, jargon, acronyms.

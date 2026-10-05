@@ -407,7 +407,7 @@ decisions they carried stay recorded here.
 
 ## ADR-0020 · Spanish-only full-text search — a known limitation
 
-- **Status:** accepted (2026-07-06).
+- **Status:** accepted (2026-07-06); **superseded by [0082](#adr-0082)** (2026-10).
 - **Decision:** the lexical branch of hybrid search uses Postgres's `'spanish'` configuration,
   even though the content is genuinely **mixed**: code, technical jargon and English pull
   requests alongside Spanish prose. Recorded as a conscious limit rather than fixed.
@@ -2794,3 +2794,31 @@ decisions they carried stay recorded here.
 - **Revisit when:** a third language is needed, which is one entry in `language` and one name in
   `agents/language.ts`, plus whatever full-text search needs; or a project wants memos in both
   languages at once, which is not what one setting can express.
+
+<a id="adr-0082"></a>
+
+## ADR-0082 · Each memo is searched in the language it was written in
+
+- **Status:** accepted as a hypothesis (2026-10-05).
+- **Context:** [0020](#adr-0020) stemmed every memo as Spanish and called it a known limitation,
+  to revisit when the content turned English. [0081](#adr-0081) lets a project write in English,
+  so that is now the expected case, not an accident. Stemmed as Spanish, an English memo keeps
+  "the" as a word and never meets its own inflections: "workers restarting" did not find "the
+  workers restarted".
+- **Decision:** a memo stores the language it was written in, `memos.language`, which is its
+  project's at the moment it is saved; existing memos are `es`, which is how they were indexed
+  until now (migration `0025_memo_language.sql`). The generated `content_tsv` stems each memo
+  with that language's configuration. The question's language is not known, so
+  `lexicalMatches` stems it both ways and ORs the two: a Spanish stem meets Spanish memos, an
+  English stem English ones. A memo keeps its language when its project changes setting.
+- **Alternatives:**
+  - **Index every memo in both languages.** Covers a memo that is not in its project's
+    language, at twice the index, and stems each memo once with the wrong rules. Rejected in
+    favour of trusting the language the memo was written in.
+  - **`simple`, with no stemming.** One index that fits everything and stems nothing, which
+    gives up what 0020 chose Spanish for. Rejected.
+  - **Detect each memo's language.** A detector for short, mixed technical text, when the
+    project already says which language its agents write in. Rejected.
+- **Revisit when:** memos saved by hand in the other language turn out to be common enough that
+  their misses show up in search (each one is stemmed with its project's rules), which would
+  argue for indexing both; or the retrieval eval, re-run against this, loses on the Spanish set.

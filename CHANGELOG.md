@@ -9,6 +9,12 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Search finds English memos by their inflections, as it does Spanish ones.** A memo is now
+  indexed in the language it was written in, its project's at the time, and a search is matched
+  in both languages. "workers restarting" finds "the workers restarted"; before, every memo was
+  stemmed as Spanish and an English one only matched on the exact words. Existing memos stay
+  indexed as Spanish. Migration `0025_memo_language.sql` rebuilds the full-text column, which on
+  a large table takes a moment ([ADR-0082](docs/decisions.md#adr-0082)).
 - **Each project chooses the language its memory is written in: Spanish or English.** Under
   Settings, a project's manager picks the language the agents write titles, summaries, distilled
   knowledge, merged entries and `ask` answers in. A project that picks none takes its parent's,

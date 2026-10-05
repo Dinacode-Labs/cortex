@@ -90,6 +90,7 @@ describe("documentation", () => {
     "apps/admin/src/commands/connect-notion.ts", // PROP_KEYS are Notion's property names
     "tests/query-intent.test.ts", // the questions are inputs, not our text
     "tests/bilingual-heuristics.test.ts", // half the sentences are the Spanish corpus the patterns match
+    "tests/integration/memo-language-fts.test.ts", // the Spanish memos are the corpus side of the comparison
     "docs/how-it-works.md", // the prompt examples, shown in the corpus's language on purpose
   ];
 

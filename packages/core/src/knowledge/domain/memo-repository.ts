@@ -1,4 +1,4 @@
-import type { ConfidenceLevel, SourceType } from "@cortex/shared";
+import type { ConfidenceLevel, Language, SourceType } from "@cortex/shared";
 import type { Memo, MemoType } from "./memo.js";
 
 /** A source to persist, before it has an id. */
@@ -21,6 +21,7 @@ export interface NewMemo {
   sourceReference: string | null;
   createdBy: string | null;
   metadata: Record<string, unknown>;
+  language: Language;
 }
 
 /** An entry a reclassification pass may retype, with what the pass needs to judge it. */

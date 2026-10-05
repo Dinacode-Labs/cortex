@@ -75,6 +75,11 @@ the corpus does not answer stay out of both averages.
 
 ### Baseline (2026-09-12)
 
+> **Pending a re-run:** since [ADR-0082](../docs/decisions.md#adr-0082) the lexical branch stems
+> each question in Spanish and in English, where it used to stem it only in Spanish. The corpus
+> is Spanish and its memos are indexed as before, but the extra English stems can let more
+> candidates into the fusion, so the numbers below are not yet confirmed against it.
+
 > **Updated the same day**: once the question's type is inferred (see below) it moves to
 > recall@5 **0.987** and MRR **0.928**. The table here is from before that change, which is
 > what it was compared against.
