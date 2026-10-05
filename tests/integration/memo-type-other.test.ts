@@ -43,9 +43,8 @@ afterAll(async () => {
 });
 
 /**
- * `module_note` became `other` (ADR-0079). The memos stored under the old name have to follow, or
- * they fall out of the pack's section and of the type filter; and a CLI installed before the
- * rename still sends the old name, which must not turn into a 400.
+ * Memos stored as `module_note` must follow the rename or drop out of the pack and the type
+ * filter, and a CLI from before the rename must not get a 400 for the old name (ADR-0079).
  */
 describe("module_note becomes other", () => {
   it("the migration moves the memos stored as module_note to other, and the old name can no longer be written", async () => {

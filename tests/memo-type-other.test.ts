@@ -8,9 +8,8 @@ import { classifyType } from "../packages/core/src/text";
 import { PACK_SECTIONS } from "../packages/core/src/knowledge/context-pack";
 
 /**
- * `module_note` was where a memo landed when no other type fitted, and the name made it read like
- * a note about a module (ADR-0079). It is `other` now, but CLIs and agents installed before the
- * rename still send the old name, and rejecting it would turn their saves into a 400.
+ * `module_note` hid that it was the catch-all, so it became `other` (ADR-0079); CLIs installed
+ * before the rename still send the old name, and refusing it would turn their saves into a 400.
  */
 describe("the type a memo falls into when nothing else fits is called other", () => {
   it("a memo no rule recognises is classified as other", () => {
