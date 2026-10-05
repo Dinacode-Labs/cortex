@@ -108,11 +108,7 @@ export async function lexicalMatches(
   return rows.map((r) => ({ id: r.id as string, rank: Number(r.rank) }));
 }
 
-/**
- * HYBRID search: it combines vector candidates (pgvector) and lexical ones (Postgres FTS) and
- * fuses them with Reciprocal Rank Fusion (RRF). The lexical side brings precision on ids,
- * proper nouns and jargon; the vector side brings meaning.
- */
+/** The lexical side brings precision on ids, proper nouns and jargon; the vector side, meaning. */
 export async function hybridSearch(
   sql: Sql,
   provider: EmbeddingProvider,

@@ -37,10 +37,8 @@ const found = async (project: ProjectRef, query: string): Promise<string[]> => {
 };
 
 /**
- * Full-text search stemmed everything as Spanish (ADR-0020). An English memo kept "the" as a
- * word and never met its own inflections: "workers restarting" did not find "the workers
- * restarted". Each memo is now indexed in its project's language, and the query, whose
- * language nobody knows, is stemmed both ways (ADR-0082).
+ * Stemmed as Spanish, an English memo kept "the" and missed its own inflections: "workers
+ * restarting" did not find "the workers restarted" (ADR-0082).
  */
 describe("each memo is searched in the language it was written in", () => {
   it("a memo takes its project's language when it is saved, and keeps it when the project changes", async () => {
@@ -56,7 +54,6 @@ describe("each memo is searched in the language it was written in", () => {
   });
 
   it("an English memo is stemmed as English, a Spanish one as Spanish", async () => {
-    // Spanish on purpose: the second memo is the corpus side of the comparison.
     const en = await stored(await save(english, "The export workers restarted twice during the night."));
     const es = await stored(await save(spanish, "El worker de exportación se reinició dos veces durante la noche."));
 
@@ -70,7 +67,6 @@ describe("each memo is searched in the language it was written in", () => {
 
   it("an English inflection finds the English memo, and a Spanish query still finds the Spanish one", async () => {
     const en = await save(english, "The billing workers restarted after the deploy.");
-    // Spanish on purpose: the query has to reach the memo through Spanish stemming.
     const es = await save(spanish, "Las exportaciones de facturación fallan de noche.");
 
     expect(await found(english, "billing worker restarting")).toContain(en);
