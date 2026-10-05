@@ -16,7 +16,6 @@ export const contextEntryType = z.enum([
   "constraint",
   "incident",
   "architecture",
-  "module_note",
   "technical_debt",
   "convention",
   "business_rule",
@@ -26,8 +25,16 @@ export const contextEntryType = z.enum([
   "meeting_summary",
   "pr_summary",
   "ticket_resolution",
+  "other",
 ]);
 export type ContextEntryType = z.infer<typeof contextEntryType>;
+
+const RENAMED_TYPES = new Map<string, ContextEntryType>([["module_note", "other"]]);
+
+export const contextEntryTypeInput = z.preprocess(
+  (value) => (typeof value === "string" ? (RENAMED_TYPES.get(value) ?? value) : value),
+  contextEntryType,
+);
 
 /** Lifecycle state of an entry. Section 14, context_entries.status */
 export const contextEntryStatus = z.enum([
@@ -224,7 +231,7 @@ export const saveContextInput = z.object({
   /** Optional short title; derived from the content when missing. */
   title: z.string().optional(),
   /** Knowledge type; proposed by the classifier agent when missing. */
-  type: contextEntryType.optional(),
+  type: contextEntryTypeInput.optional(),
   /** Optional precomputed summary (e.g. from a workflow); derived when missing. */
   summary: z.string().optional(),
   confidence: confidenceLevel.optional(),
@@ -240,7 +247,7 @@ export type SaveContextInput = z.infer<typeof saveContextInput>;
 export const searchContextInput = z.object({
   query: z.string().min(1),
   project: z.string().optional().describe("Project slug (what `cortex link` shows) or name"),
-  type: contextEntryType.optional(),
+  type: contextEntryTypeInput.optional(),
   limit: z.number().int().positive().max(50).default(10),
 });
 export type SearchContextInput = z.infer<typeof searchContextInput>;

@@ -56,7 +56,7 @@ describe("the memo a piece of knowledge becomes", () => {
   });
 
   it("embeds the title over the content, so the title weighs in retrieval", () => {
-    const draft = MemoDraft.from({ content: "Body of the entry." }, { title: "A title", type: "module_note" });
+    const draft = MemoDraft.from({ content: "Body of the entry." }, { title: "A title", type: "other" });
 
     expect(draft.embedText).toBe("A title\n\nBody of the entry.");
   });

@@ -3,6 +3,7 @@ import { html } from "hono/html";
 import {
   contextEntryStatus,
   contextEntryType,
+  contextEntryTypeInput,
   entrySortField,
   getBrandName,
   sortDirection,
@@ -51,7 +52,7 @@ projectRoutes.get("/p/:slug", async (c) => {
   if (res instanceof Response) return res;
   const { project, children } = res;
 
-  const typeParsed = contextEntryType.safeParse(c.req.query("type"));
+  const typeParsed = contextEntryTypeInput.safeParse(c.req.query("type"));
   const type: ContextEntryType | undefined = typeParsed.success ? typeParsed.data : undefined;
   const statusParsed = contextEntryStatus.safeParse(c.req.query("status"));
   const status: ContextEntryStatus | undefined = statusParsed.success ? statusParsed.data : undefined;

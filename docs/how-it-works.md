@@ -58,9 +58,10 @@ installs the CLI and signs in.
 Everything Cortex knows is a **memo** (the `memos` table; the API and the MCP tools still
 call it a *context entry*). Each memo is **one fact**: a decision, a constraint, an incident, a
 convention. There are **14 types**:
-`decision`, `constraint`, `incident`, `architecture`, `module_note`, `technical_debt`,
+`decision`, `constraint`, `incident`, `architecture`, `technical_debt`,
 `convention`, `business_rule`, `integration_note`, `risk`, `how_to`, `meeting_summary`,
-`pr_summary`, `ticket_resolution`.
+`pr_summary`, `ticket_resolution` and `other`, where a memo lands when none of the others fits
+([ADR-0079](decisions.md#adr-0079)).
 
 What separates Cortex from a drawer full of notes is that **every fact carries its
 provenance**. An example entry:
@@ -470,7 +471,7 @@ are rebuilt in place by `cortex-admin resummarize`.
 
 **What goes in it.** Everything that describes the **state** of the project: decisions,
 constraints, risks, technical debt, conventions, architecture, business rules, past incidents,
-integrations, module notes and how-tos. Left out on purpose are the three types that record an
+integrations, how-tos and other notes. Left out on purpose are the three types that record an
 **event** rather than a state — meeting, PR and ticket summaries — which `search` and `ask`
 still reach ([ADR-0054](decisions.md#adr-0054)).
 

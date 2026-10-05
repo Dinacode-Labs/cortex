@@ -2696,3 +2696,40 @@ decisions they carried stay recorded here.
   app knows, which would mean it belongs to that app and not to core; or a policy beyond
   `isAdmin` appears (roles, teams), at which point auth grows a policy module rather than more
   booleans on the user; or [0018](#adr-0018)'s trigger arrives and auth leaves core.
+
+<a id="adr-0079"></a>
+
+## ADR-0079 · `module_note` becomes `other`: the type a memo falls into says that it is one
+
+- **Status:** accepted as a hypothesis (2026-10-05).
+- **Context:** two paths fall back to `module_note` when nothing else fits: the heuristic
+  classifier (`classifyType` in `packages/core/src/text.ts`) when no rule matches, and the
+  distiller when the model answers a type that does not exist. So the type collected whatever had
+  no better home, while its name said "a note about a module": an agent reading the pack's
+  "Module notes" section, or a person filtering by it, took it for something it was not, and the
+  models were never offered an explicit "none of these". [0077](#adr-0077) had listed
+  `module_note` among the values of the public contract that do not move.
+- **Decision:** the type is `other`, listed last in `contextEntryType`. Its section of the pack is
+  "Other", also last: an over-budget pack is trimmed from the last section back, and the catch-all
+  is what should give first. Migration `0023_memo_type_other.sql` rewrites the stored memos and
+  recreates the CHECK.
+  The contract moves for this one value without breaking what is installed: every way a type comes
+  in -- `saveContextInput` and `searchContextInput` (the MCP tools and `core`), `captureRequest`
+  and `searchRequest`, the server's capture, batch and search routes, the web's type filter --
+  parses it with `contextEntryTypeInput`, which reads `module_note` as `other`. What goes out only
+  ever says `other`. The CLI does not validate the type, it passes the flag through, so an
+  installed CLI keeps working; a newer CLI sending `--type other` to an older server gets the 400
+  any unknown type gets ([0062](#adr-0062)).
+- **Alternatives:**
+  - **Keep the name and stop falling back to it**, dropping what fits no type. That is the
+    distiller's own question (#155), not an alternative to this: it fixes one of the two paths and
+    leaves a name that still misleads whoever saves by hand.
+  - **`general_note`.** Keeps the `*_note` family, and hides the fallback as well as the old name
+    did. Rejected.
+  - **`uncategorized`.** Says "not classified yet", a promise of a later reclassification that
+    nothing performs. Rejected.
+  - **Rename without the alias.** Every installed CLI and agent that still sends `module_note`
+    would get a 400. Rejected.
+- **Revisit when:** the contract gets a version that can break anyway ([0077](#adr-0077)'s
+  trigger), at which point the alias goes; or `other` becomes a large share of a project's memos,
+  which would mean a type is missing rather than that the memos are odd.

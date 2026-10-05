@@ -16,7 +16,7 @@ import {
 } from "@cortex/core";
 import {
   confidenceLevel,
-  contextEntryType,
+  contextEntryTypeInput,
   purgeEntriesRequest,
   relationType,
   sourceType,
@@ -42,7 +42,7 @@ const captureSchema = z.object({
   slug: z.string().min(1),
   content: z.string().min(1),
   title: z.string().optional(),
-  type: contextEntryType.optional(),
+  type: contextEntryTypeInput.optional(),
   confidence: confidenceLevel.optional(),
   sourceType: sourceType.optional(),
   sourceReference: z.string().optional(),
@@ -53,7 +53,7 @@ const captureSchema = z.object({
 const batchItemSchema = z.object({
   title: z.string().optional(),
   content: z.string().min(1),
-  type: contextEntryType.optional(),
+  type: contextEntryTypeInput.optional(),
   sourceType: sourceType.optional(),
   sourceReference: z.string().optional(),
   confidence: confidenceLevel.optional(),
@@ -177,7 +177,7 @@ contextRoutes.get("/search", async (c) => {
 
   const q = (c.req.query("q") ?? "").trim();
   if (!q) return c.json({ error: "Missing query: pass ?q=" }, 400);
-  const tipo = contextEntryType.safeParse(c.req.query("type"));
+  const tipo = contextEntryTypeInput.safeParse(c.req.query("type"));
   const limiteCrudo = Number(c.req.query("limit") ?? "10");
   const limit = Number.isFinite(limiteCrudo) ? Math.min(Math.max(Math.trunc(limiteCrudo), 1), 50) : 10;
 

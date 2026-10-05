@@ -398,7 +398,7 @@ The frontend sends \`usedConfigurationId\` when the user picks a saved configura
     const opts = { useClassifier: false, detectImprovements: false, skipEmbedding: true } as const;
     await saveContext({ content: chunk, project: p.name, title: "Configuration fields", sourceType: "document", sourceReference: "rl1" } as never, opts);
 
-    setClassifier(async () => ({ type: "module_note", title: "T", summary: "The price is always recomputed on the backend.", entities: [] }));
+    setClassifier(async () => ({ type: "other", title: "T", summary: "The price is always recomputed on the backend.", entities: [] }));
     try {
       expect((await resummarizeEntries({ project: p.name })).rewritten).toBe(1);
     } finally {
@@ -513,7 +513,7 @@ describe("bi-temporal invalidation (a real database)", () => {
   it("closes the validity window of a migrated task, without deleting it", async () => {
     const p = await createProject(`IT Temporal ${RID}`);
     const legacy = await saveContext(
-      { project: p.name, type: "module_note", content: "A migrated task that is no longer current.", metadata: { state: "Histórico" } } as never,
+      { project: p.name, type: "other", content: "A migrated task that is no longer current.", metadata: { state: "Histórico" } } as never,
       opts,
     );
 

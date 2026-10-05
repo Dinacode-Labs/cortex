@@ -199,7 +199,7 @@
   },
   {
     "id": "e34",
-    "type": "module_note",
+    "type": "other",
     "title": "El servicio de proceso es el único que habla con el proveedor",
     "content": "Ningún otro servicio llama al proveedor de OCR. Si hace falta convertir algo desde otro sitio, se encola un trabajo. Esto es lo que hace que cambiar de proveedor sea un cambio localizado, aunque hoy no haya capa de abstracción."
   },

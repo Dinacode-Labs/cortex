@@ -235,7 +235,7 @@ export function classifyType(content: string): MemoType {
   for (const rule of CLASSIFY_RULES) {
     if (rule.re.test(content)) return rule.type;
   }
-  return "module_note";
+  return "other";
 }
 
 const TECHNOLOGIES = [

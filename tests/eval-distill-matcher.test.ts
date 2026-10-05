@@ -52,7 +52,7 @@ describe("matchDistillItems", () => {
    * blamed for something else.
    */
   it("tells a mistyped item apart from one that never came out", () => {
-    const items = [item("module_note", "Identificador público con ULID", "Se cambia el autoincremental.")];
+    const items = [item("other", "Identificador público con ULID", "Se cambia el autoincremental.")];
     const m = matchDistillItems(items, gold([{ type: "decision", must_mention: ["ulid"] }]));
     expect(m.matched).toBe(0);
     expect(m.mistyped).toBe(1);
@@ -157,7 +157,7 @@ describe("summarizeDistillMatches", () => {
 
   it("the leak rate counts the forbidden sets, not the items that carry them", () => {
     const hiccups = [
-      item("module_note", "Servidor MCP caído", "No conectaba el MCP."),
+      item("other", "Servidor MCP caído", "No conectaba el MCP."),
       item("technical_debt", "Test flaky", "Falla el test flaky."),
     ];
     const matches = [

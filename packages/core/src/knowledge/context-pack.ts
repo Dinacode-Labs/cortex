@@ -44,8 +44,8 @@ export const PACK_SECTIONS: { type: MemoType; title: string; weight: number }[] 
   { type: "business_rule", title: "Business rules", weight: 2 },
   { type: "incident", title: "Past incidents", weight: 1 },
   { type: "integration_note", title: "Integrations", weight: 1 },
-  { type: "module_note", title: "Module notes", weight: 1 },
   { type: "how_to", title: "How to", weight: 1 },
+  { type: "other", title: "Other", weight: 1 },
 ];
 
 export interface PackSection {
