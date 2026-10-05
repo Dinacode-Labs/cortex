@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { confidenceLevel, contextEntryTypeInput, sourceType } from "./domain.js";
+import { confidenceLevel, contextEntryTypeInput } from "./domain/memo.js";
+import { sourceType } from "./domain/source.js";
 
 /**
  * The HTTP API contract: the schemas server and client share.

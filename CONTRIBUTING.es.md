@@ -47,7 +47,7 @@ Dos cosas se quedan en castellano a propósito, y las dos son **datos, no prosa 
 escrito nosotros**:
 
 - **Los patrones que casan con el corpus**, que es español: las reglas de clasificación de
-  `packages/core/src/text.ts`, los deícticos de `packages/shared/src/domain.ts` y los conjuntos
+  `packages/core/src/text.ts`, los deícticos de `packages/shared/src/domain/entity.ts` y los conjuntos
   de eval de `evals/` (la línea base se midió contra ellos). Casan con lo que escribe la gente,
   no con el idioma del fichero en el que viven.
 - **El idioma de salida de los agentes LLM** (`OUTPUT_LANGUAGE` en
