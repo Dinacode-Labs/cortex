@@ -1,3 +1,4 @@
+import type { Language } from "@cortex/shared";
 import type { SessionUser } from "../../auth/session-user.js";
 
 /**
@@ -41,4 +42,9 @@ export async function decideProjectAccess(
     if (await deps.isMember(node.id)) return true;
   }
   return false;
+}
+
+/** `chain` runs from the project up to its root: the nearest language set wins (ADR-0081). */
+export function effectiveLanguage(chain: (Language | null)[], fallback: Language): Language {
+  return chain.find((own): own is Language => own !== null) ?? fallback;
 }

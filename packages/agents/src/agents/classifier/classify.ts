@@ -1,5 +1,5 @@
 import { contextEntryType, extractableEntityType, isUsableEntityName } from "@cortex/shared";
-import type { ContextEntryType, EntityType } from "@cortex/shared";
+import type { ContextEntryType, EntityType, Language } from "@cortex/shared";
 import { runAgent } from "../../runtime/run-agent.js";
 import { extractJson } from "../../json.js";
 import { classifierPrompt } from "./prompt.js";
@@ -19,13 +19,19 @@ const ENTITY_TYPES = extractableEntityType.options;
  * Classifies an entry with the LLM. Returns null on failure (the caller must fall back to the
  * heuristics). The enums are validated by hand so model variations are tolerated.
  */
-export async function classifyEntry(content: string): Promise<ClassificationResult | null> {
+export async function classifyEntry(
+  content: string,
+  context: { language: Language },
+): Promise<ClassificationResult | null> {
   // Reasoning models need room: the budget is generous so that JSON still fits after the
   // reasoning, and we retry once when the answer arrives empty or truncated.
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await runAgent("classifier", classifierPrompt(content), { maxOutputTokens: 2000 });
+      const raw = await runAgent("classifier", classifierPrompt(content), {
+        maxOutputTokens: 2000,
+        language: context.language,
+      });
       const text = extractJson(raw).trim();
       if (!text) throw new Error("empty response from the model");
       const parsed = JSON.parse(text) as {

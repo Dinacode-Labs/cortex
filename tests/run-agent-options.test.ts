@@ -86,6 +86,34 @@ describe("what runAgent asks the provider for", () => {
   });
 });
 
+/**
+ * Every agent wrote Spanish through a constant, whatever project it wrote for. A project now
+ * chooses (ADR-0081), and the choice only counts if it reaches the system message the provider
+ * receives: the agents are registered once, so it has to travel with each call.
+ */
+describe("the language the agents write in", () => {
+  const systemMessage = (i: number): string => {
+    const messages = requestAt(i).messages as { role: string; content: string }[];
+    return messages.find((m) => m.role === "system")?.content ?? "";
+  };
+
+  it("is the one the call asks for, for every role that writes prose", async () => {
+    const run = await runAgent();
+    const writers = ["classifier", "graph", "distiller", "merger", "retriever"] as const;
+    for (const role of writers) await run(role, "a prompt", { language: "en" });
+
+    const written = Object.fromEntries(writers.map((role, i) => [role, systemMessage(i).includes("English")]));
+    expect(written).toEqual({ classifier: true, graph: true, distiller: true, merger: true, retriever: true });
+  });
+
+  it("is the server's default when the call names none", async () => {
+    await (await runAgent())("distiller", "a session window");
+
+    expect(systemMessage(0)).toContain("Spanish");
+    expect(systemMessage(0)).not.toContain("English");
+  });
+});
+
 describe("the Mastra that is installed", () => {
   /**
    * The shape above is not a convention of ours: it is what THIS version of @mastra/core

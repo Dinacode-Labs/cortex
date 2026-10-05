@@ -2,6 +2,7 @@ export * from "./domain/memo.js";
 export * from "./domain/entity.js";
 export * from "./domain/relation.js";
 export * from "./domain/source.js";
+export * from "./domain/language.js";
 export * from "./env.js";
 export * from "./brand.js";
 export * from "./capture-protocol.js";

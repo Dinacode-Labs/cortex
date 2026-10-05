@@ -199,13 +199,14 @@ export class PgMemoRepository implements MemoRepository {
 
   async findSummariesToRebuild(projectId: string | null): Promise<SummarizableMemo[]> {
     const rows = (await this.sql`
-      SELECT id, title, content, summary
+      SELECT id, project_id, title, content, summary
       FROM memos
       WHERE valid_to IS NULL
         ${projectId ? this.sql`AND project_id = ${projectId}` : this.sql``}
     `) as unknown as Row[];
     return rows.map((r) => ({
       id: r.id as string,
+      projectId: (r.project_id as string | null) ?? null,
       title: r.title as string,
       content: r.content as string,
       summary: (r.summary as string | null) ?? null,

@@ -1,9 +1,9 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
-import { getEnvNum } from "@cortex/shared";
+import { getEnvNum, type Language } from "@cortex/shared";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { saveContext } from "./save.js";
-import { findProjectIdByName } from "../projects/projects.js";
+import { findProjectIdByName, getProjectLanguage } from "../projects/projects.js";
 import { relate } from "../graph/entities.js";
 import { PgMemoRepository } from "./infrastructure/memo.repository.js";
 
@@ -93,7 +93,7 @@ export async function invalidateEntry(entryId: string, supersededById: string): 
  * reconciliation is deterministic: near-identical dedup only (no merge/supersede). */
 export interface ReconcilerHooks {
   decide: (existing: string, incoming: string) => Promise<"noop" | "update" | "supersede">;
-  merge: (existing: string, incoming: string) => Promise<string>;
+  merge: (existing: string, incoming: string, context: { language: Language }) => Promise<string>;
 }
 let reconciler: ReconcilerHooks | null = null;
 export function setReconciler(hooks: ReconcilerHooks | null): void {
@@ -182,7 +182,8 @@ export async function saveWithReconciliation(
     }
     // update: only auto-captured entries are merged (sourced/curated is never rewritten)
     if (near.sourceType === "agent_session") {
-      await updateEntryContent(near.id, await reconciler.merge(near.content, input.content));
+      const { effective: language } = await getProjectLanguage(input.project!);
+      await updateEntryContent(near.id, await reconciler.merge(near.content, input.content, { language }));
       await recordCorroboration(near.id);
       return { action: "update", entryId: near.id };
     }

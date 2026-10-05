@@ -1,13 +1,13 @@
 import { recordUsage } from "@cortex/core";
-import { getLlmConfig, withLlmSlot } from "@cortex/shared";
+import { defaultLanguage, getLlmConfig, withLlmSlot, type Language } from "@cortex/shared";
 import { JSON_ROLES } from "./model.js";
-import { getAgent } from "./registry.js";
+import { getAgent, instructionsFor } from "./registry.js";
 import type { AgentRole } from "./roles.js";
 
 export async function runAgent(
   role: AgentRole,
   prompt: string,
-  opts: { maxOutputTokens?: number; maxRetries?: number } = {},
+  opts: { maxOutputTokens?: number; maxRetries?: number; language?: Language } = {},
 ): Promise<string> {
   const agent = getAgent(role);
   if (!agent) throw new Error("LLM not enabled (LLM_PROVIDER / API key).");
@@ -25,10 +25,11 @@ export async function runAgent(
   // The roles that answer JSON get no room to improvise: the same window has to yield the same
   // entry, and a creative model is what turns a parse into a retry.
   if (JSON_ROLES.has(role)) modelSettings.temperature = 0;
+  const instructions = instructionsFor(role, opts.language ?? defaultLanguage());
   const t0 = Date.now();
   // One slot per call: the provider caps concurrent requests per API key, and
   // enrich/maintain fires several in parallel (CORTEX_ENRICH_CONCURRENCY).
-  const res = (await withLlmSlot(() => agent.generate(prompt, { modelSettings }))) as {
+  const res = (await withLlmSlot(() => agent.generate(prompt, { modelSettings, instructions }))) as {
     text?: string;
     usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number };
     response?: { modelId?: string };

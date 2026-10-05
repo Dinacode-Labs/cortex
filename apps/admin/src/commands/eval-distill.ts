@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { getLlmConfig } from "@cortex/shared";
+import { defaultLanguage, getLlmConfig } from "@cortex/shared";
 import { distill, shutdownObservability } from "@cortex/agents";
 import { matchDistillItems, summarizeDistillMatches, type DistillItem, type GoldWindow, type WindowMatch } from "../eval/distill-match.js";
 
@@ -31,8 +31,9 @@ const PROJECT = "Nébula";
  * runs this without arguments gets. It is still explicit in the path rather than being the
  * directory with no suffix: no language is the implicit one, whichever goes first.
  *
- * Worth knowing when reading its numbers: the agents answer in Spanish whatever they are fed
- * (`OUTPUT_LANGUAGE`), so the default set measures a session that is NOT in the language of the
+ * Worth knowing when reading its numbers: the eval belongs to no project, so the agents write in
+ * the server's default language (`CORTEX_DEFAULT_LANGUAGE`, Spanish unless set, ADR-0081). With
+ * that default, the default set measures a session that is NOT in the language of the
  * corpus. `--lang es` is the one that measures the two matching.
  */
 const DEFAULT_LANGUAGE = "en";
@@ -115,7 +116,10 @@ async function evalDistill(args: string[]): Promise<void> {
   // A run says which set it came from: two languages are never averaged into one number, so a
   // table that does not name its own set is a table nobody can compare against anything.
   const source = custom ? windowsDir : language;
-  console.log(`Distilling ${plural(gold.length, "window")} (${source}) with ${model?.provider}/${model?.model}...`);
+  console.log(
+    `Distilling ${plural(gold.length, "window")} (${source}) with ${model?.provider}/${model?.model}, ` +
+      `writing in ${defaultLanguage()}...`,
+  );
 
   const matches: WindowMatch[] = [];
   const emitted = new Map<string, DistillItem[]>();

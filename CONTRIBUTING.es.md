@@ -43,18 +43,16 @@ Es un repositorio público, y uno que cambia de idioma a la mitad es un reposito
 mitad no la puede leer nadie de fuera — y justo la mitad que explica **por qué** las cosas son
 como son.
 
-Dos cosas se quedan en castellano a propósito, y las dos son **datos, no prosa que hayamos
-escrito nosotros**:
+Se queda en castellano a propósito lo que son **datos, no prosa que hayamos escrito
+nosotros**:
 
 - **Los patrones que casan con el corpus**, que está en castellano y en inglés (ADR-0080), así que
   llevan las alternativas en castellano junto a las inglesas: las reglas de clasificación de
   `packages/core/src/text.ts`, los deícticos de `packages/shared/src/domain/entity.ts` y los conjuntos
   de eval de `evals/` (la línea base se midió contra ellos). Casan con lo que escribe la gente,
   no con el idioma del fichero en el que viven.
-- **El idioma de salida de los agentes LLM** (`OUTPUT_LANGUAGE` en
-  `packages/agents/src/agents/language.ts`). Los prompts están en inglés; lo que los agentes producen son
-  entradas de conocimiento que se guardan junto a un corpus que ya es español, así que cambiarlo
-  es una decisión de producto, no una traducción.
+- **El idioma en que escriben los agentes LLM** ya no es una de estas excepciones: es un ajuste de
+  cada proyecto, que se hereda del padre y, si nadie lo fija, toma el del servidor (ADR-0081).
 
 Lo que pertenece a un sistema externo conserva también su grafía (el `'Histórico'` de Plane, los
 nombres de propiedad de Notion, los nombres de fichero de las migraciones, que son claves

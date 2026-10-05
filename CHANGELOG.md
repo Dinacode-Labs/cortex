@@ -9,6 +9,12 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Each project chooses the language its memory is written in: Spanish or English.** Under
+  Settings, a project's manager picks the language the agents write titles, summaries, distilled
+  knowledge, merged entries and `ask` answers in. A project that picks none takes its parent's,
+  and one at the top takes `CORTEX_DEFAULT_LANGUAGE` (Spanish unless set), so nothing changes
+  until someone chooses. `PATCH /projects/:slug` accepts `language` too. Memos already saved
+  keep the language they were written in ([ADR-0081](docs/decisions.md#adr-0081)).
 - **Memos in English are understood as well as Spanish ones when no model is configured.**
   The heuristic classifier recognises each type in either language, modules such as
   *invoicing* or *authentication* are found, two English memos that pull opposite ways

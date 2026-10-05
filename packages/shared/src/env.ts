@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { language, type Language } from "./domain/language.js";
 
 /**
  * Loads a `.env` once, with no external dependency (Node >= 20.6 ships
@@ -52,4 +53,17 @@ export function getEnvNum(name: string, fallback: number): number {
   if (raw == null || raw === "") return fallback;
   const n = Number(raw);
   return Number.isNaN(n) ? fallback : n;
+}
+
+let warnedLanguage = false;
+
+export function defaultLanguage(): Language {
+  const configured = getEnv("CORTEX_DEFAULT_LANGUAGE", "es");
+  const parsed = language.safeParse(configured);
+  if (parsed.success) return parsed.data;
+  if (!warnedLanguage) {
+    warnedLanguage = true;
+    console.warn(`CORTEX_DEFAULT_LANGUAGE="${configured}" is not one of ${language.options.join(", ")}: using "es".`);
+  }
+  return "es";
 }
