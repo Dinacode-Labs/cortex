@@ -36,6 +36,7 @@ export interface ReclassifiableMemo {
 /** An entry whose summary may be rebuilt from its content. */
 export interface SummarizableMemo {
   id: string;
+  projectId: string | null;
   title: string;
   content: string;
   summary: string | null;

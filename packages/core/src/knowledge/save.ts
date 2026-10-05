@@ -1,8 +1,8 @@
 import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
-import { type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
+import { type Language, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "../graph/entities.js";
-import { createProject, findProjectIdByName } from "../projects/projects.js";
+import { createProject, findProjectIdByName, languageOfProject } from "../projects/projects.js";
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "./domain/memo.js";
@@ -12,7 +12,7 @@ import { PgMemoRepository } from "./infrastructure/memo.repository.js";
 export { decideReclassification } from "./domain/memo.js";
 export type { ClassifierResult, ReclassifyDecision } from "./domain/memo.js";
 
-export type Classifier = (content: string) => Promise<ClassifierResult | null>;
+export type Classifier = (content: string, context: { language: Language }) => Promise<ClassifierResult | null>;
 
 let classifier: Classifier | null = null;
 
@@ -69,9 +69,18 @@ export async function saveContext(
   // creation rules testable without a database, not what hides which adapter is in use.
   const repository = new PgMemoRepository(sql);
 
+  let projectId: string | null = null;
+  if (parsed.project) {
+    // Through `createProject`, so a project born from a save gets a slug and an owner (ADR-0051).
+    projectId = (await createProject(parsed.project, { ownerEmail: parsed.createdBy ?? null })).id;
+  }
+
   // Optional LLM layer: precedence is explicit input > LLM > heuristic.
   const useClassifier = opts.useClassifier ?? true;
-  const llm = useClassifier && classifier ? await classifier(parsed.content).catch(() => null) : null;
+  const llm =
+    useClassifier && classifier
+      ? await classifier(parsed.content, { language: (await languageOfProject(projectId)).effective }).catch(() => null)
+      : null;
   const draft = MemoDraft.from(
     {
       content: parsed.content,
@@ -85,15 +94,6 @@ export async function saveContext(
   const sourceType = parsed.sourceType ?? "manual";
   const meta: Record<string, unknown> = { ...(parsed.metadata ?? {}), enrichedBy: draft.enrichedBy };
 
-  let projectId: string | null = null;
-  if (parsed.project) {
-    // A project born from a `save` goes through the same place as `cortex link --create`: with
-    // a slug and an owner (ADR-0051). It used to be created with `resolveEntity`, which only
-    // sets the name, and ended up with no slug, no owner and public: impossible to link, to
-    // adopt or to close. `createProject` returns an existing one untouched, so this changes
-    // nothing about the projects already there.
-    projectId = (await createProject(parsed.project, { ownerEmail: parsed.createdBy ?? null })).id;
-  }
 
   const sourceId = await repository.createSource({ sourceType, rawContent: draft.content, metadata: meta });
   const entry = await repository.createMemo({
@@ -223,10 +223,11 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
 
   const repository = new PgMemoRepository(sql);
   const rows = await repository.findReclassifiable(projectId);
+  const { effective: language } = await languageOfProject(projectId);
 
   let reclassified = 0;
   for (const r of rows) {
-    const res = await classifier(r.content).catch(() => null);
+    const res = await classifier(r.content, { language }).catch(() => null);
     const proposed = res?.type;
     const decision = decideReclassification(r.type, proposed);
     // Only asked of a classifier that answered: with none, the heuristic already ran on the
@@ -244,7 +245,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   return { scanned: rows.length, reclassified };
 }
 
-function betterSummary(candidate: string | undefined, entry: SummarizableMemo): string | null {
+function betterSummary(candidate: string | undefined, entry: Pick<SummarizableMemo, "title" | "content" | "summary">): string | null {
   const current = entry.summary;
   if (!isDerivedSummary(current, entry.content, entry.title)) return null;
   const next = stripLeadingTitle((candidate ?? summarize(entry.content)).trim(), entry.title).trim();
@@ -285,10 +286,18 @@ export async function resummarizeEntries(opts: ResummarizeOptions = {}): Promise
   const repository = new PgMemoRepository(sql);
   const rows = await repository.findSummariesToRebuild(projectId);
 
+  const languages = new Map<string | null, Language>();
+  const languageOf = async (id: string | null): Promise<Language> => {
+    if (!languages.has(id)) languages.set(id, (await languageOfProject(id)).effective);
+    return languages.get(id)!;
+  };
+
   let rewritten = 0;
   for (const r of rows) {
     if (!isDerivedSummary(r.summary, r.content, r.title)) continue;
-    const llm = classifier ? await classifier(r.content).catch(() => null) : null;
+    const llm = classifier
+      ? await classifier(r.content, { language: await languageOf(r.projectId) }).catch(() => null)
+      : null;
     const next = betterSummary(llm?.summary, r);
     if (!next) continue;
     rewritten++;

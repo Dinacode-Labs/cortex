@@ -2762,3 +2762,35 @@ decisions they carried stay recorded here.
   per language rather than in each regex; or an English word starts matching Spanish text it
   should not (or the other way round), which would show up as a type misread in the heuristic
   path.
+
+<a id="adr-0081"></a>
+
+## ADR-0081 · Each project chooses the language its agents write in
+
+- **Status:** accepted as a hypothesis (2026-10-05).
+- **Context:** the agents that write -- the classifier's titles and summaries, the graph, the
+  distiller, the merger and the retriever's answers -- wrote Spanish for every project, through a
+  constant, `OUTPUT_LANGUAGE`. [0064](#adr-0064) kept it that way on purpose: the corpus was
+  Spanish, and changing it was a product decision rather than a translation. That decision is
+  now taken. A server holds projects for teams that do not share a language, and a memory in a
+  language its team does not read is a memory nobody checks.
+- **Decision:** the language is a setting of the project, `es` or `en` for now, stored in
+  `entities.language` (migration `0024_project_language.sql`) and changed under Settings in the
+  web UI or with `PATCH /projects/:slug`. A project with none takes its nearest ancestor's, as
+  the rest of the hierarchy does ([0063](#adr-0063)); one whose chain sets none takes
+  `CORTEX_DEFAULT_LANGUAGE`, which defaults to `es`, so nothing changes for a server that sets
+  nothing. `core` resolves the language and passes it to the hooks (`Classifier`,
+  `ReconcilerHooks.merge`); `agents` passes it to `runAgent`, which sends that language's
+  instructions with each call (Mastra takes them per call), so there is one agent per role and
+  not one per language. A memo keeps the language it was written in: changing the setting does
+  not rewrite anything.
+- **Alternatives:**
+  - **One setting for the whole server.** The simplest, and wrong as soon as one server holds an
+    English-speaking team and a Spanish-speaking one. Rejected.
+  - **Answer in the language of the input.** A session or a pull request mixes both, and the
+    memory of one project would end up in two languages by accident. Rejected.
+  - **An agent registered per role and language.** Twice the agents for a value Mastra already
+    takes per call. Rejected.
+- **Revisit when:** a third language is needed, which is one entry in `language` and one name in
+  `agents/language.ts`, plus whatever full-text search needs; or a project wants memos in both
+  languages at once, which is not what one setting can express.

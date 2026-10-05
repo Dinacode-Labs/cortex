@@ -319,6 +319,13 @@ one shared function, `runAgent`, which also **records the tokens** spent, for ob
 | `reconciler` | Decides noop / update / supersede on a near-duplicate | deterministic dedup (noop only) |
 | `merger` | Merges two pieces about the same thing into one | keeps the existing one |
 
+**The language they write in is the project's.** The prompts are in English; what the
+`classifier`, `graph`, `retriever`, `distiller` and `merger` write comes out in the language
+of the project it is for: the one set under its Settings, or else its nearest ancestor's, or
+else `CORTEX_DEFAULT_LANGUAGE` (Spanish unless set). Spanish and English for now. A memo keeps
+the language it was written in; changing the setting changes what comes next
+([ADR-0081](decisions.md#adr-0081)).
+
 **Concrete examples of each transformation.** The inputs are in Spanish because that is the
 corpus these prompts were tuned against.
 

@@ -1,7 +1,7 @@
 import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core";
 import { Observability } from "@mastra/observability";
-import { getLlmConfig } from "@cortex/shared";
+import { defaultLanguage, getLlmConfig, type Language } from "@cortex/shared";
 import { CortexTraceExporter } from "../infrastructure/trace-exporter.js";
 import { buildAgent } from "./model.js";
 import { classifierInstructions } from "../agents/classifier/instructions.js";
@@ -13,30 +13,25 @@ import { mergerInstructions } from "../agents/merger/instructions.js";
 import { reconcilerInstructions } from "../agents/reconciler/instructions.js";
 import type { AgentRole } from "./roles.js";
 
-/**
- * They all talk to the LLM through an OpenAI-compatible provider (see `model.ts` for the JSON
- * roles). The instructions live next to each agent (`agents/<role>/instructions.ts`); they are
- * in English and the **output language** stays Spanish on purpose. What these agents produce is
- * not source code: it is knowledge entries that get stored next to a corpus that is already
- * Spanish, and answers read by a Spanish-speaking team. Changing the prompt language is a
- * translation; changing the output language is a product decision.
- */
-
-const INSTRUCTIONS: Record<AgentRole, string> = {
+const INSTRUCTIONS: Record<AgentRole, (language: Language) => string> = {
   classifier: classifierInstructions,
   graph: graphInstructions,
-  reranker: rerankerInstructions,
+  reranker: () => rerankerInstructions,
   retriever: retrieverInstructions,
   distiller: distillerInstructions,
   merger: mergerInstructions,
-  reconciler: reconcilerInstructions,
+  reconciler: () => reconcilerInstructions,
 };
+
+export function instructionsFor(role: AgentRole, language: Language): string {
+  return INSTRUCTIONS[role](language);
+}
 
 let mastra: Mastra | null | undefined;
 
 function build(): Mastra | null {
   if (!getLlmConfig()) return null;
-  const mk = (role: AgentRole) => buildAgent(role, INSTRUCTIONS[role]);
+  const mk = (role: AgentRole) => buildAgent(role, instructionsFor(role, defaultLanguage()));
   // The Mastra instance: registered agents plus observability (AI tracing) into our own
   // exporter (ADR-0016, part B). The agents are served from here so that `generate()` emits
   // spans.

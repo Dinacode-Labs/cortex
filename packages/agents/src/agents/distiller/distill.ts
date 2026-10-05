@@ -1,4 +1,4 @@
-import { contextEntryType } from "@cortex/shared";
+import { contextEntryType, type Language } from "@cortex/shared";
 import { runAgent } from "../../runtime/run-agent.js";
 // Shared extractJson: on top of the brace trimming (distill's previous behaviour) it now
 // understands ```json fenced blocks -- a strict improvement, not a regression: the fence is a
@@ -30,9 +30,9 @@ function isProviderRejection(e: unknown): boolean {
   return /invalid api key|unauthorized|\b401\b|\b403\b/i.test(String(err?.message ?? e ?? ""));
 }
 
-export async function distill(project: string, window: string): Promise<Item[]> {
+export async function distill(project: string, window: string, language?: Language): Promise<Item[]> {
   try {
-    const raw = await runAgent("distiller", distillerPrompt(project, window), { maxOutputTokens: 1500 });
+    const raw = await runAgent("distiller", distillerPrompt(project, window), { maxOutputTokens: 1500, language });
     const parsed = JSON.parse(extractJson(raw)) as { items?: { type?: string; title?: string; content?: string; summary?: string }[] };
     return (parsed.items ?? [])
       .filter((i): i is Item => Boolean(i?.title && i?.content))

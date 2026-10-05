@@ -1,6 +1,6 @@
 import { getSql } from "@cortex/database";
 import { getEnvNum } from "@cortex/shared";
-import { linkEntryToEntity, listEntries, relate, resolveEntity } from "@cortex/core";
+import { getProjectLanguage, linkEntryToEntity, listEntries, relate, resolveEntity } from "@cortex/core";
 import { extractGraph } from "../agents/graph/extract-graph.js";
 
 const CONCURRENCY = getEnvNum("CORTEX_ENRICH_CONCURRENCY", 3);
@@ -19,6 +19,7 @@ export async function enrichProject(
 ): Promise<EnrichResult> {
   const sql = getSql();
   let entries = await listEntries({ project, limit: opts.limit ?? 2000 });
+  const { effective: language } = await getProjectLanguage(project);
   let skipped = 0;
 
   if (opts.onlyMissing) {
@@ -44,7 +45,7 @@ export async function enrichProject(
     while (cursor < entries.length) {
       const e = entries[cursor++]!;
       try {
-        const g = await extractGraph(e.content);
+        const g = await extractGraph(e.content, language);
         if (g) {
           const nameToId = new Map<string, string>();
           for (const ent of g.entities) {

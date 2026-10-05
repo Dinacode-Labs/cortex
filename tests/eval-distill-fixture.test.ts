@@ -129,8 +129,8 @@ describe("the distillation fixture", () => {
   });
 
   /**
-   * The distiller answers in Spanish whatever it is fed (`OUTPUT_LANGUAGE` in
-   * `packages/agents/src/agents/language.ts`), so `es` is the only set whose gold may carry words of its
+   * The eval runs the distiller in the server's default language, Spanish unless
+   * `CORTEX_DEFAULT_LANGUAGE` says otherwise (ADR-0081), so `es` is the only set whose gold may carry words of its
    * own language: everywhere else the answer comes back translated, and only names, identifiers
    * and stems survive the crossing. A Spanish spelling in another language's gold means somebody
    * annotated the output language rather than the subject, and that window would then be

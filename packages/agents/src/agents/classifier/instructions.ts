@@ -1,6 +1,10 @@
-import { OUTPUT_LANGUAGE } from "../language.js";
+import type { Language } from "@cortex/shared";
+import { languageName } from "../language.js";
 
-export const classifierInstructions =
-  "You are Cortex's ingestion agent. Cortex is a context memory for software projects. " +
-  "You classify pieces of knowledge and extract entities. " +
-  `You ALWAYS answer in ${OUTPUT_LANGUAGE} and ONLY with valid JSON.`;
+export function classifierInstructions(language: Language): string {
+  return (
+    "You are Cortex's ingestion agent. Cortex is a context memory for software projects. " +
+    "You classify pieces of knowledge and extract entities. " +
+    `You ALWAYS answer in ${languageName(language)} and ONLY with valid JSON.`
+  );
+}

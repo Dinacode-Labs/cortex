@@ -1,4 +1,5 @@
 import { getSql, type Sql } from "@cortex/database";
+import type { Language } from "@cortex/shared";
 import { canonicalize } from "../../text.js";
 import type { Row } from "../../storage/map.js";
 import type { ProjectChainNode, ProjectRef } from "../domain/project.js";
@@ -136,6 +137,22 @@ export class PgProjectRepository implements ProjectRepository {
     await this.sql`
       UPDATE entities SET visibility = ${changes.visibility}, owner_email = ${changes.ownerEmail}, parent_id = ${changes.parentId}
       WHERE id = ${id}`;
+  }
+
+  async languageChain(projectId: string): Promise<(Language | null)[]> {
+    const rows = (await this.sql`
+      WITH RECURSIVE chain AS (
+        SELECT id, parent_id, language, 0 AS depth FROM entities WHERE id = ${projectId}
+        UNION ALL
+        SELECT e.id, e.parent_id, e.language, c.depth + 1 FROM entities e JOIN chain c ON e.id = c.parent_id
+      )
+      SELECT language FROM chain ORDER BY depth
+    `) as unknown as Row[];
+    return rows.map((r) => (r.language as Language | null) ?? null);
+  }
+
+  async setLanguage(id: string, language: Language | null): Promise<void> {
+    await this.sql`UPDATE entities SET language = ${language} WHERE id = ${id}`;
   }
 
   async countEntries(projectId: string): Promise<number> {

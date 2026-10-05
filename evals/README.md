@@ -201,9 +201,10 @@ is copying a directory rather than editing anything. They are run **separately, 
 mark**: mixed into one total, a gain in one language would hide a loss in the other and the
 number would stop saying what happened.
 
-There is an asymmetry worth knowing before reading either number. **The distiller answers in
-Spanish whatever it is fed** -- `OUTPUT_LANGUAGE` in `packages/agents/src/agents/language.ts` is fixed,
-and changing it is a product decision, not a translation. So:
+There is an asymmetry worth knowing before reading either number. **The distiller writes in the
+server's default language whatever it is fed**: the eval belongs to no project, so it gets
+`CORTEX_DEFAULT_LANGUAGE`, which is Spanish unless set ([ADR-0081](../docs/decisions.md#adr-0081)).
+Every run prints the language it wrote in. With the default left alone:
 
 - **`es`** is the session and the corpus in the same language: it measures the judgement alone.
 - **`en`** is a session that crosses into another language on the way out. It measures whether

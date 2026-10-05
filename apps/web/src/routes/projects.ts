@@ -3,6 +3,7 @@ import { html } from "hono/html";
 import {
   addProjectMember,
   deleteProject,
+  getProjectLanguage,
   listAccessibleProjects,
   listProjectMembers,
   NotAManagerError,
@@ -10,7 +11,7 @@ import {
   removeProjectMember,
   updateProject,
 } from "@cortex/core";
-import { getBrandName } from "@cortex/shared";
+import { getBrandName, language as languageSchema, type Language } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 import { projectCard } from "../views/components.js";
 import { projectHealth } from "../project-summary.js";
@@ -25,6 +26,8 @@ import type { WebEnv } from "../middleware/session.js";
  * it is open or closed, and whether there is anything to review (ADR-0050).
  */
 export const projectsRoutes = new Hono<WebEnv>();
+
+const LANGUAGE_LABELS: Record<Language, string> = { es: "Spanish", en: "English" };
 
 projectsRoutes.get("/", async (c) => {
   const user = c.get("user")!;
@@ -119,6 +122,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   }
 
   const members = await listProjectMembers(project.slug!);
+  const projectLanguage = await getProjectLanguage(project.slug!);
   const notice = c.req.query("error");
   // The cycle check is done by the domain, which is what knows the whole ancestor chain.
   const others = (await listAccessibleProjects(user)).filter((o) => o.slug && o.id !== project.id);
@@ -163,6 +167,25 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
         <select name="parentSlug">
           <option value="">(none — top level)</option>
           ${others.map((o) => html`<option value="${o.slug}" ${project.parentId === o.id ? "selected" : ""}>${o.name}</option>`)}
+        </select>
+        <button type="submit">Save</button>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Language</h2>
+      <p class="sub">
+        The language the agents write this project's memory in. A project with none of its own takes its parent's,
+        and a project at the top takes the server's. Memos already saved keep the language they were written in.
+      </p>
+      <form class="row" method="post" action="/p/${project.slug}/settings/language">
+        <select name="language">
+          <option value="" ${projectLanguage.own === null ? "selected" : ""}>
+            inherited (${LANGUAGE_LABELS[projectLanguage.effective]})
+          </option>
+          ${languageSchema.options.map(
+            (l) => html`<option value="${l}" ${projectLanguage.own === l ? "selected" : ""}>${LANGUAGE_LABELS[l]}</option>`,
+          )}
         </select>
         <button type="submit">Save</button>
       </form>
@@ -221,6 +244,20 @@ projectsRoutes.post("/p/:slug/settings/visibility", async (c) => {
   if (v !== "public" && v !== "private") return c.redirect(`/p/${slug}/settings`);
   try {
     await updateProject(slug, { visibility: v }, user);
+  } catch (e) {
+    return c.redirect(backWithError(slug, e));
+  }
+  return c.redirect(`/p/${slug}/settings`);
+});
+
+projectsRoutes.post("/p/:slug/settings/language", async (c) => {
+  const user = c.get("user")!;
+  const slug = c.req.param("slug");
+  const raw = String((await c.req.parseBody()).language ?? "");
+  const chosen = languageSchema.safeParse(raw);
+  if (raw && !chosen.success) return c.redirect(`/p/${slug}/settings`);
+  try {
+    await updateProject(slug, { language: chosen.success ? chosen.data : null }, user);
   } catch (e) {
     return c.redirect(backWithError(slug, e));
   }

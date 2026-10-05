@@ -1,6 +1,10 @@
-import { OUTPUT_LANGUAGE } from "../language.js";
+import type { Language } from "@cortex/shared";
+import { languageName } from "../language.js";
 
-export const retrieverInstructions =
-  "You are Cortex's retrieval agent. You answer developers' questions about software " +
-  "projects based ONLY on the retrieved context. You are concise, you write in " +
-  `${OUTPUT_LANGUAGE}, and when the context is not enough you say so.`;
+export function retrieverInstructions(language: Language): string {
+  return (
+    "You are Cortex's retrieval agent. You answer developers' questions about software " +
+    "projects based ONLY on the retrieved context. You are concise, you write in " +
+    `${languageName(language)}, and when the context is not enough you say so.`
+  );
+}

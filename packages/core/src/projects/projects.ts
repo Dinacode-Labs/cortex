@@ -1,9 +1,10 @@
 import { getSql, type Sql } from "@cortex/database";
+import { defaultLanguage, type Language } from "@cortex/shared";
 import { isAdmin } from "../auth/auth.js";
 import type { SessionUser } from "../auth/session-user.js";
 import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
-import { decideProjectAccess, type ProjectRef } from "./domain/project.js";
+import { decideProjectAccess, effectiveLanguage, type ProjectRef } from "./domain/project.js";
 import { PgProjectRepository } from "./infrastructure/project.repository.js";
 
 export type { ProjectRef } from "./domain/project.js";
@@ -55,6 +56,21 @@ export async function createProject(
     parentId,
   });
   return inserted ?? (await repository.findByCanonicalName(name))!;
+}
+
+export interface ProjectLanguage {
+  own: Language | null;
+  effective: Language;
+}
+
+export async function languageOfProject(projectId: string | null): Promise<ProjectLanguage> {
+  if (!projectId) return { own: null, effective: defaultLanguage() };
+  const chain = await new PgProjectRepository(getSql()).languageChain(projectId);
+  return { own: chain[0] ?? null, effective: effectiveLanguage(chain, defaultLanguage()) };
+}
+
+export async function getProjectLanguage(ref: string): Promise<ProjectLanguage> {
+  return languageOfProject(await new PgProjectRepository(getSql()).findIdByRef(ref));
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
@@ -202,17 +218,15 @@ async function requireManager(slug: string, actor: SessionUser | null): Promise<
   return p;
 }
 
-/**
- * Changes what a project can change after birth: its visibility and its owner.
- *
- * The absence of this was ADR-0036's big hole: a project created public stayed public forever,
- * in every interface, because the repository's only `UPDATE ... visibility` ran at creation
- * time. Turning it private takes effect immediately and affects everything -- search, packs,
- * listings -- because the policy consults them live; it touches no entry.
- */
+/** Access is decided live, so going private takes effect at once everywhere and touches no memo. */
 export async function updateProject(
   slug: string,
-  changes: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
+  changes: {
+    visibility?: "public" | "private";
+    ownerEmail?: string | null;
+    parentSlug?: string | null;
+    language?: Language | null;
+  },
   actor: SessionUser | null,
 ): Promise<ProjectRef> {
   const repository = new PgProjectRepository(getSql());
@@ -245,6 +259,7 @@ export async function updateProject(
   }
 
   await repository.update(p.id, { visibility, ownerEmail, parentId });
+  if (changes.language !== undefined) await repository.setLanguage(p.id, changes.language);
   return { ...p, visibility, ownerEmail, parentId };
 }
 
