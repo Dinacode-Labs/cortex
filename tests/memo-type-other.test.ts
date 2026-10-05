@@ -5,6 +5,7 @@ import { buildMcpServer } from "../apps/mcp-server/src/server.js";
 import { captureRequest, searchRequest } from "../packages/shared/src/api-contract";
 import { contextEntryType, saveContextInput, searchContextInput } from "../packages/shared/src/domain";
 import { classifyType } from "../packages/core/src/text";
+import { PACK_SECTIONS } from "../packages/core/src/knowledge/context-pack";
 
 /**
  * `module_note` was where a memo landed when no other type fitted, and the name made it read like
@@ -14,6 +15,10 @@ import { classifyType } from "../packages/core/src/text";
 describe("the type a memo falls into when nothing else fits is called other", () => {
   it("a memo no rule recognises is classified as other", () => {
     expect(classifyType("Lorem ipsum dolor sit amet.")).toBe("other");
+  });
+
+  it("the catch-all is the last section of the pack, so it is the first to give when the pack is over budget", () => {
+    expect(PACK_SECTIONS.at(-1)?.type).toBe("other");
   });
 
   it("module_note is no longer a type a memo can have", () => {

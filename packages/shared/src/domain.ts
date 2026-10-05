@@ -29,10 +29,6 @@ export const contextEntryType = z.enum([
 ]);
 export type ContextEntryType = z.infer<typeof contextEntryType>;
 
-/**
- * `module_note` was where a memo landed when no other type fitted, under a name that hid it
- * (ADR-0079). Installed CLIs and agents may still send the old name, so it is still accepted.
- */
 const RENAMED_TYPES = new Map<string, ContextEntryType>([["module_note", "other"]]);
 
 export const contextEntryTypeInput = z.preprocess(

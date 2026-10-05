@@ -45,7 +45,6 @@ export const PACK_SECTIONS: { type: MemoType; title: string; weight: number }[] 
   { type: "incident", title: "Past incidents", weight: 1 },
   { type: "integration_note", title: "Integrations", weight: 1 },
   { type: "how_to", title: "How to", weight: 1 },
-  // Last, because an over-budget pack is trimmed from the last section back (ADR-0079).
   { type: "other", title: "Other", weight: 1 },
 ];
 
