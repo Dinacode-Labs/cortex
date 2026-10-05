@@ -2,13 +2,10 @@ import { describe, it, expect } from "vitest";
 import { classifyType, extractEntities, polarityContradicts, polarityTags } from "../packages/core/src/text";
 
 /**
- * Without a model, Cortex classifies, extracts modules and flags contradictions with patterns.
- * They were written for a Spanish corpus, so an English memo fell through all of them: no type
- * but the catch-all, no module, no contradiction. A project can be in either language
- * (ADR-0080), and so can any memo saved by hand.
+ * The no-model heuristics were written for a Spanish corpus, so an English memo got the catch-all
+ * type, no module and no contradiction; a memo can be in either language (ADR-0080).
  */
 describe("the heuristics read Spanish and English", () => {
-  // Spanish on purpose: half of these sentences are the corpus the patterns were written for.
   const SENTENCES: Record<string, { es: string; en: string }> = {
     constraint: { es: "No se permite desplegar fuera de la UE.", en: "Personal data cannot leave the EU." },
     incident: { es: "El viernes hubo una caída del servicio de pagos.", en: "Friday's outage took the payment service down." },
