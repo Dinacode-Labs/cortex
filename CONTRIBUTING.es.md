@@ -46,7 +46,8 @@ como son.
 Dos cosas se quedan en castellano a propósito, y las dos son **datos, no prosa que hayamos
 escrito nosotros**:
 
-- **Los patrones que casan con el corpus**, que es español: las reglas de clasificación de
+- **Los patrones que casan con el corpus**, que está en castellano y en inglés (ADR-0080), así que
+  llevan las alternativas en castellano junto a las inglesas: las reglas de clasificación de
   `packages/core/src/text.ts`, los deícticos de `packages/shared/src/domain/entity.ts` y los conjuntos
   de eval de `evals/` (la línea base se midió contra ellos). Casan con lo que escribe la gente,
   no con el idioma del fichero en el que viven.

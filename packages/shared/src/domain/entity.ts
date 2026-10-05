@@ -23,8 +23,9 @@ export function isUsableEntityName(name: string): boolean {
   if (n.length < 3 || n.length > 60) return false;
   if (n.split(/\s+/).length > 6) return false;
   if (/[.;]$/.test(n) || n.includes(": ")) return false;
-  // Spanish on purpose: these deictics match the corpus, not our source.
+  // Spanish and English on purpose: these deictics match the corpus, not our source (ADR-0080).
   if (/^(la |el |una? )?(opci[oó]n|alternativa|caso|punto|paso|fase|v)\s*\d*[a-z]?$/i.test(n)) return false;
+  if (/^(the |an? )?(option|alternative|case|point|step|phase)(\s+\d*[a-z]?|\d+)?$/i.test(n)) return false;
   return /[a-zA-Z]/.test(n);
 }
 

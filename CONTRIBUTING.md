@@ -105,8 +105,9 @@ of `getSql()`. A module without invariants (usage, the row mappers) gets neither
   read, including the comments that explain the decisions worth reading.
 
   Two things stay in Spanish, and both are **data rather than prose we wrote**: the patterns
-  that match the corpus (the classification rules in `packages/core/src/text.ts`, the
-  deictics in `domain/entity.ts`, the eval fixtures) and the **output language** of the LLM agents
+  that match the corpus, which carry their Spanish alternatives next to the English ones
+  (the classification rules in `packages/core/src/text.ts`, the deictics in
+  `domain/entity.ts`, the eval fixtures; ADR-0080) and the **output language** of the LLM agents
   (`OUTPUT_LANGUAGE` in `packages/agents/src/agents/language.ts`), because what they produce is stored
   next to a corpus that is already Spanish. Each of those carries an English comment saying
   why. Translating a prompt is a translation; changing the output language is a product
