@@ -97,6 +97,12 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **The type `module_note` is now `other`.** It is where Cortex puts a memo that fits no other
+  type, and the old name made it look like a note about a module. Migration
+  `0023_memo_type_other.sql` renames the stored memos, and the context pack's "Module notes"
+  section is now "Other". Whatever still sends `module_note` keeps working, because the server
+  reads it as `other`: an installed CLI, an agent, a saved link to `/p/<slug>?type=module_note`
+  ([ADR-0079](docs/decisions.md#adr-0079)).
 - **For operators: the `context_entries` table is now `memos`.** Migration `0022_memos.sql`
   renames it, `context_entry_entities` becomes `memo_entities` and the `context_entry_id` columns
   become `memo_id`; relations to a memo say `'memo'`. Nothing changes for the CLI, the MCP tools or

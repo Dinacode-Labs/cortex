@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { confidenceLevel, contextEntryType, sourceType } from "./domain.js";
+import { confidenceLevel, contextEntryTypeInput, sourceType } from "./domain.js";
 
 /**
  * The HTTP API contract: the schemas server and client share.
@@ -108,7 +108,7 @@ export const captureRequest = z.object({
   slug: z.string().min(1),
   content: z.string().min(1),
   title: z.string().optional(),
-  type: contextEntryType.optional(),
+  type: contextEntryTypeInput.optional(),
   confidence: confidenceLevel.optional(),
   sourceType: sourceType.optional(),
   sourceReference: z.string().optional(),
@@ -139,7 +139,7 @@ export const searchRequest = z.object({
   q: z.string().min(1),
   /** Without a slug it searches everything accessible; with one, only that project. */
   slug: z.string().optional(),
-  type: contextEntryType.optional(),
+  type: contextEntryTypeInput.optional(),
   limit: z.number().int().min(1).max(50).optional(),
 });
 export type SearchRequest = z.infer<typeof searchRequest>;

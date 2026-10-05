@@ -37,7 +37,7 @@ export async function distill(project: string, window: string): Promise<Item[]> 
     return (parsed.items ?? [])
       .filter((i): i is Item => Boolean(i?.title && i?.content))
       .map((i) => ({
-        type: TYPES.includes(i.type ?? "") ? (i.type as string) : "module_note",
+        type: TYPES.includes(i.type ?? "") ? (i.type as string) : "other",
         title: i.title.trim().slice(0, 160),
         content: i.content.trim(),
         summary: i.summary?.trim() || undefined,

@@ -97,7 +97,7 @@ const ENTRIES: SeedEntry[] = [
   {
     content:
       "The Client Portal lets Acme's users look up and download their historical invoices.",
-    type: "module_note",
+    type: "other",
     confidence: "medium",
     sourceType: "manual",
   },

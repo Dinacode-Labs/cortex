@@ -40,7 +40,7 @@ describe("which types reach the agent", () => {
     const inPack = new Set(PACK_SECTIONS.map((s) => s.type));
     for (const t of ["decision", "constraint", "risk", "technical_debt", "convention",
                      "architecture", "business_rule", "incident", "integration_note",
-                     "module_note", "how_to"]) {
+                     "how_to", "other"]) {
       expect(inPack.has(t as never), `"${t}" reaches no agent at all`).toBe(true);
     }
   });
