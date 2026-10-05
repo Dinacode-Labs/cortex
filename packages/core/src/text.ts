@@ -1,15 +1,8 @@
 import type { EntityType } from "@cortex/shared";
 import type { MemoType } from "./knowledge/domain/memo.js";
 
-/**
- * Local heuristics (no LLM) for classifying and enriching knowledge. They are a deliberately
- * simple fallback: the Mastra agents (with an LLM) are meant to improve on this in later
- * phases. Documented in docs/decisions.md (ADR-0005/6).
- *
- * The patterns below are written against the CORPUS, which is Spanish, so they keep their
- * Spanish alternatives alongside the English ones. They match what users write, not the
- * language of this file; add a language here when a corpus in that language is ingested.
- */
+// The patterns match what people write, in Spanish and in English (ADR-0080), not the language
+// of this file.
 
 export function canonicalize(name: string): string {
   return name
@@ -219,16 +212,16 @@ export function isDerivedSummary(summary: string | null, content: string, title:
 
 // Classification rules in priority order (most specific first).
 const CLASSIFY_RULES: { type: MemoType; re: RegExp }[] = [
-  { type: "constraint", re: /\b(restricci|no (puede|permite|admite|podemos)|exige|pol[ií]tica|prohib|requisito|debe desplegarse|constraint|no se permite)/i },
-  { type: "incident", re: /\b(error|fallo|bug|incidencia|ca[ií]d|se rompe|crash|incident|defecto)/i },
+  { type: "constraint", re: /\b(restricci|no (puede|permite|admite|podemos)|exige|pol[ií]tica|prohib|requisito|debe desplegarse|constraint|no se permite|cannot|can't|must not|not allowed|not permitted|requirement|policy|forbidden|mandatory)/i },
+  { type: "incident", re: /\b(error|fallo|bug|incidencia|ca[ií]d|se rompe|crash|incident|defecto|outage|failure|broke|went down|regression)/i },
   { type: "technical_debt", re: /\b(deuda t[eé]cnica|legacy|refactor|technical debt|tech debt|c[oó]digo heredado)/i },
-  { type: "convention", re: /\b(convenci[oó]n|convention|est[aá]ndar|naming|estilo de c[oó]digo|coding style)/i },
-  { type: "risk", re: /\b(riesgo|risk|peligro|sensible|cuidado al)/i },
-  { type: "architecture", re: /\b(arquitectura|architecture|patr[oó]n|microservi|monolito|capa de)/i },
-  { type: "integration_note", re: /\b(integraci[oó]n|integration|api externa|webhook|proveedor externo)/i },
-  { type: "business_rule", re: /\b(regla de negocio|business rule|se factura|se calcula el|tarifa)/i },
-  { type: "how_to", re: /\b(c[oó]mo (se|configurar|hacer)|how to|pasos para|gu[ií]a para)/i },
-  { type: "decision", re: /\b(decid|elig|optamos|se va a|usaremos|mantener|decisi[oó]n|decision|acordamos)/i },
+  { type: "convention", re: /\b(convenci[oó]n|convention|est[aá]ndar|naming|estilo de c[oó]digo|coding style|standard|style guide)/i },
+  { type: "risk", re: /\b(riesgo|risk|peligro|sensible|cuidado al|danger|careful with|fragile)/i },
+  { type: "architecture", re: /\b(arquitectura|architecture|patr[oó]n|microservi|monolito|capa de|pattern|monolith|layer)/i },
+  { type: "integration_note", re: /\b(integraci[oó]n|integration|api externa|webhook|proveedor externo|external api|third[- ]party|external provider)/i },
+  { type: "business_rule", re: /\b(regla de negocio|business rule|se factura|se calcula el|tarifa|is invoiced|is billed|is charged|is calculated|pricing)/i },
+  { type: "how_to", re: /\b(c[oó]mo (se|configurar|hacer)|how to|pasos para|gu[ií]a para|steps to|guide to)/i },
+  { type: "decision", re: /\b(decid|elig|optamos|se va a|usaremos|mantener|decisi[oó]n|decision|acordamos|we chose|we will use|we'll use|we went with|agreed)/i },
 ];
 
 export function classifyType(content: string): MemoType {
@@ -249,6 +242,7 @@ const TECHNOLOGIES = [
 const MODULE_KEYWORDS = [
   "facturaci[oó]n", "autenticaci[oó]n", "pagos", "billing", "auth", "payments",
   "usuarios", "notificaciones", "reporting", "documentos", "checkout",
+  "invoicing", "authentication", "users", "notifications", "documents",
 ];
 
 export interface ExtractedEntity {
@@ -279,10 +273,10 @@ export function extractEntities(content: string): ExtractedEntity[] {
 export function polarityTags(content: string): Set<string> {
   const tags = new Set<string>();
   const t = content.toLowerCase();
-  if (/\b(mantener|conservar|no migrar|no eliminar|seguir usando|no tocar)\b/.test(t)) tags.add("keep");
-  if (/\b(eliminar|migrar|quitar|retirar|deprecar|borrar|reemplazar)\b/.test(t)) tags.add("remove");
-  if (/\b(infraestructura propia|on-?prem|servidores propios)\b/.test(t)) tags.add("onprem");
-  if (/\b(cloud p[uú]blico|proveedor cloud|nube p[uú]blica)\b/.test(t)) tags.add("cloud");
+  if (/\b(mantener|conservar|no migrar|no eliminar|seguir usando|no tocar|keep|retain|keep using|do not migrate|don't migrate|do not remove|don't remove|do not touch|don't touch)\b/.test(t)) tags.add("keep");
+  if (/\b(eliminar|migrar|quitar|retirar|deprecar|borrar|reemplazar|remove|migrate|drop|retire|deprecate|delete|replace)\b/.test(t)) tags.add("remove");
+  if (/\b(infraestructura propia|on-?prem|servidores propios|on-?premises|self-hosted|own servers|own infrastructure)\b/.test(t)) tags.add("onprem");
+  if (/\b(cloud p[uú]blico|proveedor cloud|nube p[uú]blica|public cloud|cloud provider)\b/.test(t)) tags.add("cloud");
   return tags;
 }
 

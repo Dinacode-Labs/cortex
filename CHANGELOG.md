@@ -9,6 +9,12 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Memos in English are understood as well as Spanish ones when no model is configured.**
+  The heuristic classifier recognises each type in either language, modules such as
+  *invoicing* or *authentication* are found, two English memos that pull opposite ways
+  ("keep", "remove"; "self-hosted", "public cloud") are flagged as a possible contradiction,
+  and English deictics such as "option C" or "step 3" no longer become graph entities
+  ([ADR-0080](docs/decisions.md#adr-0080)).
 - **Claude Code has Cortex's read tools from the first turn.** `search_project_context`,
   `ask_project_context`, `get_project_context_pack` and `list_project_decisions` now declare
   themselves always-loaded, so the agent no longer has to find them with `ToolSearch` before it can

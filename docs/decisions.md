@@ -2733,3 +2733,32 @@ decisions they carried stay recorded here.
 - **Revisit when:** the contract gets a version that can break anyway ([0077](#adr-0077)'s
   trigger), at which point the alias goes; or `other` becomes a large share of a project's memos,
   which would mean a type is missing rather than that the memos are odd.
+
+<a id="adr-0080"></a>
+
+## ADR-0080 · The memory is in Spanish and English, and what reads it understands both
+
+- **Status:** accepted as a hypothesis (2026-10-05).
+- **Context:** the heuristics that work without a model -- the type rules in `classifyType`, the
+  module keywords, the polarity tags behind contradiction detection, and the deictics
+  `isUsableEntityName` rejects -- were written for a Spanish corpus ([0064](#adr-0064)). Some
+  rules carried an English word or two; the polarity tags and the deictics carried none. So an
+  English memo fell through all of them: the catch-all type, no module, no contradiction, and
+  "option C" as an entity. Projects are to choose the language their agents write in, and any
+  memo saved by hand or captured from an English pull request is English whatever the project
+  says, so the language a pattern has to read cannot be known from configuration.
+- **Decision:** every pattern that reads memos carries its Spanish and its English alternatives,
+  always, whatever language the project is set to. The files stay on the list of Spanish on
+  purpose in `tests/docs.test.ts`, now for half of each pattern. What writes to the memory -- the
+  language of the agents -- and full-text search are separate decisions.
+- **Alternatives:**
+  - **Pick the patterns by the project's language.** Fails on exactly the memos that are not in
+    it, which are the ones this is for. Rejected.
+  - **Detect each memo's language and apply that set.** A detector for two languages and short
+    texts, to save a few alternatives in a regex that already runs in microseconds. Rejected.
+  - **Leave the heuristics Spanish.** They are what runs when there is no model, and
+    [0064](#adr-0064)'s reason for Spanish -- the corpus is Spanish -- stops being true. Rejected.
+- **Revisit when:** a third language arrives, at which point the alternatives belong in one table
+  per language rather than in each regex; or an English word starts matching Spanish text it
+  should not (or the other way round), which would show up as a type misread in the heuristic
+  path.
