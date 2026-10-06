@@ -1,8 +1,8 @@
-import { isAdmin } from "../auth/auth.js";
-import type { SessionUser } from "../auth/session-user.js";
+import { isAdmin } from "../../auth/auth.js";
+import type { SessionUser } from "../../auth/session-user.js";
 import { canManageProject, NotAManagerError, type ProjectRef } from "./projects.js";
-import type { PurgeTarget } from "../knowledge/domain/memo-repository.js";
-import { port } from "../composition.js";
+import type { PurgeTarget } from "../../knowledge/domain/memo-repository.js";
+import { port } from "../../composition.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -2,7 +2,7 @@ import { closeSync, openSync, readSync, readdirSync, readFileSync, statSync } fr
 import { join, relative, extname, basename, sep } from "node:path";
 import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
 import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
-import { findProjectIdByName } from "../projects/projects.js";
+import { findProjectIdByName } from "../projects/application/projects.js";
 import { rrfFuse } from "../storage/vectors.js";
 import type { Row } from "../storage/map.js";
 
@@ -163,7 +163,7 @@ export async function searchProjectCode(
 ): Promise<CodeHit[]> {
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const projectId = await findProjectIdByName(sql, project);
+  const projectId = await findProjectIdByName(project);
   if (!projectId) return [];
 
   const pool = Math.max(limit * 4, 32);
@@ -234,7 +234,7 @@ export async function indexRepo(
 ): Promise<{ files: number; chunks: number; skippedOverCap: number }> {
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const projectId = await findProjectIdByName(sql, project);
+  const projectId = await findProjectIdByName(project);
   if (!projectId) throw new Error(`Project not found: "${project}".`);
   const repoName = opts.repoName ?? basename(repoPath.replace(/\/$/, ""));
   const batchSize = opts.batchSize ?? 32;

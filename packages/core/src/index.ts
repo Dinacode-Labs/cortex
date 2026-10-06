@@ -23,9 +23,9 @@ export { resolveEntities, type ResolveResult } from "./graph/application/resolve
 // `readCortexLink` lives in @cortex/client (it is client-side code, with no SQL); it is
 // re-exported here because core uses it to resolve a repo's project.
 export { readCortexLink, type CortexLink } from "@cortex/client";
-export { slugify } from "./projects/project-config.js";
-export { findProjectBySlug, findProjectByName, getEntryProject, createProject, resolveLinkedProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, updateProject, deleteProject, getProjectLanguage, getProjectCriteria, type ProjectLanguage, type ProjectCriteriaView, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects/projects.js";
-export { purgeEntries, canManageEntryProject, type PurgeResult } from "./projects/purge.js";
+export { slugify } from "./projects/domain/slug.js";
+export { findProjectBySlug, findProjectByName, getEntryProject, createProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, updateProject, deleteProject, getProjectLanguage, getProjectCriteria, type ProjectLanguage, type ProjectCriteriaView, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects/application/projects.js";
+export { purgeEntries, canManageEntryProject, type PurgeResult } from "./projects/application/purge.js";
 export {
   isNearDuplicate,
   findNearest,

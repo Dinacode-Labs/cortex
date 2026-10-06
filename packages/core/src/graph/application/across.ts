@@ -1,5 +1,5 @@
 import { port } from "../../composition.js";
-import { listChildProjects } from "../../projects/projects.js";
+import { listChildProjects } from "../../projects/application/projects.js";
 import type { ProjectRef } from "../../projects/domain/project.js";
 import type { SessionUser } from "../../auth/session-user.js";
 import { STACK_TYPES, type AcrossClient, type CrossProjectContradiction } from "../domain/across.js";

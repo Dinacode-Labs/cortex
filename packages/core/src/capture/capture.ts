@@ -2,7 +2,7 @@ import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "../knowledge/save.js";
 import { storeEmbeddingsBatch } from "../storage/vectors.js";
-import { findProjectIdByName } from "../projects/projects.js";
+import { findProjectIdByName } from "../projects/application/projects.js";
 import { relate } from "../graph/application/entities.js";
 import { type BatchItem, type RelationType, scrub } from "@cortex/shared";
 import { port } from "../composition.js";
@@ -30,7 +30,7 @@ export interface BatchItemResult {
 export async function captureBatch(projectName: string, items: BatchItem[], createdBy: string): Promise<BatchItemResult[]> {
   const useClassifier = process.env.CORTEX_CAPTURE_LLM === "1";
   const sql = getSql();
-  const projectId = await findProjectIdByName(sql, projectName);
+  const projectId = await findProjectIdByName(projectName);
   if (!projectId) throw new Error(`Project not found: ${projectName}`);
   const repository = port("memos");
 
