@@ -17,9 +17,7 @@ import { getEnvNum, PLAIN_TEXT_EXTS } from "@cortex/shared";
 // what it can and cannot read (ADR-0058). Here they are only grouped to decide HOW each one is
 // extracted.
 const TEXT_EXTS = PLAIN_TEXT_EXTS;
-const DOC_EXTS = ["docx", "pdf", "xlsx"];
 const IMAGE_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
-const DRAWIO_EXTS = ["drawio", "xml"];
 const AUDIO_EXTS = ["opus", "mp3", "m4a", "wav", "ogg", "oga", "flac", "aac", "amr", "weba", "mpga"];
 const VIDEO_EXTS = ["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv", "flv"];
 

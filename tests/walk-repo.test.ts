@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { walkRepo } from "../packages/core/src/capture/code";
+import { walkRepo } from "../packages/core/src/capture/infrastructure/source-tree";
 
 /**
  * walkRepo feeds code indexing (search_project_code). It must skip both the

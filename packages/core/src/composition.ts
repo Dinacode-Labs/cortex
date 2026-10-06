@@ -1,6 +1,11 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import type { AuthRepository } from "./auth/domain/auth-repository.js";
+import type { CodeIndex, SourceTree } from "./capture/domain/code.js";
+import type { SessionCaptureRepository } from "./capture/domain/session-capture.js";
+import { PgCodeIndex } from "./capture/infrastructure/code.index.js";
+import { PgSessionCaptureRepository } from "./capture/infrastructure/session-capture.repository.js";
+import { FsSourceTree } from "./capture/infrastructure/source-tree.js";
 import type { EmailSender } from "./auth/domain/email.js";
 import { PgAuthRepository } from "./auth/infrastructure/auth.repository.js";
 import { getEmailSender } from "./auth/infrastructure/email-senders.js";
@@ -29,6 +34,9 @@ export interface CorePorts {
   usage: UsageRepository;
   auth: AuthRepository;
   email: EmailSender;
+  sessionCaptures: SessionCaptureRepository;
+  codeIndex: CodeIndex;
+  sourceTree: SourceTree;
 }
 
 const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
@@ -41,6 +49,9 @@ const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   usage: () => new PgUsageRepository(getSql()),
   auth: () => new PgAuthRepository(getSql()),
   email: () => getEmailSender(),
+  sessionCaptures: () => new PgSessionCaptureRepository(getSql()),
+  codeIndex: () => new PgCodeIndex(getSql(), getEmbeddingProvider()),
+  sourceTree: () => new FsSourceTree(),
 };
 
 let replacements: Partial<CorePorts> = {};

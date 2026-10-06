@@ -7,7 +7,7 @@ export * from "./knowledge/application/render.js";
 export type { Memo, MemoStatus, MemoType } from "./knowledge/domain/memo.js";
 export { lintProject, renderLintReport, type LintReport } from "./knowledge/application/lint.js";
 export { planLintActions, type LintAction } from "./knowledge/application/lint-act.js";
-export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./capture/code.js";
+export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./capture/application/code.js";
 // Chunking, extension lists and directories to ignore live in `shared` now that the
 // lightweight CLI needs them too (ADR-0058). They are re-exported so callers do not break.
 export { chunkDocument, IGNORE_DIRS, SUPPORTED_EXTS, type ChunkOptions, type DocChunk } from "@cortex/shared";
@@ -50,8 +50,8 @@ export type { SessionUser } from "./auth/domain/session-user.js";
 export type { EmailSender, EmailMessage } from "./auth/domain/email.js";
 export { sendOtpEmail } from "./auth/application/otp-email.js";
 export { getEmailSender, setEmailSender, validateEmailConfig } from "./auth/infrastructure/email-senders.js";
-export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture/capture.js";
-export { extractFileText, setMediaExtractor, type ExtractedFile, type MediaExtractorHooks } from "./capture/extract.js";
+export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture/application/capture.js";
+export { extractFileText, setMediaExtractor, type ExtractedFile, type MediaExtractorHooks } from "./capture/infrastructure/extract.js";
 export {
   classifyType,
   extractEntities,
@@ -70,4 +70,4 @@ export {
   upsertSessionCapture,
   type SessionCapture,
   type SessionCaptureStatus,
-} from "./capture/session-captures.js";
+} from "./capture/application/session-captures.js";

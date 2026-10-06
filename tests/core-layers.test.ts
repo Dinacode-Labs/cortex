@@ -17,9 +17,6 @@ const INFRASTRUCTURE_IMPORTS = [
 ];
 
 const KNOWN_VIOLATIONS: Record<string, string> = {
-  "capture/code.ts": "capture module",
-  "capture/extract.ts": "capture module",
-  "capture/session-captures.ts": "capture module",
   "index.ts": "dropping core's dependency on client",
 };
 
