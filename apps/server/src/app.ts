@@ -11,6 +11,7 @@ import { installRoutes } from "./routes/install.js";
 import { metaRoutes } from "./routes/meta.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { projectRoutes } from "./routes/projects.js";
+import { agentPromptRoutes } from "./routes/agent-prompts.js";
 
 /**
  * This module has NO import-time effects (neither loadEnv nor serve): `createApp()` only
@@ -52,6 +53,7 @@ export function createApp(deps: AppDeps = {}): Hono {
   app.route("/", authRoutes);
   app.route("/", contextRoutes);
   app.route("/", projectRoutes);
+  app.route("/", agentPromptRoutes);
   app.route("/", captureSessionRoutes({ distill, queue: captureQueue }));
 
   // Unhandled errors: a full log on the server plus a generic JSON 500, leaking no internal

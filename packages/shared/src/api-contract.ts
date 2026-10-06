@@ -3,6 +3,7 @@ import { confidenceLevel, contextEntryStatus, contextEntryTypeInput, entrySortFi
 import { sourceType } from "./contract/source.js";
 import { language } from "./contract/language.js";
 import { projectCriteria } from "./contract/project-criteria.js";
+import { agentPromptChanges, agentRole } from "./contract/agent-prompts.js";
 
 /**
  * The HTTP API contract: the schemas server and client share.
@@ -47,8 +48,30 @@ export const updateProjectRequest = z.object({
   parentSlug: z.string().nullable().optional(),
   language: language.nullable().optional(),
   criteria: projectCriteria.nullable().optional(),
+  agentPrompts: agentPromptChanges.optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequest>;
+
+export const updateRootAgentPromptsRequest = z.object({ agentPrompts: agentPromptChanges });
+export type UpdateRootAgentPromptsRequest = z.infer<typeof updateRootAgentPromptsRequest>;
+
+/**
+ * What a role is told, level by level (ADR-0088): its `default` in the code, what it `inherited`
+ * from root and the projects above, its `own` text at this level, and the `effective` criterion
+ * a call runs with. Root's view has nothing inherited.
+ */
+export const agentPromptsResponse = z.object({
+  prompts: z.array(
+    z.object({
+      role: agentRole,
+      default: z.string(),
+      inherited: z.object({ root: z.string().nullable(), projects: z.array(z.string()) }),
+      own: z.object({ text: z.string(), updatedBy: z.string(), updatedAt: z.string() }).nullable(),
+      effective: z.string(),
+    }),
+  ),
+});
+export type AgentPromptsResponse = z.infer<typeof agentPromptsResponse>;
 
 export const projectMemberRequest = z.object({ email: z.string().email() });
 export type ProjectMemberRequest = z.infer<typeof projectMemberRequest>;

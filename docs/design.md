@@ -90,11 +90,13 @@ cannot be lost.
 /p/<slug>/across        Across this client   what its projects share and where they disagree*
 /p/<slug>/map           Map
 /p/<slug>/code          Code
-/p/<slug>/settings      Settings         visibility, owner, parent, language, what it keeps, members (managers only)
+/p/<slug>/settings      Settings         visibility, owner, parent, language, what it keeps,
+                                         what the agents are told, members (managers only)
 
 /entry/<id>             read, edit, and say whether it still holds
 /search?q=              across everything you can see
 /admin/usage            what the inference costs (admins only)
+/admin/agents           what every agent is told, before any project adds to it (admins only)
 ```
 
 `*` only on a project that has children: a tab leading to an empty screen is worse than no tab.
@@ -132,7 +134,9 @@ by access**: a private child you are not a member of does not appear because you
 parent, and descending is something you ask for, never a default.
 
 **What is not here, and should not be:** creating projects wholesale, running
-maintenance or indexing, editing configuration, administering users or tokens. Those live in
+maintenance or indexing, editing the server's configuration (its environment, models and keys),
+administering users or tokens. What the agents are told is not that: it is a judgement about
+what the memory should hold, which is what §6 keeps here. Those live in
 the CLI and in `cortex-admin`, where they belong.
 
 ## 5. Known gaps

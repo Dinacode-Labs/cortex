@@ -9,6 +9,15 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **What each agent is told can be changed, for the whole server and per project.** The seven
+  agents — the ones that distil sessions, classify memos, draw the graph, rerank search, answer
+  in Ask, and reconcile and merge memos — each judged by a text fixed in the code. An admin can
+  now replace it for every project under *Admin → Agents*, and a project's managers can add to
+  it under *Settings → What the agents are told*; a sub-project adds to its parent's and never
+  takes it away. The format each agent answers in stays fixed, so a rewritten text cannot break
+  what reads its answer. `PATCH /projects/:slug` accepts `agentPrompts`, `GET
+  /projects/:slug/agent-prompts` reads them, and `GET`/`PATCH /agent-prompts` read and change
+  the server's. Migration `0027_agent_prompts.sql` ([ADR-0088](docs/decisions.md#adr-0088)).
 - **A whole day, week, month or year of memory, or a whole project, can be purged at once.** On
   a project's Memory screen grouped by date, each block heading has a box that takes the whole
   block, entries past the end of the page included, and "Purge the whole project…" takes

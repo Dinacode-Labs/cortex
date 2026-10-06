@@ -1,4 +1,4 @@
-export { getAgent, shutdownObservability } from "./runtime/registry.js";
+export { defaultCriterion, getAgent, shutdownObservability } from "./runtime/registry.js";
 export { runAgent } from "./runtime/run-agent.js";
 export type { AgentRole } from "./runtime/roles.js";
 export { classifyEntry, type ClassificationResult } from "./agents/classifier/classify.js";

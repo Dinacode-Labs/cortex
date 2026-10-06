@@ -330,6 +330,12 @@ the ban on secrets. The prompt sent with each call holds only the data and the o
 They are kept apart so the criterion can be rewritten without breaking the parse
 ([ADR-0088](decisions.md#adr-0088)).
 
+**And the criterion can be rewritten.** An admin can replace a role's default for the whole
+server under *Admin → Agents*; a project's managers can add to it under *Settings*. A
+sub-project adds to what its parent says, root first, and never takes it away. Each call reads
+that chain for the project it is for. `eval-distill` keeps running the default criterion, so its
+runs stay comparable and a rewritten one is not measured by it.
+
 **The language they write in is the project's.** The prompts are in English; what the
 `classifier`, `graph`, `retriever`, `distiller` and `merger` write comes out in the language
 of the project it is for: the one set under its Settings, or else its nearest ancestor's, or
