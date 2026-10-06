@@ -47,6 +47,12 @@ describe("core's layers", () => {
     expect(offenders).toEqual([]);
   });
 
+  // A top-level infrastructure/rows.ts held three modules' row mappers: reading a module did not
+  // show how its rows become objects.
+  it("every layer lives inside a module, none is shared at the root of core", () => {
+    expect(files.filter((file) => /^(domain|application|infrastructure)\//.test(file))).toEqual([]);
+  });
+
   it("the domain imports neither use cases nor adapters, and use cases do not import adapters", () => {
     const forbidden: Record<string, string[]> = {
       domain: ["/application/", "/infrastructure/"],

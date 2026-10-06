@@ -1,6 +1,5 @@
-import { toVectorLiteral, type Sql } from "@cortex/database";
+import { toVectorLiteral, type Row, type Sql } from "@cortex/database";
 import type { EmbeddingProvider } from "@cortex/embeddings";
-import type { Row } from "../../infrastructure/rows.js";
 import { rrfFuse } from "../../knowledge/domain/rank.js";
 import type { CodeChunk, CodeHit, CodeIndex } from "../domain/code.js";
 

@@ -3,6 +3,7 @@ import { getDatabaseUrl } from "./env.js";
 
 export type Sql = postgres.Sql;
 export type SqlFragment = postgres.PendingQuery<postgres.Row[]>;
+export type Row = Record<string, any>;
 
 let client: Sql | undefined;
 

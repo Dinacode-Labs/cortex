@@ -1,5 +1,5 @@
-import { getSql, type Sql } from "@cortex/database";
-import { rowToMemo, type Row } from "../../infrastructure/rows.js";
+import { getSql, type Row, type Sql } from "@cortex/database";
+import { rowToMemo } from "./memo.row.js";
 import type {
   ContradictingSide,
   MemoRepository,

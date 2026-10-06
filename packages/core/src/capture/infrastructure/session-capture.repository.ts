@@ -1,6 +1,5 @@
-import type { Sql } from "@cortex/database";
+import type { Row, Sql } from "@cortex/database";
 import type { CaptureSessionCounters } from "@cortex/shared";
-import type { Row } from "../../infrastructure/rows.js";
 import type {
   NewSessionCapture,
   SessionCapture,

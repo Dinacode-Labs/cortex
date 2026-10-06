@@ -1,6 +1,6 @@
-import { getSql, type Sql } from "@cortex/database";
+import { getSql, type Row, type Sql } from "@cortex/database";
 import { canonicalize } from "../../text.js";
-import { rowToEntity, type Row } from "../../infrastructure/rows.js";
+import { rowToEntity } from "./entity.row.js";
 import type { EntityNameRow, EntityRepository, RelationInput } from "../domain/entity-repository.js";
 import type { SharedEntity } from "../domain/across.js";
 import type { Entity, EntityType } from "../domain/entity.js";
