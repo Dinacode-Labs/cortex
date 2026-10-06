@@ -2,6 +2,8 @@ import { getSql } from "@cortex/database";
 import type { EntityRepository } from "./graph/domain/entity-repository.js";
 import { PgEntityRepository } from "./graph/infrastructure/entity.repository.js";
 import type { MemoRepository } from "./knowledge/domain/memo-repository.js";
+import type { UsageRepository } from "./observability/domain/usage.js";
+import { PgUsageRepository } from "./observability/infrastructure/usage.repository.js";
 import { PgMemoRepository } from "./knowledge/infrastructure/memo.repository.js";
 import type { ProjectRepository } from "./projects/domain/project-repository.js";
 import { PgProjectRepository } from "./projects/infrastructure/project.repository.js";
@@ -10,12 +12,14 @@ export interface CorePorts {
   memos: MemoRepository;
   projects: ProjectRepository;
   entities: EntityRepository;
+  usage: UsageRepository;
 }
 
 const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   memos: () => new PgMemoRepository(getSql()),
   projects: () => new PgProjectRepository(getSql()),
   entities: () => new PgEntityRepository(getSql()),
+  usage: () => new PgUsageRepository(getSql()),
 };
 
 let replacements: Partial<CorePorts> = {};
