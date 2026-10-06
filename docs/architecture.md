@@ -63,6 +63,6 @@ rule and when a listed file no longer needs to be listed.
    - ✓ `auth`
    - ✓ `knowledge`: embeddings and search behind `MemoIndex`, the reads behind `MemoReader` and
      `HealthReader`, and the use cases in `application/`
-   - `capture`
+   - ✓ `capture`: session captures, code indexing (`SourceTree`, `CodeIndex`) and document extraction
 4. `core` stops depending on `client`.
 5. The domain that still lives in `shared` moves into its module in `core`.
