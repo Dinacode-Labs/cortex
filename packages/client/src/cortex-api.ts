@@ -8,6 +8,8 @@ import type {
   EntryDetailResponse,
   ProjectSummary,
   PurgeEntriesResponse,
+  PurgeProjectPreview,
+  PurgeProjectRequest,
   SearchRequest,
   SearchResponse,
   UpdateEntryRequest,
@@ -139,4 +141,14 @@ export function updateEntry(id: string, body: UpdateEntryRequest): Promise<ApiRe
 
 export function purgeEntries(ids: string[]): Promise<ApiResult<PurgeEntriesResponse>> {
   return apiRequest<PurgeEntriesResponse>("POST", "/entries/purge", { ids });
+}
+
+export type ProjectPurgeScope = Omit<PurgeProjectRequest, "confirm">;
+
+export function previewProjectPurge(slug: string, scope: ProjectPurgeScope): Promise<ApiResult<PurgeProjectPreview>> {
+  return apiRequest<PurgeProjectPreview>("POST", `/projects/${encodeURIComponent(slug)}/purge`, scope);
+}
+
+export function purgeProject(slug: string, scope: ProjectPurgeScope): Promise<ApiResult<PurgeEntriesResponse>> {
+  return apiRequest<PurgeEntriesResponse>("POST", `/projects/${encodeURIComponent(slug)}/purge`, { ...scope, confirm: slug });
 }

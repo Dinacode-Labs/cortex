@@ -62,9 +62,10 @@ const get = async (path: string): Promise<string> => {
   expect(res.status, path).toBe(200);
   return res.text();
 };
+// A manager's heading wraps the label in the box that takes the whole block (ADR-0087).
 const headings = (html: string): string[] =>
-  [...html.matchAll(/<h2 class="date-block-head">([^<]+?) <span class="date-block-count">([^<]+)<\/span>/g)].map(
-    (m) => `${m[1]} · ${m[2]}`,
+  [...html.matchAll(/<h2 class="date-block-head">(.+?) <span class="date-block-count">([^<]+)<\/span>/g)].map(
+    (m) => `${m[1]!.replace(/<[^>]+>/g, "").trim()} · ${m[2]}`,
   );
 
 describe("the Memory list in date blocks", () => {

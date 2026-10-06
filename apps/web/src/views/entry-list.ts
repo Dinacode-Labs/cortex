@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import type { EntrySortField } from "@cortex/shared";
-import { dateGroupings, groupByDate, type DateBlock, type DateGrouping } from "../date-blocks.js";
+import { dateBlockValue, dateGroupings, groupByDate, type BlockGrouping, type DateBlock, type DateGrouping } from "../date-blocks.js";
 import { entryCard, joinHtml, type EntryPick } from "./components.js";
 import type { Html } from "./layout.js";
 import type { Memo } from "@cortex/core";
@@ -51,6 +51,7 @@ export function entryList(fetched: Memo[], opts: EntryListOptions): Html {
             limit: opts.pageLimit,
           }),
           card,
+          opts.pick ? opts.grouping : undefined,
         )
       : html`<div class="grid">${entries.map(card)}</div>`;
   if (!opts.grouping || fetched.length <= opts.pageLimit) return list;
@@ -58,13 +59,18 @@ export function entryList(fetched: Memo[], opts: EntryListOptions): Html {
   return html`${list}${listMore(opts.pageLimit, next <= MAX_ENTRIES_PAGE ? opts.moreHref(next) : undefined)}`;
 }
 
-function dateBlocks(blocks: DateBlock<Memo>[], card: (entry: Memo) => Html): Html {
+/** `pickable` gives each heading a box that takes the whole block, past the page included (ADR-0087). */
+function dateBlocks(blocks: DateBlock<Memo>[], card: (entry: Memo) => Html, pickable?: BlockGrouping): Html {
   return html`${blocks.map(
     (b) => html`<section class="date-block">
-      <h2 class="date-block-head">${b.label} <span class="date-block-count">${blockCount(b)}</span></h2>
+      <h2 class="date-block-head">${pickable ? blockPick(b, pickable) : b.label} <span class="date-block-count">${blockCount(b)}</span></h2>
       <div class="grid">${b.items.map(card)}</div>
     </section>`,
   )}`;
+}
+
+function blockPick(block: DateBlock<unknown>, grouping: BlockGrouping): Html {
+  return html`<label class="block-pick"><input type="checkbox" name="blocks" value="${dateBlockValue(grouping, block.key)}" aria-label="Select all of ${block.label}" ${block.truncated ? "data-truncated" : ""}> ${block.label}</label>`;
 }
 
 function blockCount(block: DateBlock<unknown>): string {

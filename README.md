@@ -161,6 +161,7 @@ cortex mem save "We cap uploads at 25MB (Caddy)" --title "Upload limit" --type c
 cortex mem get <id>                             # one entry in full, with where it came from
 cortex mem update <id> --content "…"            # fix something you got wrong
 cortex mem purge <id> [<id>…]                   # delete for good what should never have been remembered
+cortex mem purge --all | --from 2026-09-28 --to 2026-10-04   # a whole project, or the days in between
 ```
 
 **What you get without doing anything else:** when you open a session, Cortex **injects** the
@@ -255,7 +256,8 @@ mistake you notice later.
   not deleted**, so you can ask what the project knew on a given date. The one exception is
   **purging**, for what should never have been remembered at all: whoever manages the project
   deletes the entry for good, from the CLI, the API or its page, and only who purged it and
-  when is kept ([ADR-0072](docs/decisions.md#adr-0072)).
+  when is kept ([ADR-0072](docs/decisions.md#adr-0072)). A whole day, week or project can go
+  at once, with the project's slug typed back ([ADR-0087](docs/decisions.md#adr-0087)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.
   Sub-projects **inherit** from their parent.
 - **Multimodal ingestion.** One `extract` layer for plain text and Markdown, Word, PDF and
@@ -443,8 +445,8 @@ pnpm admin maintain-worker    # scheduled maintenance
   to know before authenticating including the MCP URL, `/version`, `/toolbelt.json`,
   `/install.sh` and `/auth/request|verify`. Bearer-authenticated: `/auth/me`, `/auth/logout`,
   `/auth/ui-ticket`, `/context-pack`, `/capture`, `/capture/batch`, `/capture/session` and
-  `/capture/session/:id`, `/relate`, `/projects`, `/projects/:slug` (`GET`/`PATCH`) and
-  `/projects/:slug/members`.
+  `/capture/session/:id`, `/relate`, `/projects`, `/projects/:slug` (`GET`/`PATCH`),
+  `/projects/:slug/members` and `/projects/:slug/purge`.
 - **Auth.** Sign-in by email and one-time code, no passwords. A user **is** their email
   address. `CORTEX_AUTH_DOMAIN` is the allowed-domains list and **has no default**: empty
   means anyone in the world can sign up, so set it in production. The server warns on start if

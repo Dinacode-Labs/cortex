@@ -1,4 +1,4 @@
-import type { ConfidenceLevel, Language, SourceType } from "@cortex/shared";
+import type { ConfidenceLevel, EntrySortField, Language, SourceType } from "@cortex/shared";
 import type { Memo, MemoStatus, MemoType } from "./memo.js";
 
 /** A source to persist, before it has an id. */
@@ -49,6 +49,32 @@ export interface PurgeTarget {
   projectId: string | null;
   projectSlug: string | null;
   projectName: string | null;
+}
+
+/** Half-open, `from` included and `to` not, so a day's span ends where the next one begins. */
+export interface DatePeriod {
+  field: EntrySortField;
+  from?: Date;
+  to?: Date;
+}
+
+/** A stretch of one project's memory: the project's own memos only, never its children's. */
+export interface MemoScope {
+  projectId: string;
+  type?: MemoType;
+  status?: MemoStatus;
+  /** Any of them; none means any date. */
+  periods?: DatePeriod[];
+  /** Whoever chose the scope saw it as of this instant: a memo written later is not theirs to purge. */
+  writtenBefore: Date;
+}
+
+export interface ScopedMemo {
+  id: string;
+  title: string;
+  type: MemoType;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 /**
@@ -110,5 +136,6 @@ export interface MemoRepository {
    * check is the use case's; `purgedBy` is the audit trail in `entry_purges`.
    */
   findPurgeTargets(ids: string[]): Promise<PurgeTarget[]>;
+  findInScope(scope: MemoScope): Promise<ScopedMemo[]>;
   purge(ids: string[], purgedBy: string): Promise<string[]>;
 }

@@ -1,7 +1,8 @@
 import { isAdmin } from "../../auth/domain/auth.js";
 import type { SessionUser } from "../../auth/domain/session-user.js";
-import { canManageProject, NotAManagerError, type ProjectRef } from "./projects.js";
-import type { PurgeTarget } from "../../knowledge/domain/memo-repository.js";
+import { canManageProject, findProjectBySlug, NotAManagerError, type ProjectRef } from "./projects.js";
+import type { DatePeriod, PurgeTarget, ScopedMemo } from "../../knowledge/domain/memo-repository.js";
+import type { MemoStatus, MemoType } from "../../knowledge/domain/memo.js";
 import { port } from "../../composition.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -43,4 +44,50 @@ export async function purgeEntries(ids: string[], actor: SessionUser | null): Pr
 
   const purged = await repository.purge(targets.map((t) => t.id), actor.email);
   return { purged };
+}
+
+/** What a project-wide purge reaches, by its slug; see `MemoScope` for each field (ADR-0087). */
+export interface PurgeScope {
+  project: string;
+  type?: MemoType;
+  status?: MemoStatus;
+  periods?: DatePeriod[];
+  writtenBefore: Date;
+}
+
+export async function findPurgeScope(scope: PurgeScope, actor: SessionUser | null): Promise<ScopedMemo[]> {
+  if (!(await canManageProject(actor, scope.project))) throw new NotAManagerError(scope.project);
+  const project = await findProjectBySlug(scope.project);
+  if (!project) return [];
+  return port("memos").findInScope({
+    projectId: project.id,
+    type: scope.type,
+    status: scope.status,
+    periods: scope.periods,
+    writtenBefore: scope.writtenBefore,
+  });
+}
+
+export async function purgeScope(scope: PurgeScope, actor: SessionUser | null): Promise<PurgeResult> {
+  const memos = await findPurgeScope(scope, actor);
+  return purgeEntries(memos.map((m) => m.id), actor);
+}
+
+export interface PurgeScopeSummary {
+  count: number;
+  byType: Partial<Record<MemoType, number>>;
+  oldest: Date | null;
+  newest: Date | null;
+}
+
+export function summarizePurgeScope(memos: ScopedMemo[]): PurgeScopeSummary {
+  const byType: Partial<Record<MemoType, number>> = {};
+  let oldest: Date | null = null;
+  let newest: Date | null = null;
+  for (const m of memos) {
+    byType[m.type] = (byType[m.type] ?? 0) + 1;
+    if (!oldest || m.createdAt < oldest) oldest = m.createdAt;
+    if (!newest || m.createdAt > newest) newest = m.createdAt;
+  }
+  return { count: memos.length, byType, oldest, newest };
 }

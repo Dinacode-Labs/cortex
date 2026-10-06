@@ -9,6 +9,17 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **A whole day, week, month or year of memory, or a whole project, can be purged at once.** On
+  a project's Memory screen grouped by date, each block heading has a box that takes the whole
+  block, entries past the end of the page included, and "Purge the whole project…" takes
+  everything — or everything matching the type and status filters, when one is on. The
+  confirmation says how many go, per block and per type, and for the whole project asks for its
+  slug typed back. From the terminal, `cortex mem purge --all` or
+  `--from 2026-09-28 --to 2026-10-04` (whole UTC days), narrowed with `--type` and `--status`,
+  shows the same count and asks for the slug; the API is `POST /projects/:slug/purge`, which
+  only answers what it would purge until `confirm` carries the slug. Only the project's own
+  entries go, never a child project's, and anything written after the count was shown is left
+  alone ([ADR-0087](docs/decisions.md#adr-0087)).
 - **Agents are told what the project keeps before they save anything.** When a project narrows
   what it keeps, the context pack says so at the top, in one line: the types it does not save,
   what counts as a type there, and what to always and never save. The pack on "What agents see"

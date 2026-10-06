@@ -234,7 +234,12 @@ form.row input[type=text], form.row input[type=search], form.row input[type=emai
   margin:0; accent-color:var(--danger); cursor:pointer; }
 .card-select:has(.card-pick:checked) .card { border-color:var(--danger); background:var(--danger-soft); }
 .select-bar { display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; margin-bottom:var(--s-3); }
-.select-bar button { margin-left:auto; }
+.select-bar button:first-of-type { margin-left:auto; }
+.block-pick { display:inline-flex; align-items:center; gap:var(--s-2); cursor:pointer; }
+.block-pick input { width:16px; height:16px; margin:0; accent-color:var(--danger); cursor:pointer; }
+.purge-reach { margin:var(--s-3) 0; padding-left:var(--s-5); font-size:var(--t-sm); }
+.confirm-slug { display:inline-flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); font-size:var(--t-sm); }
+.confirm-slug input { width:auto; min-width:14ch; font-family:var(--mono); }
 button:disabled { opacity:.5; cursor:not-allowed; }
 
 .empty {

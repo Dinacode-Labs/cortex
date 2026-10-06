@@ -2427,7 +2427,8 @@ decisions they carried stay recorded here.
 ## ADR-0073 · Deleting entries in bulk from the UI: a confirmation page, and scripts only as enhancement
 
 - **Status:** accepted (2026-09-23). Builds on the purge in core ([0072](#adr-0072)); relaxes the
-  "one client script" line of `docs/design.md` without touching [0042](#adr-0042).
+  "one client script" line of `docs/design.md` without touching [0042](#adr-0042). Its "never
+  entries the person has not seen" is **revisited by [0087](#adr-0087)** (2026-10).
 - **Context:** a project's memory filled with ~150 entries distilled from lab sessions, and the UI
   could only reject them one at a time — which leaves them in place, linked and counted. The purge
   exists in core; the Memory screen had no way to reach it for many entries at once. It is the
@@ -2954,3 +2955,55 @@ decisions they carried stay recorded here.
 - **Revisit when:** something defined in `core` has to travel in a request or a response, which is
   the moment it belongs in the contract; or the contract gets a version that lets its enums part
   from the domain's.
+
+<a id="adr-0087"></a>
+
+## ADR-0087 · A whole block of days, or a whole project, can be purged, with the slug typed back
+
+- **Status:** accepted as a hypothesis (2026-10-06). Revisits what [0073](#adr-0073) ruled out,
+  selecting beyond the page; leaves [0057](#adr-0057)'s line on deleting projects where it is.
+- **Context:** a project used to try things out fills with hundreds of distilled memos in a few
+  days. Clearing it meant ticking cards page by page, at most 600 at a time, or naming every id to
+  `cortex mem purge`. 0073 named this as its trigger: "someone needs to select more than one page
+  can show". The person asking already knows what the memos are by *when* they were captured — a
+  day of experiments, a week of a trial — not one by one.
+- **Decision:**
+  1. **A scope, resolved on the server.** `findPurgeScope` and `purgeScope` in `core` take a
+     project's **own** memos — never a child's, never another project's — narrowed by type,
+     status and any number of half-open periods, by date added or last updated. They take
+     managing the project and end in the same `purgeEntries` transaction, so what a purge leaves
+     behind ([0072](#adr-0072)) does not change.
+  2. **Bounded by when it was seen.** A scope carries `writtenBefore`, the instant its count was
+     shown. A memo written or changed after it is not in the scope: an agent capturing while the
+     confirmation is on screen does not lose its memo to a count that never included it.
+  3. **The Memory screen.** Grouped by date, each block heading gets a box meaning the **whole**
+     block under the list's filters, past the page included; the server resolves `week:2026-09-28`
+     into its span and refuses a key no block produces. Unticking one of its cards unticks it. A
+     second button purges the whole project, or everything matching the type and status filters
+     when one is on, and says which. The confirmation gives the count per block and per type and
+     the first 60 titles, and for the whole project asks for the **slug typed back**, checked on
+     the server, so it holds with no JavaScript.
+  4. **API and CLI.** `POST /projects/:slug/purge` answers what it would purge — count, types,
+     oldest and newest, `asOf` — and purges nothing until `confirm` is the slug.
+     `cortex mem purge --all | --from <day> [--to <day>]`, with `--type` and `--status`, shows that
+     answer and asks for the slug, or takes `--yes`. Days are whole UTC days, as the screen prints
+     them. Not from the MCP, for 0072's reasons.
+  5. The audit rows are written in one statement instead of one per memo: thousands of round trips
+     held the transaction and its row locks open for all of them.
+- **Alternatives:**
+  - **A block's box ticks only the cards on screen.** No server change and 0073 untouched, but
+    "purge this week" would quietly leave whatever the page did not show. Rejected.
+  - **"The whole project" ignores the filters.** A list filtered to `other` whose button also
+    purges every decision is a trap. Rejected; the button's label says what it takes.
+  - **A plain second step, as for a selection.** 0057 already found confirmations clicked through
+    when a project's whole memory is at stake. A slug cannot be typed without being read.
+  - **Deleting the project instead.** 0057 stands: this empties a project and keeps its slug,
+    members, settings and children. An emptied project can then be deleted, if that was the aim.
+  - **Carrying every id through the confirmation.** Thousands of hidden fields, and the same race
+    with new captures; the scope and its `asOf` travel instead.
+- **Consequences:** these memos were never read one by one; the guards are the count, the titles
+  shown, the slug and the backup.
+- **Revisit when:** emptying a project becomes how it is kept tidy, which says capture into it
+  needs a switch rather than a broom; somebody purges the wrong project despite the slug, which
+  argues for a delay or an undo window; or the audit trail needs to say which scope a purge came
+  from.

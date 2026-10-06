@@ -6,17 +6,29 @@ import {
   createProject,
   deleteProject,
   findProjectBySlug,
+  findPurgeScope,
   listAccessibleProjects,
   listAdmins,
   listProjectMembers,
   NotAManagerError,
   ProjectNotEmptyError,
+  purgeScope,
   removeProjectMember,
   slugify,
+  summarizePurgeScope,
   updateProject,
   type ProjectRef,
+  type PurgeScope,
 } from "@cortex/core";
-import { createProjectRequest, projectMemberRequest, updateProjectRequest, type ProjectSummary } from "@cortex/shared";
+import {
+  createProjectRequest,
+  projectMemberRequest,
+  purgeProjectRequest,
+  updateProjectRequest,
+  type ProjectSummary,
+  type PurgeEntriesResponse,
+  type PurgeProjectPreview,
+} from "@cortex/shared";
 import { currentUser } from "../auth-helpers.js";
 import { parseBody } from "../validate.js";
 
@@ -185,4 +197,50 @@ projectRoutes.delete("/projects/:slug", async (c) => {
     throw e;
   }
   return c.json({ deleted: slug });
+});
+
+/**
+ * Purges a stretch of a project's memory, or all of it (ADR-0087). Without `confirm` it only
+ * answers what it would purge, which is what the CLI shows before asking for the slug.
+ */
+projectRoutes.post("/projects/:slug/purge", async (c) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: "Not authenticated." }, 401);
+  const body = await parseBody(c, purgeProjectRequest);
+  if (body instanceof Response) return body;
+  const slug = c.req.param("slug");
+  const project = await findProjectBySlug(slug);
+  if (!project || !(await canAccessProject(project, user))) return c.json({ error: "Project not found." }, 404);
+  if (body.confirm !== undefined && body.confirm !== slug) {
+    return c.json({ error: `To purge, "confirm" must be the project's slug, "${slug}".` }, 400);
+  }
+  const asOf = body.writtenBefore ? new Date(body.writtenBefore) : new Date();
+  const scope: PurgeScope = {
+    project: slug,
+    type: body.type,
+    status: body.status,
+    periods: body.periods?.map((p) => ({
+      field: p.field,
+      from: p.from ? new Date(p.from) : undefined,
+      to: p.to ? new Date(p.to) : undefined,
+    })),
+    writtenBefore: asOf,
+  };
+  try {
+    if (body.confirm === undefined) {
+      const summary = summarizePurgeScope(await findPurgeScope(scope, user));
+      const preview: PurgeProjectPreview = {
+        ...summary,
+        oldest: summary.oldest?.toISOString() ?? null,
+        newest: summary.newest?.toISOString() ?? null,
+        asOf: asOf.toISOString(),
+      };
+      return c.json(preview);
+    }
+    const result: PurgeEntriesResponse = await purgeScope(scope, user);
+    return c.json(result);
+  } catch (e) {
+    if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
+    throw e;
+  }
 });
