@@ -1,5 +1,6 @@
 export * from "./domain/memo.js";
 export * from "./domain/memo-types.js";
+export * from "./domain/project-criteria.js";
 export * from "./domain/entity.js";
 export * from "./domain/relation.js";
 export * from "./domain/source.js";

@@ -1,4 +1,4 @@
-import { contextEntryType, type Language } from "@cortex/shared";
+import { contextEntryType, keepsType, type ContextEntryType, type Language, type ProjectCriteria } from "@cortex/shared";
 import { runAgent } from "../../runtime/run-agent.js";
 // Shared extractJson: on top of the brace trimming (distill's previous behaviour) it now
 // understands ```json fenced blocks -- a strict improvement, not a regression: the fence is a
@@ -30,18 +30,30 @@ function isProviderRejection(e: unknown): boolean {
   return /invalid api key|unauthorized|\b401\b|\b403\b/i.test(String(err?.message ?? e ?? ""));
 }
 
-export async function distill(project: string, window: string, language?: Language): Promise<Item[]> {
+export function parseDistilledItems(raw: string, criteria?: ProjectCriteria): Item[] {
+  const parsed = JSON.parse(extractJson(raw)) as {
+    items?: { type?: string; title?: string; content?: string; summary?: string }[];
+  };
+  return (parsed.items ?? [])
+    .filter((i): i is Item => Boolean(i?.title && i?.content))
+    .map((i) => ({
+      type: TYPES.includes(i.type ?? "") ? (i.type as string) : "other",
+      title: i.title.trim().slice(0, 160),
+      content: i.content.trim(),
+      summary: i.summary?.trim() || undefined,
+    }))
+    .filter((item) => !criteria || keepsType(criteria, item.type as ContextEntryType));
+}
+
+export async function distill(
+  project: string,
+  window: string,
+  opts: { language?: Language; criteria?: ProjectCriteria } = {},
+): Promise<Item[]> {
   try {
-    const raw = await runAgent("distiller", distillerPrompt(project, window), { maxOutputTokens: 1500, language });
-    const parsed = JSON.parse(extractJson(raw)) as { items?: { type?: string; title?: string; content?: string; summary?: string }[] };
-    return (parsed.items ?? [])
-      .filter((i): i is Item => Boolean(i?.title && i?.content))
-      .map((i) => ({
-        type: TYPES.includes(i.type ?? "") ? (i.type as string) : "other",
-        title: i.title.trim().slice(0, 160),
-        content: i.content.trim(),
-        summary: i.summary?.trim() || undefined,
-      }));
+    const prompt = distillerPrompt(project, window, opts.criteria);
+    const raw = await runAgent("distiller", prompt, { maxOutputTokens: 1500, language: opts.language });
+    return parseDistilledItems(raw, opts.criteria);
   } catch (e) {
     // With no LLM configured there is no failure: that is a deliberate state and core falls
     // back to heuristics.

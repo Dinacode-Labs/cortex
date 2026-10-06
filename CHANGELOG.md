@@ -9,6 +9,12 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Each project says which knowledge it keeps.** Under Settings, *What this project keeps*: a
+  manager unticks the types the project does not want (how-tos, meeting summaries…), writes what
+  counts as a type there ("decisions: only those that change the public API") and lists what to
+  always keep and never keep. The distiller follows it when it distils a session in that project.
+  A sub-project starts from its parent's and can only narrow it. `PATCH /projects/:slug` accepts
+  `criteria` too ([ADR-0084](docs/decisions.md#adr-0084)).
 - **Search finds English memos by their inflections, as it does Spanish ones.** A memo is now
   indexed in the language it was written in, its project's at the time, and a search is matched
   in both languages. "workers restarting" finds "the workers restarted"; before, every memo was

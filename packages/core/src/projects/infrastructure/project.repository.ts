@@ -1,9 +1,11 @@
 import { getSql, type Sql } from "@cortex/database";
-import type { Language } from "@cortex/shared";
+import type { Language, ProjectCriteria } from "@cortex/shared";
 import { canonicalize } from "../../text.js";
 import type { Row } from "../../storage/map.js";
 import type { ProjectChainNode, ProjectRef } from "../domain/project.js";
 import type { NewProject, ProjectChanges, ProjectRepository } from "../domain/project-repository.js";
+
+type JsonValue = Parameters<Sql["json"]>[0];
 
 function toRef(r: Row | undefined): ProjectRef | null {
   if (!r) return null;
@@ -139,20 +141,25 @@ export class PgProjectRepository implements ProjectRepository {
       WHERE id = ${id}`;
   }
 
-  async languageChain(projectId: string): Promise<(Language | null)[]> {
+  async settingsChain(projectId: string): Promise<{ language: Language | null; criteria: unknown }[]> {
     const rows = (await this.sql`
       WITH RECURSIVE chain AS (
-        SELECT id, parent_id, language, 0 AS depth FROM entities WHERE id = ${projectId}
+        SELECT id, parent_id, language, criteria, 0 AS depth FROM entities WHERE id = ${projectId}
         UNION ALL
-        SELECT e.id, e.parent_id, e.language, c.depth + 1 FROM entities e JOIN chain c ON e.id = c.parent_id
+        SELECT e.id, e.parent_id, e.language, e.criteria, c.depth + 1 FROM entities e JOIN chain c ON e.id = c.parent_id
       )
-      SELECT language FROM chain ORDER BY depth
+      SELECT language, criteria FROM chain ORDER BY depth
     `) as unknown as Row[];
-    return rows.map((r) => (r.language as Language | null) ?? null);
+    return rows.map((r) => ({ language: (r.language as Language | null) ?? null, criteria: r.criteria ?? null }));
   }
 
   async setLanguage(id: string, language: Language | null): Promise<void> {
     await this.sql`UPDATE entities SET language = ${language} WHERE id = ${id}`;
+  }
+
+  async setCriteria(id: string, criteria: ProjectCriteria | null): Promise<void> {
+    const stored = criteria ? this.sql.json(criteria as unknown as JsonValue) : null;
+    await this.sql`UPDATE entities SET criteria = ${stored} WHERE id = ${id}`;
   }
 
   async countEntries(projectId: string): Promise<number> {

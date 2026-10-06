@@ -330,6 +330,12 @@ else `CORTEX_DEFAULT_LANGUAGE` (Spanish unless set). Spanish and English for now
 the language it was written in; changing the setting changes what comes next
 ([ADR-0081](decisions.md#adr-0081)).
 
+**What the distiller keeps is the project's too.** Under Settings, a project says which types it
+keeps, what counts as each one there ("decisions: only those that change the public API"), and
+two lists, *always keep* and *never keep*. The distiller is offered only the kept types, with
+those lines, and anything it still returns under a discarded type is dropped. A project starts
+from what its parent keeps and can only narrow it ([ADR-0084](decisions.md#adr-0084)).
+
 **Concrete examples of each transformation.** The inputs are in Spanish because that is the
 corpus these prompts were tuned against.
 

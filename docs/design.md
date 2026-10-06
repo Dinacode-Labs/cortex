@@ -90,7 +90,7 @@ cannot be lost.
 /p/<slug>/across        Across this client   what its projects share and where they disagree*
 /p/<slug>/map           Map
 /p/<slug>/code          Code
-/p/<slug>/settings      Settings         visibility, owner, parent, language, members (managers only)
+/p/<slug>/settings      Settings         visibility, owner, parent, language, what it keeps, members (managers only)
 
 /entry/<id>             read, edit, and say whether it still holds
 /search?q=              across everything you can see

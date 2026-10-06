@@ -1,6 +1,6 @@
 import { scrub, type CaptureSessionCounters, type SourceType } from "@cortex/shared";
 import { sliceTranscript } from "@cortex/client";
-import { getProjectLanguage, saveWithReconciliation } from "@cortex/core";
+import { getProjectCriteria, getProjectLanguage, saveWithReconciliation } from "@cortex/core";
 import { distill } from "../agents/distiller/distill.js";
 
 /**
@@ -43,7 +43,10 @@ export const distillSession: DistillSessionFn = async (input) => {
   const seen = new Set<string>();
 
   const { windows, dropped } = sliceTranscript(condensed);
-  const { effective: language } = await getProjectLanguage(input.projectName);
+  const [{ effective: language }, { effective: criteria }] = await Promise.all([
+    getProjectLanguage(input.projectName),
+    getProjectCriteria(input.projectName),
+  ]);
   if (dropped > 0) {
     // Make it visible: a trimmed session used to end up `done` just like one that fitted whole.
     counters.droppedChars = dropped;
@@ -58,7 +61,7 @@ export const distillSession: DistillSessionFn = async (input) => {
     counters.windows++;
     let items: Awaited<ReturnType<typeof distill>>;
     try {
-      items = await distill(input.projectName, window, language);
+      items = await distill(input.projectName, window, { language, criteria });
     } catch (e) {
       // A window that fails (timeout, 429 after the retries) must not bring the whole session
       // down: it is counted and the rest carry on.

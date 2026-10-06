@@ -2844,3 +2844,35 @@ decisions they carried stay recorded here.
 - **Revisit when:** `eval-distill`, run before and after, shows the definitions move items to the
   wrong type; or a project needs to redefine a type rather than narrow it, which is what
   per-project criteria are for.
+
+<a id="adr-0084"></a>
+
+## ADR-0084 · Each project says which knowledge it keeps, and a child can only narrow its parent
+
+- **Status:** accepted as a hypothesis (2026-10-06).
+- **Context:** what the distiller keeps from a session was one prompt for every project. A
+  project whose team never wants how-tos in its memory, or that only cares about the decisions
+  touching its public API, had no way to say so, and the noise it did not want was the noise its
+  people learnt to skip. The types have a shared meaning since [0083](#adr-0083), which is what
+  a project's rules can be written against.
+- **Decision:** a project's criteria (`ProjectCriteria`, stored in `entities.criteria` by
+  migration `0026_project_criteria.sql`) say, per type, whether it is kept and what counts as one
+  in this project, plus two lists, *always keep* and *never keep*. They are inherited as the rest
+  of the hierarchy is ([0063](#adr-0063)), but only by narrowing: a type is kept if nobody in the
+  chain discards it, the per-type lines and the lists add up, parent first
+  (`effectiveCriteria`). The distiller is offered only the kept types, with their lines and the
+  lists, and `parseDistilledItems` drops whatever still comes back under a discarded type, so the
+  rule on types holds even when the model ignores it. Managers change them under Settings or with
+  `PATCH /projects/:slug`. A memo saved by hand is never dropped for its type: someone chose to
+  save it.
+- **Alternatives:**
+  - **A gate in the server on every save.** One model call per memo, and it can drop what
+    somebody deliberately saved. Rejected.
+  - **Free text only.** Flexible, but nothing in it can be checked without a model. Rejected.
+  - **Types only.** Checkable, but it cannot say "only the decisions about the public API".
+    Rejected.
+  - **A child that replaces its parent's criteria.** The client's rule would vanish the moment a
+    sub-project set its own. Rejected.
+- **Revisit when:** agents saving by hand turn out to be the main source of what a project does not
+  want, which is what passing the criteria to them in the pack is for; or a project needs to keep
+  a type its parent discards, which this design refuses on purpose.

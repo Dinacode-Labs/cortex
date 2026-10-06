@@ -3,6 +3,7 @@ import { html } from "hono/html";
 import {
   addProjectMember,
   deleteProject,
+  getProjectCriteria,
   getProjectLanguage,
   listAccessibleProjects,
   listProjectMembers,
@@ -11,11 +12,20 @@ import {
   removeProjectMember,
   updateProject,
 } from "@cortex/core";
-import { getBrandName, language as languageSchema, type Language } from "@cortex/shared";
+import {
+  contextEntryType,
+  getBrandName,
+  keepsType,
+  language as languageSchema,
+  projectCriteria,
+  type Language,
+  type ProjectCriteria,
+} from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 import { projectCard } from "../views/components.js";
 import { projectHealth } from "../project-summary.js";
 import { projectHeader } from "../views/project-nav.js";
+import { criteriaPanel } from "../views/project-criteria.js";
 import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -123,6 +133,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
 
   const members = await listProjectMembers(project.slug!);
   const projectLanguage = await getProjectLanguage(project.slug!);
+  const criteria = await getProjectCriteria(project.slug!);
   const notice = c.req.query("error");
   // The cycle check is done by the domain, which is what knows the whole ancestor chain.
   const others = (await listAccessibleProjects(user)).filter((o) => o.slug && o.id !== project.id);
@@ -191,6 +202,8 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
       </form>
     </div>
 
+    ${criteriaPanel(project.slug!, criteria)}
+
     <div class="panel">
       <h2>Members</h2>
       <p class="sub">
@@ -258,6 +271,41 @@ projectsRoutes.post("/p/:slug/settings/language", async (c) => {
   if (raw && !chosen.success) return c.redirect(`/p/${slug}/settings`);
   try {
     await updateProject(slug, { language: chosen.success ? chosen.data : null }, user);
+  } catch (e) {
+    return c.redirect(backWithError(slug, e));
+  }
+  return c.redirect(`/p/${slug}/settings`);
+});
+
+function criteriaFromForm(form: Record<string, unknown>, inherited: ProjectCriteria): unknown {
+  const text = (key: string): string => String(form[key] ?? "").trim();
+  const lines = (key: string): string[] => text(key).split("\n").map((l) => l.trim()).filter(Boolean);
+  const types = Object.fromEntries(
+    contextEntryType.options.flatMap((type) => {
+      if (!keepsType(inherited, type)) return [];
+      const keep = form[`keep.${type}`] === "on";
+      const guidance = text(`guidance.${type}`);
+      if (keep && !guidance) return [];
+      return [[type, guidance ? { keep, guidance } : { keep }]];
+    }),
+  );
+  const keep = lines("keepList");
+  const discard = lines("discardList");
+  return Object.keys(types).length || keep.length || discard.length ? { types, keep, discard } : null;
+}
+
+projectsRoutes.post("/p/:slug/settings/criteria", async (c) => {
+  const user = c.get("user")!;
+  const slug = c.req.param("slug");
+  const { inherited } = await getProjectCriteria(slug);
+  const raw = criteriaFromForm(await c.req.parseBody(), inherited);
+  const parsed = raw === null ? null : projectCriteria.safeParse(raw);
+  if (parsed && !parsed.success) {
+    const reason = "Each line can be at most 200 characters, and each list at most 20 lines.";
+    return c.redirect(`/p/${slug}/settings?error=${encodeURIComponent(reason)}`);
+  }
+  try {
+    await updateProject(slug, { criteria: parsed ? parsed.data : null }, user);
   } catch (e) {
     return c.redirect(backWithError(slug, e));
   }

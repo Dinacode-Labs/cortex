@@ -1,10 +1,10 @@
 import { getSql, type Sql } from "@cortex/database";
-import { defaultLanguage, type Language } from "@cortex/shared";
+import { defaultLanguage, projectCriteria, type Language, type ProjectCriteria } from "@cortex/shared";
 import { isAdmin } from "../auth/auth.js";
 import type { SessionUser } from "../auth/session-user.js";
 import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
-import { decideProjectAccess, effectiveLanguage, type ProjectRef } from "./domain/project.js";
+import { decideProjectAccess, effectiveCriteria, effectiveLanguage, type ProjectRef } from "./domain/project.js";
 import { PgProjectRepository } from "./infrastructure/project.repository.js";
 
 export type { ProjectRef } from "./domain/project.js";
@@ -65,12 +65,35 @@ export interface ProjectLanguage {
 
 export async function languageOfProject(projectId: string | null): Promise<ProjectLanguage> {
   if (!projectId) return { own: null, effective: defaultLanguage() };
-  const chain = await new PgProjectRepository(getSql()).languageChain(projectId);
+  const chain = (await new PgProjectRepository(getSql()).settingsChain(projectId)).map((s) => s.language);
   return { own: chain[0] ?? null, effective: effectiveLanguage(chain, defaultLanguage()) };
 }
 
 export async function getProjectLanguage(ref: string): Promise<ProjectLanguage> {
   return languageOfProject(await new PgProjectRepository(getSql()).findIdByRef(ref));
+}
+
+export interface ProjectCriteriaView {
+  own: ProjectCriteria | null;
+  inherited: ProjectCriteria;
+  effective: ProjectCriteria;
+}
+
+function parseStoredCriteria(raw: unknown): ProjectCriteria | null {
+  if (raw === null || raw === undefined) return null;
+  const parsed = projectCriteria.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+export async function criteriaOfProject(projectId: string | null): Promise<ProjectCriteriaView> {
+  if (!projectId) return { own: null, inherited: effectiveCriteria([]), effective: effectiveCriteria([]) };
+  const settings = await new PgProjectRepository(getSql()).settingsChain(projectId);
+  const chain = settings.map((s) => parseStoredCriteria(s.criteria));
+  return { own: chain[0] ?? null, inherited: effectiveCriteria(chain.slice(1)), effective: effectiveCriteria(chain) };
+}
+
+export async function getProjectCriteria(ref: string): Promise<ProjectCriteriaView> {
+  return criteriaOfProject(await new PgProjectRepository(getSql()).findIdByRef(ref));
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
@@ -226,6 +249,7 @@ export async function updateProject(
     ownerEmail?: string | null;
     parentSlug?: string | null;
     language?: Language | null;
+    criteria?: ProjectCriteria | null;
   },
   actor: SessionUser | null,
 ): Promise<ProjectRef> {
@@ -260,6 +284,7 @@ export async function updateProject(
 
   await repository.update(p.id, { visibility, ownerEmail, parentId });
   if (changes.language !== undefined) await repository.setLanguage(p.id, changes.language);
+  if (changes.criteria !== undefined) await repository.setCriteria(p.id, changes.criteria);
   return { ...p, visibility, ownerEmail, parentId };
 }
 
