@@ -7,7 +7,7 @@ import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle,
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "./domain/memo.js";
 import type { SummarizableMemo } from "./domain/memo-repository.js";
-import { PgMemoRepository } from "./infrastructure/memo.repository.js";
+import { port } from "../composition.js";
 
 export { decideReclassification } from "./domain/memo.js";
 export type { ClassifierResult, ReclassifyDecision } from "./domain/memo.js";
@@ -67,7 +67,7 @@ export async function saveContext(
   const provider = getEmbeddingProvider();
   // No DI container (ADR-0041): the use case builds the adapter. The port is what keeps the
   // creation rules testable without a database, not what hides which adapter is in use.
-  const repository = new PgMemoRepository(sql);
+  const repository = port("memos");
 
   let projectId: string | null = null;
   if (parsed.project) {
@@ -176,7 +176,7 @@ async function detectImprovements(
   }
 
   if (newPolarity.size > 0 && entityIds.length > 0) {
-    const candidates = await new PgMemoRepository(sql).findContradictionCandidates(entityIds, entry.id);
+    const candidates = await port("memos").findContradictionCandidates(entityIds, entry.id);
     for (const cand of candidates) {
       if (seen.has(cand.id)) continue;
       if (polarityContradicts(newPolarity, polarityTags(cand.content))) {
@@ -221,7 +221,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
   if (!projectId) throw new Error(`Project not found: "${project}".`);
   if (!classifier) return { scanned: 0, reclassified: 0 };
 
-  const repository = new PgMemoRepository(sql);
+  const repository = port("memos");
   const rows = await repository.findReclassifiable(projectId);
   const { effective: language } = await languageOfProject(projectId);
 
@@ -283,7 +283,7 @@ export async function resummarizeEntries(opts: ResummarizeOptions = {}): Promise
     if (!projectId) throw new Error(`Project not found: "${opts.project}".`);
   }
 
-  const repository = new PgMemoRepository(sql);
+  const repository = port("memos");
   const rows = await repository.findSummariesToRebuild(projectId);
 
   const languages = new Map<string | null, Language>();

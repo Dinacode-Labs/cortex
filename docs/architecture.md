@@ -48,8 +48,10 @@ The rules above are checked by `tests/core-layers.test.ts`. Files that do not fo
 listed there, each with the step that moves it, and the test fails both when a new file breaks a
 rule and when a listed file no longer needs to be listed.
 
-1. The decision, this page and the test.
-2. `composition.ts` and `configureCore()`, taking over the three repositories that already exist.
+1. ✓ The decision, this page and the test.
+2. ✓ `composition.ts` and `configureCore()`, taking over the three repositories that already exist.
+   A test runs a use case on a fake with `configureCore({ projects: fake })` and `resetCore()`
+   after it, with no database.
 3. One step per module: `knowledge` (with `storage`), `graph`, `projects`, `auth`, `capture`,
    `observability`. Use cases move into `application/`, SQL and libraries into
    `infrastructure/`.

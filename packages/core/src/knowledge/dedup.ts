@@ -5,7 +5,7 @@ import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { saveContext } from "./save.js";
 import { findProjectIdByName, getProjectLanguage } from "../projects/projects.js";
 import { relate } from "../graph/entities.js";
-import { PgMemoRepository } from "./infrastructure/memo.repository.js";
+import { port } from "../composition.js";
 
 /**
  * Write reconciliation (mem0 style: ADD / UPDATE / NOOP). Before storing auto-captured
@@ -53,12 +53,12 @@ export async function isNearDuplicate(project: string, text: string, threshold =
  * re-embedded and corrected by hand without any of that making it truer.
  */
 export async function recordCorroboration(entryId: string): Promise<void> {
-  await new PgMemoRepository(getSql()).recordCorroboration(entryId);
+  await port("memos").recordCorroboration(entryId);
 }
 
 export async function updateEntryContent(entryId: string, content: string): Promise<void> {
   const sql = getSql();
-  await new PgMemoRepository(sql).updateMemoContent(entryId, content);
+  await port("memos").updateMemoContent(entryId, content);
   await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
 }
 
@@ -77,7 +77,7 @@ export async function updateEntryFields(
 ): Promise<boolean> {
   const { content } = fields;
   const sql = getSql();
-  const ok = await new PgMemoRepository(sql).updateMemoFields(entryId, fields);
+  const ok = await port("memos").updateMemoFields(entryId, fields);
   if (!ok) return false;
   if (content !== undefined) await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
   return true;
@@ -86,7 +86,7 @@ export async function updateEntryFields(
 /** Bi-temporal DELETE (section 5.5: invalidating is not deleting): marks the entry as
  * historical and superseded by another. The same pattern as temporal invalidation. */
 export async function invalidateEntry(entryId: string, supersededById: string): Promise<void> {
-  await new PgMemoRepository(getSql()).invalidate(entryId, supersededById);
+  await port("memos").invalidate(entryId, supersededById);
 }
 
 /** Injectable LLM reconciler (provided by @cortex/agents through setReconciler). Without it,
@@ -208,7 +208,7 @@ export async function reconcileProject(project: string, maxDistance = getEnvNum(
   const sql = getSql();
   const pid = await findProjectIdByName(sql, project);
   if (!pid) return { deduped: 0 };
-  const repository = new PgMemoRepository(sql);
+  const repository = port("memos");
   const pairs = await repository.findNearDuplicatePairs(pid, maxDistance, NON_DEDUP_FORMATS);
   const dropped = new Set<string>();
   let deduped = 0;

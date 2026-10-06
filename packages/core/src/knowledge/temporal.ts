@@ -1,5 +1,4 @@
-import { getSql } from "@cortex/database";
-import { PgMemoRepository } from "./infrastructure/memo.repository.js";
+import { port } from "../composition.js";
 
 /**
  * Bi-temporal invalidation (the Zep/Graphiti pattern): it closes the validity window of facts
@@ -14,7 +13,7 @@ export async function applyTemporalInvalidation(): Promise<{
   historical: number;
   superseded: number;
 }> {
-  const repository = new PgMemoRepository(getSql());
+  const repository = port("memos");
   return {
     historical: await repository.closeHistoricalStates(),
     superseded: await repository.applySupersessions(),

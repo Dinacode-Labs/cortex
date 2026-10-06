@@ -1,4 +1,4 @@
-import { getSql, type Sql } from "@cortex/database";
+import type { Sql } from "@cortex/database";
 import { defaultLanguage, projectCriteria, type Language, type ProjectCriteria } from "@cortex/shared";
 import { isAdmin } from "../auth/auth.js";
 import type { SessionUser } from "../auth/session-user.js";
@@ -6,6 +6,7 @@ import { readCortexLink } from "@cortex/client";
 import { slugify } from "./project-config.js";
 import { decideProjectAccess, effectiveCriteria, effectiveLanguage, type ProjectRef } from "./domain/project.js";
 import { PgProjectRepository } from "./infrastructure/project.repository.js";
+import { port } from "../composition.js";
 
 export type { ProjectRef } from "./domain/project.js";
 
@@ -16,24 +17,24 @@ export async function findProjectIdByName(sql: Sql, project: string): Promise<st
 }
 
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {
-  return new PgProjectRepository(getSql()).findBySlug(slug);
+  return port("projects").findBySlug(slug);
 }
 
 /** By slug or canonical name: what an agent or a person types into `project`. It used to
  * compare the EXACT name, so the MCP guard rejected what the data operations did find. */
 export async function findProjectByName(name: string): Promise<ProjectRef | null> {
-  return new PgProjectRepository(getSql()).findByRef(name);
+  return port("projects").findByRef(name);
 }
 
 export async function getEntryProject(entryId: string): Promise<ProjectRef | null> {
-  return (await new PgProjectRepository(getSql()).resolveEntryProject(entryId)).project;
+  return (await port("projects").resolveEntryProject(entryId)).project;
 }
 
 export async function createProject(
   name: string,
   opts?: { visibility?: "public" | "private"; ownerEmail?: string | null; parentSlug?: string | null },
 ): Promise<ProjectRef> {
-  const repository = new PgProjectRepository(getSql());
+  const repository = port("projects");
   let parentId: string | null = null;
   if (opts?.parentSlug) {
     const parent = await findProjectBySlug(opts.parentSlug);
@@ -65,12 +66,12 @@ export interface ProjectLanguage {
 
 export async function languageOfProject(projectId: string | null): Promise<ProjectLanguage> {
   if (!projectId) return { own: null, effective: defaultLanguage() };
-  const chain = (await new PgProjectRepository(getSql()).settingsChain(projectId)).map((s) => s.language);
+  const chain = (await port("projects").settingsChain(projectId)).map((s) => s.language);
   return { own: chain[0] ?? null, effective: effectiveLanguage(chain, defaultLanguage()) };
 }
 
 export async function getProjectLanguage(ref: string): Promise<ProjectLanguage> {
-  return languageOfProject(await new PgProjectRepository(getSql()).findIdByRef(ref));
+  return languageOfProject(await port("projects").findIdByRef(ref));
 }
 
 export interface ProjectCriteriaView {
@@ -87,17 +88,17 @@ function parseStoredCriteria(raw: unknown): ProjectCriteria | null {
 
 export async function criteriaOfProject(projectId: string | null): Promise<ProjectCriteriaView> {
   if (!projectId) return { own: null, inherited: effectiveCriteria([]), effective: effectiveCriteria([]) };
-  const settings = await new PgProjectRepository(getSql()).settingsChain(projectId);
+  const settings = await port("projects").settingsChain(projectId);
   const chain = settings.map((s) => parseStoredCriteria(s.criteria));
   return { own: chain[0] ?? null, inherited: effectiveCriteria(chain.slice(1)), effective: effectiveCriteria(chain) };
 }
 
 export async function getProjectCriteria(ref: string): Promise<ProjectCriteriaView> {
-  return criteriaOfProject(await new PgProjectRepository(getSql()).findIdByRef(ref));
+  return criteriaOfProject(await port("projects").findIdByRef(ref));
 }
 
 export async function isProjectMember(projectId: string, email: string): Promise<boolean> {
-  return new PgProjectRepository(getSql()).isMember(projectId, email);
+  return port("projects").isMember(projectId, email);
 }
 
 /**
@@ -106,7 +107,7 @@ export async function isProjectMember(projectId: string, email: string): Promise
  * the project or of any ancestor (membership of the parent "Acme" opens its sub-projects).
  */
 export async function canAccessProject(project: ProjectRef, viewer: SessionUser | null): Promise<boolean> {
-  const repository = new PgProjectRepository(getSql());
+  const repository = port("projects");
   const chain = await repository.chain(project.id);
   return decideProjectAccess(chain, viewer, {
     isAdmin: isAdmin(viewer),
@@ -122,7 +123,7 @@ export async function canAccessProject(project: ProjectRef, viewer: SessionUser 
  * child is restricted -- so having access to the child implies having it to all its parents.
  */
 export async function projectIdsWithAncestors(projectId: string): Promise<string[]> {
-  return new PgProjectRepository(getSql()).idsWithAncestors(projectId);
+  return port("projects").idsWithAncestors(projectId);
 }
 
 /**
@@ -131,7 +132,7 @@ export async function projectIdsWithAncestors(projectId: string): Promise<string
  * its parents.
  */
 export async function listProjectAncestors(projectId: string): Promise<ProjectRef[]> {
-  return new PgProjectRepository(getSql()).ancestors(projectId);
+  return port("projects").ancestors(projectId);
 }
 
 export type AccessCheck =
@@ -170,7 +171,7 @@ export async function checkEntryAccess(
   viewer: SessionUser | null,
   entryId: string,
 ): Promise<{ status: "ok"; project: ProjectRef | null } | { status: "not_found" } | { status: "forbidden" }> {
-  const { found, project } = await new PgProjectRepository(getSql()).resolveEntryProject(entryId);
+  const { found, project } = await port("projects").resolveEntryProject(entryId);
   if (!found) return { status: "not_found" };
   if (project && !(await canAccessProject(project, viewer))) return { status: "forbidden" };
   return { status: "ok", project };
@@ -186,7 +187,7 @@ export interface AccessibleProject extends ProjectRef {
  * (GROUP BY project_id) merged by id -- not one query per project.
  */
 export async function listAccessibleProjects(viewer: SessionUser | null): Promise<AccessibleProject[]> {
-  const repository = new PgProjectRepository(getSql());
+  const repository = port("projects");
   const counts = await repository.entryCounts();
   const refs = (await repository.listAll()).map((r): AccessibleProject => ({ ...r, entryCount: counts.get(r.id) ?? 0 }));
   if (isAdmin(viewer)) return refs;
@@ -253,7 +254,7 @@ export async function updateProject(
   },
   actor: SessionUser | null,
 ): Promise<ProjectRef> {
-  const repository = new PgProjectRepository(getSql());
+  const repository = port("projects");
   const p = await requireManager(slug, actor);
   const visibility = changes.visibility ?? p.visibility;
   const ownerEmail =
@@ -300,7 +301,7 @@ export async function updateProject(
  * without writing to anybody, and there is nothing here to destroy.
  */
 export async function deleteProject(slug: string, actor: SessionUser | null): Promise<void> {
-  const repository = new PgProjectRepository(getSql());
+  const repository = port("projects");
   const p = await requireManager(slug, actor);
   const entries = await repository.countEntries(p.id);
   if (entries > 0) {
@@ -324,19 +325,19 @@ export class ProjectNotEmptyError extends Error {
 /** Adds a member. Owner or admin only (ADR-0051). */
 export async function addProjectMember(slug: string, email: string, actor: SessionUser | null): Promise<void> {
   const p = await requireManager(slug, actor);
-  await new PgProjectRepository(getSql()).addMember(p.id, email);
+  await port("projects").addMember(p.id, email);
 }
 
 /** Removes a member. Owner or admin only (ADR-0051). */
 export async function removeProjectMember(slug: string, email: string, actor: SessionUser | null): Promise<void> {
   const p = await requireManager(slug, actor);
-  await new PgProjectRepository(getSql()).removeMember(p.id, email);
+  await port("projects").removeMember(p.id, email);
 }
 
 export async function listProjectMembers(slug: string): Promise<string[]> {
   const p = await findProjectBySlug(slug);
   if (!p) return [];
-  return new PgProjectRepository(getSql()).listMembers(p.id);
+  return port("projects").listMembers(p.id);
 }
 
 /**
