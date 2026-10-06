@@ -1,7 +1,7 @@
 import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import type { ProjectCriteria } from "@cortex/shared";
-import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../projects/projects.js";
+import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../projects/application/projects.js";
 import { rowToMemo, type Row } from "../storage/map.js";
 import { port } from "../composition.js";
 import { vectorSearch, type SearchHit } from "../storage/vectors.js";

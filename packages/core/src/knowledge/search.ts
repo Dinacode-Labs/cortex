@@ -5,7 +5,7 @@ import {
   type SearchContextInput,
   searchContextInput,
 } from "@cortex/shared";
-import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../projects/projects.js";
+import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../projects/application/projects.js";
 import type { SessionUser } from "../auth/session-user.js";
 import { rowToMemo, type Row } from "../storage/map.js";
 import { hybridSearch, type SearchHit } from "../storage/vectors.js";
@@ -59,7 +59,7 @@ export async function searchContext(
   const parsed = searchContextInput.parse(input);
   const sql = getSql();
   const provider = getEmbeddingProvider();
-  const askedProject = parsed.project ? await findProjectIdByName(sql, parsed.project) : null;
+  const askedProject = parsed.project ? await findProjectIdByName(parsed.project) : null;
   // Searching inside a child also looks at the client's knowledge: the context pack already
   // inherited from its ancestors and search did not, so the cross-cutting things -- contracts,
   // conventions, who to talk to -- were stored in the parent and could not be found from the
@@ -113,7 +113,7 @@ export async function searchContext(
 
 export async function listDecisions(project: string, limit = 20): Promise<Memo[]> {
   const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
+  const projectId = await findProjectIdByName(project);
   if (!projectId) return [];
   const rows = (await sql`
     SELECT * FROM memos

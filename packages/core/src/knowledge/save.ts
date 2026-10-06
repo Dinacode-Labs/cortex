@@ -2,7 +2,7 @@ import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { type Language, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "../graph/application/entities.js";
-import { createProject, findProjectIdByName, languageOfProject } from "../projects/projects.js";
+import { createProject, findProjectIdByName, languageOfProject } from "../projects/application/projects.js";
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "./domain/memo.js";
@@ -216,8 +216,7 @@ async function detectImprovements(
  * type that stays the same is not.
  */
 export async function reclassifyProject(project: string): Promise<{ scanned: number; reclassified: number }> {
-  const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
+  const projectId = await findProjectIdByName(project);
   if (!projectId) throw new Error(`Project not found: "${project}".`);
   if (!classifier) return { scanned: 0, reclassified: 0 };
 
@@ -276,10 +275,9 @@ export interface ResummarizeResult {
  * but it is a bulk write, which is what `dryRun` is for.
  */
 export async function resummarizeEntries(opts: ResummarizeOptions = {}): Promise<ResummarizeResult> {
-  const sql = getSql();
   let projectId: string | null = null;
   if (opts.project) {
-    projectId = await findProjectIdByName(sql, opts.project);
+    projectId = await findProjectIdByName(opts.project);
     if (!projectId) throw new Error(`Project not found: "${opts.project}".`);
   }
 

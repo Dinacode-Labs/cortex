@@ -1,4 +1,4 @@
-import { canonicalize } from "../text.js";
+import { canonicalize } from "../../text.js";
 
 export function slugify(name: string): string {
   return (

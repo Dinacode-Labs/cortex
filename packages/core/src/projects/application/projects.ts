@@ -1,19 +1,15 @@
-import type { Sql } from "@cortex/database";
 import { defaultLanguage, projectCriteria, type Language, type ProjectCriteria } from "@cortex/shared";
-import { isAdmin } from "../auth/auth.js";
-import type { SessionUser } from "../auth/session-user.js";
-import { readCortexLink } from "@cortex/client";
-import { slugify } from "./project-config.js";
-import { decideProjectAccess, effectiveCriteria, effectiveLanguage, type ProjectRef } from "./domain/project.js";
-import { PgProjectRepository } from "./infrastructure/project.repository.js";
-import { port } from "../composition.js";
+import { isAdmin } from "../../auth/auth.js";
+import type { SessionUser } from "../../auth/session-user.js";
+import { slugify } from "../domain/slug.js";
+import { decideProjectAccess, effectiveCriteria, effectiveLanguage, type ProjectRef } from "../domain/project.js";
+import { port } from "../../composition.js";
 
-export type { ProjectRef } from "./domain/project.js";
+export type { ProjectRef } from "../domain/project.js";
 
-/** A project's id by slug or canonical name (see `PgProjectRepository.findByRef`). For data
- * operations: different casing or accents must not create new projects nor skip the dedup. */
-export async function findProjectIdByName(sql: Sql, project: string): Promise<string | null> {
-  return new PgProjectRepository(sql).findIdByRef(project);
+/** By slug or canonical name: different casing or accents must not create new projects nor skip the dedup. */
+export async function findProjectIdByName(project: string): Promise<string | null> {
+  return port("projects").findIdByRef(project);
 }
 
 export async function findProjectBySlug(slug: string): Promise<ProjectRef | null> {
@@ -338,17 +334,4 @@ export async function listProjectMembers(slug: string): Promise<string[]> {
   const p = await findProjectBySlug(slug);
   if (!p) return [];
   return port("projects").listMembers(p.id);
-}
-
-/**
- * Resolves the project LINKED to a directory (it reads `.cortex.json`). It does NOT create:
- * when the slug does not exist in Cortex (or there is an opt-out, or no `.cortex.json`), it
- * returns null.
- */
-export async function resolveLinkedProject(cwd: string): Promise<ProjectRef | null> {
-  const link = readCortexLink(cwd);
-  if (!link || link.ignore === true) return null;
-  if (link.slug) return findProjectBySlug(link.slug);
-  if (link.project) return findProjectByName(link.project);
-  return null;
 }

@@ -30,7 +30,6 @@ const KNOWN_VIOLATIONS: Record<string, string> = {
   "knowledge/queries.ts": "knowledge module",
   "knowledge/save.ts": "knowledge module",
   "knowledge/search.ts": "knowledge module",
-  "projects/projects.ts": "projects module",
   "storage/vectors.ts": "knowledge module",
 };
 

@@ -5,7 +5,7 @@ import type {
   SortDirection,
   Source,
 } from "@cortex/shared";
-import { findProjectIdByName } from "../projects/projects.js";
+import { findProjectIdByName } from "../projects/application/projects.js";
 import { rowToMemo, rowToEntity, rowToSource, type Row } from "../storage/map.js";
 import type { Memo, MemoStatus, MemoType } from "./domain/memo.js";
 
@@ -52,7 +52,7 @@ export async function listEntries(filter: ListEntriesFilter = {}): Promise<Memo[
   const sql = getSql();
   let where = sql`WHERE true`;
   if (filter.project) {
-    const projectId = await findProjectIdByName(sql, filter.project);
+    const projectId = await findProjectIdByName(filter.project);
     if (!projectId) return [];
     where = sql`${where} AND m.project_id = ${projectId}`;
   } else if (filter.accessibleProjectIds) {
@@ -138,7 +138,7 @@ export async function getProjectGraph(
   opts: { includeEntries?: boolean; maxEntries?: number } = {},
 ): Promise<ProjectGraph> {
   const sql = getSql();
-  const projectId = await findProjectIdByName(sql, project);
+  const projectId = await findProjectIdByName(project);
   if (!projectId) return { nodes: [], edges: [] };
   const includeEntries = opts.includeEntries ?? true;
   const maxEntries = opts.maxEntries ?? 500;

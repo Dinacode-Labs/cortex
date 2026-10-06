@@ -3,7 +3,7 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
 import { getEnvNum, type Language } from "@cortex/shared";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { saveContext } from "./save.js";
-import { findProjectIdByName, getProjectLanguage } from "../projects/projects.js";
+import { findProjectIdByName, getProjectLanguage } from "../projects/application/projects.js";
 import { relate } from "../graph/application/entities.js";
 import { port } from "../composition.js";
 
@@ -29,7 +29,7 @@ export interface NearestEntry {
 
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
   const sql = getSql();
-  const pid = await findProjectIdByName(sql, project);
+  const pid = await findProjectIdByName(project);
   if (!pid) return null;
   try {
     const hits = await vectorSearch(sql, getEmbeddingProvider(), { queryText: text, projectId: pid, limit: 1 });
@@ -205,8 +205,7 @@ export async function saveWithReconciliation(
 const NON_DEDUP_FORMATS = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "tif", "tiff"];
 
 export async function reconcileProject(project: string, maxDistance = getEnvNum("CORTEX_DEDUP_MAX_DIST", 0.05)): Promise<{ deduped: number }> {
-  const sql = getSql();
-  const pid = await findProjectIdByName(sql, project);
+  const pid = await findProjectIdByName(project);
   if (!pid) return { deduped: 0 };
   const repository = port("memos");
   const pairs = await repository.findNearDuplicatePairs(pid, maxDistance, NON_DEDUP_FORMATS);

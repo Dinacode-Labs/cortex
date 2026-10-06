@@ -1,5 +1,5 @@
 import { getSql, type Sql } from "@cortex/database";
-import { findProjectIdByName } from "../projects/projects.js";
+import { findProjectIdByName } from "../projects/application/projects.js";
 import type { Row } from "../storage/map.js";
 
 /**
@@ -40,7 +40,7 @@ export interface LintReport {
 
 export async function lintProject(project: string): Promise<LintReport> {
   const sql = getSql();
-  const pid = await findProjectIdByName(sql, project);
+  const pid = await findProjectIdByName(project);
   if (!pid) throw new Error(`Project not found: "${project}".`);
 
   const totalEntries = Number(
