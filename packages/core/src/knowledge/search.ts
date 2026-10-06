@@ -6,7 +6,7 @@ import {
   searchContextInput,
 } from "@cortex/shared";
 import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../projects/application/projects.js";
-import type { SessionUser } from "../auth/session-user.js";
+import type { SessionUser } from "../auth/domain/session-user.js";
 import { rowToMemo, type Row } from "../storage/map.js";
 import { hybridSearch, type SearchHit } from "../storage/vectors.js";
 import { inferTypeFromQuery } from "./query-intent.js";

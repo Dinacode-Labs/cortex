@@ -17,8 +17,6 @@ const INFRASTRUCTURE_IMPORTS = [
 ];
 
 const KNOWN_VIOLATIONS: Record<string, string> = {
-  "auth/auth.ts": "auth module",
-  "auth/email-smtp.ts": "auth module",
   "capture/capture.ts": "capture module",
   "capture/code.ts": "capture module",
   "capture/extract.ts": "capture module",

@@ -44,16 +44,12 @@ export {
   type ReconcileResult,
 } from "./knowledge/dedup.js";
 export { autoCurate, type CurationResult } from "./knowledge/curate.js";
-export { requestOtp, verifyOtp, authenticate, authenticateAccount, revokeToken, createUiTicket, redeemUiTicket, isAdmin, listAdmins, type Account } from "./auth/auth.js";
-export type { SessionUser } from "./auth/session-user.js";
-export {
-  sendOtpEmail,
-  getEmailSender,
-  setEmailSender,
-  validateEmailConfig,
-  type EmailSender,
-  type EmailMessage,
-} from "./auth/email.js";
+export { requestOtp, verifyOtp, authenticate, authenticateAccount, revokeToken, createUiTicket, redeemUiTicket } from "./auth/application/auth.js";
+export { isAdmin, listAdmins, type Account } from "./auth/domain/auth.js";
+export type { SessionUser } from "./auth/domain/session-user.js";
+export type { EmailSender, EmailMessage } from "./auth/domain/email.js";
+export { sendOtpEmail } from "./auth/application/otp-email.js";
+export { getEmailSender, setEmailSender, validateEmailConfig } from "./auth/infrastructure/email-senders.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture/capture.js";
 export { extractFileText, setMediaExtractor, type ExtractedFile, type MediaExtractorHooks } from "./capture/extract.js";
 export {

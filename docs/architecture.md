@@ -57,6 +57,7 @@ rule and when a listed file no longer needs to be listed.
    - ✓ `observability`
    - ✓ `graph`
    - ✓ `projects`
-   - `auth`, `capture`, `knowledge` (with `storage`)
+   - ✓ `auth`
+   - `capture`, `knowledge` (with `storage`)
 4. `core` stops depending on `client`.
 5. The domain that still lives in `shared` moves into its module in `core`.

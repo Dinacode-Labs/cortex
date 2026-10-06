@@ -1,5 +1,5 @@
 import type { ContextEntryType, Language, ProjectCriteria, TypeCriterion } from "@cortex/shared";
-import type { SessionUser } from "../../auth/session-user.js";
+import type { SessionUser } from "../../auth/domain/session-user.js";
 
 /**
  * The `Project` aggregate as the apps see it, plus the access policy that used to be tangled
