@@ -101,7 +101,7 @@ jobs:
       # Actions cache only works with the docker-container driver, which is what
       # setup-buildx-action installs; without it, buildx fails with "Cache export is not
       # supported for the docker driver".
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Docker image
         uses: docker/build-push-action@v6
