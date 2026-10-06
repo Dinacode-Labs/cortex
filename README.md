@@ -290,7 +290,7 @@ Claude Code / Codex / OpenCode / Hermes / Pi
                  │           graph, reranker, retriever, distiller, merger, reconciler, maintain
                  ├── packages/embeddings (local | openai-compatible | openai | voyage)
                  └── packages/database (Postgres + pgvector + FTS + migrations)
-        packages/shared  ── domain model (zod) + API contracts
+        packages/shared  ── the contract (API schemas and enums) + env
 ```
 
 `@cortex/core` is **deterministic** and works with no keys. The intelligence, `@cortex/agents`

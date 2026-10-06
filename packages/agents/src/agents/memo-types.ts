@@ -1,4 +1,5 @@
-import { MEMO_TYPE_DEFINITIONS, type ContextEntryType, type ProjectCriteria } from "@cortex/shared";
+import type { ContextEntryType, ProjectCriteria } from "@cortex/shared";
+import { MEMO_TYPE_DEFINITIONS } from "@cortex/core";
 
 export function describeMemoTypes(types: readonly ContextEntryType[], criteria?: ProjectCriteria): string {
   return types

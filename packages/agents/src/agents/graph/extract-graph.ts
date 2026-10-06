@@ -1,8 +1,8 @@
-import { extractableEntityType, isUsableEntityName, relationType } from "@cortex/shared";
-import type { EntityType, Language, RelationType } from "@cortex/shared";
+import type { Language } from "@cortex/shared";
 import { runAgent } from "../../runtime/run-agent.js";
 import { extractJson } from "../../json.js";
 import { graphPrompt } from "./prompt.js";
+import { extractableEntityType, isUsableEntityName, relationType, type EntityType, type RelationType } from "@cortex/core";
 
 export interface ExtractedEntity {
   name: string;

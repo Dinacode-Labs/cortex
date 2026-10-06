@@ -1,8 +1,9 @@
 import { saveContext } from "../../knowledge/application/save.js";
 import { findProjectIdByName } from "../../projects/application/projects.js";
 import { relate } from "../../graph/application/entities.js";
-import { type BatchItem, type RelationType, scrub } from "@cortex/shared";
+import { type BatchItem, scrub } from "@cortex/shared";
 import { port } from "../../composition.js";
+import type { RelationType } from "../../graph/domain/relation.js";
 
 export type { BatchItem };
 

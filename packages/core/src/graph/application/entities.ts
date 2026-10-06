@@ -1,6 +1,6 @@
-import type { Entity, EntityType } from "@cortex/shared";
 import { port } from "../../composition.js";
 import type { RelationInput } from "../domain/entity-repository.js";
+import type { Entity, EntityType } from "../domain/entity.js";
 
 /**
  * Finds or creates an entity by (type, canonical name). The basis of entity resolution

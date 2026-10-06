@@ -1,8 +1,8 @@
-import type { Entity } from "@cortex/shared";
 import { port } from "../../composition.js";
 import { findProjectIdByName } from "../../projects/application/projects.js";
 import type { EntryDetail, EntrySort } from "../domain/memo-reader.js";
 import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
+import type { Entity } from "../../graph/domain/entity.js";
 
 export type { EntryDetail, EntrySort } from "../domain/memo-reader.js";
 

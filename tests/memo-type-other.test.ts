@@ -3,7 +3,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { buildMcpServer } from "../apps/mcp-server/src/server.js";
 import { captureRequest, searchRequest } from "../packages/shared/src/api-contract";
-import { contextEntryType, saveContextInput, searchContextInput } from "../packages/shared/src/domain/memo";
+import { contextEntryType, saveContextInput, searchContextInput } from "../packages/shared/src/contract/memo";
 import { classifyType } from "../packages/core/src/text";
 import { PACK_SECTIONS } from "../packages/core/src/knowledge/application/context-pack";
 

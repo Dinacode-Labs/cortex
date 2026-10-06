@@ -1,7 +1,8 @@
 import { html } from "hono/html";
-import { contextEntryType, keepsType, MEMO_TYPE_DEFINITIONS } from "@cortex/shared";
+import { contextEntryType } from "@cortex/shared";
 import type { ProjectCriteriaView } from "@cortex/core";
 import type { Html } from "./layout.js";
+import { keepsType, MEMO_TYPE_DEFINITIONS } from "@cortex/core";
 
 function listField(name: string, label: string, own: string[], inherited: string[]): Html {
   return html`<label>${label}

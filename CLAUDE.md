@@ -48,8 +48,8 @@ any of them disagrees with the code, the code wins.
 
 ```
 packages/
-  shared/      # domain/ (types, enums and zod v3 schemas, one file per aggregate: memo,
-               # entity, relation, source), API contracts, env, branding,
+  shared/      # the contract only (ADR-0086): contract/ (the enums and zod v3 schemas both
+               # sides of the API agree on), API contracts, env, scrub, branding,
                # capture protocol (the wording every agent gets, ADR-0066)
   client/      # client side: HTTP + credentials + .cortex.json + transcripts (→ shared only)
   database/    # SQL schema + migrations + Postgres client

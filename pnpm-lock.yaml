@@ -159,9 +159,6 @@ importers:
       '@ai-sdk/openai-compatible':
         specifier: ^2.0.51
         version: 2.0.51(zod@4.4.3)
-      '@cortex/client':
-        specifier: workspace:*
-        version: link:../client
       '@cortex/core':
         specifier: workspace:*
         version: link:../core
@@ -216,6 +213,9 @@ importers:
       xlsx:
         specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
         version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
     devDependencies:
       '@types/nodemailer':
         specifier: ^8.0.1

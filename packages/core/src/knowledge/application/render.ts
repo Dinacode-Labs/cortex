@@ -1,7 +1,6 @@
 import {
   contextEntryType,
   getBrandName,
-  keepsType,
   packIsASample,
   packShowing,
   type ProjectCriteria,
@@ -10,6 +9,7 @@ import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "../domain/memo-index.js";
 import type { Memo } from "../domain/memo.js";
+import { keepsType } from "../../projects/domain/project.js";
 
 /**
  * Markdown renderers: this is what the MCP tools return and what the hook injects when a

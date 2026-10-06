@@ -1,8 +1,9 @@
-import { contextEntryType, extractableEntityType, isUsableEntityName } from "@cortex/shared";
-import type { ContextEntryType, EntityType, Language } from "@cortex/shared";
+import { contextEntryType } from "@cortex/shared";
+import type { ContextEntryType, Language } from "@cortex/shared";
 import { runAgent } from "../../runtime/run-agent.js";
 import { extractJson } from "../../json.js";
 import { classifierPrompt } from "./prompt.js";
+import { extractableEntityType, isUsableEntityName, type EntityType } from "@cortex/core";
 
 export interface ClassificationResult {
   type?: ContextEntryType;

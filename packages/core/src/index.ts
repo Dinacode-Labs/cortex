@@ -1,10 +1,16 @@
 export { configureCore, resetCore, type CorePorts } from "./composition.js";
+export { MEMO_TYPE_DEFINITIONS, type MemoTypeDefinition } from "./knowledge/domain/memo-types.js";
+export { defaultLanguage, keepsType } from "./projects/domain/project.js";
+export { entityType, extractableEntityType, isUsableEntityName, type Entity, type EntityType, type ExtractableEntityType } from "./graph/domain/entity.js";
+export { relationType, type Relation, type RelationType } from "./graph/domain/relation.js";
 export * from "./knowledge/application/save.js";
 export * from "./knowledge/application/search.js";
 export * from "./knowledge/application/context-pack.js";
 export * from "./knowledge/application/queries.js";
 export * from "./knowledge/application/render.js";
-export type { Memo, MemoStatus, MemoType } from "./knowledge/domain/memo.js";
+export type { Memo, MemoStatus, MemoType, Validity } from "./knowledge/domain/memo.js";
+export type { Source } from "./knowledge/domain/source.js";
+export { sliceTranscript, type SlicedTranscript } from "./capture/domain/transcript-windows.js";
 export { lintProject, renderLintReport, type LintReport } from "./knowledge/application/lint.js";
 export { planLintActions, type LintAction } from "./knowledge/application/lint-act.js";
 export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./capture/application/code.js";

@@ -2911,3 +2911,46 @@ decisions they carried stay recorded here.
     Rejected.
 - **Revisit when:** a port turns out to need two adapters at once in one process, which a single
   composition cannot express; or the composition grows past what one file can show at a glance.
+
+<a id="adr-0086"></a>
+
+## ADR-0086 · `shared` holds the contract; the domain lives in `core`
+
+- **Status:** accepted as a hypothesis (2026-10-06). The last step of [0085](#adr-0085). Revisits
+  the part of [0077](#adr-0077) that kept `ContextEntry` in `shared`, and where
+  [0083](#adr-0083) put the type definitions.
+- **Context:** `shared` was where anything common landed. Next to the HTTP contract and `env` it
+  held domain that the laptop never reads: the type definitions every agent is told
+  ([0083](#adr-0083)), the rule that says whether a project keeps a type ([0084](#adr-0084)), the
+  server's default language, the entity and relation vocabularies with the rule that turns a
+  sentence away as an entity name ([0055](#adr-0055)), the memo record, and the LLM
+  configuration. Reading the package did not say what it was for. And `agents` depended on
+  `client`, the laptop's package, for one function: slicing a session into windows, which runs on
+  the server.
+- **Decision:** `shared` keeps what both sides of the API must agree on and what every package
+  needs: the request and response schemas, the enums they carry (memo type, status, confidence,
+  source type, language, project criteria), the MCP tools' input schemas, `env`, `scrub`, the
+  capture protocol, branding, concurrency and chunking. Its `domain/` folder becomes `contract/`.
+  The rest moves to its module:
+  - the type definitions to `core/src/knowledge/domain/memo-types.ts`;
+  - `keepsType` and `defaultLanguage` to `core/src/projects/domain/project.ts`;
+  - entities and relations to `core/src/graph/domain/`, so `core` takes zod for their enums,
+    which the agents' schemas reuse;
+  - the window slicing to `core/src/capture/domain/transcript-windows.ts`, with the same
+    environment variables;
+  - the LLM configuration to `agents`, the only package that calls a model.
+
+  `Memo` and `Source` become `core`'s own types instead of aliases of `shared`'s. The contract
+  never declared the record: `EntryDetailResponse` pins only what a client reads, so the alias
+  was a second name for something the contract does not own. `agents` no longer depends on
+  `client`, and `tests/core-layers.test.ts` checks that neither `core` nor `agents` does.
+- **Alternatives:**
+  - **Move the enums as well.** They travel in the requests a CLI sends, so `client` would come to
+    depend on `core`. Rejected.
+  - **A package of its own for the domain, between `shared` and `core`.** One more package for
+    what `core` is for. Rejected.
+  - **Leave the domain where it was and document it.** That is what made `shared` hard to read.
+    Rejected.
+- **Revisit when:** something defined in `core` has to travel in a request or a response, which is
+  the moment it belongs in the contract; or the contract gets a version that lets its enums part
+  from the domain's.

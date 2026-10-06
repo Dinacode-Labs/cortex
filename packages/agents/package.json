@@ -16,7 +16,6 @@
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^2.0.51",
-    "@cortex/client": "workspace:*",
     "@cortex/core": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/shared": "workspace:*",

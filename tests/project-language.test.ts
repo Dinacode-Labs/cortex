@@ -1,6 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { defaultLanguage } from "../packages/shared/src/env";
-import { effectiveLanguage } from "../packages/core/src/projects/domain/project";
+import { effectiveLanguage, defaultLanguage } from "../packages/core/src/projects/domain/project";
 
 /**
  * Getting the inheritance order wrong would make a sub-project write in the server's language

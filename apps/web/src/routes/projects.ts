@@ -1,21 +1,9 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import {
-  addProjectMember,
-  deleteProject,
-  getProjectCriteria,
-  getProjectLanguage,
-  listAccessibleProjects,
-  listProjectMembers,
-  NotAManagerError,
-  ProjectNotEmptyError,
-  removeProjectMember,
-  updateProject,
-} from "@cortex/core";
+import { addProjectMember, deleteProject, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, ProjectNotEmptyError, removeProjectMember, updateProject, keepsType } from "@cortex/core";
 import {
   contextEntryType,
   getBrandName,
-  keepsType,
   language as languageSchema,
   projectCriteria,
   type Language,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderContextPack } from "../packages/core/src/knowledge/application/render.js";
 import type { ContextPack } from "../packages/core/src/knowledge/application/context-pack.js";
-import type { ContextEntry } from "@cortex/shared";
+import type { Memo } from "../packages/core/src/knowledge/domain/memo";
 
 /**
  * The hook injects the pack when a session starts, and there is a character cap. When the pack
@@ -9,7 +9,7 @@ import type { ContextEntry } from "@cortex/shared";
  * decisions and NOTHING ELSE: constraints, risks and debt fell outside the scissors with nobody
  * the wiser. The agent believes it has seen the project's memory and has seen a third of it.
  */
-function entry(kind: string, i: number): ContextEntry {
+function entry(kind: string, i: number): Memo {
   return {
     id: `${kind}-${i}`,
     title: `${kind} number ${i}`,
@@ -18,7 +18,7 @@ function entry(kind: string, i: number): ContextEntry {
     type: kind,
     status: "active",
     confidence: "medium",
-  } as unknown as ContextEntry;
+  } as unknown as Memo;
 }
 
 const list = (kind: string, n: number) => Array.from({ length: n }, (_, i) => entry(kind, i));

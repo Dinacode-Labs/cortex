@@ -48,7 +48,7 @@ nosotros**:
 
 - **Los patrones que casan con el corpus**, que está en castellano y en inglés (ADR-0080), así que
   llevan las alternativas en castellano junto a las inglesas: las reglas de clasificación de
-  `packages/core/src/text.ts`, los deícticos de `packages/shared/src/domain/entity.ts` y los conjuntos
+  `packages/core/src/text.ts`, los deícticos de `packages/core/src/graph/domain/entity.ts` y los conjuntos
   de eval de `evals/` (la línea base se midió contra ellos). Casan con lo que escribe la gente,
   no con el idioma del fichero en el que viven.
 - **El idioma en que escriben los agentes LLM** ya no es una de estas excepciones: es un ajuste de

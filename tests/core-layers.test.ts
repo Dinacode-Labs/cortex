@@ -37,10 +37,14 @@ describe("core's layers", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("core does not depend on the laptop's client package, nor on the LLM layer", () => {
-    const manifest = JSON.parse(readFileSync(resolve(ROOT, "packages/core/package.json"), "utf8"));
-    const dependencies = Object.keys(manifest.dependencies ?? {});
-    expect(dependencies.filter((d) => d === "@cortex/client" || d === "@cortex/agents")).toEqual([]);
+  it("nothing that runs on the server depends on the laptop's client package, and core not on the LLM layer", () => {
+    const dependenciesOf = (pkg: string): string[] =>
+      Object.keys(JSON.parse(readFileSync(resolve(ROOT, `packages/${pkg}/package.json`), "utf8")).dependencies ?? {});
+    const offenders = [
+      ...["core", "agents"].flatMap((pkg) => dependenciesOf(pkg).filter((d) => d === "@cortex/client").map((d) => `${pkg} → ${d}`)),
+      ...dependenciesOf("core").filter((d) => d === "@cortex/agents").map((d) => `core → ${d}`),
+    ];
+    expect(offenders).toEqual([]);
   });
 
   it("the domain imports neither use cases nor adapters, and use cases do not import adapters", () => {

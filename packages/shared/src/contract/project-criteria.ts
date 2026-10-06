@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contextEntryType, type ContextEntryType } from "./memo.js";
+import { contextEntryType } from "./memo.js";
 
 const line = z.string().trim().min(1).max(200);
 
@@ -15,7 +15,3 @@ export const projectCriteria = z.object({
   discard: z.array(line).max(20).default([]),
 });
 export type ProjectCriteria = z.infer<typeof projectCriteria>;
-
-export function keepsType(criteria: ProjectCriteria, type: ContextEntryType): boolean {
-  return criteria.types[type]?.keep ?? true;
-}

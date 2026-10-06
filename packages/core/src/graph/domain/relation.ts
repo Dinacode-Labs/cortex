@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { confidenceLevel } from "./memo.js";
+import { confidenceLevel } from "@cortex/shared";
 
 export const relationType = z.enum([
   "belongs_to",

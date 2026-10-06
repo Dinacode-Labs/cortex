@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getLlmConfig, getSttConfig, getVisionConfig, isLlmEnabled } from "@cortex/shared";
+import { getLlmConfig, getSttConfig, getVisionConfig, isLlmEnabled } from "../packages/agents/src/runtime/llm-config";
 
 /**
  * The LLM provider stopped being a closed list of vendors (`nan`, `openrouter`) and became any

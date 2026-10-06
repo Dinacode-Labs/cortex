@@ -1,5 +1,6 @@
-import { contextEntryType, extractableEntityType } from "@cortex/shared";
+import { contextEntryType } from "@cortex/shared";
 import { describeMemoTypes } from "../memo-types.js";
+import { extractableEntityType } from "@cortex/core";
 
 // No `project`: a project is created, not extracted (see `extractableEntityType`, #135).
 const ENTITY_TYPES = extractableEntityType.options;

@@ -1,9 +1,10 @@
 import { html, raw } from "hono/html";
 import type { AccessibleProject } from "@cortex/core";
-import type { ContextEntry, EntrySortField } from "@cortex/shared";
+import type { EntrySortField } from "@cortex/shared";
 import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
 import { ASSET_VERSION } from "../version.js";
+import type { Memo } from "@cortex/core";
 
 /**
  * Everything that repeats across more than one screen lives here, and the routes COMPOSE
@@ -88,7 +89,7 @@ export interface EntryPick {
   checked: boolean;
 }
 
-export function entryCard(entry: ContextEntry, dated?: EntrySortField, pick?: EntryPick): Html {
+export function entryCard(entry: Memo, dated?: EntrySortField, pick?: EntryPick): Html {
   const card = html`<a class="card" href="/entry/${entry.id}">
     <div class="card-head">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)}</div>
     <h3>${entry.title}</h3>
@@ -123,7 +124,7 @@ export function entrySelection(list: Html, opts: EntrySelectionOptions): Html {
     <script src="/select.js?v=${ASSET_VERSION}" defer></script>`;
 }
 
-function entryDate(entry: ContextEntry, field: EntrySortField): Html {
+function entryDate(entry: Memo, field: EntrySortField): Html {
   const iso = (field === "updated" ? entry.updatedAt : entry.createdAt).toISOString();
   const label = field === "updated" ? "Updated" : "Added";
   return html`<div class="card-date">${label} <time datetime="${iso}">${iso.slice(0, 16).replace("T", " ")} UTC</time></div>`;
@@ -134,7 +135,7 @@ function entryDate(entry: ContextEntry, field: EntrySortField): Html {
  * `origin` is filled in by whoever searches across more than one project at a time -- without
  * it, results from three different repos read as if they came from the same one.
  */
-export function hitCard(entry: ContextEntry, score: number, origin?: Html): Html {
+export function hitCard(entry: Memo, score: number, origin?: Html): Html {
   return html`<a class="card" href="/entry/${entry.id}">
     <div class="card-head">${scoreBadge(score)} ${typeBadge(entry.type)} ${statusBadge(entry.status)} ${origin ?? ""}</div>
     <h3>${entry.title}</h3>

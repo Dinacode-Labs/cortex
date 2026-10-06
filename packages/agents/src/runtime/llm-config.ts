@@ -1,4 +1,4 @@
-import { getEnv, loadEnv } from "./env.js";
+import { getEnv, loadEnv } from "@cortex/shared";
 
 /**
  * LLM credential/model resolution. Every supported endpoint speaks the OpenAI dialect

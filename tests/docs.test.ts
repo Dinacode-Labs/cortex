@@ -77,13 +77,13 @@ describe("documentation", () => {
    * read, and the half they cannot read is the one explaining *why* things are the way they are.
    *
    * What stays in Spanish on purpose is DATA rather than prose we wrote: the patterns that match
-   * the corpus (`packages/core/src/text.ts`, the deictics in `domain/entity.ts`, the eval fixtures).
+   * the corpus (`packages/core/src/text.ts`, the deictics in `graph/domain/entity.ts`, the eval fixtures).
    * Anything an external system owns keeps its own spelling too. They are listed below, one by
    * one: an exception that is not written down is indistinguishable from an oversight.
    */
   const SPANISH_ON_PURPOSE = [
     "packages/core/src/text.ts", // CLASSIFY_RULES / MODULE_KEYWORDS / polarityTags: corpus patterns
-    "packages/shared/src/domain/entity.ts", // the deictics regex, likewise
+    "packages/core/src/graph/domain/entity.ts", // the deictics regex, likewise
     "packages/core/src/knowledge/domain/query-intent.ts", // bilingual ES|EN patterns
     "packages/core/src/knowledge/application/temporal.ts", // 'Histórico' is Plane's own value
     "packages/core/src/knowledge/infrastructure/health.reader.ts", // likewise

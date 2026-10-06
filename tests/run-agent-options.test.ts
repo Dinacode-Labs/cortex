@@ -21,7 +21,10 @@ process.env.LLM_BASE_URL = "http://llm.invalid/v1"; // .invalid never resolves: 
 process.env.LLM_API_KEY = "test-key";
 process.env.LLM_MODEL = "test-model";
 
-vi.mock("@cortex/core", () => ({ recordUsage: vi.fn() }));
+vi.mock("@cortex/core", async () => ({
+  recordUsage: vi.fn(),
+  defaultLanguage: (await import("../packages/core/src/projects/domain/project")).defaultLanguage,
+}));
 vi.mock("@cortex/database", () => ({
   getSql: () => Object.assign(() => Promise.resolve([]), { json: (value: unknown) => value }),
 }));
