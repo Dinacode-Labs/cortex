@@ -2877,3 +2877,37 @@ decisions they carried stay recorded here.
 - **Revisit when:** agents saving by hand turn out to be the main source of what a project does not
   want, which is what passing the criteria to them in the pack is for; or a project needs to keep
   a type its parent discards, which this design refuses on purpose.
+
+<a id="adr-0085"></a>
+
+## ADR-0085 · `core` is layered: domain, use cases and adapters, and one file wires them
+
+- **Status:** accepted as a hypothesis (2026-10-06). Revisits [0076](#adr-0076) and the part of
+  [0041](#adr-0041) that left the wiring inside each use case.
+- **Context:** [0076](#adr-0076) gave three modules a `domain/` and an `infrastructure/`, but left
+  the use cases next to them, free to call `getSql()` and to build their own adapter
+  (`new PgMemoRepository(getSql())`). Twenty-two files outside any `infrastructure/` import the
+  database, the embeddings, the client package or an external library. Reading `core` does not
+  tell domain from persistence, and nothing in it can be swapped: replacing Postgres or the
+  embeddings provider would mean editing the use cases themselves.
+- **Decision:** every module of `core` has three layers. `domain/` holds the aggregates, their
+  rules and the **ports**, the interfaces the module needs from outside. `application/` holds the
+  use cases, which work only through ports. `infrastructure/` holds the adapters, and it is the
+  only layer that may import `@cortex/database`, `@cortex/embeddings`, `@cortex/client` or an
+  external library. The adapters live inside `core`, not in a package of their own.
+  `composition.ts`, the one file that may join the layers, says which adapter answers each port;
+  use cases ask it for theirs, and `configureCore()` replaces any of them, for a test or for
+  another implementation. The use cases keep their names and signatures (`saveContext(input)`),
+  so the apps and the tests calling them do not change. `docs/architecture.md` is the map, and
+  `tests/core-layers.test.ts` holds the rules, with the files still to move listed by the step
+  that moves them. The migration goes one step per pull request: the composition, then one module
+  at a time, then `core` without `client`, then the domain still in `shared`.
+- **Alternatives:**
+  - **Adapters in a package of their own.** `database` and `embeddings` would stay generic, but a
+    module's port and its adapter would live in two packages. Rejected: they live in the module.
+  - **A factory, `createCore(adapters)`, built by each app.** Nothing global, but every call to a
+    use case in the apps and in the tests changes. Rejected.
+  - **Keep [0076](#adr-0076)'s halfway point.** It is what made the structure hard to follow.
+    Rejected.
+- **Revisit when:** a port turns out to need two adapters at once in one process, which a single
+  composition cannot express; or the composition grows past what one file can show at a glance.
