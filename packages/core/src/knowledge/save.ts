@@ -1,10 +1,8 @@
 import { getSql, type Sql } from "@cortex/database";
-import { getEmbeddingProvider } from "@cortex/embeddings";
 import { type Language, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
 import { linkEntryToEntity, relate, resolveEntity } from "../graph/application/entities.js";
 import { createProject, findProjectIdByName, languageOfProject } from "../projects/application/projects.js";
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
-import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "./domain/memo.js";
 import type { SummarizableMemo } from "./domain/memo-repository.js";
 import { port } from "../composition.js";
@@ -64,7 +62,6 @@ export async function saveContext(
     title: raw.title ? scrub(raw.title) : raw.title,
   };
   const sql = getSql();
-  const provider = getEmbeddingProvider();
   // No DI container (ADR-0041): the use case builds the adapter. The port is what keeps the
   // creation rules testable without a database, not what hides which adapter is in use.
   const repository = port("memos");
@@ -110,7 +107,7 @@ export async function saveContext(
     language,
   });
 
-  if (!opts.skipEmbedding) await storeEmbedding(sql, provider, entry.id, draft.embedText);
+  if (!opts.skipEmbedding) await port("memoIndex").index(entry.id, draft.embedText);
 
   const entityIds: string[] = [];
   for (const e of draft.entities) {
@@ -150,17 +147,11 @@ async function detectImprovements(
   embedText: string,
   entityIds: string[],
 ): Promise<ContextWarning[]> {
-  const provider = getEmbeddingProvider();
   const warnings: ContextWarning[] = [];
   const seen = new Set<string>();
   const newPolarity = polarityTags(entry.content);
 
-  const hits = await vectorSearch(sql, provider, {
-    queryText: embedText,
-    projectId,
-    limit: 6,
-    excludeId: entry.id,
-  });
+  const hits = await port("memoIndex").similar(embedText, { projectId, excludeId: entry.id }, 6);
   const scoreById = new Map(hits.map((h) => [h.entry.id, h.score]));
   for (const hit of hits) {
     if (hit.score >= 0.85 && !seen.has(hit.entry.id)) {

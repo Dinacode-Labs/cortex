@@ -1,4 +1,5 @@
 import { getSql } from "@cortex/database";
+import { getEmbeddingProvider } from "@cortex/embeddings";
 import type { AuthRepository } from "./auth/domain/auth-repository.js";
 import type { EmailSender } from "./auth/domain/email.js";
 import { PgAuthRepository } from "./auth/infrastructure/auth.repository.js";
@@ -6,6 +7,8 @@ import { getEmailSender } from "./auth/infrastructure/email-senders.js";
 import type { EntityRepository } from "./graph/domain/entity-repository.js";
 import { PgEntityRepository } from "./graph/infrastructure/entity.repository.js";
 import type { MemoRepository } from "./knowledge/domain/memo-repository.js";
+import type { MemoIndex } from "./knowledge/domain/memo-index.js";
+import { PgMemoIndex } from "./knowledge/infrastructure/memo.index.js";
 import type { UsageRepository } from "./observability/domain/usage.js";
 import { PgUsageRepository } from "./observability/infrastructure/usage.repository.js";
 import { PgMemoRepository } from "./knowledge/infrastructure/memo.repository.js";
@@ -14,6 +17,7 @@ import { PgProjectRepository } from "./projects/infrastructure/project.repositor
 
 export interface CorePorts {
   memos: MemoRepository;
+  memoIndex: MemoIndex;
   projects: ProjectRepository;
   entities: EntityRepository;
   usage: UsageRepository;
@@ -23,6 +27,7 @@ export interface CorePorts {
 
 const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   memos: () => new PgMemoRepository(getSql()),
+  memoIndex: () => new PgMemoIndex(getSql(), getEmbeddingProvider()),
   projects: () => new PgProjectRepository(getSql()),
   entities: () => new PgEntityRepository(getSql()),
   usage: () => new PgUsageRepository(getSql()),

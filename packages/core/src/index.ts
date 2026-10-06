@@ -12,7 +12,7 @@ export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./ca
 // lightweight CLI needs them too (ADR-0058). They are re-exported so callers do not break.
 export { chunkDocument, IGNORE_DIRS, SUPPORTED_EXTS, type ChunkOptions, type DocChunk } from "@cortex/shared";
 export { applyTemporalInvalidation } from "./knowledge/temporal.js";
-export { storeEmbeddingsBatch } from "./storage/vectors.js";
+export { indexMemos } from "./knowledge/application/index-memos.js";
 export { recordUsage, getUsageSummary, getRecentTraces } from "./observability/application/usage.js";
 export { estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./observability/domain/usage.js";
 export { registerUsageSink } from "./observability/infrastructure/embedding-usage-sink.js";

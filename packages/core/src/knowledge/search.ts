@@ -1,5 +1,4 @@
 import { getSql } from "@cortex/database";
-import { getEmbeddingProvider } from "@cortex/embeddings";
 import {
   getEnvNum,
   type SearchContextInput,
@@ -8,11 +7,12 @@ import {
 import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../projects/application/projects.js";
 import type { SessionUser } from "../auth/domain/session-user.js";
 import { rowToMemo, type Row } from "../storage/map.js";
-import { hybridSearch, type SearchHit } from "../storage/vectors.js";
+import type { SearchHit } from "./domain/memo-index.js";
+import { port } from "../composition.js";
 import { inferTypeFromQuery } from "./query-intent.js";
 import type { Memo } from "./domain/memo.js";
 
-export type { SearchHit } from "../storage/vectors.js";
+export type { SearchHit } from "./domain/memo-index.js";
 
 export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]>;
 
@@ -57,8 +57,6 @@ export async function searchContext(
   },
 ): Promise<SearchHit[]> {
   const parsed = searchContextInput.parse(input);
-  const sql = getSql();
-  const provider = getEmbeddingProvider();
   const askedProject = parsed.project ? await findProjectIdByName(parsed.project) : null;
   // Searching inside a child also looks at the client's knowledge: the context pack already
   // inherited from its ancestors and search did not, so the cross-cutting things -- contracts,
@@ -87,15 +85,9 @@ export async function searchContext(
 
   // With a reranker or an inferred type, over-fetch so a larger pool can be reordered: nudging
   // within the 5 that already came out would be useless if the good one was 7th. The projectIds
-  // filter is applied in hybridSearch (before reordering), not after.
+  // filter is applied in the hybrid search (before reordering), not after.
   const overFetch = reranker || inferredType ? Math.min(parsed.limit * 3, 30) : parsed.limit;
-  const hits = await hybridSearch(sql, provider, {
-    queryText: parsed.query,
-    projectId,
-    projectIds,
-    type: parsed.type,
-    limit: overFetch,
-  });
+  const hits = await port("memoIndex").hybrid(parsed.query, { projectId, projectIds, type: parsed.type }, overFetch);
 
   // The nudge goes into the ORDER, not into the `score`: the score returned is still the real
   // similarity, because some callers display it and others compare it against a threshold.
