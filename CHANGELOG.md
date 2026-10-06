@@ -9,6 +9,10 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Agents are told what the project keeps before they save anything.** When a project narrows
+  what it keeps, the context pack says so at the top, in one line: the types it does not save,
+  what counts as a type there, and what to always and never save. The pack on "What agents see"
+  shows the same line, with a link to change it ([ADR-0084](docs/decisions.md#adr-0084)).
 - **Each project says which knowledge it keeps.** Under Settings, *What this project keeps*: a
   manager unticks the types the project does not want (how-tos, meeting summaries…), writes what
   counts as a type there ("decisions: only those that change the public API") and lists what to

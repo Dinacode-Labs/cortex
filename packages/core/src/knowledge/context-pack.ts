@@ -1,6 +1,7 @@
 import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
-import { findProjectByName, projectIdsWithAncestors } from "../projects/projects.js";
+import type { ProjectCriteria } from "@cortex/shared";
+import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../projects/projects.js";
 import { rowToMemo, type Row } from "../storage/map.js";
 import { vectorSearch, type SearchHit } from "../storage/vectors.js";
 import type { Memo, MemoStatus, MemoType } from "./domain/memo.js";
@@ -58,6 +59,7 @@ export interface PackSection {
 export interface ContextPack {
   project: string;
   generatedAt: Date;
+  criteria?: ProjectCriteria;
   sections: PackSection[];
   sensitiveModules: string[];
   relevantToArea: SearchHit[];
@@ -133,6 +135,7 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   return {
     project: resolved.name,
     generatedAt: new Date(),
+    criteria: (await criteriaOfProject(projectId)).effective,
     sections,
     sensitiveModules,
     relevantToArea,

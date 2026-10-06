@@ -13,6 +13,7 @@ import {
   type SortDirection,
 } from "@cortex/shared";
 import {
+  describeCriteria,
   getAcrossClient,
   getContextPack,
   lintProject,
@@ -235,6 +236,7 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
   const asOfStr = c.req.query("asof");
   const asOf = asOfStr ? new Date(asOfStr) : undefined;
   const pack = await getContextPack(project.name, area, asOf);
+  const criteria = describeCriteria(pack.criteria);
 
   // Where each entry comes from. A child's pack mixes its own knowledge with the client's, and
   // until now it did so silently: whoever reviewed "Acme Portal" saw decisions that are not in
@@ -286,6 +288,11 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
       <a class="button secondary" href="/p/${project.slug}/agents.md${area ? `?area=${encodeURIComponent(area)}` : ""}">Copy as Markdown</a>
     </div>
     ${asOf ? html`<div class="warn">⏳ Point-in-time view: what was in force on ${asOfStr ?? ""}, including what was invalidated later.</div>` : ""}
+    ${criteria
+      ? html`<p class="note">
+          <b>What this project keeps:</b> ${criteria}. <a href="/p/${project.slug}/settings">Change it</a>
+        </p>`
+      : ""}
     ${pack.sections.map(sec)}
     ${pack.sensitiveModules.length
       ? panel("Sensitive modules", html`<div class="row">${joinHtml(pack.sensitiveModules.map((m) => badge(m, "#8a4b00")), " ")}</div>`)
