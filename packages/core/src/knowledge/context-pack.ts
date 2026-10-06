@@ -3,6 +3,7 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
 import type { ProjectCriteria } from "@cortex/shared";
 import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../projects/projects.js";
 import { rowToMemo, type Row } from "../storage/map.js";
+import { port } from "../composition.js";
 import { vectorSearch, type SearchHit } from "../storage/vectors.js";
 import type { Memo, MemoStatus, MemoType } from "./domain/memo.js";
 
@@ -153,48 +154,13 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
  * "src/webhook.js"), which is the frequent case; there all we can say is that the area is
  * disputed, because an entry hanging off "README" does not necessarily contradict anything.
  */
-export interface ContradictingSide {
-  id: string;
-  title: string;
-  createdAt: Date;
-  projectId: string | null;
-}
-
-/**
- * The pairs of CURRENT entries related by `contradicts` within a set of projects.
- *
- * It is the base query behind every contradiction in the product, and it lives in one place on
- * purpose: the pack uses it to tell each entry what it clashes with, and the client view uses
- * it to show the clashes BETWEEN projects of the same subtree. Two similar queries over
- * `relations` would end up saying different things about the same data.
- */
-export async function contradictingEntryPairs(
-  sql: Sql,
-  projectIds: string[],
-  limit = 25,
-): Promise<{ a: ContradictingSide; b: ContradictingSide }[]> {
-  const rows = (await sql`
-    SELECT ca.id AS a_id, ca.title AS a_title, ca.created_at AS a_at, ca.project_id AS a_project,
-           cb.id AS b_id, cb.title AS b_title, cb.created_at AS b_at, cb.project_id AS b_project
-    FROM relations r
-    JOIN memos ca ON ca.id = r.source_id AND ca.valid_to IS NULL
-    JOIN memos cb ON cb.id = r.target_id AND cb.valid_to IS NULL
-    WHERE r.relation_type = 'contradicts'
-      AND ca.project_id = ANY(${projectIds}) AND cb.project_id = ANY(${projectIds})
-    LIMIT ${limit}
-  `) as unknown as Row[];
-  return rows.map((r) => ({
-    a: { id: r.a_id as string, title: r.a_title as string, createdAt: new Date(r.a_at as string), projectId: (r.a_project as string) ?? null },
-    b: { id: r.b_id as string, title: r.b_title as string, createdAt: new Date(r.b_at as string), projectId: (r.b_project as string) ?? null },
-  }));
-}
 
 async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConflict[]> {
   const direct = new Map<string, { label: string; recordedLater: boolean }[]>();
   const areas = new Map<string, Map<string, Set<string>>>();
 
   // 1) Entry-to-entry: besides what it clashes with, which one was recorded first.
-  const betweenEntries = await contradictingEntryPairs(sql, projectIds);
+  const betweenEntries = await port("memos").contradictingPairs(projectIds, 25);
   const noteDirect = (id: string, label: string, recordedLater: boolean): void => {
     const list = direct.get(id) ?? [];
     if (!list.some((x) => x.label === label)) list.push({ label, recordedLater });

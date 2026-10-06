@@ -49,9 +49,9 @@ export async function enrichProject(
         if (g) {
           const nameToId = new Map<string, string>();
           for (const ent of g.entities) {
-            const resolved = await resolveEntity(sql, ent.name, ent.type);
+            const resolved = await resolveEntity(ent.name, ent.type);
             nameToId.set(ent.name.toLowerCase(), resolved.id);
-            await linkEntryToEntity(sql, e.id, resolved.id);
+            await linkEntryToEntity(e.id, resolved.id);
             nEnt++;
           }
           for (const rel of g.relations) {
@@ -59,7 +59,7 @@ export async function enrichProject(
             const sourceId = isEntry ? e.id : nameToId.get(rel.source.toLowerCase());
             const targetId = nameToId.get(rel.target.toLowerCase());
             if (!sourceId || !targetId || sourceId === targetId) continue;
-            await relate(sql, {
+            await relate({
               sourceId,
               sourceType: isEntry ? "memo" : "entity",
               targetId,

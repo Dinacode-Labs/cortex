@@ -102,7 +102,7 @@ describe("batch capture plus reconciliation (a real database)", () => {
     const older = await saveContext({ content: "Retries use a fixed 30-second backoff.", project: p.name, title: "Fixed 30s backoff", type: "decision" }, opts);
     const newer = await saveContext({ content: "Retries use exponential backoff capped at 60 seconds.", project: p.name, title: "Capped exponential backoff", type: "decision" }, opts);
 
-    await relate(getSql(), {
+    await relate({
       sourceId: newer.entry.id,
       sourceType: "memo",
       targetId: older.entry.id,
@@ -137,10 +137,10 @@ describe("batch capture plus reconciliation (a real database)", () => {
       opts,
     );
     const sql = getSql();
-    const readme = await resolveEntity(sql, `README ${RID}`, "module");
-    const webhook = await resolveEntity(sql, `src/webhook.js ${RID}`, "module");
+    const readme = await resolveEntity(`README ${RID}`, "module");
+    const webhook = await resolveEntity(`src/webhook.js ${RID}`, "module");
     await sql`INSERT INTO memo_entities (memo_id, entity_id) VALUES (${entry_.entry.id}, ${readme.id}) ON CONFLICT DO NOTHING`;
-    await relate(sql, { sourceId: readme.id, sourceType: "entity", targetId: webhook.id, targetType: "entity", relationType: "contradicts" });
+    await relate({ sourceId: readme.id, sourceType: "entity", targetId: webhook.id, targetType: "entity", relationType: "contradicts" });
 
     const text = renderContextPack(await getContextPack(p.name));
     expect(text).toContain("README on idempotence");
@@ -540,7 +540,7 @@ describe("bi-temporal invalidation (a real database)", () => {
       { project: p.name, type: "decision", content: "Retries use exponential backoff capped at 60 seconds." } as never,
       opts,
     );
-    await relate(getSql(), {
+    await relate({
       sourceId: newer.entry.id,
       sourceType: "memo",
       targetId: older.entry.id,
@@ -650,12 +650,12 @@ describe("graph integrity (the partial UNIQUE on active edges, D-5)", () => {
   it("relate is idempotent: the same edge twice → a single row", async () => {
     const sql = getSql();
     // Non-project entities (they avoid resolveEntities' `project` exclusion).
-    const a = await resolveEntity(sql, `Vendor A ${RID}`, "vendor");
-    const b = await resolveEntity(sql, `Vendor B ${RID}`, "vendor");
+    const a = await resolveEntity(`Vendor A ${RID}`, "vendor");
+    const b = await resolveEntity(`Vendor B ${RID}`, "vendor");
 
-    await relate(sql, { sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
+    await relate({ sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
     // A second time: with the partial UNIQUE + ON CONFLICT DO NOTHING it neither throws nor duplicates.
-    await relate(sql, { sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
+    await relate({ sourceId: a.id, sourceType: "entity", targetId: b.id, targetType: "entity", relationType: "related_to" });
 
     const rows = (await sql`
       SELECT count(*)::int AS n FROM relations
@@ -667,15 +667,15 @@ describe("graph integrity (the partial UNIQUE on active edges, D-5)", () => {
   it("resolveEntities merges entities with colliding edges without throwing (conflict-safe re-pointing)", async () => {
     const sql = getSql();
     // Two variants of the same normalised name -> they merge; a third one as a common target.
-    const canon = await resolveEntity(sql, `Acme Corp ${RID}`, "vendor");
-    const dup = await resolveEntity(sql, `acme-corp ${RID}`, "vendor"); // the same normalisation → loser
-    const target = await resolveEntity(sql, `Payments Svc ${RID}`, "service");
+    const canon = await resolveEntity(`Acme Corp ${RID}`, "vendor");
+    const dup = await resolveEntity(`acme-corp ${RID}`, "vendor"); // the same normalisation → loser
+    const target = await resolveEntity(`Payments Svc ${RID}`, "service");
 
     // Both variants have an edge to the SAME third entity with the SAME type: after re-pointing
     // the loser's `source_id` to the canonical one, it would clash with the canonical one's
     // (the partial UNIQUE).
-    await relate(sql, { sourceId: canon.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
-    await relate(sql, { sourceId: dup.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
+    await relate({ sourceId: canon.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
+    await relate({ sourceId: dup.id, sourceType: "entity", targetId: target.id, targetType: "entity", relationType: "depends_on" });
 
     // It must not throw (without point 3's fix, the UPDATE violates relations_active_unique -> an exception).
     await expect(resolveEntities()).resolves.toBeDefined();
@@ -699,8 +699,8 @@ describe("graph integrity (the partial UNIQUE on active edges, D-5)", () => {
   it("resolveEntities does NOT merge same-named entities of different types", async () => {
     const sql = getSql();
     // The same normalised name, different types: they are different things (backlog #7).
-    const vendor = await resolveEntity(sql, `Stripe ${RID}`, "vendor");
-    const service = await resolveEntity(sql, `stripe ${RID}`, "service");
+    const vendor = await resolveEntity(`Stripe ${RID}`, "vendor");
+    const service = await resolveEntity(`stripe ${RID}`, "service");
     expect(vendor.id).not.toBe(service.id);
 
     await resolveEntities();
@@ -751,7 +751,7 @@ describe("a project is created, not extracted (a real database)", () => {
   });
 
   it("resolveEntity refuses to create projects: that is createProject's job", async () => {
-    await expect(resolveEntity(getSql(), `IT Refused ${RID}`, "project")).rejects.toThrow(/createProject/);
+    await expect(resolveEntity(`IT Refused ${RID}`, "project")).rejects.toThrow(/createProject/);
   });
 
   it("the database does not accept a project with no slug either, not even through hand-written SQL", async () => {

@@ -3,6 +3,7 @@ import type { Entity, EntityType } from "@cortex/shared";
 import { canonicalize } from "../../text.js";
 import { rowToEntity, type Row } from "../../storage/map.js";
 import type { EntityNameRow, EntityRepository, RelationInput } from "../domain/entity-repository.js";
+import type { SharedEntity } from "../domain/across.js";
 
 export class PgEntityRepository implements EntityRepository {
   constructor(private readonly sql: Sql = getSql()) {}
@@ -102,5 +103,42 @@ export class PgEntityRepository implements EntityRepository {
       WHERE a.id > b.id AND a.source_id = b.source_id
         AND a.target_id = b.target_id AND a.relation_type = b.relation_type
     `;
+  }
+
+  /**
+   * Entities linked from current entries of TWO OR MORE of these projects.
+   *
+   * Entities are global (one row per type and canonical name across the whole installation), so
+   * the cross-over has existed in the data for a long time: what was missing was somewhere to
+   * look at it.
+   *
+   * This is "what the memory has linked from several repos", not an architecture inventory: it
+   * comes from what the agents wrote, noise included. That is why it is ordered by how many it
+   * appears in and then cut: a long list does not get read, and the first rows are the ones that
+   * say something.
+   */
+  async sharedStack(projectIds: string[], types: EntityType[], limit: number): Promise<SharedEntity[]> {
+    const rows = (await this.sql`
+      SELECT e.name, e.type,
+             count(DISTINCT m.id)::int AS entries,
+             json_agg(DISTINCT jsonb_build_object('name', p.name, 'slug', p.slug)) AS projects
+      FROM entities e
+      JOIN memo_entities me ON me.entity_id = e.id
+      JOIN memos m ON m.id = me.memo_id
+        AND m.valid_to IS NULL AND m.status NOT IN ('rejected', 'obsolete')
+        AND m.project_id = ANY(${projectIds})
+      JOIN entities p ON p.id = m.project_id
+      WHERE e.type = ANY(${types})
+      GROUP BY e.id, e.name, e.type
+      HAVING count(DISTINCT m.project_id) >= 2
+      ORDER BY count(DISTINCT m.project_id) DESC, count(DISTINCT m.id) DESC, e.name
+      LIMIT ${limit}
+    `) as unknown as Row[];
+    return rows.map((r) => ({
+      name: r.name as string,
+      type: r.type as EntityType,
+      entries: Number(r.entries),
+      projects: (r.projects as { name: string; slug: string | null }[]).sort((x, y) => x.name.localeCompare(y.name)),
+    }));
   }
 }

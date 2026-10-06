@@ -4,7 +4,7 @@ import { getEnvNum, type Language } from "@cortex/shared";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { saveContext } from "./save.js";
 import { findProjectIdByName, getProjectLanguage } from "../projects/projects.js";
-import { relate } from "../graph/entities.js";
+import { relate } from "../graph/application/entities.js";
 import { port } from "../composition.js";
 
 /**
@@ -177,7 +177,7 @@ export async function saveWithReconciliation(
         return { action: "supersede", entryId: entry.id };
       }
       // Sourced/curated knowledge: never invalidated automatically, only flagged.
-      await relate(getSql(), { sourceId: entry.id, sourceType: "memo", targetId: near.id, targetType: "memo", relationType: "contradicts" });
+      await relate({ sourceId: entry.id, sourceType: "memo", targetId: near.id, targetType: "memo", relationType: "contradicts" });
       return { action: "contradict", entryId: entry.id };
     }
     // update: only auto-captured entries are merged (sourced/curated is never rewritten)

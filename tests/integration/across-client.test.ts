@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { getSql } from "@cortex/database";
 import {
   createProject,
   getAcrossClient,
@@ -55,8 +54,8 @@ let entryB: string;
 /** Stores an entry and hangs it off an entity, the way the extractor would. */
 async function saveWith(project: string, contenido: string, entidad: [string, "technology" | "client"]): Promise<string> {
   const { entry } = await saveContext({ content: contenido, project, type: "decision", createdBy: OWNER });
-  const e = await resolveEntity(getSql(), entidad[0], entidad[1]);
-  await linkEntryToEntity(getSql(), entry.id, e.id);
+  const e = await resolveEntity(entidad[0], entidad[1]);
+  await linkEntryToEntity(entry.id, e.id);
   return entry.id;
 }
 

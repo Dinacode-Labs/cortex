@@ -55,7 +55,23 @@ export interface PurgeTarget {
  * The port the knowledge module writes through. It exists so the creation rules (ADR-0076) can
  * be read and tested without a database; the pg adapter lives in `infrastructure/`.
  */
+export interface ContradictingSide {
+  id: string;
+  title: string;
+  createdAt: Date;
+  projectId: string | null;
+}
+
+/**
+ * The pairs of CURRENT entries related by `contradicts` within a set of projects.
+ *
+ * It is the base query behind every contradiction in the product, and it lives in one place on
+ * purpose: the pack uses it to tell each entry what it clashes with, and the client view uses
+ * it to show the clashes BETWEEN projects of the same subtree. Two similar queries over
+ * `relations` would end up saying different things about the same data.
+ */
 export interface MemoRepository {
+  contradictingPairs(projectIds: string[], limit: number): Promise<{ a: ContradictingSide; b: ContradictingSide }[]>;
   createSource(source: NewSource): Promise<string>;
   createMemo(memo: NewMemo): Promise<Memo>;
   /**

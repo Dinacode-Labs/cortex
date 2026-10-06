@@ -1,7 +1,7 @@
 import { getSql, type Sql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { type Language, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
-import { linkEntryToEntity, relate, resolveEntity } from "../graph/entities.js";
+import { linkEntryToEntity, relate, resolveEntity } from "../graph/application/entities.js";
 import { createProject, findProjectIdByName, languageOfProject } from "../projects/projects.js";
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
 import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
@@ -114,11 +114,11 @@ export async function saveContext(
 
   const entityIds: string[] = [];
   for (const e of draft.entities) {
-    const ent = await resolveEntity(sql, e.name, e.type);
+    const ent = await resolveEntity(e.name, e.type);
     entityIds.push(ent.id);
-    await linkEntryToEntity(sql, entry.id, ent.id);
+    await linkEntryToEntity(entry.id, ent.id);
     if (projectId) {
-      await relate(sql, {
+      await relate({
         sourceId: ent.id,
         sourceType: "entity",
         targetId: projectId,
@@ -127,7 +127,7 @@ export async function saveContext(
       });
     }
   }
-  if (projectId) await linkEntryToEntity(sql, entry.id, projectId);
+  if (projectId) await linkEntryToEntity(entry.id, projectId);
 
   const warnings =
     (opts.detectImprovements ?? true)
