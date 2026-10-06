@@ -1,5 +1,5 @@
-import { isAdmin } from "../../auth/auth.js";
-import type { SessionUser } from "../../auth/session-user.js";
+import { isAdmin } from "../../auth/domain/auth.js";
+import type { SessionUser } from "../../auth/domain/session-user.js";
 import { canManageProject, NotAManagerError, type ProjectRef } from "./projects.js";
 import type { PurgeTarget } from "../../knowledge/domain/memo-repository.js";
 import { port } from "../../composition.js";

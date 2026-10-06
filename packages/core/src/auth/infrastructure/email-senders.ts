@@ -1,4 +1,5 @@
 import { getBrandName, getEnv } from "@cortex/shared";
+import type { EmailSender } from "../domain/email.js";
 
 /**
  * Transactional email (today only the login OTP) with a **pluggable** provider:
@@ -12,18 +13,6 @@ import { getBrandName, getEnv } from "@cortex/shared";
  * package, and the choice is pure configuration: threading it through all four entrypoints
  * would be ritual with no gain. `setEmailSender` covers tests and overrides. See ADR-0028.
  */
-
-export interface EmailMessage {
-  to: string;
-  subject: string;
-  html: string;
-  text: string;
-}
-
-export interface EmailSender {
-  readonly name: string;
-  send(msg: EmailMessage): Promise<void>;
-}
 
 const BREVO_ENDPOINT = "https://api.brevo.com/v3/smtp/email";
 const SEND_TIMEOUT_MS = 10_000;
@@ -151,19 +140,4 @@ export function validateEmailConfig(): string[] {
     throw new Error("SMTP_HOST is required with CORTEX_EMAIL_PROVIDER=smtp.");
   }
   return warnings;
-}
-
-export async function sendOtpEmail(email: string, code: string): Promise<void> {
-  const brand = getBrandName();
-  await getEmailSender().send({
-    to: email,
-    subject: `Your ${brand} sign-in code`,
-    // The literal "OTP code for <email>: <code>" is the contract the auth integration tests
-    // capture from the `log` sender; do not change it without changing them.
-    text: `OTP code for ${email}: ${code}`,
-    html:
-      `<p>Hi,</p><p>Your sign-in code for <b>${brand}</b> is:</p>` +
-      `<p style="font-size:28px;font-weight:700;letter-spacing:4px">${code}</p>` +
-      `<p>It expires in a few minutes. If you did not ask for it, ignore this email.</p>`,
-  });
 }

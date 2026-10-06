@@ -1,4 +1,8 @@
 import { getSql } from "@cortex/database";
+import type { AuthRepository } from "./auth/domain/auth-repository.js";
+import type { EmailSender } from "./auth/domain/email.js";
+import { PgAuthRepository } from "./auth/infrastructure/auth.repository.js";
+import { getEmailSender } from "./auth/infrastructure/email-senders.js";
 import type { EntityRepository } from "./graph/domain/entity-repository.js";
 import { PgEntityRepository } from "./graph/infrastructure/entity.repository.js";
 import type { MemoRepository } from "./knowledge/domain/memo-repository.js";
@@ -13,6 +17,8 @@ export interface CorePorts {
   projects: ProjectRepository;
   entities: EntityRepository;
   usage: UsageRepository;
+  auth: AuthRepository;
+  email: EmailSender;
 }
 
 const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
@@ -20,6 +26,8 @@ const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   projects: () => new PgProjectRepository(getSql()),
   entities: () => new PgEntityRepository(getSql()),
   usage: () => new PgUsageRepository(getSql()),
+  auth: () => new PgAuthRepository(getSql()),
+  email: () => getEmailSender(),
 };
 
 let replacements: Partial<CorePorts> = {};
