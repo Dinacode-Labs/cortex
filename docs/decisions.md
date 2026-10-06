@@ -2822,3 +2822,25 @@ decisions they carried stay recorded here.
 - **Revisit when:** memos saved by hand in the other language turn out to be common enough that
   their misses show up in search (each one is stemmed with its project's rules), which would
   argue for indexing both; or the retrieval eval, re-run against this, loses on the Spanish set.
+
+<a id="adr-0083"></a>
+
+## ADR-0083 · Each memo type is defined once, and every agent that picks a type is told the definitions
+
+- **Status:** accepted as a hypothesis (2026-10-06).
+- **Context:** the distiller and the classifier were offered the fourteen type names and no
+  definition, so the model guessed: a proposal became a `decision`, a session hiccup an
+  `incident`, and whatever it was unsure of went to the catch-all. Nothing a project could say
+  about which kinds of knowledge it keeps had a shared meaning to stand on either.
+- **Decision:** `MEMO_TYPE_DEFINITIONS` in `packages/shared/src/domain/memo-types.ts`, next to the
+  model and apart from it, says for each type what it is and what it is not, in one line each.
+  The distiller's and the classifier's prompts list them (`describeMemoTypes` in `agents`). A
+  type cannot be added without its definition: the record is typed by the enum, and a test
+  checks both that every type is defined and that both prompts carry every definition.
+- **Alternatives:**
+  - **Comments on the enum.** They reach whoever reads the code, not the model. Rejected.
+  - **Definitions inside each prompt.** Two wordings of the same type, which is how they drift
+    ([0066](#adr-0066) made the same call for the capture protocol). Rejected.
+- **Revisit when:** `eval-distill`, run before and after, shows the definitions move items to the
+  wrong type; or a project needs to redefine a type rather than narrow it, which is what
+  per-project criteria are for.

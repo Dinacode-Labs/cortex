@@ -115,6 +115,10 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **The agents are told what each memo type means.** The distiller and the classifier used to
+  get the list of type names and nothing else; they now get one line per type saying what it is
+  and what it is not (a proposal is not a `decision`, a local hiccup is not an `incident`).
+  Classification and distillation should mistype less ([ADR-0083](docs/decisions.md#adr-0083)).
 - **The type `module_note` is now `other`.** It is where Cortex puts a memo that fits no other
   type, and the old name made it look like a note about a module. Migration
   `0023_memo_type_other.sql` renames the stored memos, and the context pack's "Module notes"

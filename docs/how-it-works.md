@@ -61,7 +61,9 @@ convention. There are **14 types**:
 `decision`, `constraint`, `incident`, `architecture`, `technical_debt`,
 `convention`, `business_rule`, `integration_note`, `risk`, `how_to`, `meeting_summary`,
 `pr_summary`, `ticket_resolution` and `other`, where a memo lands when none of the others fits
-([ADR-0079](decisions.md#adr-0079)).
+([ADR-0079](decisions.md#adr-0079)). What each one is, and what it is not, is written once in
+`packages/shared/src/domain/memo-types.ts`, and every agent that picks a type is told it
+([ADR-0083](decisions.md#adr-0083)).
 
 What separates Cortex from a drawer full of notes is that **every fact carries its
 provenance**. An example entry:
