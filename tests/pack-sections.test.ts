@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { PACK_SECTIONS } from "../packages/core/src/knowledge/context-pack.js";
-import { renderContextPack } from "../packages/core/src/knowledge/render.js";
+import { PACK_SECTIONS } from "../packages/core/src/knowledge/application/context-pack.js";
+import { renderContextPack } from "../packages/core/src/knowledge/application/render.js";
 import { stripLeadingTitle } from "../packages/core/src/text.js";
 import { contextEntryType } from "@cortex/shared";
-import type { ContextPack } from "../packages/core/src/knowledge/context-pack.js";
+import type { ContextPack } from "../packages/core/src/knowledge/application/context-pack.js";
 import type { ContextEntry } from "@cortex/shared";
 
 /**

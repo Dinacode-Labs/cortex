@@ -1,5 +1,5 @@
 import { getSql, type Sql } from "@cortex/database";
-import { rowToMemo, type Row } from "../../storage/map.js";
+import { rowToMemo, type Row } from "../../infrastructure/rows.js";
 import type {
   ContradictingSide,
   MemoRepository,
@@ -9,7 +9,7 @@ import type {
   ReclassifiableMemo,
   SummarizableMemo,
 } from "../domain/memo-repository.js";
-import type { Memo, MemoType } from "../domain/memo.js";
+import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
 
 type JsonValue = Parameters<Sql["json"]>[0];
 
@@ -315,5 +315,10 @@ export class PgMemoRepository implements MemoRepository {
       a: { id: r.a_id as string, title: r.a_title as string, createdAt: new Date(r.a_at as string), projectId: (r.a_project as string) ?? null },
       b: { id: r.b_id as string, title: r.b_title as string, createdAt: new Date(r.b_at as string), projectId: (r.b_project as string) ?? null },
     }));
+  }
+
+  async setStatus(id: string, status: MemoStatus): Promise<Memo | null> {
+    const rows = (await this.sql`UPDATE memos SET status = ${status} WHERE id = ${id} RETURNING *`) as unknown as Row[];
+    return rows[0] ? rowToMemo(rows[0]) : null;
   }
 }

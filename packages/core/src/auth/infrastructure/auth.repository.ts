@@ -1,5 +1,5 @@
 import type { Sql } from "@cortex/database";
-import type { Row } from "../../storage/map.js";
+import type { Row } from "../../infrastructure/rows.js";
 import type { Account, OtpVerdict, StoredOtp } from "../domain/auth.js";
 import type { AuthRepository, IssuedToken } from "../domain/auth-repository.js";
 

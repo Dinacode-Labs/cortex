@@ -4,7 +4,7 @@ import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
 import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
 import { findProjectIdByName } from "../projects/application/projects.js";
 import { rrfFuse } from "../knowledge/domain/rank.js";
-import type { Row } from "../storage/map.js";
+import type { Row } from "../infrastructure/rows.js";
 
 /** Directories NEVER walked when indexing/ingesting a repo: dependencies and generated
  * artefacts. Shared with the document connectors (connect-docs) so no junk from

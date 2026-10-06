@@ -8,8 +8,8 @@ import {
 } from "@cortex/shared";
 import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
-import type { SearchHit } from "./domain/memo-index.js";
-import type { Memo } from "./domain/memo.js";
+import type { SearchHit } from "../domain/memo-index.js";
+import type { Memo } from "../domain/memo.js";
 
 /**
  * Markdown renderers: this is what the MCP tools return and what the hook injects when a

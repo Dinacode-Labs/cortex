@@ -8,6 +8,10 @@ import type { EntityRepository } from "./graph/domain/entity-repository.js";
 import { PgEntityRepository } from "./graph/infrastructure/entity.repository.js";
 import type { MemoRepository } from "./knowledge/domain/memo-repository.js";
 import type { MemoIndex } from "./knowledge/domain/memo-index.js";
+import type { MemoReader } from "./knowledge/domain/memo-reader.js";
+import type { HealthReader } from "./knowledge/domain/health.js";
+import { PgMemoReader } from "./knowledge/infrastructure/memo.reader.js";
+import { PgHealthReader } from "./knowledge/infrastructure/health.reader.js";
 import { PgMemoIndex } from "./knowledge/infrastructure/memo.index.js";
 import type { UsageRepository } from "./observability/domain/usage.js";
 import { PgUsageRepository } from "./observability/infrastructure/usage.repository.js";
@@ -18,6 +22,8 @@ import { PgProjectRepository } from "./projects/infrastructure/project.repositor
 export interface CorePorts {
   memos: MemoRepository;
   memoIndex: MemoIndex;
+  memoReader: MemoReader;
+  health: HealthReader;
   projects: ProjectRepository;
   entities: EntityRepository;
   usage: UsageRepository;
@@ -28,6 +34,8 @@ export interface CorePorts {
 const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   memos: () => new PgMemoRepository(getSql()),
   memoIndex: () => new PgMemoIndex(getSql(), getEmbeddingProvider()),
+  memoReader: () => new PgMemoReader(getSql()),
+  health: () => new PgHealthReader(getSql()),
   projects: () => new PgProjectRepository(getSql()),
   entities: () => new PgEntityRepository(getSql()),
   usage: () => new PgUsageRepository(getSql()),

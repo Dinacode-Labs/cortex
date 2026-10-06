@@ -1,14 +1,13 @@
-import { getSql, type Sql } from "@cortex/database";
 import { type Language, type SaveContextInput, saveContextInput, scrub } from "@cortex/shared";
-import { linkEntryToEntity, relate, resolveEntity } from "../graph/application/entities.js";
-import { createProject, findProjectIdByName, languageOfProject } from "../projects/application/projects.js";
-import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../text.js";
-import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "./domain/memo.js";
-import type { SummarizableMemo } from "./domain/memo-repository.js";
-import { port } from "../composition.js";
+import { linkEntryToEntity, relate, resolveEntity } from "../../graph/application/entities.js";
+import { createProject, findProjectIdByName, languageOfProject } from "../../projects/application/projects.js";
+import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../../text.js";
+import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "../domain/memo.js";
+import type { SummarizableMemo } from "../domain/memo-repository.js";
+import { port } from "../../composition.js";
 
-export { decideReclassification } from "./domain/memo.js";
-export type { ClassifierResult, ReclassifyDecision } from "./domain/memo.js";
+export { decideReclassification } from "../domain/memo.js";
+export type { ClassifierResult, ReclassifyDecision } from "../domain/memo.js";
 
 export type Classifier = (content: string, context: { language: Language }) => Promise<ClassifierResult | null>;
 
@@ -61,7 +60,6 @@ export async function saveContext(
     content: scrub(raw.content),
     title: raw.title ? scrub(raw.title) : raw.title,
   };
-  const sql = getSql();
   // No DI container (ADR-0041): the use case builds the adapter. The port is what keeps the
   // creation rules testable without a database, not what hides which adapter is in use.
   const repository = port("memos");
@@ -128,7 +126,7 @@ export async function saveContext(
 
   const warnings =
     (opts.detectImprovements ?? true)
-      ? await detectImprovements(sql, entry, projectId, draft.embedText, entityIds)
+      ? await detectImprovements(entry, projectId, draft.embedText, entityIds)
       : [];
   return { entry, warnings };
 }
@@ -141,7 +139,6 @@ export async function saveContext(
  *    local lexical embeddings would be unreliable.
  */
 async function detectImprovements(
-  sql: Sql,
   entry: Memo,
   projectId: string | null,
   embedText: string,

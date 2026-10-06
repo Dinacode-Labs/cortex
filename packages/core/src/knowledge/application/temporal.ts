@@ -1,4 +1,4 @@
-import { port } from "../composition.js";
+import { port } from "../../composition.js";
 
 /**
  * Bi-temporal invalidation (the Zep/Graphiti pattern): it closes the validity window of facts

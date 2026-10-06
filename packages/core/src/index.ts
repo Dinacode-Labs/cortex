@@ -1,17 +1,17 @@
 export { configureCore, resetCore, type CorePorts } from "./composition.js";
-export * from "./knowledge/save.js";
-export * from "./knowledge/search.js";
-export * from "./knowledge/context-pack.js";
-export * from "./knowledge/queries.js";
-export * from "./knowledge/render.js";
+export * from "./knowledge/application/save.js";
+export * from "./knowledge/application/search.js";
+export * from "./knowledge/application/context-pack.js";
+export * from "./knowledge/application/queries.js";
+export * from "./knowledge/application/render.js";
 export type { Memo, MemoStatus, MemoType } from "./knowledge/domain/memo.js";
-export { lintProject, renderLintReport, type LintReport } from "./knowledge/lint.js";
-export { planLintActions, type LintAction } from "./knowledge/lint-act.js";
+export { lintProject, renderLintReport, type LintReport } from "./knowledge/application/lint.js";
+export { planLintActions, type LintAction } from "./knowledge/application/lint-act.js";
 export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./capture/code.js";
 // Chunking, extension lists and directories to ignore live in `shared` now that the
 // lightweight CLI needs them too (ADR-0058). They are re-exported so callers do not break.
 export { chunkDocument, IGNORE_DIRS, SUPPORTED_EXTS, type ChunkOptions, type DocChunk } from "@cortex/shared";
-export { applyTemporalInvalidation } from "./knowledge/temporal.js";
+export { applyTemporalInvalidation } from "./knowledge/application/temporal.js";
 export { indexMemos } from "./knowledge/application/index-memos.js";
 export { recordUsage, getUsageSummary, getRecentTraces } from "./observability/application/usage.js";
 export { estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./observability/domain/usage.js";
@@ -42,8 +42,8 @@ export {
   type ReconcilerHooks,
   type ReconcileAction,
   type ReconcileResult,
-} from "./knowledge/dedup.js";
-export { autoCurate, type CurationResult } from "./knowledge/curate.js";
+} from "./knowledge/application/dedup.js";
+export { autoCurate, type CurationResult } from "./knowledge/application/curate.js";
 export { requestOtp, verifyOtp, authenticate, authenticateAccount, revokeToken, createUiTicket, redeemUiTicket } from "./auth/application/auth.js";
 export { isAdmin, listAdmins, type Account } from "./auth/domain/auth.js";
 export type { SessionUser } from "./auth/domain/session-user.js";

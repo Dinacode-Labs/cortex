@@ -1,4 +1,4 @@
-import type { MemoType } from "./domain/memo.js";
+import type { MemoType } from "./memo.js";
 
 /**
  * When the question names a domain category, infer it.

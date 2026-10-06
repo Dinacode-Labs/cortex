@@ -5,7 +5,7 @@ import { buildMcpServer } from "../apps/mcp-server/src/server.js";
 import { captureRequest, searchRequest } from "../packages/shared/src/api-contract";
 import { contextEntryType, saveContextInput, searchContextInput } from "../packages/shared/src/domain/memo";
 import { classifyType } from "../packages/core/src/text";
-import { PACK_SECTIONS } from "../packages/core/src/knowledge/context-pack";
+import { PACK_SECTIONS } from "../packages/core/src/knowledge/application/context-pack";
 
 /**
  * `module_note` hid that it was the catch-all, so it became `other` (ADR-0079); CLIs installed

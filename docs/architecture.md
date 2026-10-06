@@ -33,6 +33,9 @@ three layers:
 | `application/` | The **use cases**: `saveContext`, `searchContext`, `getContextPack`… They work only through ports | `domain/`, `shared`, the composition |
 | `infrastructure/` | The **adapters**: the implementations of the ports (`PgMemoRepository` with Postgres, the SMTP mailer, the document extractors) | anything, including `database`, `embeddings` and external libraries |
 
+What several modules' adapters share, such as turning rows into memos and entities, lives in
+`core/src/infrastructure/`, which follows the same rule as any `infrastructure/`.
+
 One file, `composition.ts`, says which adapter answers each port. A use case asks it for the port
 it needs and never builds an adapter itself. A test, or a deployment that wants another
 implementation, replaces one with `configureCore()`. Swapping Postgres for another library means
@@ -58,7 +61,8 @@ rule and when a listed file no longer needs to be listed.
    - ✓ `graph`
    - ✓ `projects`
    - ✓ `auth`
-   - `knowledge`: ✓ embeddings and search behind `MemoIndex`; the reads and the use cases still to move
+   - ✓ `knowledge`: embeddings and search behind `MemoIndex`, the reads behind `MemoReader` and
+     `HealthReader`, and the use cases in `application/`
    - `capture`
 4. `core` stops depending on `client`.
 5. The domain that still lives in `shared` moves into its module in `core`.

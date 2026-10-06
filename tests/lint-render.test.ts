@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderLintReport, type LintReport } from "../packages/core/src/knowledge/lint.js";
+import { renderLintReport, type LintReport } from "../packages/core/src/knowledge/application/lint.js";
 
 /**
  * `neverReviewed` is the largest finding in almost any project -- in a real one, 348 out of

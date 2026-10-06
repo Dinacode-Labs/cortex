@@ -1,18 +1,16 @@
-import { getSql } from "@cortex/database";
 import {
   getEnvNum,
   type SearchContextInput,
   searchContextInput,
 } from "@cortex/shared";
-import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../projects/application/projects.js";
-import type { SessionUser } from "../auth/domain/session-user.js";
-import { rowToMemo, type Row } from "../storage/map.js";
-import type { SearchHit } from "./domain/memo-index.js";
-import { port } from "../composition.js";
-import { inferTypeFromQuery } from "./query-intent.js";
-import type { Memo } from "./domain/memo.js";
+import { findProjectIdByName, listAccessibleProjects, projectIdsWithAncestors } from "../../projects/application/projects.js";
+import type { SessionUser } from "../../auth/domain/session-user.js";
+import type { SearchHit } from "../domain/memo-index.js";
+import { port } from "../../composition.js";
+import { inferTypeFromQuery } from "../domain/query-intent.js";
+import type { Memo } from "../domain/memo.js";
 
-export type { SearchHit } from "./domain/memo-index.js";
+export type { SearchHit } from "../domain/memo-index.js";
 
 export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]>;
 
@@ -104,15 +102,7 @@ export async function searchContext(
 }
 
 export async function listDecisions(project: string, limit = 20): Promise<Memo[]> {
-  const sql = getSql();
   const projectId = await findProjectIdByName(project);
   if (!projectId) return [];
-  const rows = (await sql`
-    SELECT * FROM memos
-    WHERE project_id = ${projectId} AND type = 'decision'
-      AND status NOT IN ('rejected') AND valid_to IS NULL
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `) as unknown as Row[];
-  return rows.map(rowToMemo);
+  return port("memoReader").decisions(projectId, limit);
 }

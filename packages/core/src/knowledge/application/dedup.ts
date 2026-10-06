@@ -1,8 +1,8 @@
 import { getEnvNum, type Language } from "@cortex/shared";
 import { saveContext } from "./save.js";
-import { findProjectIdByName, getProjectLanguage } from "../projects/application/projects.js";
-import { relate } from "../graph/application/entities.js";
-import { port } from "../composition.js";
+import { findProjectIdByName, getProjectLanguage } from "../../projects/application/projects.js";
+import { relate } from "../../graph/application/entities.js";
+import { port } from "../../composition.js";
 
 /**
  * Write reconciliation (mem0 style: ADD / UPDATE / NOOP). Before storing auto-captured
