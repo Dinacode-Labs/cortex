@@ -1,3 +1,4 @@
+export { configureCore, resetCore, type CorePorts } from "./composition.js";
 export * from "./knowledge/save.js";
 export * from "./knowledge/search.js";
 export * from "./knowledge/context-pack.js";

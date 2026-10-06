@@ -1,11 +1,11 @@
 import { getSql } from "@cortex/database";
 import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "../knowledge/save.js";
-import { PgMemoRepository } from "../knowledge/infrastructure/memo.repository.js";
 import { storeEmbeddingsBatch } from "../storage/vectors.js";
 import { findProjectIdByName } from "../projects/projects.js";
 import { relate } from "../graph/entities.js";
 import { type BatchItem, type RelationType, scrub } from "@cortex/shared";
+import { port } from "../composition.js";
 
 export type { BatchItem };
 
@@ -32,7 +32,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
   const sql = getSql();
   const projectId = await findProjectIdByName(sql, projectName);
   if (!projectId) throw new Error(`Project not found: ${projectName}`);
-  const repository = new PgMemoRepository(sql);
+  const repository = port("memos");
 
   const results: BatchItemResult[] = [];
   const toEmbed: { memoId: string; text: string }[] = [];

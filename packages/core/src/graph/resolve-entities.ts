@@ -1,6 +1,5 @@
-import { getSql } from "@cortex/database";
 import { entityGroupKey, rankEntities } from "./domain/entity.js";
-import { PgEntityRepository } from "./infrastructure/entity.repository.js";
+import { port } from "../composition.js";
 
 /**
  * The entity resolution loop (section 12.4): merges variants of the same entity
@@ -17,7 +16,7 @@ export interface ResolveResult {
 }
 
 export async function resolveEntities(): Promise<ResolveResult> {
-  const repository = new PgEntityRepository(getSql());
+  const repository = port("entities");
   const entities = await repository.listResolvable();
   const linkCounts = await repository.linkCounts();
 
