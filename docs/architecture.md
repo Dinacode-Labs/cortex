@@ -33,8 +33,11 @@ three layers:
 | `application/` | The **use cases**: `saveContext`, `searchContext`, `getContextPack`… They work only through ports | `domain/`, `shared`, the composition |
 | `infrastructure/` | The **adapters**: the implementations of the ports (`PgMemoRepository` with Postgres, the SMTP mailer, the document extractors) | anything, including `database`, `embeddings` and external libraries |
 
-What several modules' adapters share, such as turning rows into memos and entities, lives in
-`core/src/infrastructure/`, which follows the same rule as any `infrastructure/`.
+Every layer belongs to a module; there is no `domain/`, `application/` or `infrastructure/` shared
+between modules. Turning a row into an aggregate ([ADR-0022](decisions.md#adr-0022)) lives with that
+aggregate's adapters: `rowToMemo` and `rowToSource` in `knowledge/infrastructure/`, `rowToEntity`
+in `graph/infrastructure/`. An adapter of one module may use another module's, as the memo reader
+does to read a memo's entities. The shape of a raw row, `Row`, comes from `@cortex/database`.
 
 One file, `composition.ts`, says which adapter answers each port. A use case asks it for the port
 it needs and never builds an adapter itself. A test, or a deployment that wants another

@@ -1,5 +1,4 @@
-import type { Sql } from "@cortex/database";
-import type { Row } from "../../infrastructure/rows.js";
+import type { Row, Sql } from "@cortex/database";
 import type { DUPLICATE_DISTANCE, HealthReader, LintReport } from "../domain/health.js";
 
 const count = (rows: Row[]): number => Number(rows[0]?.n ?? 0);

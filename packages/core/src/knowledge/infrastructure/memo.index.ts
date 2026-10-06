@@ -1,6 +1,6 @@
-import { toVectorLiteral, type Sql, type SqlFragment } from "@cortex/database";
+import { toVectorLiteral, type Row, type Sql, type SqlFragment } from "@cortex/database";
 import type { EmbeddingProvider } from "@cortex/embeddings";
-import { rowToMemo, type Row } from "../../infrastructure/rows.js";
+import { rowToMemo } from "./memo.row.js";
 import type { MemoIndex, MemoSearchScope, SearchHit } from "../domain/memo-index.js";
 import { rrfFuse } from "../domain/rank.js";
 
