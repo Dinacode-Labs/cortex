@@ -2864,7 +2864,8 @@ decisions they carried stay recorded here.
   lists, and `parseDistilledItems` drops whatever still comes back under a discarded type, so the
   rule on types holds even when the model ignores it. Managers change them under Settings or with
   `PATCH /projects/:slug`. A memo saved by hand is never dropped for its type: someone chose to
-  save it.
+  save it. The agents that save by hand learn the criteria instead from the head of the context
+  pack, which states them in one line (`describeCriteria`) whenever the project narrows anything.
 - **Alternatives:**
   - **A gate in the server on every save.** One model call per memo, and it can drop what
     somebody deliberately saved. Rejected.

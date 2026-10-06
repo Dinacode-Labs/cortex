@@ -1,4 +1,11 @@
-import { getBrandName, packIsASample, packShowing } from "@cortex/shared";
+import {
+  contextEntryType,
+  getBrandName,
+  keepsType,
+  packIsASample,
+  packShowing,
+  type ProjectCriteria,
+} from "@cortex/shared";
 import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
 import type { SearchHit } from "../storage/vectors.js";
@@ -120,6 +127,20 @@ export interface RenderPackOptions {
   maxChars?: number;
 }
 
+export function describeCriteria(criteria: ProjectCriteria | undefined): string | null {
+  if (!criteria) return null;
+  const discarded = contextEntryType.options.filter((type) => !keepsType(criteria, type));
+  const parts = [
+    discarded.length ? `do not save ${discarded.join(", ")}` : "",
+    ...contextEntryType.options
+      .filter((type) => keepsType(criteria, type) && criteria.types[type]?.guidance)
+      .map((type) => `${type}: ${criteria.types[type]!.guidance}`),
+    criteria.keep.length ? `always save ${criteria.keep.join("; ")}` : "",
+    criteria.discard.length ? `never save ${criteria.discard.join("; ")}` : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {}): string {
   // The warning is glued to EVERY entry involved, not put in a section of its own: if it goes
   // at the end, the agent has already believed the entry by the time the warning arrives.
@@ -157,9 +178,11 @@ export function renderContextPack(pack: ContextPack, opts: RenderPackOptions = {
   const head = (shown: number, explain: boolean): string => {
     const cut = shown < total || shown < pack.totalEntries;
     const count = cut ? packShowing(shown, pack.totalEntries) : `${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total`;
+    const criteria = describeCriteria(pack.criteria);
     return [
       `# Context Pack — ${pack.project}`,
       `_${count} · generated ${pack.generatedAt.toISOString()}_`,
+      ...(criteria ? [`> **What this project keeps:** ${criteria}.`] : []),
       ...(cut && explain ? [`> ${packIsASample()}`] : []),
     ].join("\n");
   };

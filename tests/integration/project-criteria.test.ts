@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { closeSql } from "@cortex/database";
 import {
   createProject,
+  getContextPack,
   getProjectCriteria,
+  renderContextPack,
   requestOtp,
   updateProject,
   verifyOtp,
@@ -116,5 +118,15 @@ describe("a project's criteria", () => {
       keep: ["pricing", "agreed scope"],
       discard: ["local setup"],
     });
+  });
+
+  it("reach the agents: the child's pack and its agents page say what the parent discards", async () => {
+    await updateProject(child.slug!, { criteria: null }, actor);
+    const text = renderContextPack(await getContextPack(child.name));
+    expect(text).toContain("> **What this project keeps:** do not save how_to · always save client deadlines.");
+
+    const cookie = `cortex_session=${token}`;
+    const page = await (await createWebApp().request(`/p/${child.slug}/agents`, { headers: { cookie } })).text();
+    expect(page).toContain("do not save how_to");
   });
 });
