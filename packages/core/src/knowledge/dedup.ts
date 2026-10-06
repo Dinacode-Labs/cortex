@@ -1,7 +1,4 @@
-import { getSql } from "@cortex/database";
-import { getEmbeddingProvider } from "@cortex/embeddings";
 import { getEnvNum, type Language } from "@cortex/shared";
-import { storeEmbedding, vectorSearch } from "../storage/vectors.js";
 import { saveContext } from "./save.js";
 import { findProjectIdByName, getProjectLanguage } from "../projects/application/projects.js";
 import { relate } from "../graph/application/entities.js";
@@ -28,11 +25,10 @@ export interface NearestEntry {
 }
 
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
-  const sql = getSql();
   const pid = await findProjectIdByName(project);
   if (!pid) return null;
   try {
-    const hits = await vectorSearch(sql, getEmbeddingProvider(), { queryText: text, projectId: pid, limit: 1 });
+    const hits = await port("memoIndex").similar(text, { projectId: pid }, 1);
     const h = hits[0];
     if (!h) return null;
     return { id: h.entry.id, title: h.entry.title, content: h.entry.content, score: h.score, sourceType: h.entry.sourceType };
@@ -57,9 +53,8 @@ export async function recordCorroboration(entryId: string): Promise<void> {
 }
 
 export async function updateEntryContent(entryId: string, content: string): Promise<void> {
-  const sql = getSql();
   await port("memos").updateMemoContent(entryId, content);
-  await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
+  await port("memoIndex").index(entryId, content);
 }
 
 /**
@@ -76,10 +71,9 @@ export async function updateEntryFields(
   fields: { title?: string; content?: string },
 ): Promise<boolean> {
   const { content } = fields;
-  const sql = getSql();
   const ok = await port("memos").updateMemoFields(entryId, fields);
   if (!ok) return false;
-  if (content !== undefined) await storeEmbedding(sql, getEmbeddingProvider(), entryId, content);
+  if (content !== undefined) await port("memoIndex").index(entryId, content);
   return true;
 }
 

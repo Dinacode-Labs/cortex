@@ -17,18 +17,15 @@ const INFRASTRUCTURE_IMPORTS = [
 ];
 
 const KNOWN_VIOLATIONS: Record<string, string> = {
-  "capture/capture.ts": "capture module",
   "capture/code.ts": "capture module",
   "capture/extract.ts": "capture module",
   "capture/session-captures.ts": "capture module",
   "index.ts": "dropping core's dependency on client",
   "knowledge/context-pack.ts": "knowledge module",
-  "knowledge/dedup.ts": "knowledge module",
   "knowledge/lint.ts": "knowledge module",
   "knowledge/queries.ts": "knowledge module",
   "knowledge/save.ts": "knowledge module",
   "knowledge/search.ts": "knowledge module",
-  "storage/vectors.ts": "knowledge module",
 };
 
 const files = globSync(`${CORE}**/*.ts`, { cwd: ROOT }).map((f) => f.slice(CORE.length)).sort();

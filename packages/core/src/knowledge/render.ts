@@ -8,7 +8,7 @@ import {
 } from "@cortex/shared";
 import type { ContextPack } from "./context-pack.js";
 import type { SaveContextResult } from "./save.js";
-import type { SearchHit } from "../storage/vectors.js";
+import type { SearchHit } from "./domain/memo-index.js";
 import type { Memo } from "./domain/memo.js";
 
 /**

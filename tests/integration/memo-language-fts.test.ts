@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { closeSql, getSql } from "@cortex/database";
 import { createProject, saveContext, updateProject, type ProjectRef } from "@cortex/core";
-import { lexicalMatches } from "../../packages/core/src/storage/vectors.js";
+import { lexicalMatches } from "../../packages/core/src/knowledge/infrastructure/memo.index.js";
 
 const RID = Math.random().toString(36).slice(2, 8);
 const OWNER = `fts-owner-${RID}@example.com`;

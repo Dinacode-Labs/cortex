@@ -1,10 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getSql } from "@cortex/database";
-import { getEmbeddingProvider } from "@cortex/embeddings";
 import { getEnvNum } from "@cortex/shared";
 import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shared";
-import { registerUsageSink, saveContext, storeEmbeddingsBatch } from "@cortex/core";
+import { indexMemos, registerUsageSink, saveContext } from "@cortex/core";
 
 /**
  * Bulk context ingestion from a JSON file (an array of items) into a project. Two phases, to
@@ -81,7 +79,7 @@ export async function run(args: string[]): Promise<void> {
   console.log(`Phase 1 done: ${toEmbed.length} entries (${failed} failed).`);
 
   console.log(`Phase 2: generating embeddings in batches of ${EMBED_BATCH}...`);
-  await storeEmbeddingsBatch(getSql(), getEmbeddingProvider(), toEmbed, {
+  await indexMemos(toEmbed, {
     batchSize: EMBED_BATCH,
     onProgress: (d) => console.log(`  phase 2: ${d}/${toEmbed.length}`),
   });

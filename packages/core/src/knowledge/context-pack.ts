@@ -1,10 +1,9 @@
 import { getSql, type Sql } from "@cortex/database";
-import { getEmbeddingProvider } from "@cortex/embeddings";
 import type { ProjectCriteria } from "@cortex/shared";
 import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../projects/application/projects.js";
 import { rowToMemo, type Row } from "../storage/map.js";
 import { port } from "../composition.js";
-import { vectorSearch, type SearchHit } from "../storage/vectors.js";
+import type { SearchHit } from "./domain/memo-index.js";
 import type { Memo, MemoStatus, MemoType } from "./domain/memo.js";
 
 export async function validateEntry(
@@ -124,13 +123,7 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
 
   let relevantToArea: SearchHit[] = [];
   if (area) {
-    const provider = getEmbeddingProvider();
-    relevantToArea = await vectorSearch(sql, provider, {
-      queryText: area,
-      projectId,
-      limit: 5,
-      asOf,
-    });
+    relevantToArea = await port("memoIndex").similar(area, { projectId, asOf }, 5);
   }
 
   return {

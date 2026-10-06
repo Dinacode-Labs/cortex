@@ -3,7 +3,7 @@ import { join, relative, extname, basename, sep } from "node:path";
 import { getSql, toVectorLiteral, type Sql } from "@cortex/database";
 import { getEmbeddingProvider, type EmbeddingProvider } from "@cortex/embeddings";
 import { findProjectIdByName } from "../projects/application/projects.js";
-import { rrfFuse } from "../storage/vectors.js";
+import { rrfFuse } from "../knowledge/domain/rank.js";
 import type { Row } from "../storage/map.js";
 
 /** Directories NEVER walked when indexing/ingesting a repo: dependencies and generated
