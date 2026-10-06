@@ -1,5 +1,5 @@
-import { entityGroupKey, rankEntities } from "./domain/entity.js";
-import { port } from "../composition.js";
+import { entityGroupKey, rankEntities } from "../domain/entity.js";
+import { port } from "../../composition.js";
 
 /**
  * The entity resolution loop (section 12.4): merges variants of the same entity

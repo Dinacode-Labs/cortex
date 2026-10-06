@@ -23,8 +23,6 @@ const KNOWN_VIOLATIONS: Record<string, string> = {
   "capture/code.ts": "capture module",
   "capture/extract.ts": "capture module",
   "capture/session-captures.ts": "capture module",
-  "graph/across.ts": "graph module",
-  "graph/entities.ts": "graph module",
   "index.ts": "dropping core's dependency on client",
   "knowledge/context-pack.ts": "knowledge module",
   "knowledge/dedup.ts": "knowledge module",

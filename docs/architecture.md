@@ -55,6 +55,7 @@ rule and when a listed file no longer needs to be listed.
 3. One step per module. Use cases move into `application/`, SQL and libraries into
    `infrastructure/`.
    - ✓ `observability`
-   - `graph`, `projects`, `auth`, `capture`, `knowledge` (with `storage`)
+   - ✓ `graph`
+   - `projects`, `auth`, `capture`, `knowledge` (with `storage`)
 4. `core` stops depending on `client`.
 5. The domain that still lives in `shared` moves into its module in `core`.

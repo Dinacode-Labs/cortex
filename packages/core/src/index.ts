@@ -16,14 +16,10 @@ export { storeEmbeddingsBatch } from "./storage/vectors.js";
 export { recordUsage, getUsageSummary, getRecentTraces } from "./observability/application/usage.js";
 export { estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./observability/domain/usage.js";
 export { registerUsageSink } from "./observability/infrastructure/embedding-usage-sink.js";
-export { resolveEntity, relate, linkEntryToEntity } from "./graph/entities.js";
-export {
-  getAcrossClient,
-  type AcrossClient,
-  type SharedEntity,
-  type CrossProjectContradiction,
-} from "./graph/across.js";
-export { resolveEntities, type ResolveResult } from "./graph/resolve-entities.js";
+export { resolveEntity, relate, linkEntryToEntity } from "./graph/application/entities.js";
+export { getAcrossClient } from "./graph/application/across.js";
+export type { AcrossClient, SharedEntity, CrossProjectContradiction } from "./graph/domain/across.js";
+export { resolveEntities, type ResolveResult } from "./graph/application/resolve-entities.js";
 // `readCortexLink` lives in @cortex/client (it is client-side code, with no SQL); it is
 // re-exported here because core uses it to resolve a repo's project.
 export { readCortexLink, type CortexLink } from "@cortex/client";

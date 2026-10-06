@@ -1,6 +1,7 @@
 import { getSql, type Sql } from "@cortex/database";
 import { rowToMemo, type Row } from "../../storage/map.js";
 import type {
+  ContradictingSide,
   MemoRepository,
   NewMemo,
   NewSource,
@@ -297,5 +298,22 @@ export class PgMemoRepository implements MemoRepository {
       }
       return found;
     });
+  }
+
+  async contradictingPairs(projectIds: string[], limit: number): Promise<{ a: ContradictingSide; b: ContradictingSide }[]> {
+    const rows = (await this.sql`
+      SELECT ca.id AS a_id, ca.title AS a_title, ca.created_at AS a_at, ca.project_id AS a_project,
+             cb.id AS b_id, cb.title AS b_title, cb.created_at AS b_at, cb.project_id AS b_project
+      FROM relations r
+      JOIN memos ca ON ca.id = r.source_id AND ca.valid_to IS NULL
+      JOIN memos cb ON cb.id = r.target_id AND cb.valid_to IS NULL
+      WHERE r.relation_type = 'contradicts'
+        AND ca.project_id = ANY(${projectIds}) AND cb.project_id = ANY(${projectIds})
+      LIMIT ${limit}
+    `) as unknown as Row[];
+    return rows.map((r) => ({
+      a: { id: r.a_id as string, title: r.a_title as string, createdAt: new Date(r.a_at as string), projectId: (r.a_project as string) ?? null },
+      b: { id: r.b_id as string, title: r.b_title as string, createdAt: new Date(r.b_at as string), projectId: (r.b_project as string) ?? null },
+    }));
   }
 }

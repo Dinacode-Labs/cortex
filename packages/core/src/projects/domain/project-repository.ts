@@ -28,6 +28,7 @@ export interface ProjectRepository {
   findBySlug(slug: string): Promise<ProjectRef | null>;
   findIdByRef(ref: string): Promise<string | null>;
   findByCanonicalName(name: string): Promise<ProjectRef | null>;
+  findByIds(ids: string[]): Promise<ProjectRef[]>;
   resolveEntryProject(entryId: string): Promise<{ found: boolean; project: ProjectRef | null }>;
   chain(projectId: string): Promise<ProjectChainNode[]>;
   isMember(projectId: string, email: string): Promise<boolean>;

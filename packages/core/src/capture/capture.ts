@@ -3,7 +3,7 @@ import { getEmbeddingProvider } from "@cortex/embeddings";
 import { saveContext } from "../knowledge/save.js";
 import { storeEmbeddingsBatch } from "../storage/vectors.js";
 import { findProjectIdByName } from "../projects/projects.js";
-import { relate } from "../graph/entities.js";
+import { relate } from "../graph/application/entities.js";
 import { type BatchItem, type RelationType, scrub } from "@cortex/shared";
 import { port } from "../composition.js";
 
@@ -73,5 +73,5 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
 }
 
 export async function relateEntries(sourceId: string, targetId: string, relationType: RelationType): Promise<void> {
-  await relate(getSql(), { sourceId, sourceType: "memo", targetId, targetType: "memo", relationType });
+  await relate({ sourceId, sourceType: "memo", targetId, targetType: "memo", relationType });
 }

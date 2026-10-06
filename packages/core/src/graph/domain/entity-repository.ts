@@ -1,4 +1,5 @@
 import type { ConfidenceLevel, Entity, EntityType, RelationType } from "@cortex/shared";
+import type { SharedEntity } from "./across.js";
 
 export interface RelationInput {
   sourceId: string;
@@ -31,4 +32,5 @@ export interface EntityRepository {
   mergeEntities(canonicalId: string, loserIds: string[]): Promise<void>;
   /** Drops self-relations and duplicate edges left after the merges. */
   normalizeRelations(): Promise<void>;
+  sharedStack(projectIds: string[], types: EntityType[], limit: number): Promise<SharedEntity[]>;
 }

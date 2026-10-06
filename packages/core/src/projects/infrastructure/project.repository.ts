@@ -111,6 +111,14 @@ export class PgProjectRepository implements ProjectRepository {
     return new Map(rows.map((r) => [r.project_id as string, Number(r.entry_count)]));
   }
 
+  async findByIds(ids: string[]): Promise<ProjectRef[]> {
+    const rows = (await this.sql`
+      SELECT id, name, slug, visibility, owner_email, parent_id FROM entities
+      WHERE type = 'project' AND id = ANY(${ids})
+    `) as unknown as Row[];
+    return rows.map(toRef).filter((r): r is ProjectRef => r !== null);
+  }
+
   async findByCanonicalName(name: string): Promise<ProjectRef | null> {
     const rows = (await this.sql`
       SELECT id, name, slug, visibility, owner_email, parent_id FROM entities

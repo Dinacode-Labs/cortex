@@ -91,11 +91,11 @@ describe("purging an entry leaves nothing behind", () => {
     await relateEntries(doomed.id, kept.id, "contradicts");
 
     const sql = getSql();
-    const onlyDoomed = await resolveEntity(sql, `ghostmodule${RID}`, "module");
-    const shared = await resolveEntity(sql, `paymentsqueue${RID}`, "module");
-    await linkEntryToEntity(sql, doomed.id, onlyDoomed.id);
-    await linkEntryToEntity(sql, doomed.id, shared.id);
-    await linkEntryToEntity(sql, kept.id, shared.id);
+    const onlyDoomed = await resolveEntity(`ghostmodule${RID}`, "module");
+    const shared = await resolveEntity(`paymentsqueue${RID}`, "module");
+    await linkEntryToEntity(doomed.id, onlyDoomed.id);
+    await linkEntryToEntity(doomed.id, shared.id);
+    await linkEntryToEntity(kept.id, shared.id);
 
     expect((await searchContext({ query: MARKER, project: project.name, limit: 20 })).map((h) => h.entry.id)).toContain(doomed.id);
 
