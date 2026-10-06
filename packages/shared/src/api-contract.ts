@@ -2,6 +2,7 @@ import { z } from "zod";
 import { confidenceLevel, contextEntryTypeInput } from "./domain/memo.js";
 import { sourceType } from "./domain/source.js";
 import { language } from "./domain/language.js";
+import { projectCriteria } from "./domain/project-criteria.js";
 
 /**
  * The HTTP API contract: the schemas server and client share.
@@ -45,6 +46,7 @@ export const updateProjectRequest = z.object({
   /** Hang it under another project, or `null` to leave it standalone. */
   parentSlug: z.string().nullable().optional(),
   language: language.nullable().optional(),
+  criteria: projectCriteria.nullable().optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequest>;
 

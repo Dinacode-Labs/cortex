@@ -1,4 +1,4 @@
-import type { Language } from "@cortex/shared";
+import type { Language, ProjectCriteria } from "@cortex/shared";
 import type { ProjectChainNode, ProjectRef } from "./project.js";
 
 /** A project to create, before it has an id. */
@@ -39,8 +39,9 @@ export interface ProjectRepository {
   insert(project: NewProject): Promise<ProjectRef | null>;
   parentIdOf(id: string): Promise<string | null>;
   update(id: string, changes: ProjectChanges): Promise<void>;
-  languageChain(projectId: string): Promise<(Language | null)[]>;
+  settingsChain(projectId: string): Promise<{ language: Language | null; criteria: unknown }[]>;
   setLanguage(id: string, language: Language | null): Promise<void>;
+  setCriteria(id: string, criteria: ProjectCriteria | null): Promise<void>;
   countEntries(projectId: string): Promise<number>;
   countChildren(projectId: string): Promise<number>;
   remove(id: string): Promise<void>;

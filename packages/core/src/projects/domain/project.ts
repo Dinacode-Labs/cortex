@@ -1,4 +1,4 @@
-import type { Language } from "@cortex/shared";
+import type { ContextEntryType, Language, ProjectCriteria, TypeCriterion } from "@cortex/shared";
 import type { SessionUser } from "../../auth/session-user.js";
 
 /**
@@ -47,4 +47,19 @@ export async function decideProjectAccess(
 /** `chain` runs from the project up to its root: the nearest language set wins (ADR-0081). */
 export function effectiveLanguage(chain: (Language | null)[], fallback: Language): Language {
   return chain.find((own): own is Language => own !== null) ?? fallback;
+}
+
+/** `chain` runs from the project up to its root: a child narrows what it inherits, never widens it (ADR-0084). */
+export function effectiveCriteria(chain: (ProjectCriteria | null)[]): ProjectCriteria {
+  const rootFirst = [...chain].reverse().filter((criteria): criteria is ProjectCriteria => criteria !== null);
+  const types: ProjectCriteria["types"] = {};
+  for (const criteria of rootFirst) {
+    for (const [type, criterion] of Object.entries(criteria.types) as [ContextEntryType, TypeCriterion][]) {
+      const before = types[type];
+      const guidance = [before?.guidance, criterion.guidance].filter(Boolean).join("; ");
+      types[type] = { keep: (before?.keep ?? true) && criterion.keep, ...(guidance ? { guidance } : {}) };
+    }
+  }
+  const union = (lists: string[][]): string[] => [...new Set(lists.flat())];
+  return { types, keep: union(rootFirst.map((c) => c.keep)), discard: union(rootFirst.map((c) => c.discard)) };
 }
