@@ -8,12 +8,12 @@ export type { ContextSnippet };
 export async function synthesizeContextAnswer(
   question: string,
   snippets: ContextSnippet[],
-  language?: Language,
+  context: { language?: Language; projectId?: string | null } = {},
 ): Promise<string | null> {
   if (!getAgent("retriever") || snippets.length === 0) return null;
 
   try {
-    return await runAgent("retriever", retrieverPrompt(question, snippets), { maxOutputTokens: 900, language });
+    return await runAgent("retriever", retrieverPrompt(question, snippets), { maxOutputTokens: 900, ...context });
   } catch (e) {
     console.error("[agents] synthesizeContextAnswer failed:", (e as Error).message);
     return null;

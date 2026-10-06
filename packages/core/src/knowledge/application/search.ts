@@ -12,7 +12,7 @@ import type { Memo } from "../domain/memo.js";
 
 export type { SearchHit } from "../domain/memo-index.js";
 
-export type Reranker = (query: string, hits: SearchHit[]) => Promise<SearchHit[]>;
+export type Reranker = (query: string, hits: SearchHit[], context: { projectId: string | null }) => Promise<SearchHit[]>;
 
 let reranker: Reranker | null = null;
 
@@ -97,7 +97,7 @@ export async function searchContext(
     : hits;
 
   if (!reranker) return ordered.slice(0, parsed.limit);
-  const reranked = await reranker(parsed.query, ordered).catch(() => ordered);
+  const reranked = await reranker(parsed.query, ordered, { projectId: askedProject }).catch(() => ordered);
   return reranked.slice(0, parsed.limit);
 }
 

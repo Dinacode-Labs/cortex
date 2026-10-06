@@ -23,6 +23,8 @@ import { PgUsageRepository } from "./observability/infrastructure/usage.reposito
 import { PgMemoRepository } from "./knowledge/infrastructure/memo.repository.js";
 import type { ProjectRepository } from "./projects/domain/project-repository.js";
 import { PgProjectRepository } from "./projects/infrastructure/project.repository.js";
+import type { AgentPromptRepository } from "./projects/domain/agent-prompt-repository.js";
+import { PgAgentPromptRepository } from "./projects/infrastructure/agent-prompt.repository.js";
 
 export interface CorePorts {
   memos: MemoRepository;
@@ -30,6 +32,7 @@ export interface CorePorts {
   memoReader: MemoReader;
   health: HealthReader;
   projects: ProjectRepository;
+  agentPrompts: AgentPromptRepository;
   entities: EntityRepository;
   usage: UsageRepository;
   auth: AuthRepository;
@@ -45,6 +48,7 @@ const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   memoReader: () => new PgMemoReader(getSql()),
   health: () => new PgHealthReader(getSql()),
   projects: () => new PgProjectRepository(getSql()),
+  agentPrompts: () => new PgAgentPromptRepository(getSql()),
   entities: () => new PgEntityRepository(getSql()),
   usage: () => new PgUsageRepository(getSql()),
   auth: () => new PgAuthRepository(getSql()),

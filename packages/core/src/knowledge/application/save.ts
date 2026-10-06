@@ -9,7 +9,10 @@ import { port } from "../../composition.js";
 export { decideReclassification } from "../domain/memo.js";
 export type { ClassifierResult, ReclassifyDecision } from "../domain/memo.js";
 
-export type Classifier = (content: string, context: { language: Language }) => Promise<ClassifierResult | null>;
+export type Classifier = (
+  content: string,
+  context: { language: Language; projectId: string | null },
+) => Promise<ClassifierResult | null>;
 
 let classifier: Classifier | null = null;
 
@@ -74,7 +77,7 @@ export async function saveContext(
 
   // Optional LLM layer: precedence is explicit input > LLM > heuristic.
   const useClassifier = opts.useClassifier ?? true;
-  const llm = useClassifier && classifier ? await classifier(parsed.content, { language }).catch(() => null) : null;
+  const llm = useClassifier && classifier ? await classifier(parsed.content, { language, projectId }).catch(() => null) : null;
   const draft = MemoDraft.from(
     {
       content: parsed.content,
@@ -214,7 +217,7 @@ export async function reclassifyProject(project: string): Promise<{ scanned: num
 
   let reclassified = 0;
   for (const r of rows) {
-    const res = await classifier(r.content, { language }).catch(() => null);
+    const res = await classifier(r.content, { language, projectId }).catch(() => null);
     const proposed = res?.type;
     const decision = decideReclassification(r.type, proposed);
     // Only asked of a classifier that answered: with none, the heuristic already ran on the
@@ -282,7 +285,7 @@ export async function resummarizeEntries(opts: ResummarizeOptions = {}): Promise
   for (const r of rows) {
     if (!isDerivedSummary(r.summary, r.content, r.title)) continue;
     const llm = classifier
-      ? await classifier(r.content, { language: await languageOf(r.projectId) }).catch(() => null)
+      ? await classifier(r.content, { language: await languageOf(r.projectId), projectId: r.projectId }).catch(() => null)
       : null;
     const next = betterSummary(llm?.summary, r);
     if (!next) continue;

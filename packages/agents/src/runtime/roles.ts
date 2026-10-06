@@ -1,7 +1,7 @@
-import type { Language } from "@cortex/shared";
+import { agentRole, type AgentRole, type Language } from "@cortex/shared";
 
-export const AGENT_ROLES = ["classifier", "graph", "reranker", "retriever", "distiller", "merger", "reconciler"] as const;
-export type AgentRole = (typeof AGENT_ROLES)[number];
+export type { AgentRole };
+export const AGENT_ROLES = agentRole.options;
 
 /**
  * A role's system prompt is two parts kept apart on purpose (ADR-0088): the criterion it judges

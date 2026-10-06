@@ -1,4 +1,4 @@
-import { getProjectLanguage, searchContext, type SearchHit, type SessionUser } from "@cortex/core";
+import { findProjectByName, getProjectLanguage, searchContext, type SearchHit, type SessionUser } from "@cortex/core";
 import { synthesizeContextAnswer } from "../agents/retriever/synthesize.js";
 
 /**
@@ -24,10 +24,11 @@ export async function askProjectContext(
   // a trusted call (it searches everything); with it, it restricts to accessible projects.
   const hits = await searchContext({ query: question, project, limit }, opts);
   const language = project ? (await getProjectLanguage(project)).effective : undefined;
+  const projectId = project ? ((await findProjectByName(project))?.id ?? null) : null;
   const answer = await synthesizeContextAnswer(
     question,
     hits.map((h) => ({ title: h.entry.title, summary: h.entry.summary ?? h.entry.content, type: h.entry.type })),
-    language,
+    { language, projectId },
   );
   return { answer, hits };
 }

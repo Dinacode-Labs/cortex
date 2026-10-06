@@ -5,7 +5,7 @@ import { runAgent } from "../../runtime/run-agent.js";
 // superset of the simple trimming we used to do here.
 import { extractJson } from "../../json.js";
 import { distillerPrompt } from "./prompt.js";
-import { keepsType } from "@cortex/core";
+import { keepsType, type AgentPromptChain } from "@cortex/core";
 
 /**
  * Each item also carries its own `summary`. Without it the entry was summarised by the
@@ -49,11 +49,16 @@ export function parseDistilledItems(raw: string, criteria?: ProjectCriteria): It
 export async function distill(
   project: string,
   window: string,
-  opts: { language?: Language; criteria?: ProjectCriteria } = {},
+  opts: { language?: Language; criteria?: ProjectCriteria; projectId?: string | null; chain?: AgentPromptChain } = {},
 ): Promise<Item[]> {
   try {
     const prompt = distillerPrompt(project, window, opts.criteria);
-    const raw = await runAgent("distiller", prompt, { maxOutputTokens: 1500, language: opts.language });
+    const raw = await runAgent("distiller", prompt, {
+      maxOutputTokens: 1500,
+      language: opts.language,
+      projectId: opts.projectId,
+      chain: opts.chain,
+    });
     return parseDistilledItems(raw, opts.criteria);
   } catch (e) {
     // With no LLM configured there is no failure: that is a deliberate state and core falls

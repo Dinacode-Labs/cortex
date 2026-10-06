@@ -22,6 +22,7 @@ export interface NearestEntry {
   content: string;
   score: number;
   sourceType: string;
+  projectId: string;
 }
 
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
@@ -31,7 +32,14 @@ export async function findNearest(project: string, text: string): Promise<Neares
     const hits = await port("memoIndex").similar(text, { projectId: pid }, 1);
     const h = hits[0];
     if (!h) return null;
-    return { id: h.entry.id, title: h.entry.title, content: h.entry.content, score: h.score, sourceType: h.entry.sourceType };
+    return {
+      id: h.entry.id,
+      title: h.entry.title,
+      content: h.entry.content,
+      score: h.score,
+      sourceType: h.entry.sourceType,
+      projectId: pid,
+    };
   } catch {
     return null;
   }
@@ -86,8 +94,16 @@ export async function invalidateEntry(entryId: string, supersededById: string): 
 /** Injectable LLM reconciler (provided by @cortex/agents through setReconciler). Without it,
  * reconciliation is deterministic: near-identical dedup only (no merge/supersede). */
 export interface ReconcilerHooks {
-  decide: (existing: string, incoming: string) => Promise<"noop" | "update" | "supersede">;
-  merge: (existing: string, incoming: string, context: { language: Language }) => Promise<string>;
+  decide: (
+    existing: string,
+    incoming: string,
+    context: { projectId: string | null },
+  ) => Promise<"noop" | "update" | "supersede">;
+  merge: (
+    existing: string,
+    incoming: string,
+    context: { language: Language; projectId: string | null },
+  ) => Promise<string>;
 }
 let reconciler: ReconcilerHooks | null = null;
 export function setReconciler(hooks: ReconcilerHooks | null): void {
@@ -152,14 +168,14 @@ export async function saveWithReconciliation(
   // nothing is ever modified or invalidated: the worst that can happen is that the entry is not
   // added because we already knew it, which is exactly what is wanted.
   if (near && !sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
-    if ((await reconciler.decide(near.content, input.content)) === "noop") {
+    if ((await reconciler.decide(near.content, input.content, { projectId: near.projectId })) === "noop") {
       await recordCorroboration(near.id);
       return { action: "noop", entryId: near.id };
     }
   }
 
   if (near && sameKind && near.score >= UPDATE_THRESHOLD && reconciler) {
-    const decision = await reconciler.decide(near.content, input.content);
+    const decision = await reconciler.decide(near.content, input.content, { projectId: near.projectId });
     if (decision === "noop") {
       await recordCorroboration(near.id);
       return { action: "noop", entryId: near.id };
@@ -177,7 +193,8 @@ export async function saveWithReconciliation(
     // update: only auto-captured entries are merged (sourced/curated is never rewritten)
     if (near.sourceType === "agent_session") {
       const { effective: language } = await getProjectLanguage(input.project!);
-      await updateEntryContent(near.id, await reconciler.merge(near.content, input.content, { language }));
+      const merged = await reconciler.merge(near.content, input.content, { language, projectId: near.projectId });
+      await updateEntryContent(near.id, merged);
       await recordCorroboration(near.id);
       return { action: "update", entryId: near.id };
     }

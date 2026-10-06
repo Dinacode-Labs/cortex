@@ -25,11 +25,14 @@ export interface GraphExtraction {
 const ETYPES = extractableEntityType.options;
 const RTYPES = relationType.options;
 
-export async function extractGraph(content: string, language?: Language): Promise<GraphExtraction | null> {
+export async function extractGraph(
+  content: string,
+  context: { language?: Language; projectId?: string | null } = {},
+): Promise<GraphExtraction | null> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const raw = await runAgent("graph", graphPrompt(content), { maxOutputTokens: 1200, language });
+      const raw = await runAgent("graph", graphPrompt(content), { maxOutputTokens: 1200, ...context });
       const text = extractJson(raw).trim();
       if (!text) throw new Error("empty response");
       const parsed = JSON.parse(text) as {

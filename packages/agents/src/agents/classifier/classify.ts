@@ -22,7 +22,7 @@ const ENTITY_TYPES = extractableEntityType.options;
  */
 export async function classifyEntry(
   content: string,
-  context: { language: Language },
+  context: { language: Language; projectId: string | null },
 ): Promise<ClassificationResult | null> {
   // Reasoning models need room: the budget is generous so that JSON still fits after the
   // reasoning, and we retry once when the answer arrives empty or truncated.
@@ -32,6 +32,7 @@ export async function classifyEntry(
       const raw = await runAgent("classifier", classifierPrompt(content), {
         maxOutputTokens: 2000,
         language: context.language,
+        projectId: context.projectId,
       });
       const text = extractJson(raw).trim();
       if (!text) throw new Error("empty response from the model");
