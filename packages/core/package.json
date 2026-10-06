@@ -15,7 +15,6 @@
     "build": "tsc -b tsconfig.build.json"
   },
   "dependencies": {
-    "@cortex/client": "workspace:*",
     "@cortex/database": "workspace:*",
     "@cortex/embeddings": "workspace:*",
     "@cortex/shared": "workspace:*",

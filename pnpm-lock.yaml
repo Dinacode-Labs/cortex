@@ -195,9 +195,6 @@ importers:
 
   packages/core:
     dependencies:
-      '@cortex/client':
-        specifier: workspace:*
-        version: link:../client
       '@cortex/database':
         specifier: workspace:*
         version: link:../database

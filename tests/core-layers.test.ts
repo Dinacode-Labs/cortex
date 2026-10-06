@@ -16,10 +16,6 @@ const INFRASTRUCTURE_IMPORTS = [
   "xlsx",
 ];
 
-const KNOWN_VIOLATIONS: Record<string, string> = {
-  "index.ts": "dropping core's dependency on client",
-};
-
 const files = globSync(`${CORE}**/*.ts`, { cwd: ROOT }).map((f) => f.slice(CORE.length)).sort();
 const importsOf = (file: string): string[] =>
   [...readFileSync(resolve(ROOT, CORE, file), "utf8").matchAll(/(?:from\s+|import\()\s*"([^"]+)"/g)].map((m) => m[1]!);
@@ -36,16 +32,15 @@ const mayTouchInfrastructure = (file: string): boolean =>
 describe("core's layers", () => {
   it("only the infrastructure layer and the composition touch the database, embeddings or an external library", () => {
     const offenders = files
-      .filter((file) => !mayTouchInfrastructure(file) && !(file in KNOWN_VIOLATIONS))
+      .filter((file) => !mayTouchInfrastructure(file))
       .flatMap((file) => importsOf(file).filter(isInfrastructure).map((spec) => `${file} imports ${spec}`));
     expect(offenders).toEqual([]);
   });
 
-  it("the list of files still to move is honest: each one exists and still needs moving", () => {
-    const stale = Object.keys(KNOWN_VIOLATIONS).filter(
-      (file) => !files.includes(file) || !importsOf(file).some(isInfrastructure),
-    );
-    expect(stale).toEqual([]);
+  it("core does not depend on the laptop's client package, nor on the LLM layer", () => {
+    const manifest = JSON.parse(readFileSync(resolve(ROOT, "packages/core/package.json"), "utf8"));
+    const dependencies = Object.keys(manifest.dependencies ?? {});
+    expect(dependencies.filter((d) => d === "@cortex/client" || d === "@cortex/agents")).toEqual([]);
   });
 
   it("the domain imports neither use cases nor adapters, and use cases do not import adapters", () => {
