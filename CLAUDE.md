@@ -54,8 +54,9 @@ packages/
   client/      # client side: HTTP + credentials + .cortex.json + transcripts (→ shared only)
   database/    # SQL schema + migrations + Postgres client
   embeddings/  # pluggable provider (local | openai-compatible | openai | voyage)
-  core/        # the domain: save/search/context-pack, dedup/reconciliation, lint,
-               # bi-temporal, projects/permissions, extract, code indexing
+  core/        # the domain and its use cases: save/search/context-pack, dedup/reconciliation,
+               # lint, bi-temporal, projects/permissions, extract, code indexing. Each module is
+               # domain/ + application/ + infrastructure/ (READ docs/architecture.md)
   agents/      # the LLM layer (Mastra over an OpenAI-compatible endpoint): classifier, graph,
                # rerank, synthesize, distill, reconcile, maintain
 apps/
@@ -85,6 +86,7 @@ evals/         # the eval sets: retrieval/ (corpus + questions) and distill/<lan
                # so they live outside tests/ and CI never runs them (evals/README.md)
 docs/
   decisions.md # a light ADR log: decisions = hypotheses to revisit
+  architecture.md # how the packages depend on each other and how core is layered
   design.md    # what the web UI is for and what it is not; read it BEFORE touching apps/web
   roadmap.md   # what is missing (the technical WHAT only; priorities and owners stay out)
   research/    # technical research of general interest
