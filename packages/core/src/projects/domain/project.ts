@@ -1,4 +1,4 @@
-import type { ContextEntryType, Language, ProjectCriteria, TypeCriterion } from "@cortex/shared";
+import { getEnv, language, type ContextEntryType, type Language, type ProjectCriteria, type TypeCriterion } from "@cortex/shared";
 import type { SessionUser } from "../../auth/domain/session-user.js";
 
 /**
@@ -62,4 +62,21 @@ export function effectiveCriteria(chain: (ProjectCriteria | null)[]): ProjectCri
   }
   const union = (lists: string[][]): string[] => [...new Set(lists.flat())];
   return { types, keep: union(rootFirst.map((c) => c.keep)), discard: union(rootFirst.map((c) => c.discard)) };
+}
+
+export function keepsType(criteria: ProjectCriteria, type: ContextEntryType): boolean {
+  return criteria.types[type]?.keep ?? true;
+}
+
+let warnedLanguage = false;
+
+export function defaultLanguage(): Language {
+  const configured = getEnv("CORTEX_DEFAULT_LANGUAGE", "es");
+  const parsed = language.safeParse(configured);
+  if (parsed.success) return parsed.data;
+  if (!warnedLanguage) {
+    warnedLanguage = true;
+    console.warn(`CORTEX_DEFAULT_LANGUAGE="${configured}" is not one of ${language.options.join(", ")}: using "es".`);
+  }
+  return "es";
 }

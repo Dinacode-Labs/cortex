@@ -1,6 +1,5 @@
 import { scrub, type CaptureSessionCounters, type SourceType } from "@cortex/shared";
-import { sliceTranscript } from "@cortex/client";
-import { getProjectCriteria, getProjectLanguage, saveWithReconciliation } from "@cortex/core";
+import { getProjectCriteria, getProjectLanguage, saveWithReconciliation, sliceTranscript } from "@cortex/core";
 import { distill } from "../agents/distiller/distill.js";
 
 /**

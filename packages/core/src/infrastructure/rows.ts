@@ -1,5 +1,6 @@
-import type { Entity, Source } from "@cortex/shared";
 import type { Memo } from "../knowledge/domain/memo.js";
+import type { Entity } from "../graph/domain/entity.js";
+import type { Source } from "../knowledge/domain/source.js";
 
 export type Row = Record<string, any>;
 

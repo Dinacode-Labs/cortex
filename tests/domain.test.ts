@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { saveContextInput, contextEntryType, confidenceLevel } from "../packages/shared/src/domain/memo";
+import { saveContextInput, contextEntryType, confidenceLevel } from "../packages/shared/src/contract/memo";
 
 describe("schemas de dominio (zod)", () => {
   it("saveContextInput requires content and accepts the bare minimum", () => {

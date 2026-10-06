@@ -1,4 +1,4 @@
-import type { ContextEntryType } from "./memo.js";
+import type { ContextEntryType } from "@cortex/shared";
 
 export interface MemoTypeDefinition {
   is: string;

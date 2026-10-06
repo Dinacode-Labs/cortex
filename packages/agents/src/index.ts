@@ -11,3 +11,4 @@ export { distillSession, type DistillSessionFn, type DistillSessionInput } from 
 export { wireLlm } from "./wiring.js";
 export { enrichProject, type EnrichResult } from "./jobs/enrich-project.js";
 export { runMaintenance, type MaintenanceReport } from "./jobs/maintenance.js";
+export { getLlmConfig, isLlmEnabled, getVisionConfig, getSttConfig, type LlmConfig, type SttConfig } from "./runtime/llm-config.js";

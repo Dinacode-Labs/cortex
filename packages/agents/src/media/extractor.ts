@@ -4,8 +4,9 @@ import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { getBrandName, getEnvNum, getSttConfig, getVisionConfig, type LlmConfig, type SttConfig, withLlmSlot } from "@cortex/shared";
+import { getBrandName, getEnvNum, withLlmSlot } from "@cortex/shared";
 import type { MediaExtractorHooks } from "@cortex/core";
+import { getSttConfig, getVisionConfig, type LlmConfig, type SttConfig } from "../runtime/llm-config.js";
 
 const execFileAsync = promisify(execFile);
 

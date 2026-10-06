@@ -1,7 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { Agent } from "@mastra/core/agent";
-import { getLlmConfig } from "@cortex/shared";
 import type { AgentRole } from "./roles.js";
+import { getLlmConfig } from "./llm-config.js";
 
 export const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller", "reconciler"]);
 

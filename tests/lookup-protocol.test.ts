@@ -15,12 +15,12 @@ import {
 import { PACK_SECTIONS } from "../packages/core/src/knowledge/application/context-pack.js";
 import { renderContextPack } from "../packages/core/src/knowledge/application/render.js";
 import type { ContextPack } from "../packages/core/src/knowledge/application/context-pack.js";
-import type { ContextEntry } from "@cortex/shared";
+import type { Memo } from "../packages/core/src/knowledge/domain/memo";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const read = (rel: string): string => readFileSync(resolve(ROOT, rel), "utf8");
 
-const entry = (type: string, i: number): ContextEntry =>
+const entry = (type: string, i: number): Memo =>
   ({
     id: `${type}-${i}`,
     title: `${type} number ${i}`,
@@ -29,7 +29,7 @@ const entry = (type: string, i: number): ContextEntry =>
     type,
     status: "active",
     confidence: "medium",
-  }) as unknown as ContextEntry;
+  }) as unknown as Memo;
 
 const pack = (perSection = 12, totalEntries = 349): ContextPack =>
   ({

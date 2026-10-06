@@ -45,33 +45,6 @@ export type SortDirection = z.infer<typeof sortDirection>;
 export const confidenceLevel = z.enum(["low", "medium", "high", "verified"]);
 export type ConfidenceLevel = z.infer<typeof confidenceLevel>;
 
-export const validity = z.enum(["current", "historical", "unknown"]);
-export type Validity = z.infer<typeof validity>;
-
-export const contextEntry = z.object({
-  id: z.string().uuid(),
-  projectId: z.string().uuid().nullable(),
-  clientId: z.string().uuid().nullable(),
-  title: z.string(),
-  content: z.string(),
-  summary: z.string().nullable(),
-  type: contextEntryType,
-  status: contextEntryStatus,
-  confidence: confidenceLevel,
-  validity: validity,
-  sourceType: sourceType,
-  sourceReference: z.string().nullable(),
-  createdBy: z.string().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  supersededBy: z.string().uuid().nullable(),
-  metadata: z.record(z.unknown()),
-  validFrom: z.date(),
-  validTo: z.date().nullable(),
-  observedAt: z.date(),
-});
-export type ContextEntry = z.infer<typeof contextEntry>;
-
 export const saveContextInput = z.object({
   content: z.string().min(1, "content cannot be empty"),
   project: z.string().min(1).optional().describe("Project slug (what `cortex link` shows) or name; a new project is created if neither matches"),

@@ -1,10 +1,11 @@
-import { contextEntryType, keepsType, type ContextEntryType, type Language, type ProjectCriteria } from "@cortex/shared";
+import { contextEntryType, type ContextEntryType, type Language, type ProjectCriteria } from "@cortex/shared";
 import { runAgent } from "../../runtime/run-agent.js";
 // Shared extractJson: on top of the brace trimming (distill's previous behaviour) it now
 // understands ```json fenced blocks -- a strict improvement, not a regression: the fence is a
 // superset of the simple trimming we used to do here.
 import { extractJson } from "../../json.js";
 import { distillerPrompt } from "./prompt.js";
+import { keepsType } from "@cortex/core";
 
 /**
  * Each item also carries its own `summary`. Without it the entry was summarised by the

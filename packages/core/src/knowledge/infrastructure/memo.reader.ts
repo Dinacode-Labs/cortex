@@ -1,8 +1,8 @@
 import type { Sql } from "@cortex/database";
-import type { Entity } from "@cortex/shared";
 import { rowToEntity, rowToMemo, rowToSource, type Row } from "../../infrastructure/rows.js";
 import type { EntryDetail, EntrySort, MemoListFilter, MemoReader, ProjectGraphData } from "../domain/memo-reader.js";
 import type { Memo, MemoType } from "../domain/memo.js";
+import type { Entity } from "../../graph/domain/entity.js";
 
 export class PgMemoReader implements MemoReader {
   constructor(private readonly sql: Sql) {}

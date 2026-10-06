@@ -1,5 +1,6 @@
-import { contextEntryType, keepsType, type ProjectCriteria } from "@cortex/shared";
+import { contextEntryType, type ProjectCriteria } from "@cortex/shared";
 import { describeMemoTypes } from "../memo-types.js";
+import { keepsType } from "@cortex/core";
 
 function projectLists(criteria?: ProjectCriteria): string {
   const lines = [

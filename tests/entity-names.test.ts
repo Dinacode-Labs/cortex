@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { entityType, extractableEntityType, isUsableEntityName } from "@cortex/shared";
+import { entityType, extractableEntityType, isUsableEntityName } from "../packages/core/src/graph/domain/entity";
 
 /**
  * An entity is a THING THAT HAS A NAME, not a claim about the project.

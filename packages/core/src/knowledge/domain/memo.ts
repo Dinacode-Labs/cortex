@@ -1,14 +1,34 @@
-import type { ContextEntry, ContextEntryStatus, ContextEntryType, EntityType } from "@cortex/shared";
+import type { ConfidenceLevel, ContextEntryStatus, ContextEntryType, SourceType } from "@cortex/shared";
 import { canonicalize, classifyType, deriveTitle, extractEntities, stripLeadingTitle, summarize } from "../../text.js";
+import type { EntityType } from "../../graph/domain/entity.js";
 
-/**
- * A memo is one piece of the memory (ADR-0077). Aliases rather than a type of its own: the
- * HTTP contract still calls it `ContextEntry` and has the same shape, so a copy here would only
- * be a second definition to keep in step.
- */
-export type Memo = ContextEntry;
 export type MemoType = ContextEntryType;
 export type MemoStatus = ContextEntryStatus;
+export type Validity = "current" | "historical" | "unknown";
+
+/** A memo is one piece of the memory (ADR-0077). The contract pins only what a client reads of it (ADR-0086). */
+export interface Memo {
+  id: string;
+  projectId: string | null;
+  clientId: string | null;
+  title: string;
+  content: string;
+  summary: string | null;
+  type: MemoType;
+  status: MemoStatus;
+  confidence: ConfidenceLevel;
+  validity: Validity;
+  sourceType: SourceType;
+  sourceReference: string | null;
+  createdBy: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  supersededBy: string | null;
+  metadata: Record<string, unknown>;
+  validFrom: Date;
+  validTo: Date | null;
+  observedAt: Date;
+}
 
 /**
  * The `Memo` aggregate in its creation state: the rules that turn a piece of knowledge into a

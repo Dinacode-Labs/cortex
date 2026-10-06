@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { confidenceLevel, contextEntryTypeInput } from "./domain/memo.js";
-import { sourceType } from "./domain/source.js";
-import { language } from "./domain/language.js";
-import { projectCriteria } from "./domain/project-criteria.js";
+import { confidenceLevel, contextEntryTypeInput } from "./contract/memo.js";
+import { sourceType } from "./contract/source.js";
+import { language } from "./contract/language.js";
+import { projectCriteria } from "./contract/project-criteria.js";
 
 /**
  * The HTTP API contract: the schemas server and client share.

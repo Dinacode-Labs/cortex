@@ -4,13 +4,13 @@ import { renderContextPack } from "../packages/core/src/knowledge/application/re
 import { stripLeadingTitle } from "../packages/core/src/text.js";
 import { contextEntryType } from "@cortex/shared";
 import type { ContextPack } from "../packages/core/src/knowledge/application/context-pack.js";
-import type { ContextEntry } from "@cortex/shared";
+import type { Memo } from "../packages/core/src/knowledge/domain/memo";
 
 /**
  * ADR-0054: the pack covers all the knowledge that describes the project's STATE, not the five
  * types somebody once hand-wrote into an interface.
  */
-const entrada = (tipo: string, i: number): ContextEntry =>
+const entrada = (tipo: string, i: number): Memo =>
   ({
     id: `${tipo}-${i}`,
     title: `${tipo} ${i}`,
@@ -19,7 +19,7 @@ const entrada = (tipo: string, i: number): ContextEntry =>
     type: tipo,
     status: "active",
     confidence: "medium",
-  }) as unknown as ContextEntry;
+  }) as unknown as Memo;
 
 const pack = (): ContextPack =>
   ({

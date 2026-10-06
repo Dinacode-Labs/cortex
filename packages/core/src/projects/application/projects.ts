@@ -1,8 +1,8 @@
-import { defaultLanguage, projectCriteria, type Language, type ProjectCriteria } from "@cortex/shared";
+import { projectCriteria, type Language, type ProjectCriteria } from "@cortex/shared";
 import { isAdmin } from "../../auth/domain/auth.js";
 import type { SessionUser } from "../../auth/domain/session-user.js";
 import { slugify } from "../domain/slug.js";
-import { decideProjectAccess, effectiveCriteria, effectiveLanguage, type ProjectRef } from "../domain/project.js";
+import { decideProjectAccess, effectiveCriteria, effectiveLanguage, type ProjectRef, defaultLanguage } from "../domain/project.js";
 import { port } from "../../composition.js";
 
 export type { ProjectRef } from "../domain/project.js";

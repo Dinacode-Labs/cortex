@@ -46,7 +46,8 @@ CLI.
 | --- | --- |
 | Domain operations (capture, search, pack, lint, projects, auth) | `packages/core/src/` — **deterministic, no LLM** |
 | The LLM layer (classify, graph, rerank, synthesise, distil, merge, reconcile) | `packages/agents/src/` (Mastra agents) |
-| The domain model (types, enums, zod schemas), one file per aggregate | `packages/shared/src/domain/` |
+| The domain model: aggregates, rules and ports, per module | `packages/core/src/<module>/domain/` (see `docs/architecture.md`) |
+| The contract: the enums and schemas the CLI and the server agree on | `packages/shared/src/contract/` and `api-contract.ts` |
 | Schema, SQL, Postgres client | `packages/database/` (migrations in `migrations/`) |
 | The embeddings provider | `packages/embeddings/` |
 | MCP server · web UI · API and auth · CLI | `apps/mcp-server` · `apps/web` · `apps/server` · `apps/cli` |
@@ -107,7 +108,7 @@ that may import `@cortex/database`, `@cortex/embeddings` or an external library)
 
   What stays in Spanish is **data rather than prose we wrote**: the patterns that match the
   corpus, which carry their Spanish alternatives next to the English ones (the classification
-  rules in `packages/core/src/text.ts`, the deictics in `domain/entity.ts`, the eval fixtures;
+  rules in `packages/core/src/text.ts`, the deictics in `core/src/graph/domain/entity.ts`, the eval fixtures;
   ADR-0080). Each of those carries an English comment saying why. The language the LLM agents
   write in is not a matter of this rule: it is a setting of each project (ADR-0081).
 

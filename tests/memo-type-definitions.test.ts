@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { contextEntryType, MEMO_TYPE_DEFINITIONS } from "../packages/shared/src/index";
+import { contextEntryType } from "../packages/shared/src/index";
 import { distillerPrompt } from "../packages/agents/src/agents/distiller/prompt";
 import { classifierPrompt } from "../packages/agents/src/agents/classifier/prompt";
+import { MEMO_TYPE_DEFINITIONS } from "../packages/core/src/knowledge/domain/memo-types";
 
 /**
  * The prompts listed the type names and defined none, so the model guessed what each one meant

@@ -1,8 +1,9 @@
-import { recordUsage } from "@cortex/core";
-import { defaultLanguage, getLlmConfig, withLlmSlot, type Language } from "@cortex/shared";
+import { recordUsage, defaultLanguage } from "@cortex/core";
+import { withLlmSlot, type Language } from "@cortex/shared";
 import { JSON_ROLES } from "./model.js";
 import { getAgent, instructionsFor } from "./registry.js";
 import type { AgentRole } from "./roles.js";
+import { getLlmConfig } from "./llm-config.js";
 
 export async function runAgent(
   role: AgentRole,

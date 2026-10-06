@@ -1,9 +1,9 @@
 import { getSql, type Sql } from "@cortex/database";
-import type { Entity, EntityType } from "@cortex/shared";
 import { canonicalize } from "../../text.js";
 import { rowToEntity, type Row } from "../../infrastructure/rows.js";
 import type { EntityNameRow, EntityRepository, RelationInput } from "../domain/entity-repository.js";
 import type { SharedEntity } from "../domain/across.js";
+import type { Entity, EntityType } from "../domain/entity.js";
 
 export class PgEntityRepository implements EntityRepository {
   constructor(private readonly sql: Sql = getSql()) {}

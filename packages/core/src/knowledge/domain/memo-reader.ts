@@ -1,5 +1,7 @@
-import type { Entity, EntrySortField, SortDirection, Source } from "@cortex/shared";
+import type { EntrySortField, SortDirection } from "@cortex/shared";
 import type { Memo, MemoStatus, MemoType } from "./memo.js";
+import type { Entity } from "../../graph/domain/entity.js";
+import type { Source } from "./source.js";
 
 export interface EntrySort {
   by: EntrySortField;

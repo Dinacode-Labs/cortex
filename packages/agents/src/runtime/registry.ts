@@ -1,7 +1,7 @@
 import { Agent } from "@mastra/core/agent";
 import { Mastra } from "@mastra/core";
 import { Observability } from "@mastra/observability";
-import { defaultLanguage, getLlmConfig, type Language } from "@cortex/shared";
+import type { Language } from "@cortex/shared";
 import { CortexTraceExporter } from "../infrastructure/trace-exporter.js";
 import { buildAgent } from "./model.js";
 import { classifierInstructions } from "../agents/classifier/instructions.js";
@@ -12,6 +12,8 @@ import { distillerInstructions } from "../agents/distiller/instructions.js";
 import { mergerInstructions } from "../agents/merger/instructions.js";
 import { reconcilerInstructions } from "../agents/reconciler/instructions.js";
 import type { AgentRole } from "./roles.js";
+import { defaultLanguage } from "@cortex/core";
+import { getLlmConfig } from "./llm-config.js";
 
 const INSTRUCTIONS: Record<AgentRole, (language: Language) => string> = {
   classifier: classifierInstructions,

@@ -14,7 +14,7 @@ alternatives are in [ADR-0085](decisions.md#adr-0085); this page is the map.
             │
             ├──► database     utility: the Postgres client and the migrations
             ├──► embeddings   utility: the providers that turn text into vectors
-            └──► shared       the contract between the CLI and the server, and env
+            └──► shared       the contract between the CLI and the server, and env (ADR-0086)
 
  cli ──► client ──► shared    what is installed on a developer's laptop
 ```
@@ -47,9 +47,8 @@ The LLM arrives the same way, through hooks that `agents` wires in one place (`w
 
 ## Where the migration stands
 
-The rules above are checked by `tests/core-layers.test.ts`. Files that do not follow them yet are
-listed there, each with the step that moves it, and the test fails both when a new file breaks a
-rule and when a listed file no longer needs to be listed.
+The rules above are checked by `tests/core-layers.test.ts`. While the migration ran, the files that
+did not follow them yet were listed there; the list is empty and gone.
 
 1. ✓ The decision, this page and the test.
 2. ✓ `composition.ts` and `configureCore()`, taking over the three repositories that already exist.
@@ -65,4 +64,5 @@ rule and when a listed file no longer needs to be listed.
      `HealthReader`, and the use cases in `application/`
    - ✓ `capture`: session captures, code indexing (`SourceTree`, `CodeIndex`) and document extraction
 4. ✓ `core` stops depending on `client`.
-5. The domain that still lives in `shared` moves into its module in `core`.
+5. ✓ The domain that still lived in `shared` moves into its module in `core`, and `agents` stops
+   depending on `client` ([ADR-0086](decisions.md#adr-0086)).

@@ -1,8 +1,9 @@
 import { html } from "hono/html";
-import type { ContextEntry, EntrySortField } from "@cortex/shared";
+import type { EntrySortField } from "@cortex/shared";
 import { dateGroupings, groupByDate, type DateBlock, type DateGrouping } from "../date-blocks.js";
 import { entryCard, joinHtml, type EntryPick } from "./components.js";
 import type { Html } from "./layout.js";
+import type { Memo } from "@cortex/core";
 
 export const ENTRIES_PAGE = 60;
 const MAX_ENTRIES_PAGE = 600;
@@ -38,8 +39,8 @@ export interface EntryListOptions {
   pick?: EntryPick;
 }
 
-export function entryList(fetched: ContextEntry[], opts: EntryListOptions): Html {
-  const card = (e: ContextEntry) => entryCard(e, opts.dateField, opts.pick);
+export function entryList(fetched: Memo[], opts: EntryListOptions): Html {
+  const card = (e: Memo) => entryCard(e, opts.dateField, opts.pick);
   const entries = fetched.slice(0, opts.pageLimit);
   const list =
     opts.grouping && opts.grouping !== "list"
@@ -57,7 +58,7 @@ export function entryList(fetched: ContextEntry[], opts: EntryListOptions): Html
   return html`${list}${listMore(opts.pageLimit, next <= MAX_ENTRIES_PAGE ? opts.moreHref(next) : undefined)}`;
 }
 
-function dateBlocks(blocks: DateBlock<ContextEntry>[], card: (entry: ContextEntry) => Html): Html {
+function dateBlocks(blocks: DateBlock<Memo>[], card: (entry: Memo) => Html): Html {
   return html`${blocks.map(
     (b) => html`<section class="date-block">
       <h2 class="date-block-head">${b.label} <span class="date-block-count">${blockCount(b)}</span></h2>

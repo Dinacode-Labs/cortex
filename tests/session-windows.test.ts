@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sliceTranscript, windows } from "../packages/client/src/transcript-utils.js";
+import { sliceTranscript, windows } from "../packages/core/src/capture/domain/transcript-windows.js";
 
 /**
  * A session that does not fit whole into the distillation always used to lose its ending.

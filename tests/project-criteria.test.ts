@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { contextEntryType, keepsType, type ProjectCriteria } from "../packages/shared/src/index";
-import { effectiveCriteria } from "../packages/core/src/projects/domain/project";
+import { contextEntryType, type ProjectCriteria } from "../packages/shared/src/index";
+import { effectiveCriteria, keepsType } from "../packages/core/src/projects/domain/project";
 import { distillerPrompt } from "../packages/agents/src/agents/distiller/prompt";
 import { parseDistilledItems } from "../packages/agents/src/agents/distiller/distill";
 

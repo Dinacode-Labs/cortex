@@ -1,5 +1,7 @@
-import type { ConfidenceLevel, Entity, EntityType, RelationType } from "@cortex/shared";
+import type { ConfidenceLevel } from "@cortex/shared";
 import type { SharedEntity } from "./across.js";
+import type { RelationType } from "./relation.js";
+import type { Entity, EntityType } from "./entity.js";
 
 export interface RelationInput {
   sourceId: string;

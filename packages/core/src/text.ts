@@ -1,5 +1,5 @@
-import type { EntityType } from "@cortex/shared";
 import type { MemoType } from "./knowledge/domain/memo.js";
+import type { EntityType } from "./graph/domain/entity.js";
 
 // The patterns match what people write, in Spanish and in English (ADR-0080), not the language
 // of this file.

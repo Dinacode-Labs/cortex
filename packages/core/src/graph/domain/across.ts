@@ -1,5 +1,5 @@
-import type { EntityType } from "@cortex/shared";
 import type { ProjectRef } from "../../projects/domain/project.js";
+import type { EntityType } from "./entity.js";
 
 /**
  * What can only be seen by looking at a WHOLE client: what its repos share, and where they

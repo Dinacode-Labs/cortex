@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { defaultLanguage, getLlmConfig } from "@cortex/shared";
-import { distill, shutdownObservability } from "@cortex/agents";
+import { distill, shutdownObservability, getLlmConfig } from "@cortex/agents";
 import { matchDistillItems, summarizeDistillMatches, type DistillItem, type GoldWindow, type WindowMatch } from "../eval/distill-match.js";
+import { defaultLanguage } from "@cortex/core";
 
 /**
  * `cortex-admin eval-distill` -- measures what the distiller keeps, drops and mistypes.

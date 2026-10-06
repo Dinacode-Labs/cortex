@@ -1,4 +1,4 @@
-import { extractableEntityType, relationType } from "@cortex/shared";
+import { extractableEntityType, relationType } from "@cortex/core";
 
 // No 'project': the project is the container, not an entity to extract (otherwise the LLM
 // invents spurious "projects" out of headers). The rule lives in shared so every extractor
