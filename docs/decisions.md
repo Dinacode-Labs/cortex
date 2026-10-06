@@ -3007,3 +3007,46 @@ decisions they carried stay recorded here.
   needs a switch rather than a broom; somebody purges the wrong project despite the slug, which
   argues for a delay or an undo window; or the audit trail needs to say which scope a purge came
   from.
+
+<a id="adr-0088"></a>
+
+## ADR-0088 · A role's prompt is a criterion that can be rewritten, over a contract that cannot
+
+- **Status:** accepted as a hypothesis (2026-10-06). Adds free text next to [0084](#adr-0084)'s
+  criteria, which stay as the part the code can check.
+- **Context:** the seven roles that call a model judged by one prompt, written in the code, for
+  every instance and every project. A team that wants the graph to leave people out, `ask` to
+  answer in bullet points, or the reconciler to read a version bump as a replacement had no way
+  to say so. And each prompt mixed two things: what the role judges by, and the shape the code
+  reading its answer depends on — the JSON, the enums, the language.
+- **Decision:**
+  1. **Two parts per role.** A role's system prompt is its *criterion* followed by its *contract*
+     (`RoleInstructions` in `packages/agents/src/runtime/roles.ts`). The criterion is what a
+     person may rewrite. The contract — the language, "only valid JSON", the distiller's ban on
+     secrets — is added by the code after it, always. The prompt sent with each call carries only
+     the data and the output format, so no line of the old judgement is left there to contradict
+     a new one.
+  2. **A chain that starts at root.** Every project hangs from a common root. Root's criterion is
+     the default in the code until an admin rewrites it, and the rewrite replaces it. Each
+     project adds its text to its parent's, root first, and never replaces what it inherits.
+  3. **Set in the product, not in the environment.** Admins edit root and a project's managers
+     edit the project, from the web UI and the API. The model per role, the provider and the
+     keys stay in the environment.
+  4. The type definitions ([0083](#adr-0083)) and the per-project criteria stay where they are,
+     in the prompt sent with each call.
+- **Alternatives:**
+  - **The whole prompt editable.** A project could drop the JSON shape and break the parse of its
+    own memory. Rejected.
+  - **A project's text replaces the default while root has none.** One line written in a project
+    would quietly remove all of the default judgement there. Rejected: only an admin replaces
+    the default, at root.
+  - **Each level chooses whether it adds or replaces.** The prompt a call runs with could no
+    longer be read off the chain. Rejected.
+  - **Environment variables, as the models per role are.** One setting per instance and a restart
+    for every change. Rejected.
+- **Consequences:** the evals measure the default criteria only, so a rewritten one can lower
+  quality with nothing to flag it. A reconciler told to read more as `supersede` invalidates more
+  of a project's auto-captured memos.
+- **Revisit when:** a rewritten criterion turns out to be behind a bad memory, which argues for
+  recording which criterion each call ran with; or a project needs to narrow a role's contract,
+  such as fewer entity types, which is a structured setting like 0084's rather than free text.
