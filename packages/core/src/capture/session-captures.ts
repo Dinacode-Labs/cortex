@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { getSql } from "@cortex/database";
 import type { CaptureSessionCounters } from "@cortex/shared";
-import type { Row } from "../storage/map.js";
+import type { Row } from "../infrastructure/rows.js";
 
 /**
  * A record of which agent sessions have already been distilled.

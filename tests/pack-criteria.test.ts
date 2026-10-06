@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { PACK_SECTIONS, type ContextPack } from "../packages/core/src/knowledge/context-pack.js";
-import { renderContextPack } from "../packages/core/src/knowledge/render.js";
+import { PACK_SECTIONS, type ContextPack } from "../packages/core/src/knowledge/application/context-pack.js";
+import { renderContextPack } from "../packages/core/src/knowledge/application/render.js";
 import type { ProjectCriteria } from "../packages/shared/src/index";
 
 const memo = (type: string, i: number) => ({

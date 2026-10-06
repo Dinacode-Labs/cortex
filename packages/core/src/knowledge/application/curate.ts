@@ -1,5 +1,5 @@
 import { getEnvNum } from "@cortex/shared";
-import { port } from "../composition.js";
+import { port } from "../../composition.js";
 
 /**
  * Auto-curation with NO human in the loop (it replaces "review" so as not to add friction;

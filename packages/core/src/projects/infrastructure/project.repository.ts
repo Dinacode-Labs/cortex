@@ -1,7 +1,7 @@
 import { getSql, type Sql } from "@cortex/database";
 import type { Language, ProjectCriteria } from "@cortex/shared";
 import { canonicalize } from "../../text.js";
-import type { Row } from "../../storage/map.js";
+import type { Row } from "../../infrastructure/rows.js";
 import type { ProjectChainNode, ProjectRef } from "../domain/project.js";
 import type { NewProject, ProjectChanges, ProjectRepository } from "../domain/project-repository.js";
 

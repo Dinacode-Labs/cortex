@@ -1,20 +1,14 @@
-import { getSql, type Sql } from "@cortex/database";
 import type { ProjectCriteria } from "@cortex/shared";
-import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../projects/application/projects.js";
-import { rowToMemo, type Row } from "../storage/map.js";
-import { port } from "../composition.js";
-import type { SearchHit } from "./domain/memo-index.js";
-import type { Memo, MemoStatus, MemoType } from "./domain/memo.js";
+import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../../projects/application/projects.js";
+import { port } from "../../composition.js";
+import type { SearchHit } from "../domain/memo-index.js";
+import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
 
 export async function validateEntry(
   id: string,
   status: Extract<MemoStatus, "validated" | "rejected" | "obsolete">,
 ): Promise<Memo | null> {
-  const sql = getSql();
-  const rows = (await sql`
-    UPDATE memos SET status = ${status} WHERE id = ${id} RETURNING *
-  `) as unknown as Row[];
-  return rows[0] ? rowToMemo(rows[0]) : null;
+  return port("memos").setStatus(id, status);
 }
 
 /**
@@ -90,7 +84,7 @@ export interface EntryConflict {
 }
 
 export async function getContextPack(project: string, area?: string, asOf?: Date): Promise<ContextPack> {
-  const sql = getSql();
+  const reader = port("memoReader");
   // Resolved by slug or by name (#136); the pack carries the project's NAME, not whatever was
   // typed, so the header does not say "acme-portal" when the project is called Acme Portal.
   const resolved = await findProjectByName(project);
@@ -100,26 +94,14 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
   }
 
   const ids = await projectIdsWithAncestors(projectId);
-  const byType = await Promise.all(PACK_SECTIONS.map((s) => entriesByType(sql, ids, s.type, asOf)));
+  const byType = await Promise.all(PACK_SECTIONS.map((s) => reader.byType(ids, s.type, asOf, 20)));
   const sections: PackSection[] = PACK_SECTIONS.map((s, i) => ({ ...s, entries: byType[i]! })).filter(
     (s) => s.entries.length > 0,
   );
 
-  const moduleRows = (await sql`
-    SELECT DISTINCT e.name
-    FROM entities e
-    JOIN memo_entities me ON me.entity_id = e.id
-    JOIN memos m ON m.id = me.memo_id
-    WHERE e.type = 'module' AND m.project_id = ${projectId}
-  `) as unknown as Row[];
-  const sensitiveModules = moduleRows.map((r) => r.name as string);
-
-  const countRows = (await sql`
-    SELECT count(*)::int AS n FROM memos WHERE project_id = ${projectId}
-  `) as unknown as Row[];
-  const totalEntries = Number(countRows[0]!.n);
-
-  const conflicts = await entryConflicts(sql, ids);
+  const sensitiveModules = await reader.moduleNames(projectId);
+  const totalEntries = await reader.countInProject(projectId);
+  const conflicts = await entryConflicts(ids);
 
   let relevantToArea: SearchHit[] = [];
   if (area) {
@@ -148,7 +130,7 @@ export async function getContextPack(project: string, area?: string, asOf?: Date
  * disputed, because an entry hanging off "README" does not necessarily contradict anything.
  */
 
-async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConflict[]> {
+async function entryConflicts(projectIds: string[]): Promise<EntryConflict[]> {
   const direct = new Map<string, { label: string; recordedLater: boolean }[]>();
   const areas = new Map<string, Map<string, Set<string>>>();
 
@@ -165,29 +147,14 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
     noteDirect(b.id, a.title, aIsNewer);
   }
 
-  // 2) Disputed entities. Entries hanging off BOTH sides are excluded: those are not caught in
-  //    the middle of the argument, they are the argument, and warning them about themselves
-  //    says nothing.
-  const withEntities = (await sql`
-    SELECT m.id AS entry_id, mine.name AS area, other.name AS against
-    FROM relations r
-    JOIN entities mine  ON mine.id  IN (r.source_id, r.target_id)
-    JOIN entities other ON other.id IN (r.source_id, r.target_id) AND other.id <> mine.id
-    JOIN memo_entities me ON me.entity_id = mine.id
-    JOIN memos m ON m.id = me.memo_id
-      AND m.valid_to IS NULL AND m.project_id = ANY(${projectIds})
-    WHERE r.relation_type = 'contradicts' AND mine.type <> 'project' AND other.type <> 'project'
-      AND NOT EXISTS (
-        SELECT 1 FROM memo_entities x WHERE x.memo_id = m.id AND x.entity_id = other.id
-      )
-    LIMIT 200
-  `) as unknown as Row[];
+  // 2) Disputed entities: the memos caught on one side of an argument between entities.
+  const withEntities = await port("memoReader").disputedAreas(projectIds, 200);
   for (const r of withEntities) {
-    const byArea = areas.get(r.entry_id as string) ?? new Map<string, Set<string>>();
-    const against = byArea.get(r.area as string) ?? new Set<string>();
-    against.add(r.against as string);
-    byArea.set(r.area as string, against);
-    areas.set(r.entry_id as string, byArea);
+    const byArea = areas.get(r.entryId) ?? new Map<string, Set<string>>();
+    const against = byArea.get(r.area) ?? new Set<string>();
+    against.add(r.against);
+    byArea.set(r.area, against);
+    areas.set(r.entryId, byArea);
   }
 
   // Caps: a warning longer than this stops being read and starts being skipped.
@@ -200,26 +167,4 @@ async function entryConflicts(sql: Sql, projectIds: string[]): Promise<EntryConf
       against: [...against].slice(0, 3),
     })),
   }));
-}
-
-async function entriesByType(
-  sql: Sql,
-  projectIds: string[],
-  type: MemoType,
-  asOf?: Date,
-  limit = 20,
-): Promise<Memo[]> {
-  const temporal = asOf
-    ? sql`AND valid_from <= ${asOf} AND (valid_to IS NULL OR valid_to > ${asOf})`
-    : sql`AND valid_to IS NULL`;
-  const rows = (await sql`
-    SELECT * FROM memos
-    WHERE project_id = ANY(${projectIds}) AND type = ${type}
-      AND status NOT IN ('rejected', 'obsolete')
-      ${temporal}
-    ORDER BY CASE confidence WHEN 'verified' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
-             created_at DESC
-    LIMIT ${limit}
-  `) as unknown as Row[];
-  return rows.map(rowToMemo);
 }

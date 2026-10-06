@@ -84,9 +84,9 @@ describe("documentation", () => {
   const SPANISH_ON_PURPOSE = [
     "packages/core/src/text.ts", // CLASSIFY_RULES / MODULE_KEYWORDS / polarityTags: corpus patterns
     "packages/shared/src/domain/entity.ts", // the deictics regex, likewise
-    "packages/core/src/knowledge/query-intent.ts", // bilingual ES|EN patterns
-    "packages/core/src/knowledge/temporal.ts", // 'Histórico' is Plane's own value
-    "packages/core/src/knowledge/lint.ts", // likewise
+    "packages/core/src/knowledge/domain/query-intent.ts", // bilingual ES|EN patterns
+    "packages/core/src/knowledge/application/temporal.ts", // 'Histórico' is Plane's own value
+    "packages/core/src/knowledge/infrastructure/health.reader.ts", // likewise
     "apps/admin/src/commands/connect-notion.ts", // PROP_KEYS are Notion's property names
     "tests/query-intent.test.ts", // the questions are inputs, not our text
     "tests/bilingual-heuristics.test.ts", // half the sentences are the Spanish corpus the patterns match
