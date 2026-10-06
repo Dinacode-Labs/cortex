@@ -178,6 +178,7 @@ projectRoutes.get("/p/:slug", async (c) => {
             hidden: { ...listState, ...pageState },
             allChecked: selectAll,
             toggleHref: withFilters({ ...pageState, ...(selectAll ? {} : { select: "all" }) }),
+            filtered: !!(type || status),
           })
         : entryList(entries, listOptions)
       : empty(

@@ -109,6 +109,8 @@ export interface EntrySelectionOptions {
   hidden: Record<string, string>;
   allChecked: boolean;
   toggleHref: string;
+  /** Whether a type or status filter is on, which is what "everything" then means. */
+  filtered: boolean;
 }
 
 export function entrySelection(list: Html, opts: EntrySelectionOptions): Html {
@@ -117,7 +119,8 @@ export function entrySelection(list: Html, opts: EntrySelectionOptions): Html {
       <div class="select-bar">
         <a class="button quiet" href="${opts.toggleHref}" data-select-toggle>${opts.allChecked ? "Clear selection" : "Select all visible"}</a>
         <span class="sub" data-selected-count hidden></span>
-        <button class="danger" type="submit">Purge selected…</button>
+        <button class="danger" type="submit" data-purge-selected>Purge selected…</button>
+        <button class="quiet" type="submit" name="scope" value="all">${opts.filtered ? "Purge everything matching these filters…" : "Purge the whole project…"}</button>
       </div>
       ${list}
     </form>

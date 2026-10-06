@@ -7,6 +7,8 @@ export function parseDateGrouping(value: string | undefined): DateGrouping {
   return dateGroupings.find((g) => g === value) ?? DEFAULT_DATE_GROUPING;
 }
 
+export type BlockGrouping = Exclude<DateGrouping, "list">;
+
 export interface DateBlock<T> {
   key: string;
   label: string;
@@ -15,7 +17,7 @@ export interface DateBlock<T> {
 }
 
 export interface GroupByDateOptions<T> {
-  grouping: Exclude<DateGrouping, "list">;
+  grouping: BlockGrouping;
   dateOf: (item: T) => Date;
   limit?: number;
 }
@@ -31,7 +33,7 @@ function mondayOf(date: Date): Date {
   return new Date(midnight - daysSinceMonday * DAY_MS);
 }
 
-export function dateBlockOf(date: Date, grouping: Exclude<DateGrouping, "list">): { key: string; label: string } {
+export function dateBlockOf(date: Date, grouping: BlockGrouping): { key: string; label: string } {
   const iso = date.toISOString();
   switch (grouping) {
     case "day":
@@ -62,4 +64,54 @@ export function groupByDate<T>(items: T[], opts: GroupByDateOptions<T>): DateBlo
     lastShown.truncated = dateBlockOf(opts.dateOf(firstHidden), opts.grouping).key === lastShown.key;
   }
   return blocks;
+}
+
+/** How a whole block travels in a form: `week:2026-09-28`. */
+export function dateBlockValue(grouping: BlockGrouping, key: string): string {
+  return `${grouping}:${key}`;
+}
+
+export interface DateBlockSpan {
+  value: string;
+  grouping: BlockGrouping;
+  key: string;
+  label: string;
+  /** Half-open: `from` is in the block, `to` is the first instant of the next one. */
+  from: Date;
+  to: Date;
+}
+
+const BLOCK_KEY_SHAPE: Record<BlockGrouping, RegExp> = {
+  day: /^\d{4}-\d{2}-\d{2}$/,
+  week: /^\d{4}-\d{2}-\d{2}$/,
+  month: /^\d{4}-\d{2}$/,
+  year: /^\d{4}$/,
+};
+
+function blockEnd(from: Date, grouping: BlockGrouping): Date {
+  switch (grouping) {
+    case "day":
+      return new Date(from.getTime() + DAY_MS);
+    case "week":
+      return new Date(from.getTime() + 7 * DAY_MS);
+    case "month":
+      return new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1));
+    case "year":
+      return new Date(Date.UTC(from.getUTCFullYear() + 1, 0, 1));
+  }
+}
+
+/**
+ * A key that is not its own first instant's key -- 31 February, a week that starts on a
+ * Wednesday -- is refused: no block on screen produces it, so the form was written by hand.
+ */
+export function parseDateBlock(value: string): DateBlockSpan | null {
+  const [name, key = ""] = value.split(":", 2);
+  const grouping = dateGroupings.find((g): g is BlockGrouping => g !== "list" && g === name);
+  if (!grouping || !BLOCK_KEY_SHAPE[grouping].test(key)) return null;
+  const [year, month = 1, day = 1] = key.split("-").map(Number) as [number, number?, number?];
+  const from = new Date(Date.UTC(year, month - 1, day));
+  const block = dateBlockOf(from, grouping);
+  if (block.key !== key) return null;
+  return { value: dateBlockValue(grouping, key), grouping, key, label: block.label, from, to: blockEnd(from, grouping) };
 }

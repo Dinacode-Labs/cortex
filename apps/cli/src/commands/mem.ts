@@ -2,14 +2,26 @@ import { createInterface } from "node:readline/promises";
 import {
   capture,
   getEntry,
+  previewProjectPurge,
   purgeEntries,
+  purgeProject,
   readCortexLink,
   searchEntries,
   updateEntry,
   useProjectServer,
+  type ProjectPurgeScope,
 } from "@cortex/client";
 import { writeBlocker } from "../compat.js";
-import { describePurgeResult, isPurgeConfirmed, PURGE_CONFIRMATION } from "../purge.js";
+import {
+  describePurgeFailure,
+  describePurgePreview,
+  describePurgeResult,
+  isPurgeConfirmed,
+  isSlugConfirmed,
+  parsePurgeScope,
+  PROJECT_PURGE_UNSUPPORTED,
+  PURGE_CONFIRMATION,
+} from "../purge.js";
 
 /**
  * `cortex mem` -- the project's memory from the command line: store, search, read an entry and
@@ -164,7 +176,7 @@ function positionals(args: string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i]!;
-    if (a === "--yes" || a === "--json") continue;
+    if (a === "--yes" || a === "--json" || a === "--all") continue;
     if (a.startsWith("--")) {
       if (!a.includes("=") && args[i + 1] && !args[i + 1]!.startsWith("--")) i++;
       continue;
@@ -190,9 +202,65 @@ async function confirmPurge(ids: string[]): Promise<boolean> {
   }
 }
 
+async function askForSlug(slug: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return isSlugConfirmed(await rl.question(`Type the project's slug ("${slug}") to confirm: `), slug);
+  } finally {
+    rl.close();
+  }
+}
+
+async function purgeScope(args: string[], scope: ProjectPurgeScope, json: boolean): Promise<void> {
+  const p = slugDe(args);
+  if ("error" in p) return emit({ json, ok: false, data: p, text: `✗ ${p.error}` });
+  const block = await writeBlocker();
+  if (block) return emit({ json, ok: false, data: { error: block }, text: `✗ ${block}` });
+
+  let asOf: string | undefined;
+  if (!args.includes("--yes")) {
+    if (json || !process.stdin.isTTY) {
+      return emit({ json, ok: false, data: { error: "Purging is irreversible: pass --yes" }, text: "✗ Purging is irreversible: pass --yes to confirm." });
+    }
+    const preview = await previewProjectPurge(p.slug, scope);
+    if (!preview.ok) {
+      const error = describePurgeFailure(preview, PROJECT_PURGE_UNSUPPORTED);
+      return emit({ json, ok: false, data: { error }, text: `✗ ${error}` });
+    }
+    if (preview.data.count === 0) return emit({ json, ok: true, data: { purged: [] }, text: "Nothing to purge." });
+    console.log(describePurgePreview(preview.data, p.slug));
+    if (!(await askForSlug(p.slug))) return emit({ json, ok: false, data: { error: "Not confirmed" }, text: "Nothing purged." });
+    // A memo written while the question was on screen was not in the count above.
+    asOf = preview.data.asOf;
+  }
+
+  const res = await purgeProject(p.slug, { ...scope, ...(asOf ? { writtenBefore: asOf } : {}) });
+  const outcome = describePurgeResult(res, PROJECT_PURGE_UNSUPPORTED);
+  emit({
+    json,
+    ok: outcome.ok,
+    data: outcome.ok ? res.data : { error: outcome.message },
+    text: `${outcome.ok ? "✓" : "✗"} ${outcome.message}`,
+  });
+}
+
+const PURGE_USAGE = "Usage: cortex mem purge <id> [<id>...] [--yes]\n       cortex mem purge --all | --from YYYY-MM-DD [--to YYYY-MM-DD] [--type t] [--status s] [--yes]";
+
 async function purge(args: string[], json: boolean): Promise<void> {
   const ids = positionals(args);
-  if (!ids.length) return emit({ json, ok: false, data: { error: "Missing id" }, text: "Usage: cortex mem purge <id> [<id>...] [--yes]" });
+  const scoped = parsePurgeScope({
+    all: args.includes("--all"),
+    from: flag(args, "from"),
+    to: flag(args, "to"),
+    type: flag(args, "type"),
+    status: flag(args, "status"),
+  });
+  if (scoped && "error" in scoped) return emit({ json, ok: false, data: scoped, text: `✗ ${scoped.error}` });
+  if (scoped && ids.length) {
+    return emit({ json, ok: false, data: { error: "Ids or a scope, not both" }, text: `✗ Pass ids or a scope (--all, --from, --to), not both.\n${PURGE_USAGE}` });
+  }
+  if (scoped) return purgeScope(args, scoped.scope, json);
+  if (!ids.length) return emit({ json, ok: false, data: { error: "Missing id" }, text: PURGE_USAGE });
   useProjectServer(flag(args, "cwd") || process.cwd());
   const block = await writeBlocker();
   if (block) return emit({ json, ok: false, data: { error: block }, text: `✗ ${block}` });
@@ -230,5 +298,6 @@ export async function run(args: string[] = []): Promise<void> {
     console.log("  cortex mem get <id>");
     console.log("  cortex mem update <id> [--title t] [--content c]");
     console.log("  cortex mem purge <id> [<id>...] [--yes]");
+    console.log("  cortex mem purge --all | --from YYYY-MM-DD [--to YYYY-MM-DD] [--type t] [--status s] [--yes]");
   }
 }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { confidenceLevel, contextEntryTypeInput } from "./contract/memo.js";
+import { confidenceLevel, contextEntryStatus, contextEntryTypeInput, entrySortField, type ContextEntryType } from "./contract/memo.js";
 import { sourceType } from "./contract/source.js";
 import { language } from "./contract/language.js";
 import { projectCriteria } from "./contract/project-criteria.js";
@@ -189,6 +189,39 @@ export type PurgeEntriesRequest = z.input<typeof purgeEntriesRequest>;
 
 export interface PurgeEntriesResponse {
   purged: string[];
+}
+
+export const MAX_PURGE_PERIODS = 50;
+
+const instant = z.string().datetime({ offset: true });
+
+/** Half-open, `from` included and `to` not; one end may be left open, not both. */
+export const purgePeriod = z
+  .object({ field: entrySortField.default("created"), from: instant.optional(), to: instant.optional() })
+  .refine((p) => p.from !== undefined || p.to !== undefined, { message: "A period needs `from`, `to` or both." })
+  .refine((p) => !p.from || !p.to || Date.parse(p.from) < Date.parse(p.to), { message: "`from` must come before `to`." });
+
+/**
+ * `POST /projects/:slug/purge` (ADR-0087): the project's own memos, narrowed by type, status
+ * and periods. Without `confirm` it purges nothing and answers what it would; `confirm` must
+ * be the slug, and `writtenBefore` the `asOf` of that answer, so a memo written after it was
+ * read is left alone.
+ */
+export const purgeProjectRequest = z.object({
+  type: contextEntryTypeInput.optional(),
+  status: contextEntryStatus.optional(),
+  periods: z.array(purgePeriod).max(MAX_PURGE_PERIODS).optional(),
+  writtenBefore: instant.optional(),
+  confirm: z.string().optional(),
+});
+export type PurgeProjectRequest = z.input<typeof purgeProjectRequest>;
+
+export interface PurgeProjectPreview {
+  count: number;
+  byType: Partial<Record<ContextEntryType, number>>;
+  oldest: string | null;
+  newest: string | null;
+  asOf: string;
 }
 
 /**

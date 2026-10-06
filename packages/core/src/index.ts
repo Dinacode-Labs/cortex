@@ -28,7 +28,17 @@ export type { AcrossClient, SharedEntity, CrossProjectContradiction } from "./gr
 export { resolveEntities, type ResolveResult } from "./graph/application/resolve-entities.js";
 export { slugify } from "./projects/domain/slug.js";
 export { findProjectBySlug, findProjectByName, getEntryProject, createProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, updateProject, deleteProject, getProjectLanguage, getProjectCriteria, type ProjectLanguage, type ProjectCriteriaView, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects/application/projects.js";
-export { purgeEntries, canManageEntryProject, type PurgeResult } from "./projects/application/purge.js";
+export {
+  purgeEntries,
+  canManageEntryProject,
+  findPurgeScope,
+  purgeScope,
+  summarizePurgeScope,
+  type PurgeResult,
+  type PurgeScope,
+  type PurgeScopeSummary,
+} from "./projects/application/purge.js";
+export type { DatePeriod, ScopedMemo } from "./knowledge/domain/memo-repository.js";
 export {
   isNearDuplicate,
   findNearest,

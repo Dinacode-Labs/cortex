@@ -2,11 +2,14 @@ import { getSql, type Row, type Sql } from "@cortex/database";
 import { rowToMemo } from "./memo.row.js";
 import type {
   ContradictingSide,
+  DatePeriod,
   MemoRepository,
+  MemoScope,
   NewMemo,
   NewSource,
   PurgeTarget,
   ReclassifiableMemo,
+  ScopedMemo,
   SummarizableMemo,
 } from "../domain/memo-repository.js";
 import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
@@ -241,12 +244,45 @@ export class PgMemoRepository implements MemoRepository {
     }));
   }
 
+  async findInScope(scope: MemoScope): Promise<ScopedMemo[]> {
+    const sql = this.sql;
+    const periods = scope.periods ?? [];
+    const inAnyPeriod = periods.length
+      ? periods.map((p) => this.withinPeriod(p)).reduce((any, next) => sql`${any} OR ${next}`)
+      : sql`true`;
+    const rows = (await sql`
+      SELECT m.id, m.title, m.type, m.created_at, m.updated_at
+        FROM memos m
+       WHERE m.project_id = ${scope.projectId}
+         AND m.updated_at <= ${scope.writtenBefore}
+         ${scope.type ? sql`AND m.type = ${scope.type}` : sql``}
+         ${scope.status ? sql`AND m.status = ${scope.status}` : sql``}
+         AND (${inAnyPeriod})
+       ORDER BY m.created_at DESC, m.id DESC
+    `) as unknown as Row[];
+    return rows.map((r) => ({
+      id: r.id as string,
+      title: r.title as string,
+      type: r.type as MemoType,
+      createdAt: r.created_at as Date,
+      updatedAt: r.updated_at as Date,
+    }));
+  }
+
+  private withinPeriod(period: DatePeriod) {
+    const sql = this.sql;
+    const column = period.field === "updated" ? sql`m.updated_at` : sql`m.created_at`;
+    const from = period.from ? sql`${column} >= ${period.from}` : sql`true`;
+    const to = period.to ? sql`${column} < ${period.to}` : sql`true`;
+    return sql`(${from} AND ${to})`;
+  }
+
   async purge(ids: string[], purgedBy: string): Promise<string[]> {
     return this.sql.begin(async (tx) => {
       // FOR UPDATE holds the entries while the whole cleanup runs, so nobody edits one in the
       // middle of it.
       const entries = (await tx`
-        SELECT m.id, m.source_id, m.project_id, m.type, m.source_type, m.created_at
+        SELECT m.id, m.source_id
           FROM memos m
          WHERE m.id = ANY(${ids}::uuid[])
            FOR UPDATE OF m
@@ -268,13 +304,14 @@ export class PgMemoRepository implements MemoRepository {
       await tx`
         DELETE FROM relations WHERE source_id = ANY(${found}::uuid[]) OR target_id = ANY(${found}::uuid[])
       `;
-      for (const e of entries) {
-        await tx`
-          INSERT INTO entry_purges (entry_id, project_id, entry_type, entry_source_type, entry_created_at, purged_by)
-          VALUES (${e.id as string}, ${(e.project_id as string | null) ?? null}, ${e.type as string},
-                  ${e.source_type as string}, ${e.created_at as Date}, ${purgedBy.toLowerCase()})
-        `;
-      }
+      // One statement rather than one per entry: purging a whole project means thousands of rows,
+      // and a round trip each kept the transaction and its row locks open for all of them.
+      await tx`
+        INSERT INTO entry_purges (entry_id, project_id, entry_type, entry_source_type, entry_created_at, purged_by)
+        SELECT m.id, m.project_id, m.type, m.source_type, m.created_at, ${purgedBy.toLowerCase()}
+          FROM memos m
+         WHERE m.id = ANY(${found}::uuid[])
+      `;
       await tx`DELETE FROM memos WHERE id = ANY(${found}::uuid[])`;
 
       if (sourceIds.length) {
