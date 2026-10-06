@@ -13,7 +13,9 @@ export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./ca
 export { chunkDocument, IGNORE_DIRS, SUPPORTED_EXTS, type ChunkOptions, type DocChunk } from "@cortex/shared";
 export { applyTemporalInvalidation } from "./knowledge/temporal.js";
 export { storeEmbeddingsBatch } from "./storage/vectors.js";
-export { recordUsage, registerUsageSink, getUsageSummary, getRecentTraces, estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./observability/usage.js";
+export { recordUsage, getUsageSummary, getRecentTraces } from "./observability/application/usage.js";
+export { estimateCostUsd, resetPricingCache, type UsageRecord, type UsageSummary, type TraceTree, type TraceSpan } from "./observability/domain/usage.js";
+export { registerUsageSink } from "./observability/infrastructure/embedding-usage-sink.js";
 export { resolveEntity, relate, linkEntryToEntity } from "./graph/entities.js";
 export {
   getAcrossClient,
