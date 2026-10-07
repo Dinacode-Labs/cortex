@@ -555,9 +555,12 @@ that, each agent run emits a **trace tree** (`agent_run → model_generation →
 `ai_traces` table. The `/admin/usage` page in the UI shows cost per operation, agent and model,
 alongside the trace tree.
 
-> **⚠️ What to watch for.** The lint is **deterministic and cheap**, but its thresholds and
-> rules, what counts as a "duplicate", what counts as a "gap", are heuristics. Treat them as
-> a signal, not as truth. And for now it **reports** rather than fixes, by design.
+> **⚠️ What to watch for.** The lint is **deterministic**, but not cheap: the duplicate search
+> measures every pair of a project's vectors, so it grows with the square of the memos. That is
+> why the project cards in the UI show what the last lint found instead of running one
+> ([ADR-0089](decisions.md#adr-0089)). Its thresholds and rules, what counts as a "duplicate",
+> what counts as a "gap", are heuristics. Treat them as a signal, not as truth. And for now it
+> **reports** rather than fixes, by design.
 
 ---
 

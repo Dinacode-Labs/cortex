@@ -11,7 +11,13 @@ export * from "./knowledge/application/render.js";
 export type { Memo, MemoStatus, MemoType, Validity } from "./knowledge/domain/memo.js";
 export type { Source } from "./knowledge/domain/source.js";
 export { sliceTranscript, type SlicedTranscript } from "./capture/domain/transcript-windows.js";
-export { lintProject, renderLintReport, type LintReport } from "./knowledge/application/lint.js";
+export {
+  latestProjectHealth,
+  lintProject,
+  renderLintReport,
+  type HealthSnapshot,
+  type LintReport,
+} from "./knowledge/application/lint.js";
 export { planLintActions, type LintAction } from "./knowledge/application/lint-act.js";
 export { searchProjectCode, indexRepo, renderCodeHits, type CodeHit } from "./capture/application/code.js";
 // Chunking, extension lists and directories to ignore live in `shared` now that the

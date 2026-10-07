@@ -45,6 +45,22 @@ export const DUPLICATE_DISTANCE = { sameType: 0.15, otherType: 0.12 } as const;
 /** An area with this many incidents and no decision is a gap: things keep breaking and nobody decided anything. */
 export const GAP_MIN_INCIDENTS = 2;
 
+/**
+ * What the last lint of a project found, kept so a project card can show it without linting: the
+ * duplicate search compares every pair of the project's vectors, over ten seconds for 1,800 memos
+ * (ADR-0089).
+ */
+export interface HealthSnapshot {
+  contradictions: number;
+  duplicates: number;
+  checkedAt: Date;
+}
+
+export interface HealthSnapshots {
+  record(projectId: string, found: Omit<HealthSnapshot, "checkedAt">): Promise<void>;
+  latest(projectIds: string[]): Promise<Map<string, HealthSnapshot>>;
+}
+
 export interface HealthReader {
   currentCount(projectId: string): Promise<number>;
   contradictions(projectId: string, limit: number): Promise<LintReport["contradictions"]>;

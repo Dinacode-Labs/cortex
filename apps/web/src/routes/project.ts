@@ -27,7 +27,7 @@ import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
 import { badge, empty, entrySelection, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge, warn } from "../views/components.js";
 import { parseDateGrouping } from "../date-blocks.js";
-import { projectHealth } from "../project-summary.js";
+import { projectHealths } from "../project-summary.js";
 import { ENTRIES_PAGE, entryList, groupingPills, parsePageLimit } from "../views/entry-list.js";
 import { mdLite } from "../views/md.js";
 import { projectHeader } from "../views/project-nav.js";
@@ -69,7 +69,7 @@ projectRoutes.get("/p/:slug", async (c) => {
   const purged = Number(c.req.query("purged") ?? 0);
 
   const entries = await listEntries({ project: project.name, type, status, sort: effectiveSort, limit: pageLimit + 1 });
-  const healths = await Promise.all(children.map((h) => projectHealth(h.name)));
+  const healthOf = await projectHealths(children);
   const base = `/p/${project.slug}`;
   const listState: Record<string, string> = {
     ...(type ? { type } : {}),
@@ -141,7 +141,7 @@ projectRoutes.get("/p/:slug", async (c) => {
   const childrenSection = children.length
     ? panel(
         "Projects in this client",
-        html`<div class="project-grid">${children.map((h, i) => projectCard(h, healths[i]!))}</div>`,
+        html`<div class="project-grid">${children.map((h) => projectCard(h, healthOf.get(h.id) ?? html``))}</div>`,
         { help: "Everything remembered here is also part of what their agents are told." },
       )
     : html``;
