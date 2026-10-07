@@ -361,6 +361,7 @@ a.back:hover { color:var(--ink); text-decoration:none; }
 .health { display:inline-flex; align-items:center; gap:5px; font-size:var(--t-sm); font-weight:600; }
 .health.ok { color:var(--ok); }
 .health.warn { color:var(--warn); }
+.health.unchecked { color:var(--faint); font-weight:400; }
 .onboarding .content-block { margin:var(--s-4) 0; }
 
 /* A client and its repos: the parent full width and the children inside, indented, so it

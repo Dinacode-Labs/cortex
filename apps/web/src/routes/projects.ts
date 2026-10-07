@@ -11,7 +11,7 @@ import {
 } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 import { projectCard } from "../views/components.js";
-import { projectHealth } from "../project-summary.js";
+import { projectHealths } from "../project-summary.js";
 import { projectHeader } from "../views/project-nav.js";
 import { criteriaPanel } from "../views/project-criteria.js";
 import { projectAgentPromptsPanel } from "../views/agent-prompts.js";
@@ -38,8 +38,7 @@ projectsRoutes.get("/", async (c) => {
     const p = projects.find((x) => x.name === old);
     if (p?.slug) return c.redirect(`/p/${p.slug}`, 301);
   }
-  const healths = await Promise.all(projects.map((p) => projectHealth(p.name)));
-  const healthOf = new Map(projects.map((p, i) => [p.id, healths[i]!]));
+  const healthOf = await projectHealths(projects);
   const card = (p: (typeof projects)[number]): Html => projectCard(p, healthOf.get(p.id) ?? html``);
 
   // Children are painted INSIDE their parent, not loose in the same list. A client with three

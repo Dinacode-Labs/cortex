@@ -222,6 +222,14 @@ fixes things.
   generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
 
 ### Fixed
+- **The projects page opens at once, however large the projects.** Each card's health badge ran
+  the whole lint of its project on every view, and the lint's duplicate search grows with the
+  square of a project's memos: one of a couple of thousand took over ten seconds on its own, and
+  the page, and on a small server everything else, waited for all of them. A card now shows what
+  the last lint found, with the time on hover, and "not checked yet" for a project nobody has
+  linted; opening Health, the MCP lint tool, `cortex-admin lint` and the scheduled maintenance
+  bring it up to date. A client's page lists its repos the same way. Migration
+  `0028_project_health.sql` ([ADR-0089](docs/decisions.md#adr-0089)).
 - **A `supersedes` relation no longer makes maintenance fall over.** The bi-temporal pass that
   closes a superseded entry wrote `validity = 'superseded'`, a value the table does not accept
   (only `current`, `historical` and `unknown`), so the whole maintenance run aborted as soon as

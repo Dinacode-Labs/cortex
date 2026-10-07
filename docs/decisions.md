@@ -3050,3 +3050,42 @@ decisions they carried stay recorded here.
 - **Revisit when:** a rewritten criterion turns out to be behind a bad memory, which argues for
   recording which criterion each call ran with; or a project needs to narrow a role's contract,
   such as fewer entity types, which is a structured setting like 0084's rather than free text.
+
+<a id="adr-0089"></a>
+
+## ADR-0089 · A project card shows what the last lint found, and never lints
+
+- **Status:** accepted as a hypothesis (2026-10-07).
+- **Context:** the projects page paints a health badge on every card — "✓ healthy" or "N to
+  review", the contradictions plus the likely duplicates — and it got it by running the whole
+  lint of every project the viewer could see, on every view. A client's page did the same for
+  each of its repos. The lint's duplicate search joins a project's embeddings with themselves and
+  measures every pair, so it grows with the square of the memos, and wide vectors make each
+  measure dearer: with 4,096-dimension embeddings, on one core, 150 memos take about 0.1 s, 800
+  over 2 s and 1,800 over 12 s. The page waited for the sum, and on a single-core server every
+  other request — MCP, API, hooks — waited with it.
+- **Decision:**
+  1. **Every lint records what it found.** `lintProject` writes the counts of contradictions and
+     duplicates, and when, to `project_health` (migration `0028_project_health.sql`). Because it
+     is the lint itself that records, the Health tab, the MCP tool, `cortex-admin lint` and the
+     scheduled maintenance all bring it up to date.
+  2. **The cards read it and never lint**: one query for the whole page. The badge says on hover
+     when it was checked, and a project nobody has linted says "not checked yet" instead of
+     claiming to be healthy.
+  3. **The Health tab still lints when opened**: whoever opens it is asking for the state now.
+- **Alternatives:**
+  - **Count only the contradictions, live.** Cheap, but the badge would mean something other
+    than what Health shows, and call a project full of duplicates healthy. Rejected.
+  - **Load each badge from the browser after the page.** The page would open at once, but the
+    server would do the same work on every view and the one core would still be taken by it.
+    Rejected.
+  - **An approximate-nearest-neighbour index for the duplicate search.** pgvector indexes vectors
+    of up to 2,000 dimensions (4,000 as `halfvec`), so whether it applies depends on the
+    embedding width each server chooses. Not ruled out for the Health tab; it would not make
+    linting every project on every view cheap either.
+- **Consequences:** a badge can be as old as the last maintenance run: a contradiction saved at
+  noon reaches the card when somebody opens Health or when maintenance next runs. A fresh
+  deployment shows "not checked yet" on every card until then.
+- **Revisit when:** a stale badge misleads somebody, which argues for recording health when memos
+  are saved or reconciled rather than when linting; or the Health tab itself becomes too slow to
+  open, which is the duplicate search to fix, not the card.

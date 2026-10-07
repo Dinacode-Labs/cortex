@@ -1,8 +1,8 @@
 import { port } from "../../composition.js";
 import { findProjectIdByName } from "../../projects/application/projects.js";
-import { DUPLICATE_DISTANCE, GAP_MIN_INCIDENTS, type LintReport } from "../domain/health.js";
+import { DUPLICATE_DISTANCE, GAP_MIN_INCIDENTS, type HealthSnapshot, type LintReport } from "../domain/health.js";
 
-export type { LintReport } from "../domain/health.js";
+export type { HealthSnapshot, LintReport } from "../domain/health.js";
 
 export async function lintProject(project: string): Promise<LintReport> {
   const pid = await findProjectIdByName(project);
@@ -19,6 +19,7 @@ export async function lintProject(project: string): Promise<LintReport> {
       health.neverReviewedCount(pid),
       health.incidentGaps(pid, GAP_MIN_INCIDENTS, 15),
     ]);
+  await port("healthSnapshots").record(pid, { contradictions: contradictions.length, duplicates: duplicates.length });
   return {
     project,
     totalEntries,
@@ -30,6 +31,11 @@ export async function lintProject(project: string): Promise<LintReport> {
     neverReviewed,
     gaps,
   };
+}
+
+/** By project id; a project never linted is missing from the map. */
+export async function latestProjectHealth(projectIds: string[]): Promise<Map<string, HealthSnapshot>> {
+  return port("healthSnapshots").latest(projectIds);
 }
 
 export function renderLintReport(r: LintReport): string {
