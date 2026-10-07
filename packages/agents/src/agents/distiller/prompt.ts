@@ -16,9 +16,9 @@ export function distillerPrompt(project: string, window: string, criteria?: Proj
 """
 ${window}
 """
-Extract ONLY the DURABLE, reusable knowledge as JSON:
+Return the knowledge worth keeping as JSON:
 {"items":[{"type": one of the types below, "title": "a short title", "content": "the knowledge in 1-3 sentences", "summary": "one sentence that does NOT repeat the title"}]}
 Types:
 ${describeMemoTypes(types, criteria)}${projectLists(criteria)}
-Include technical decisions, constraints, incidents and how they were resolved, conventions, technical debt, risks and how-tos. DISCARD noise (tool calls, file dumps, narration, greetings, abandoned attempts). NEVER include secrets or keys. When nothing is worth keeping, return {"items":[]}.`;
+When nothing is worth keeping, return {"items":[]}.`;
 }

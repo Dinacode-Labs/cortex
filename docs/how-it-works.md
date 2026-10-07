@@ -323,6 +323,13 @@ one shared function, `runAgent`, which also **records the tokens** spent, for ob
 | `reconciler` | Decides noop / update / supersede on a near-duplicate | deterministic dedup (noop only) |
 | `merger` | Merges two pieces about the same thing into one | keeps the existing one |
 
+**Each role judges by a criterion and answers by a contract.** Its system prompt is the
+criterion — what it keeps, what it prioritises, what it leaves out — followed by the contract
+the code reading its answer depends on: the language, "only valid JSON", and for the distiller
+the ban on secrets. The prompt sent with each call holds only the data and the output format.
+They are kept apart so the criterion can be rewritten without breaking the parse
+([ADR-0088](decisions.md#adr-0088)).
+
 **The language they write in is the project's.** The prompts are in English; what the
 `classifier`, `graph`, `retriever`, `distiller` and `merger` write comes out in the language
 of the project it is for: the one set under its Settings, or else its nearest ancestor's, or

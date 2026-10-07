@@ -9,6 +9,5 @@ export function rerankerPrompt(query: string, hits: SearchHit[]): string {
 Candidate fragments:
 ${list}
 
-Order the indices from MOST to LEAST relevant for answering the question. Include only the
-ones that contribute something. Return ONLY JSON: {"order":[indices]}.`;
+Return ONLY JSON with the indices in order: {"order":[indices]}.`;
 }

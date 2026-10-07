@@ -11,22 +11,26 @@ import { retrieverInstructions } from "../agents/retriever/instructions.js";
 import { distillerInstructions } from "../agents/distiller/instructions.js";
 import { mergerInstructions } from "../agents/merger/instructions.js";
 import { reconcilerInstructions } from "../agents/reconciler/instructions.js";
-import type { AgentRole } from "./roles.js";
+import type { AgentRole, RoleInstructions } from "./roles.js";
 import { defaultLanguage } from "@cortex/core";
 import { getLlmConfig } from "./llm-config.js";
 
-const INSTRUCTIONS: Record<AgentRole, (language: Language) => string> = {
+const INSTRUCTIONS: Record<AgentRole, RoleInstructions> = {
   classifier: classifierInstructions,
   graph: graphInstructions,
-  reranker: () => rerankerInstructions,
+  reranker: rerankerInstructions,
   retriever: retrieverInstructions,
   distiller: distillerInstructions,
   merger: mergerInstructions,
-  reconciler: () => reconcilerInstructions,
+  reconciler: reconcilerInstructions,
 };
 
-export function instructionsFor(role: AgentRole, language: Language): string {
-  return INSTRUCTIONS[role](language);
+export function defaultCriterion(role: AgentRole): string {
+  return INSTRUCTIONS[role].criterion;
+}
+
+export function instructionsFor(role: AgentRole, language: Language, criterion = defaultCriterion(role)): string {
+  return `${criterion}\n\n${INSTRUCTIONS[role].contract(language)}`;
 }
 
 let mastra: Mastra | null | undefined;

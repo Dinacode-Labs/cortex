@@ -1,4 +1,5 @@
 import { runAgent } from "../../runtime/run-agent.js";
+import { reconcilerPrompt } from "./prompt.js";
 
 /**
  * The decision half of the LLM reconciler. `core` receives both this and the merger through
@@ -7,9 +8,8 @@ import { runAgent } from "../../runtime/run-agent.js";
  * dedup.
  */
 export async function reconcile(existing: string, incoming: string): Promise<"noop" | "update" | "supersede"> {
-  const prompt = `EXISTING:\n"""\n${existing}\n"""\n\nNEW:\n"""\n${incoming}\n"""\n\nWhat is the NEW one's relationship to the EXISTING one?`;
   try {
-    const raw = await runAgent("reconciler", prompt, { maxOutputTokens: 60 });
+    const raw = await runAgent("reconciler", reconcilerPrompt(existing, incoming), { maxOutputTokens: 60 });
     const m = raw.match(/noop|update|supersede/i);
     // When the LLM answers nothing recognisable, do NOT touch what exists: a failure (timeout,
     // truncated response) must not rewrite knowledge through a merge.

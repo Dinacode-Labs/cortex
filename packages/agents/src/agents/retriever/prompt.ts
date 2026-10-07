@@ -13,6 +13,5 @@ export function retrieverPrompt(question: string, snippets: ContextSnippet[]): s
 Context retrieved from Cortex:
 ${context}
 
-Answer the question based only on the context above. Highlight risks, decisions in force and
-constraints when they are relevant. When information is missing, say so.`;
+Answer the developer's question.`;
 }
