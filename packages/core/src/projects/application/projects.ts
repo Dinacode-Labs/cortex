@@ -231,7 +231,7 @@ export class NotAManagerError extends Error {
   }
 }
 
-async function requireManager(slug: string, actor: SessionUser | null): Promise<ProjectRef> {
+export async function requireManager(slug: string, actor: SessionUser | null): Promise<ProjectRef> {
   const p = await findProjectBySlug(slug);
   if (!p) throw new Error(`Project "${slug}" not found.`);
   if (!(await canManageProject(actor, slug))) throw new NotAManagerError(slug);

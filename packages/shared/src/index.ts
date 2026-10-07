@@ -1,5 +1,6 @@
 export * from "./contract/memo.js";
 export * from "./contract/project-criteria.js";
+export * from "./contract/agent-prompts.js";
 export * from "./contract/source.js";
 export * from "./contract/language.js";
 export * from "./env.js";

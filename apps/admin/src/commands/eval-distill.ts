@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { distill, shutdownObservability, getLlmConfig } from "@cortex/agents";
 import { matchDistillItems, summarizeDistillMatches, type DistillItem, type GoldWindow, type WindowMatch } from "../eval/distill-match.js";
-import { defaultLanguage } from "@cortex/core";
+import { defaultLanguage, EMPTY_CHAIN } from "@cortex/core";
 
 /**
  * `cortex-admin eval-distill` -- measures what the distiller keeps, drops and mistypes.
@@ -123,7 +123,9 @@ async function evalDistill(args: string[]): Promise<void> {
   const emitted = new Map<string, DistillItem[]>();
   for (const g of gold) {
     const window = readFileSync(join(windowsDir, g.window), "utf8");
-    const items = await distill(PROJECT, window);
+    // The baseline was measured on the default criterion; whatever an instance set at root
+    // would make two runs incomparable, and reading it would need a database (ADR-0088).
+    const items = await distill(PROJECT, window, { chain: EMPTY_CHAIN });
     emitted.set(g.window, items);
     matches.push(matchDistillItems(items, g));
     console.log(`  ${g.window} → ${plural(items.length, "item")}`);

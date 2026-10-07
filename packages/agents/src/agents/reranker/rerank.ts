@@ -9,11 +9,15 @@ import { rerankerPrompt } from "./prompt.js";
  * ADR-0009). Implemented as a Mastra Agent (role "reranker"). On any failure it leaves the
  * hits as they were.
  */
-export async function rerankLLM(query: string, hits: SearchHit[]): Promise<SearchHit[]> {
+export async function rerankLLM(
+  query: string,
+  hits: SearchHit[],
+  context: { projectId: string | null },
+): Promise<SearchHit[]> {
   if (!getAgent("reranker") || hits.length <= 1) return hits;
 
   try {
-    const raw = await runAgent("reranker", rerankerPrompt(query, hits), { maxOutputTokens: 300 });
+    const raw = await runAgent("reranker", rerankerPrompt(query, hits), { maxOutputTokens: 300, projectId: context.projectId });
     const s = raw.indexOf("{");
     const e = raw.lastIndexOf("}");
     const parsed = JSON.parse(s >= 0 && e > s ? raw.slice(s, e + 1) : raw) as { order?: number[] };

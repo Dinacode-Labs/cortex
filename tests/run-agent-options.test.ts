@@ -21,9 +21,14 @@ process.env.LLM_BASE_URL = "http://llm.invalid/v1"; // .invalid never resolves: 
 process.env.LLM_API_KEY = "test-key";
 process.env.LLM_MODEL = "test-model";
 
+const { agentPromptChain } = vi.hoisted(() => ({
+  agentPromptChain: vi.fn(async (_role: string, _projectId: string | null) => ({ root: null, projects: [] as string[] })),
+}));
 vi.mock("@cortex/core", async () => ({
   recordUsage: vi.fn(),
   defaultLanguage: (await import("../packages/core/src/projects/domain/project")).defaultLanguage,
+  effectiveCriterion: (await import("../packages/core/src/projects/domain/agent-prompts")).effectiveCriterion,
+  agentPromptChain,
 }));
 vi.mock("@cortex/database", () => ({
   getSql: () => Object.assign(() => Promise.resolve([]), { json: (value: unknown) => value }),
@@ -57,7 +62,13 @@ function requestAt(i: number): Record<string, unknown> {
 
 beforeEach(() => {
   fetchStub.mockClear();
+  agentPromptChain.mockClear();
 });
+
+function systemMessage(i: number): string {
+  const messages = requestAt(i).messages as { role: string; content: string }[];
+  return messages.find((m) => m.role === "system")?.content ?? "";
+}
 
 describe("what runAgent asks the provider for", () => {
   it("caps the output: the role's ceiling arrives as max_tokens", async () => {
@@ -94,11 +105,6 @@ describe("what runAgent asks the provider for", () => {
  * message of each call (ADR-0081).
  */
 describe("the language the agents write in", () => {
-  const systemMessage = (i: number): string => {
-    const messages = requestAt(i).messages as { role: string; content: string }[];
-    return messages.find((m) => m.role === "system")?.content ?? "";
-  };
-
   it("is the one the call asks for, for every role that writes prose", async () => {
     const run = await runAgent();
     const writers = ["classifier", "graph", "distiller", "merger", "retriever"] as const;
@@ -113,6 +119,36 @@ describe("the language the agents write in", () => {
 
     expect(systemMessage(0)).toContain("Spanish");
     expect(systemMessage(0)).not.toContain("English");
+  });
+});
+
+/**
+ * The agents are registered once, with the default criterion: what root and a project set
+ * (ADR-0088) only counts if it reaches the system message of the call made for that project.
+ */
+describe("what a role is told for a project", () => {
+  it("is root's text in place of the default, each project's after it, and the contract last", async () => {
+    agentPromptChain.mockResolvedValueOnce({ root: "Root rule.", projects: ["Parent rule.", "Child rule."] });
+    await (await runAgent())("graph", "a memo", { projectId: "child-id", language: "en" });
+
+    expect(agentPromptChain).toHaveBeenCalledWith("graph", "child-id");
+    expect(systemMessage(0)).toBe(
+      "Root rule.\n\nParent rule.\n\nChild rule.\n\nYou ALWAYS answer in English and ONLY with valid JSON.",
+    );
+  });
+
+  it("is the default plus the project's when root has none", async () => {
+    agentPromptChain.mockResolvedValueOnce({ root: null, projects: ["Child rule."] });
+    await (await runAgent())("merger", "two entries", { projectId: "child-id" });
+
+    expect(systemMessage(0)).toMatch(/^You are Cortex's consolidation agent\.[\s\S]*\n\nChild rule\.\n\nYou write in Spanish\./);
+  });
+
+  it("reads nothing when the caller brings its own chain", async () => {
+    await (await runAgent())("distiller", "a window", { chain: { root: null, projects: [] } });
+
+    expect(agentPromptChain).not.toHaveBeenCalled();
+    expect(systemMessage(0)).toMatch(/^You are Cortex's distillation agent\./);
   });
 });
 
