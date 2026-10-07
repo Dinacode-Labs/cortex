@@ -260,6 +260,10 @@ mistake you notice later.
   at once, with the project's slug typed back ([ADR-0087](docs/decisions.md#adr-0087)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.
   Sub-projects **inherit** from their parent.
+- **Agents you can tune.** What each of the seven agents judges by — what the distiller keeps,
+  how the graph names things, how Ask answers — is a text an admin can rewrite for the whole
+  server and each project can add to, from the web UI or the API. The format they answer in
+  stays fixed ([ADR-0088](docs/decisions.md#adr-0088)).
 - **Multimodal ingestion.** One `extract` layer for plain text and Markdown, Word, PDF and
   Excel, `.drawio` diagrams, images captioned by a vision model, and audio and video
   transcribed with whisper and ffmpeg.

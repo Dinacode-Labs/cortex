@@ -20,6 +20,7 @@ export interface AgentPromptChain {
 
 export interface AgentPromptView {
   role: AgentRole;
+  level: "root" | "project";
   own: AgentPrompt | null;
   inherited: AgentPromptChain;
 }
@@ -51,7 +52,15 @@ export function viewOf(role: AgentRole, prompts: ChainedAgentPrompt[], level: "r
   const above = level === "root" ? [] : prompts.filter((p) => p.depth !== 0);
   return {
     role,
+    level,
     own: own && { role: own.role, text: own.text, updatedBy: own.updatedBy, updatedAt: own.updatedAt },
     inherited: chainOf(role, above),
   };
+}
+
+/** The chain a call made at this level runs with: what it inherits, and its own text. */
+export function chainAt(view: AgentPromptView): AgentPromptChain {
+  const own = view.own?.text ?? null;
+  if (view.level === "root") return { root: own, projects: [] };
+  return { root: view.inherited.root, projects: own ? [...view.inherited.projects, own] : view.inherited.projects };
 }

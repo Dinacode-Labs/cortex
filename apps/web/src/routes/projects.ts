@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import { addProjectMember, deleteProject, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, ProjectNotEmptyError, removeProjectMember, updateProject, keepsType } from "@cortex/core";
+import { addProjectMember, deleteProject, getAgentPrompts, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, ProjectNotEmptyError, removeProjectMember, updateProject, keepsType } from "@cortex/core";
 import {
   contextEntryType,
   getBrandName,
@@ -14,6 +14,7 @@ import { projectCard } from "../views/components.js";
 import { projectHealth } from "../project-summary.js";
 import { projectHeader } from "../views/project-nav.js";
 import { criteriaPanel } from "../views/project-criteria.js";
+import { projectAgentPromptsPanel } from "../views/agent-prompts.js";
 import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -122,6 +123,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const members = await listProjectMembers(project.slug!);
   const projectLanguage = await getProjectLanguage(project.slug!);
   const criteria = await getProjectCriteria(project.slug!);
+  const agentPrompts = await getAgentPrompts(project.slug!);
   const notice = c.req.query("error");
   // The cycle check is done by the domain, which is what knows the whole ancestor chain.
   const others = (await listAccessibleProjects(user)).filter((o) => o.slug && o.id !== project.id);
@@ -191,6 +193,8 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
     </div>
 
     ${criteriaPanel(project.slug!, criteria)}
+
+    ${projectAgentPromptsPanel(project.slug!, agentPrompts)}
 
     <div class="panel">
       <h2>Members</h2>

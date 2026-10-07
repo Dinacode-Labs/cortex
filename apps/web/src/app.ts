@@ -14,6 +14,7 @@ import { purgeRoutes } from "./routes/purge.js";
 import { searchRoutes } from "./routes/search.js";
 import { entriesRoutes } from "./routes/entries.js";
 import { usageRoutes } from "./routes/usage.js";
+import { agentPromptRoutes } from "./routes/agent-prompts.js";
 import { graphRoutes } from "./routes/graph.js";
 import { redirectRoutes } from "./routes/redirects.js";
 
@@ -72,6 +73,7 @@ export function createApp(): Hono<WebEnv> {
   app.route("/", searchRoutes);
   app.route("/", entriesRoutes);
   app.route("/", usageRoutes);
+  app.route("/", agentPromptRoutes);
   app.route("/", graphRoutes);
 
   // Unhandled errors: a full log on the server plus a generic page (500), leaking no internal

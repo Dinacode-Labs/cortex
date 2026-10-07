@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { html, raw } from "hono/html";
 import { getRecentTraces, getUsageSummary, isAdmin } from "@cortex/core";
 import { layout, type Html } from "../views/layout.js";
+import { adminTabs } from "../views/admin-nav.js";
 import type { WebEnv } from "../middleware/session.js";
 
 /**
@@ -68,6 +69,7 @@ usageRoutes.get("/admin/usage", async (c) => {
     <p><a class="back" href="/">← Projects</a></p>
     <h1>AI cost and usage</h1>
     <p class="sub">Tokens and estimated cost per operation and model (ADR-0016). Prices come from a table you can override with <code>CORTEX_PRICING_JSON</code>, so a model priced at zero shows up as zero.</p>
+    ${adminTabs("usage")}
     <div class="row" style="display:flex;gap:12px;flex-wrap:wrap">
       ${stat("Calls", num(u.totals.calls))}
       ${stat("Tokens (total)", num(u.totals.totalTokens))}

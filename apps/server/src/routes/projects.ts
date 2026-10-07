@@ -14,6 +14,7 @@ import {
   ProjectNotEmptyError,
   purgeScope,
   removeProjectMember,
+  setAgentPrompts,
   slugify,
   summarizePurgeScope,
   updateProject,
@@ -124,7 +125,9 @@ projectRoutes.patch("/projects/:slug", async (c) => {
   const project = await findProjectBySlug(slug);
   if (!project || !(await canAccessProject(project, user))) return c.json({ error: "Project not found." }, 404);
   try {
-    return c.json({ project: toSummary(await updateProject(slug, body, user)) });
+    const updated = await updateProject(slug, body, user);
+    if (body.agentPrompts) await setAgentPrompts(slug, body.agentPrompts, user);
+    return c.json({ project: toSummary(updated) });
   } catch (e) {
     if (e instanceof NotAManagerError) return c.json({ error: e.message }, 403);
     return c.json({ error: (e as Error).message }, 400);

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createProject, requestOtp, saveContext, verifyOtp, type ProjectRef } from "@cortex/core";
@@ -39,13 +39,20 @@ async function otpDe(email: string): Promise<string> {
 
 let cookie: string;
 let project_: ProjectRef;
+const previousAdmins = process.env.CORTEX_ADMIN_EMAIL;
 
 beforeAll(async () => {
+  // An admin, so the admin pages are painted too.
+  process.env.CORTEX_ADMIN_EMAIL = USER;
   const { token } = await verifyOtp(USER, await otpDe(USER));
   cookie = `cortex_session=${token}`;
   project_ = await createProject(`Styles ${RID}`, { ownerEmail: USER });
   await saveContext({ content: `Some decision or other ${RID}.`, project: project_.name, createdBy: USER });
 }, 120_000);
+
+afterAll(() => {
+  process.env.CORTEX_ADMIN_EMAIL = previousAdmins;
+});
 
 const clasesDe = (html: string): string[] => [
   ...new Set([...html.matchAll(/class="([^"]+)"/g)].flatMap((m) => m[1]!.split(/\s+/).filter(Boolean))),
@@ -65,6 +72,8 @@ describe("the UI's styles", () => {
       `/p/${project_.slug}/map`,
       `/p/${project_.slug}/code`,
       "/search?q=decision",
+      "/admin/usage",
+      "/admin/agents",
     ];
     const sinEstilo = new Set<string>();
     for (const path of paths) {
