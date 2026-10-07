@@ -71,6 +71,18 @@ async function memoAddedOn(target: ProjectRef, day: string, type: "decision" | "
   return entry.id;
 }
 
+/*
+ * `updated_at` keeps microseconds and a JS Date only milliseconds, so a memo written in the same
+ * millisecond as `new Date()` falls after it; on CI the last memo of a case often did. This cut is
+ * read from the database's clock, rounded up past every write so far, and passed before it returns.
+ */
+async function cutAfterEveryWrite(): Promise<Date> {
+  const [row] = (await getSql()`
+    SELECT date_trunc('milliseconds', now()) + interval '1 millisecond' AS cut FROM pg_sleep(0.002)
+  `) as unknown as { cut: Date }[];
+  return row!.cut;
+}
+
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
 const sorted = (ids: string[]) => [...ids].sort();
 const stillThere = async (ids: string[]) =>
@@ -107,8 +119,9 @@ describe("the memos a purge scope reaches", () => {
     await memoAddedOn(child, "2026-03-02");
     await memoAddedOn(elsewhere, "2026-03-02");
 
+    const march2 = { field: "created" as const, from: day("2026-03-02"), to: day("2026-03-03") };
     const scoped = await findPurgeScope(
-      { project: project.slug!, periods: [{ field: "created", from: day("2026-03-02"), to: day("2026-03-03") }], writtenBefore: new Date() },
+      { project: project.slug!, periods: [march2], writtenBefore: await cutAfterEveryWrite() },
       { email: OWNER },
     );
     expect(sorted(scoped.map((m) => m.id))).toEqual(sorted(inside));
@@ -118,7 +131,7 @@ describe("the memos a purge scope reaches", () => {
     const { project } = await freshProject();
     const decisions = [await memoAddedOn(project, "2026-01-10"), await memoAddedOn(project, "2026-02-10")];
     const other = await memoAddedOn(project, "2026-02-10", "other");
-    const asOf = new Date();
+    const asOf = await cutAfterEveryWrite();
 
     const all = await findPurgeScope({ project: project.slug!, writtenBefore: asOf }, { email: OWNER });
     expect(sorted(all.map((m) => m.id))).toEqual(sorted([...decisions, other]));
@@ -132,7 +145,7 @@ describe("the memos a purge scope reaches", () => {
     const { project } = await freshProject();
     const untouched = await memoAddedOn(project, "2026-04-01");
     const changed = await memoAddedOn(project, "2026-04-01");
-    const asOf = new Date();
+    const asOf = await cutAfterEveryWrite();
     await getSql()`UPDATE memos SET title = title || ' (edited)' WHERE id = ${changed}`;
     await memoAddedOn(project, "2026-04-01");
 
