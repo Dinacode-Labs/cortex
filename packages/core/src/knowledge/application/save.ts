@@ -4,6 +4,8 @@ import { createProject, findProjectIdByName, languageOfProject } from "../../pro
 import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle, summarize } from "../../text.js";
 import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "../domain/memo.js";
 import type { SummarizableMemo } from "../domain/memo-repository.js";
+import type { SearchHit } from "../domain/memo-index.js";
+import { queueReviewsOf } from "./review-queue.js";
 import { port } from "../../composition.js";
 
 export { decideReclassification } from "../domain/memo.js";
@@ -127,10 +129,13 @@ export async function saveContext(
   }
   if (projectId) await linkEntryToEntity(entry.id, projectId);
 
-  const warnings =
-    (opts.detectImprovements ?? true)
-      ? await detectImprovements(entry, projectId, draft.embedText, entityIds)
-      : [];
+  const wantsWarnings = opts.detectImprovements ?? true;
+  // Bulk ingestion embeds later, in batches, and would flood the queue: it raises no reviews (ADR-0091).
+  const wantsReviews = !opts.skipEmbedding && projectId !== null;
+  const neighbours =
+    wantsWarnings || wantsReviews ? await port("memoIndex").similar(draft.embedText, { projectId, excludeId: entry.id }, 6) : [];
+  const warnings = wantsWarnings ? await detectImprovements(entry, neighbours, entityIds) : [];
+  if (wantsReviews) await queueReviewsOf(entry, neighbours);
   return { entry, warnings };
 }
 
@@ -141,17 +146,11 @@ export async function saveContext(
  *    detected through shared entities. It does not rely on high vector similarity, which with
  *    local lexical embeddings would be unreliable.
  */
-async function detectImprovements(
-  entry: Memo,
-  projectId: string | null,
-  embedText: string,
-  entityIds: string[],
-): Promise<ContextWarning[]> {
+async function detectImprovements(entry: Memo, hits: SearchHit[], entityIds: string[]): Promise<ContextWarning[]> {
   const warnings: ContextWarning[] = [];
   const seen = new Set<string>();
   const newPolarity = polarityTags(entry.content);
 
-  const hits = await port("memoIndex").similar(embedText, { projectId, excludeId: entry.id }, 6);
   const scoreById = new Map(hits.map((h) => [h.entry.id, h.score]));
   for (const hit of hits) {
     if (hit.score >= 0.85 && !seen.has(hit.entry.id)) {

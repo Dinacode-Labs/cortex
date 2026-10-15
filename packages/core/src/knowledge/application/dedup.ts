@@ -1,4 +1,4 @@
-import { getEnvNum, type ConfidenceLevel, type Language } from "@cortex/shared";
+import { getEnvNum, scrub, type ConfidenceLevel, type Language } from "@cortex/shared";
 import { saveContext } from "./save.js";
 import { findProjectIdByName, getProjectLanguage } from "../../projects/application/projects.js";
 import { relate } from "../../graph/application/entities.js";
@@ -85,8 +85,10 @@ export async function updateEntryFields(
   entryId: string,
   fields: { title?: string; content?: string },
 ): Promise<boolean> {
-  const { content } = fields;
-  const ok = await port("memos").updateMemoFields(entryId, fields);
+  // A correction is text coming in like any save, and a person pasting a log brings its secrets.
+  const title = fields.title === undefined ? undefined : scrub(fields.title);
+  const content = fields.content === undefined ? undefined : scrub(fields.content);
+  const ok = await port("memos").updateMemoFields(entryId, { title, content });
   if (!ok) return false;
   if (content !== undefined) await port("memoIndex").index(entryId, content);
   return true;

@@ -11,6 +11,7 @@ import { authRoutes } from "./routes/auth.js";
 import { projectsRoutes } from "./routes/projects.js";
 import { projectRoutes } from "./routes/project.js";
 import { purgeRoutes } from "./routes/purge.js";
+import { reviewRoutes } from "./routes/review.js";
 import { searchRoutes } from "./routes/search.js";
 import { entriesRoutes } from "./routes/entries.js";
 import { usageRoutes } from "./routes/usage.js";
@@ -70,6 +71,7 @@ export function createApp(): Hono<WebEnv> {
   app.route("/", projectsRoutes);
   app.route("/", projectRoutes);
   app.route("/", purgeRoutes);
+  app.route("/", reviewRoutes);
   app.route("/", searchRoutes);
   app.route("/", entriesRoutes);
   app.route("/", usageRoutes);

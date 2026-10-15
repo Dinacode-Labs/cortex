@@ -9,7 +9,7 @@ import type { Html } from "./layout.js";
  * wants to know whether their memory is healthy and what their agent is being told; "lint" and
  * "pack" are what we call it (ADR-0050).
  */
-export type Section = "memory" | "ask" | "agents" | "health" | "across" | "map" | "code" | "settings";
+export type Section = "memory" | "review" | "ask" | "agents" | "health" | "across" | "map" | "code" | "settings";
 
 const SECTIONS: { id: Section; label: string; suffix: string }[] = [
   { id: "memory", label: "Memory", suffix: "" },
@@ -49,9 +49,14 @@ function crumbs(ancestors: ProjectRef[], current: string): Html {
  * are children to look at -- a tab leading to an empty screen is worse than no tab.
  */
 export function projectHeader(page: ProjectPage, active: Section): Html {
-  const { project, manager, ancestors, children } = page;
+  const { project, manager, reviewer, pendingReviews, ancestors, children } = page;
   const base = `/p/${project.slug}`;
   const tabs = [...SECTIONS];
+  // Right after Memory, and for whoever may judge its memos: it is the job the UI exists for
+  // (docs/design.md §1). It stays when the queue is empty, so it says there is nothing to do.
+  if (reviewer) {
+    tabs.splice(1, 0, { id: "review", label: pendingReviews ? `Review (${pendingReviews})` : "Review", suffix: "/review" });
+  }
   // It goes right after Health, not at the end: it is the same question -- can I trust this? --
   // but looking at the whole client, and reading them together is how it makes sense. Map and
   // Code are something else, and Settings always closes.

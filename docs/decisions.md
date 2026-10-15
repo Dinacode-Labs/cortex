@@ -3135,3 +3135,62 @@ decisions they carried stay recorded here.
 - **Revisit when:** people review in batches — a queue, bulk verdicts, suggested verdicts — which
   may need a verdict to carry a note or the evidence an agent offered; or `verified` turns out to
   be granted too easily, which argues for reserving it to a project's members.
+
+## ADR-0091 · New knowledge wins, and the older memos it touches wait in a queue for a person
+
+- **Status:** accepted as a hypothesis (2026-10-15). Builds on [0090](#adr-0090).
+- **Context:** when a memo was saved, the memory compared it with the single nearest memo, and
+  only from 0.82 similarity up, where the reconciler decides whether to merge, supersede or do
+  nothing. An older memo the newer one contradicted in other words — the usual case: "a fixed
+  30 s backoff" against "exponential, capped, with jitter" — was never looked at again, and the
+  pack kept handing both over as current. Nothing else closed that gap. The save path's
+  contradiction check is a pattern over two axes (keep/remove, on-prem/cloud) that matches memos
+  sharing an entity in any project. Its warnings are shown once and not kept. And the route agents
+  use mid-task, `save_project_context`, does not reconcile at all. Reviewing by hand meant picking,
+  one by one, which of hundreds of unreviewed memos to open.
+- **Decision:**
+  1. **New knowledge is taken as valid.** The reconciler keeps adding what arrives; nothing waits
+     for a person before it counts.
+  2. **Every memo saved through an interactive route puts the older ones about the same thing up
+     for review.** They are the current memos of its project at `CORTEX_REVIEW_THRESHOLD`
+     similarity or more, up to six. The default, 0.75, sits below the reconciler's band because a
+     contradiction is usually worded differently. Each older/newer pair is a row in `review_queue`
+     (migration `0030_review_queue.sql`). Bulk ingestion embeds later, in batches, and raises
+     none: a connector's first run would bury the queue.
+  3. **The Review section** (`/p/<slug>/review`) shows one older memo at a time, with every newer
+     memo that raised it, and four decisions:
+     - **it still holds:** validated, so `verified` ([0090](#adr-0090));
+     - **discard it:** obsolete, because it held once;
+     - **rewrite it:** the text is replaced and validated;
+     - **skip it:** it goes behind the rest.
+
+     Every decision lands on the next memo: the person never picks what to look at. A decision
+     closes every review of that memo. A memo drops out of the queue once it, or the newer memo,
+     is no longer in force.
+  4. **Priority is the similarity, for now.** The highest goes first and skipped ones go last. It
+     is a column of its own because it will change once an agent judges each pair.
+  5. **Only the project's team judges its memos**, in the Review section and on a memo's page
+     alike. The team is its owner, a member of it or of an ancestor, and the admins. Reading a
+     public project is open to anyone signed in, and since [0090](#adr-0090) a verdict decides
+     what its agents are told first.
+  6. **Edits to a memo's title and content are scrubbed**, like any other text coming in.
+- **Alternatives:**
+  - **Turn the reconciler's merge and supersede into suggestions waiting for a person.** Safer
+    for the older memo, but new knowledge would not count until somebody reviewed it, and the
+    queue would grow with every session. Rejected: the newer memo is the better bet, and it is
+    the older one a person looks at.
+  - **A queue of every unreviewed memo.** It would start with hundreds and give no reason to look
+    at any one of them. Rejected: a memo is worth a second look when something newer is about it.
+  - **Build the queue when the page is opened.** Every view would pay for a similarity search
+    over the project ([0089](#adr-0089)). Rejected.
+- **Consequences:** memos saved before this change only enter the queue when something newer
+  arrives about them. Without a model the queue knows only similarity: a paraphrase that adds
+  nothing and a flat contradiction look alike, and a person tells them apart. The polarity check
+  and its warnings stay as they were until an agent replaces them. The API's `PATCH /entries/:id`
+  and the MCP's `validate_context_entry` still need only read access.
+- **Revisit when:**
+  - the agent that comments on each review lands — importance, repetition, a recommendation to
+    keep, discard or rewrite. It should set the priority and close the reviews that leave
+    nothing to decide;
+  - or the queue grows faster than people clear it, which argues for a higher threshold or a cap
+    per memo.

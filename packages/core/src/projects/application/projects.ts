@@ -2,7 +2,7 @@ import { projectCriteria, type Language, type ProjectCriteria } from "@cortex/sh
 import { isAdmin } from "../../auth/domain/auth.js";
 import type { SessionUser } from "../../auth/domain/session-user.js";
 import { slugify } from "../domain/slug.js";
-import { decideProjectAccess, effectiveCriteria, effectiveLanguage, type ProjectRef, defaultLanguage } from "../domain/project.js";
+import { decideProjectAccess, effectiveCriteria, effectiveLanguage, isOnProjectTeam, type ProjectRef, defaultLanguage } from "../domain/project.js";
 import { port } from "../../composition.js";
 
 export type { ProjectRef } from "../domain/project.js";
@@ -109,6 +109,28 @@ export async function canAccessProject(project: ProjectRef, viewer: SessionUser 
     isAdmin: isAdmin(viewer),
     isMember: (projectId) => repository.isMember(projectId, viewer!.email),
   });
+}
+
+/** Who may judge a project's memos: validate, correct, discard them (ADR-0091). */
+export async function canReviewProject(project: Pick<ProjectRef, "id">, viewer: SessionUser | null): Promise<boolean> {
+  const repository = port("projects");
+  const chain = await repository.chain(project.id);
+  return isOnProjectTeam(chain, viewer, {
+    isAdmin: isAdmin(viewer),
+    isMember: (projectId) => repository.isMember(projectId, viewer!.email),
+  });
+}
+
+/** A memo with no project belongs to nobody's team: only an admin may judge it. */
+export async function canReviewEntryProject(viewer: SessionUser | null, project: Pick<ProjectRef, "id"> | null): Promise<boolean> {
+  return project ? canReviewProject(project, viewer) : isAdmin(viewer);
+}
+
+export class NotAReviewerError extends Error {
+  constructor(project: string) {
+    super(`Only the owner of "${project}", its members or an administrator can review its memos.`);
+    this.name = "NotAReviewerError";
+  }
 }
 
 /**

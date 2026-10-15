@@ -7,6 +7,8 @@ export * from "./knowledge/application/save.js";
 export * from "./knowledge/application/search.js";
 export * from "./knowledge/application/context-pack.js";
 export * from "./knowledge/application/review.js";
+export { nextReview, pendingReviewCount, REVIEW_THRESHOLD } from "./knowledge/application/review-queue.js";
+export { isReviewDecision, type NewerMemo, type PendingReview, type ReviewDecision } from "./knowledge/domain/review-queue.js";
 export * from "./knowledge/application/queries.js";
 export * from "./knowledge/application/render.js";
 export type { Memo, MemoStatus, MemoType, Validity } from "./knowledge/domain/memo.js";
@@ -42,7 +44,7 @@ export { getAcrossClient } from "./graph/application/across.js";
 export type { AcrossClient, SharedEntity, CrossProjectContradiction } from "./graph/domain/across.js";
 export { resolveEntities, type ResolveResult } from "./graph/application/resolve-entities.js";
 export { slugify } from "./projects/domain/slug.js";
-export { findProjectBySlug, findProjectByName, getEntryProject, createProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, updateProject, deleteProject, getProjectLanguage, getProjectCriteria, type ProjectLanguage, type ProjectCriteriaView, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects/application/projects.js";
+export { findProjectBySlug, findProjectByName, getEntryProject, createProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, canReviewProject, canReviewEntryProject, NotAReviewerError, updateProject, deleteProject, getProjectLanguage, getProjectCriteria, type ProjectLanguage, type ProjectCriteriaView, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects/application/projects.js";
 export { agentPromptChain, getAgentPrompts, setAgentPrompts, NotAnAdminError } from "./projects/application/agent-prompts.js";
 export { EMPTY_CHAIN, chainAt, effectiveCriterion, type AgentPrompt, type AgentPromptChain, type AgentPromptView } from "./projects/domain/agent-prompts.js";
 export {

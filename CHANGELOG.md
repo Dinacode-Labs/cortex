@@ -9,6 +9,13 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **A Review section in every project, for the memos something newer is about.** When a memo is
+  saved — by an agent, a session or a person — the older memos of its project about the same
+  thing (similarity 0.75 or more, `CORTEX_REVIEW_THRESHOLD`) wait for review. The newer one
+  counts at once. *Review* shows the older memos one at a time, next to what came in since, with
+  four decisions: it still holds (it becomes `verified`), discard it, rewrite it, or skip it for
+  now. Each one brings up the next; nobody has to pick what to look at. Bulk ingestion raises
+  no reviews. Migration `0030_review_queue.sql` ([ADR-0091](docs/decisions.md#adr-0091)).
 - **A person saying a memo holds now changes what agents are told.** "Yes, it holds" on a memo's
   page makes it `verified`, and the pack puts verified memos first; it used to change only the
   status, so a memo somebody had confirmed ranked below one nobody had read. Every verdict —
@@ -152,6 +159,10 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **Only a project's team judges its memos in the web UI.** Validating, rejecting, editing and
+  reviewing a memo takes being the project's owner, a member of it or of a parent, or an admin.
+  It used to take only being able to read it, which in a public project is anyone signed in. The
+  others still read everything ([ADR-0091](docs/decisions.md#adr-0091)).
 - **Reconciliation no longer rewrites a memo a person verified.** A distilled memo somebody
   validated counts as curated: it is not merged into or superseded on its own any more — a
   contradiction is flagged for a person instead — and the maintenance dedup never drops it
@@ -233,6 +244,8 @@ fixes things.
   generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
 
 ### Fixed
+- **Correcting a memo strips secrets, as saving one does.** An edit from the web UI or `PATCH
+  /entries/:id` stored its text as typed, so a pasted log kept its tokens.
 - **The web UI's validate form only takes a verdict.** It wrote whatever status the form carried,
   so a hand-made request could mark any memo its sender could read as `superseded` or `draft`.
 - **The projects page opens at once, however large the projects.** Each card's health badge ran

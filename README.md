@@ -258,6 +258,10 @@ mistake you notice later.
   deletes the entry for good, from the CLI, the API or its page, and only who purged it and
   when is kept ([ADR-0072](docs/decisions.md#adr-0072)). A whole day, week or project can go
   at once, with the project's slug typed back ([ADR-0087](docs/decisions.md#adr-0087)).
+- **Review queue.** When a memo is saved, the older ones about the same thing in its project
+  wait for a person. The project's Review section brings them one at a time, next to what came
+  in since, and each decision (it still holds, discard, rewrite, skip) lands on the next one.
+  Only the project's team judges its memos ([ADR-0091](docs/decisions.md#adr-0091)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.
   Sub-projects **inherit** from their parent.
 - **Agents you can tune.** What each of the seven agents judges by — what the distiller keeps,

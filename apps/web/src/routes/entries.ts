@@ -3,6 +3,7 @@ import { html } from "hono/html";
 import { contextEntryType, getBrandName } from "@cortex/shared";
 import {
   canManageEntryProject,
+  canReviewEntryProject,
   checkEntryAccess,
   checkProjectAccess,
   findProjectByName,
@@ -48,8 +49,10 @@ entriesRoutes.get("/entry/:id", async (c) => {
 
   const project = projectName ? await findProjectByName(projectName) : null;
   const back = project?.slug ? `/p/${project.slug}` : "/";
-  const editing = c.req.query("edit") === "1";
-  const canPurge = await canManageEntryProject(c.get("user"), access.status === "ok" ? access.project : null);
+  const entryProject = access.status === "ok" ? access.project : null;
+  const canReview = await canReviewEntryProject(c.get("user"), entryProject);
+  const editing = canReview && c.req.query("edit") === "1";
+  const canPurge = await canManageEntryProject(c.get("user"), entryProject);
   const confirmingPurge = canPurge && c.req.query("purge") === "1";
 
   const body = html`
@@ -71,7 +74,7 @@ entriesRoutes.get("/entry/:id", async (c) => {
       : html`<div class="page-head row-between">
             <h1>${entry.title}</h1>
             <div class="row">
-              <a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a>
+              ${canReview ? html`<a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a>` : ""}
               ${canPurge ? html`<a class="button danger" href="/entry/${entry.id}?purge=1">Purge</a>` : ""}
             </div>
           </div>
@@ -94,11 +97,13 @@ entriesRoutes.get("/entry/:id", async (c) => {
     ${source?.rawContent ? panel("Original source", html`<div class="content-block">${source.rawContent}</div>`) : ""}
     ${panel(
       "Is this still true?",
-      html`<div class="row">
-        ${validateForm("validated", "Yes, it holds")}
-        ${validateForm("rejected", "No, it is wrong")}
-        ${validateForm("obsolete", "It was, not any more")}
-      </div>
+      html`${canReview
+        ? html`<div class="row">
+            ${validateForm("validated", "Yes, it holds")}
+            ${validateForm("rejected", "No, it is wrong")}
+            ${validateForm("obsolete", "It was, not any more")}
+          </div>`
+        : html`<p class="sub">${NOT_ON_THE_TEAM}</p>`}
       ${reviewHistory(reviews, iso)}`,
       { help: "An agent wrote this. “Yes, it holds” marks it verified, and what is verified is what agents are told first." },
     )}`;
@@ -144,13 +149,20 @@ entriesRoutes.post("/entry/:id/purge", async (c) => {
   return c.redirect(access.project?.slug ? `/p/${access.project.slug}` : "/");
 });
 
+const NOT_ON_THE_TEAM = "Only the owner of this project, its members or an administrator judge its memos.";
+
+function notOnTheTeam(entryId: string, user: WebEnv["Variables"]["user"]) {
+  return layout("Not allowed", html`<p><a class="back" href="/entry/${entryId}">← Back to the entry</a></p><div class="empty">${NOT_ON_THE_TEAM}</div>`, user);
+}
+
 entriesRoutes.post("/entry/:id/validate", async (c) => {
   const id = c.req.param("id");
-  // The same gate as the detail view (GET /entry/:id): without access to the entry's project,
-  // its status cannot be changed.
+  // Reading the project is not enough: in a public one that is anyone signed in, and a verdict
+  // decides what its agents are told first (ADR-0091).
   const access = await checkEntryAccess(c.get("user"), id);
   if (access.status === "not_found") return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
+  if (!(await canReviewEntryProject(c.get("user"), access.project))) return c.html(notOnTheTeam(id, c.get("user")), 403);
   const form = await c.req.parseBody();
   const verdict = String(form.status);
   if (isReviewVerdict(verdict)) await validateEntry(id, verdict, { email: c.get("user")!.email, channel: "web" });
@@ -199,6 +211,7 @@ entriesRoutes.post("/entry/:id/edit", async (c) => {
   if (access.status === "not_found")
     return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
+  if (!(await canReviewEntryProject(c.get("user"), access.project))) return c.html(notOnTheTeam(id, c.get("user")), 403);
   const form = await c.req.parseBody();
   const title = String(form.title ?? "").trim();
   const content = String(form.content ?? "").trim();
