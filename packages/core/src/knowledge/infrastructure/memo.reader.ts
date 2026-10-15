@@ -1,6 +1,7 @@
 import type { Row, Sql } from "@cortex/database";
 import { rowToMemo } from "./memo.row.js";
 import { rowToSource } from "./source.row.js";
+import { rowToReview } from "./review.row.js";
 import { rowToEntity } from "../../graph/infrastructure/entity.row.js";
 import type { EntryDetail, EntrySort, MemoListFilter, MemoReader, ProjectGraphData } from "../domain/memo-reader.js";
 import type { Memo, MemoType } from "../domain/memo.js";
@@ -68,11 +69,17 @@ export class PgMemoReader implements MemoReader {
       const projRows = (await sql`SELECT name FROM entities WHERE id = ${entry.projectId} LIMIT 1`) as unknown as Row[];
       projectName = projRows[0] ? (projRows[0].name as string) : null;
     }
+    const reviewRows = (await sql`
+      SELECT verdict, channel, reviewed_by, reviewed_at FROM memo_reviews
+      WHERE memo_id = ${id}
+      ORDER BY reviewed_at DESC
+    `) as unknown as Row[];
     return {
       entry,
       source: sourceRows[0] ? rowToSource(sourceRows[0]) : null,
       entities: entityRows.map(rowToEntity),
       projectName,
+      reviews: reviewRows.map(rowToReview),
     };
   }
 

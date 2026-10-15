@@ -84,7 +84,8 @@ valid_from/_to:   2026-01-10 / NULL           ← time window (see §6)
 ```
 
 - **`confidence`** (`low` < `medium` < `high` < `verified`): a note auto-captured from a
-  session enters as `low`. Something confirmed against a real source can be `verified`. The
+  session enters as `low`. Something confirmed against a real source can be `verified`, and
+  so is anything a person validates in the web UI ([ADR-0090](decisions.md#adr-0090)). The
   lint reports how many low-confidence entries a project carries.
 - **`status`** is the lifecycle: `draft → pending_validation → validated / rejected /
   obsolete / superseded`. The context pack and the decision list **exclude** anything
@@ -97,9 +98,10 @@ valid_from/_to:   2026-01-10 / NULL           ← time window (see §6)
 > and you can always trace where something came from.
 
 > **⚠️ What to watch for.** The default `status` is `pending_validation`, and today **nobody
-> validates systematically by hand**. That would be too much friction. Quality rises through
-> auto-curation instead (§8), not through human review. If a given client needs stronger
-> guarantees, that review workflow does not exist yet. It is on the roadmap.
+> validates systematically by hand**. A person's validation does reach the pack, since it makes
+> the memo `verified` and records who gave it, but reviewing is still one memo at a time, so
+> quality rises mainly through auto-curation (§8). A review workflow that scales is on the
+> roadmap.
 
 ## 2. Embeddings and vector search, the basis of RAG
 
@@ -428,7 +430,7 @@ having been written to, that auto-curation promotes on ([ADR-0067](decisions.md#
 
 **The critical guardrail:** Cortex **never automatically rewrites or invalidates** knowledge
 that came from a source or was curated by a human. Only **auto-captured** entries
-(`agent_session`) get merged or superseded on their own. If a new note contradicts something
+(`agent_session`) that no person has verified get merged or superseded on their own. If a new note contradicts something
 curated, a `contradicts` edge is recorded so **a person reviews it**. The AI does not
 overwrite what a human signed off on.
 

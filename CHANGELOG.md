@@ -9,6 +9,13 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **A person saying a memo holds now changes what agents are told.** "Yes, it holds" on a memo's
+  page makes it `verified`, and the pack puts verified memos first; it used to change only the
+  status, so a memo somebody had confirmed ranked below one nobody had read. Every verdict —
+  validated, rejected, obsolete — is recorded with who gave it, from where and when, and the
+  memo's page shows the history. An agent validating through MCP (`validate_context_entry`)
+  records its verdict and leaves the confidence alone, and the tool says so. Migration
+  `0029_memo_reviews.sql` ([ADR-0090](docs/decisions.md#adr-0090)).
 - **What each agent is told can be changed, for the whole server and per project.** The seven
   agents — the ones that distil sessions, classify memos, draw the graph, rerank search, answer
   in Ask, and reconcile and merge memos — each judged by a text fixed in the code. An admin can
@@ -145,6 +152,10 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **Reconciliation no longer rewrites a memo a person verified.** A distilled memo somebody
+  validated counts as curated: it is not merged into or superseded on its own any more — a
+  contradiction is flagged for a person instead — and the maintenance dedup never drops it
+  ([ADR-0090](docs/decisions.md#adr-0090)).
 - **The agents are told what each memo type means.** The distiller and the classifier used to
   get the list of type names and nothing else; they now get one line per type saying what it is
   and what it is not (a proposal is not a `decision`, a local hiccup is not an `incident`).
@@ -222,6 +233,8 @@ fixes things.
   generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
 
 ### Fixed
+- **The web UI's validate form only takes a verdict.** It wrote whatever status the form carried,
+  so a hand-made request could mark any memo its sender could read as `superseded` or `draft`.
 - **The projects page opens at once, however large the projects.** Each card's health badge ran
   the whole lint of its project on every view, and the lint's duplicate search grows with the
   square of a project's memos: one of a couple of thousand took over ten seconds on its own, and

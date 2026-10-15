@@ -1,17 +1,20 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import { contextEntryType, getBrandName, type ContextEntryStatus } from "@cortex/shared";
+import { contextEntryType, getBrandName } from "@cortex/shared";
 import {
   canManageEntryProject,
   checkEntryAccess,
   checkProjectAccess,
   findProjectByName,
   getEntryDetail,
+  isReviewVerdict,
   NotAManagerError,
   purgeEntries,
   saveContext,
   updateEntryFields,
   validateEntry,
+  type MemoReview,
+  type ReviewVerdict,
 } from "@cortex/core";
 import { layout } from "../views/layout.js";
 import { badge, confidenceBadge, panel, statusBadge, typeBadge } from "../views/components.js";
@@ -26,13 +29,13 @@ entriesRoutes.get("/entry/:id", async (c) => {
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const detail = access.status === "ok" ? await getEntryDetail(id) : null;
   if (!detail) return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
-  const { entry, source, entities, projectName } = detail;
+  const { entry, source, entities, projectName, reviews } = detail;
 
   const entityTags = entities.length
     ? html`<div class="tags">${entities.map((e) => html`<a href="/search?q=${encodeURIComponent(e.name)}">#${e.name} <small>(${e.type})</small></a>`)}</div>`
     : html`<span class="sub">No linked entities.</span>`;
 
-  const validateForm = (status: ContextEntryStatus, label: string) =>
+  const validateForm = (status: ReviewVerdict, label: string) =>
     html`<form method="post" action="/entry/${entry.id}/validate">
       <input type="hidden" name="status" value="${status}">
       <button class="${status === "rejected" ? "danger" : "secondary"}" type="submit">${label}</button>
@@ -95,11 +98,20 @@ entriesRoutes.get("/entry/:id", async (c) => {
         ${validateForm("validated", "Yes, it holds")}
         ${validateForm("rejected", "No, it is wrong")}
         ${validateForm("obsolete", "It was, not any more")}
-      </div>`,
-      { help: "An agent wrote this. Saying so is what makes the rest of the memory worth trusting." },
+      </div>
+      ${reviewHistory(reviews, iso)}`,
+      { help: "An agent wrote this. “Yes, it holds” marks it verified, and what is verified is what agents are told first." },
     )}`;
   return c.html(layout(entry.title, body, c.get("user")));
 });
+
+function reviewHistory(reviews: MemoReview[], day: (d: unknown) => string) {
+  if (!reviews.length) return html`<p class="sub">Nobody has reviewed it yet.</p>`;
+  const where = (r: MemoReview) => (r.channel === "web" ? "here" : "by an agent, through MCP");
+  return html`<dl class="meta">
+    ${reviews.map((r) => html`<dt>${day(r.reviewedAt)}</dt><dd>${statusBadge(r.verdict)} ${r.reviewedBy ?? "nobody signed in"}, ${where(r)}</dd>`)}
+  </dl>`;
+}
 
 function purgeConfirmation(entryId: string) {
   return panel(
@@ -140,8 +152,8 @@ entriesRoutes.post("/entry/:id/validate", async (c) => {
   if (access.status === "not_found") return c.html(layout("Not found", html`<p><a class="back" href="/">← Projects</a></p><div class="empty">Entry not found.</div>`), 404);
   if (access.status === "forbidden") return c.html(deniedPage(c.get("user")), 403);
   const form = await c.req.parseBody();
-  const status = String(form.status) as "validated" | "rejected" | "obsolete";
-  await validateEntry(id, status);
+  const verdict = String(form.status);
+  if (isReviewVerdict(verdict)) await validateEntry(id, verdict, { email: c.get("user")!.email, channel: "web" });
   return c.redirect(`/entry/${id}`);
 });
 

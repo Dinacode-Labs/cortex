@@ -333,7 +333,7 @@ directly and applies no permissions. It is for developing the server, not for da
 | `search_project_context` | Hybrid search, vector plus lexical, with optional rerank |
 | `get_project_context_pack` | A briefing for a project or area; `asOf` gives a point-in-time view |
 | `list_project_decisions` | The decisions currently in force |
-| `validate_context_entry` | Validate, reject, or mark obsolete |
+| `validate_context_entry` | Validate, reject, or mark obsolete (only a person in the web UI makes a memo `verified`) |
 | `ask_project_context` | A question in plain language, answered from the memory with sources |
 | `search_project_code` | Hybrid search over the project's indexed code |
 | `lint_project_context` | Health of the memory: contradictions, duplicates, gaps, unreviewed entries |

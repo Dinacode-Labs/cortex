@@ -13,6 +13,7 @@ import type {
   SummarizableMemo,
 } from "../domain/memo-repository.js";
 import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
+import type { ReviewWrite } from "../domain/review.js";
 
 type JsonValue = Parameters<Sql["json"]>[0];
 
@@ -145,6 +146,7 @@ export class PgMemoRepository implements MemoRepository {
     maxDistance: number,
     skipFormats: string[],
   ): Promise<{ keep: string; drop: string }[]> {
+    // The copy a person verified is never the one dropped, whichever is older (ADR-0090).
     return (await this.sql`
       SELECT a.id AS keep, b.id AS drop
       FROM embeddings ea
@@ -157,6 +159,7 @@ export class PgMemoRepository implements MemoRepository {
         AND a.valid_to IS NULL AND b.valid_to IS NULL
         AND a.status NOT IN ('rejected', 'obsolete', 'superseded')
         AND b.status NOT IN ('rejected', 'obsolete', 'superseded')
+        AND b.confidence <> 'verified'
         AND coalesce(a.metadata->>'format', '') <> ALL(${skipFormats})
         AND coalesce(b.metadata->>'format', '') <> ALL(${skipFormats})
         AND a.created_at < b.created_at
@@ -354,8 +357,20 @@ export class PgMemoRepository implements MemoRepository {
     }));
   }
 
-  async setStatus(id: string, status: MemoStatus): Promise<Memo | null> {
-    const rows = (await this.sql`UPDATE memos SET status = ${status} WHERE id = ${id} RETURNING *`) as unknown as Row[];
-    return rows[0] ? rowToMemo(rows[0]) : null;
+  async review(id: string, write: ReviewWrite): Promise<Memo | null> {
+    return this.sql.begin(async (tx) => {
+      const rows = (await tx`
+        UPDATE memos
+           SET status = ${write.verdict}, confidence = coalesce(${write.confidence}::text, confidence)
+         WHERE id = ${id}
+        RETURNING *
+      `) as unknown as Row[];
+      if (!rows[0]) return null;
+      await tx`
+        INSERT INTO memo_reviews (memo_id, verdict, channel, reviewed_by)
+        VALUES (${id}, ${write.verdict}, ${write.reviewer.channel}, ${write.reviewer.email?.toLowerCase() ?? null})
+      `;
+      return rowToMemo(rows[0]);
+    });
   }
 }

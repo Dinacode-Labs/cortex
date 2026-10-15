@@ -6,9 +6,18 @@ export { relationType, type Relation, type RelationType } from "./graph/domain/r
 export * from "./knowledge/application/save.js";
 export * from "./knowledge/application/search.js";
 export * from "./knowledge/application/context-pack.js";
+export * from "./knowledge/application/review.js";
 export * from "./knowledge/application/queries.js";
 export * from "./knowledge/application/render.js";
 export type { Memo, MemoStatus, MemoType, Validity } from "./knowledge/domain/memo.js";
+export {
+  confidenceAfterReview,
+  isReviewVerdict,
+  type MemoReview,
+  type Reviewer,
+  type ReviewChannel,
+  type ReviewVerdict,
+} from "./knowledge/domain/review.js";
 export type { Source } from "./knowledge/domain/source.js";
 export { sliceTranscript, type SlicedTranscript } from "./capture/domain/transcript-windows.js";
 export {

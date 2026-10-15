@@ -1,5 +1,6 @@
 import type { ConfidenceLevel, EntrySortField, Language, SourceType } from "@cortex/shared";
 import type { Memo, MemoStatus, MemoType } from "./memo.js";
+import type { ReviewWrite } from "./review.js";
 
 /** A source to persist, before it has an id. */
 export interface NewSource {
@@ -97,7 +98,8 @@ export interface ContradictingSide {
  * `relations` would end up saying different things about the same data.
  */
 export interface MemoRepository {
-  setStatus(id: string, status: MemoStatus): Promise<Memo | null>;
+  /** The verdict and the record of who gave it, in one transaction (ADR-0090). */
+  review(id: string, write: ReviewWrite): Promise<Memo | null>;
   contradictingPairs(projectIds: string[], limit: number): Promise<{ a: ContradictingSide; b: ContradictingSide }[]>;
   createSource(source: NewSource): Promise<string>;
   createMemo(memo: NewMemo): Promise<Memo>;
