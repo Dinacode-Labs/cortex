@@ -160,8 +160,10 @@ still true, plus what the rework did not touch.
 5. **The shared stack shows what the extractor wrote, noise and all.** «Across this client»
    filters out the entity types that are pure hierarchy noise today, but a ticket id recorded
    as a module still reaches the list. It gets better when the extractor does, not here.
-6. **Editing has no history.** A correction overwrites, leaving only `updated_at`. For a system
-   whose whole argument is traceability, that is a gap worth closing when someone needs it.
+6. **Editing has no history.** Verdicts do — who said a memo holds, and from where
+   ([ADR-0090](decisions.md#adr-0090)) — but a correction to the text overwrites, leaving only
+   `updated_at`. For a system whose whole argument is traceability, that is a gap worth closing
+   when someone needs it.
 
 **Closed on 2026-09-15:** the empty landing page ([0052](decisions.md#adr-0052)); visibility
 and owner being unchangeable and member management being invisible

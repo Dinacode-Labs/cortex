@@ -38,11 +38,10 @@ Working, and in daily use by a team:
 
 ### What is already hurting
 
-- **Nobody validates.** 608 current entries, **608 unreviewed**. Status and confidence are the
-  two fields that exist so an agent knows what to trust, and while they go unused they tell
-  nothing apart: the pack cannot prioritise by reliability even though it knows how. Half of
-  this loop belongs to people, not to code; what the code could do -- make it visible and
-  filterable -- is already done.
+- **Nobody validates.** 608 current entries, **608 unreviewed**. A person's validation now
+  reaches the pack -- it makes the memo `verified`, which is what the pack orders by -- and every
+  verdict is recorded ([ADR-0090](decisions.md#adr-0090)). What is left is the cost of doing it:
+  one memo at a time, with no queue, no verdicts in bulk and nothing suggesting one.
 - **`search` and `ask` do not inherit from the parent.** The context pack climbs the ancestor
   chain and search does not, so inside a child project you do not find what is stored in the
   client. With real hierarchies being set up right now, this already shows.

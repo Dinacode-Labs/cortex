@@ -2,6 +2,7 @@ import type { EntrySortField, SortDirection } from "@cortex/shared";
 import type { Memo, MemoStatus, MemoType } from "./memo.js";
 import type { Entity } from "../../graph/domain/entity.js";
 import type { Source } from "./source.js";
+import type { MemoReview } from "./review.js";
 
 export interface EntrySort {
   by: EntrySortField;
@@ -23,6 +24,8 @@ export interface EntryDetail {
   source: Source | null;
   entities: Entity[];
   projectName: string | null;
+  /** The newest first. */
+  reviews: MemoReview[];
 }
 
 export interface ProjectGraphData {

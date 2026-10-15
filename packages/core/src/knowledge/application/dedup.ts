@@ -1,4 +1,4 @@
-import { getEnvNum, type Language } from "@cortex/shared";
+import { getEnvNum, type ConfidenceLevel, type Language } from "@cortex/shared";
 import { saveContext } from "./save.js";
 import { findProjectIdByName, getProjectLanguage } from "../../projects/application/projects.js";
 import { relate } from "../../graph/application/entities.js";
@@ -22,7 +22,13 @@ export interface NearestEntry {
   content: string;
   score: number;
   sourceType: string;
+  confidence: ConfidenceLevel;
   projectId: string;
+}
+
+// What a person validated is curated, whatever wrote it first (ADR-0090).
+function reconcilerMayModify(near: NearestEntry): boolean {
+  return near.sourceType === "agent_session" && near.confidence !== "verified";
 }
 
 export async function findNearest(project: string, text: string): Promise<NearestEntry | null> {
@@ -38,6 +44,7 @@ export async function findNearest(project: string, text: string): Promise<Neares
       content: h.entry.content,
       score: h.score,
       sourceType: h.entry.sourceType,
+      confidence: h.entry.confidence,
       projectId: pid,
     };
   } catch {
@@ -126,7 +133,8 @@ export interface ReconcileResult {
  *  - With a reconciler injected, similarity 0.82-0.95 **and the same `sourceType`**: UPDATE
  *    (merge, auto-captured only), SUPERSEDE (invalidate the old auto-captured one; if it is
  *    sourced or curated it is only marked `contradicts`) or NOOP. Here the same origin IS
- *    required, because these branches MODIFY what was already there.
+ *    required, because these branches MODIFY what was already there. An auto-captured entry a
+ *    person validated counts as curated.
  *  - ADD in every other case. It NEVER rewrites or invalidates sourced or curated knowledge.
  *
  * Every branch that does NOT add a new entry -- the three noops and the merge -- counts as a
@@ -182,7 +190,7 @@ export async function saveWithReconciliation(
     }
     if (decision === "supersede") {
       const { entry } = await saveContext(input, opts);
-      if (near.sourceType === "agent_session") {
+      if (reconcilerMayModify(near)) {
         await invalidateEntry(near.id, entry.id);
         return { action: "supersede", entryId: entry.id };
       }
@@ -191,7 +199,7 @@ export async function saveWithReconciliation(
       return { action: "contradict", entryId: entry.id };
     }
     // update: only auto-captured entries are merged (sourced/curated is never rewritten)
-    if (near.sourceType === "agent_session") {
+    if (reconcilerMayModify(near)) {
       const { effective: language } = await getProjectLanguage(input.project!);
       const merged = await reconciler.merge(near.content, input.content, { language, projectId: near.projectId });
       await updateEntryContent(near.id, merged);
@@ -209,7 +217,7 @@ export async function saveWithReconciliation(
  * SAME project and `source_type`, reusing the embeddings already computed (no LLM cost and no
  * re-embedding). That way the connectors (which embed in batches and cannot inject the LLM
  * reconciler) benefit too. It keeps the oldest as canonical and invalidates (section 5.5) the
- * duplicates (`superseded_by` the canonical one). Reversible.
+ * duplicates (`superseded_by` the canonical one), never one a person verified. Reversible.
  */
 // Formats whose embedding is NOT their identity but a generated description (a vision
 // caption): generic captions group DIFFERENT images together -> never dedup them by embedding.

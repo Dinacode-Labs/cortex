@@ -2,14 +2,7 @@ import type { ProjectCriteria } from "@cortex/shared";
 import { criteriaOfProject, findProjectByName, projectIdsWithAncestors } from "../../projects/application/projects.js";
 import { port } from "../../composition.js";
 import type { SearchHit } from "../domain/memo-index.js";
-import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
-
-export async function validateEntry(
-  id: string,
-  status: Extract<MemoStatus, "validated" | "rejected" | "obsolete">,
-): Promise<Memo | null> {
-  return port("memos").setStatus(id, status);
-}
+import type { Memo, MemoType } from "../domain/memo.js";
 
 /**
  * Which knowledge types go into the pack, in what order and with how much weight.

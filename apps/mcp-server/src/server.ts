@@ -156,7 +156,8 @@ export function buildMcpServer(user?: SessionUser): McpServer {
     "validate_context_entry",
     {
       title: "Validate a context entry",
-      description: "Change the validation state of an entry: validated, rejected or obsolete.",
+      description:
+        "Change the validation state of an entry: validated, rejected or obsolete. The verdict is recorded under the signed-in user. Validating here does not raise the entry's confidence: only a person validating it in the web UI makes it verified.",
       inputSchema: {
         id: z.string().uuid().describe("Id of the context entry"),
         status: z.enum(["validated", "rejected", "obsolete"]),
@@ -171,9 +172,13 @@ export function buildMcpServer(user?: SessionUser): McpServer {
           if (access.status === "not_found") return errorText(`No entry with id ${id}.`);
           if (access.status === "forbidden") return errorText(`No access to entry ${id}.`);
         }
-        const entry = await validateEntry(id, status);
+        const entry = await validateEntry(id, status, { email: user?.email ?? null, channel: "mcp" });
         if (!entry) return errorText(`No entry with id ${id}.`);
-        return text(`Entry ${entry.id} is now "${entry.status}".`);
+        const confidenceNote =
+          status === "validated" && entry.confidence !== "verified"
+            ? ` Its confidence stays "${entry.confidence}": only a person validating it in the web UI makes it verified.`
+            : "";
+        return text(`Entry ${entry.id} is now "${entry.status}".${confidenceNote}`);
       } catch (e) {
         return errorText(`Could not validate the entry: ${(e as Error).message}`);
       }

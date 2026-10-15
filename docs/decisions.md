@@ -3089,3 +3089,49 @@ decisions they carried stay recorded here.
 - **Revisit when:** a stale badge misleads somebody, which argues for recording health when memos
   are saved or reconciled rather than when linting; or the Health tab itself becomes too slow to
   open, which is the duplicate search to fix, not the card.
+
+## ADR-0090 · A person's "yes, it holds" makes a memo verified, and every verdict is recorded
+
+- **Status:** accepted as a hypothesis (2026-10-15). Adds a second way to earn confidence next to
+  corroboration ([0067](#adr-0067)).
+- **Context:** validating a memo — "Yes, it holds" in the web UI, or `validate_context_entry` —
+  changed only its `status`, and nothing read that status as a reason to trust it. The context
+  pack orders each section by `confidence`, and auto-curation only promotes memos still
+  `pending_validation`, so a distilled memo a person had confirmed stayed `low` for good and
+  ranked below one nobody had read but that had turned up twice. Reconciliation decided whether
+  it could merge into or supersede a memo by its origin alone, so a model could rewrite that same
+  confirmed memo. And nothing recorded who validated what, or when: a mistaken click could not be
+  traced, and an agent validating through MCP looked exactly like a person. With every memo of a
+  project unreviewed, there was no reason to start: reviewing changed nothing an agent saw.
+- **Decision:**
+  1. **A person validating a memo in the web UI makes it `verified`**, which is what the pack
+     orders by: what a person confirmed is what agents are told first. Rejecting it or marking
+     it obsolete leaves the confidence as it was; both already keep it out of the pack.
+  2. **An agent validating through MCP changes the status and leaves the confidence alone.** A
+     model's judgement does not become a fact. The tool says so in its answer, and a person can
+     confirm the memo on the web.
+  3. **Every verdict is recorded** in `memo_reviews` (migration `0029_memo_reviews.sql`): the
+     verdict, who gave it, through which channel (`web` or `mcp`) and when, in the same
+     transaction as the status. The entry page shows the history; purging a memo takes its
+     reviews with it.
+  4. **A memo a person verified counts as curated.** Reconciliation neither merges into it nor
+     supersedes it — it flags the contradiction for a person instead — and the after-the-fact
+     dedup never drops it, even when it is the newer copy.
+  5. The web route accepts the three verdicts only. It used to write whatever status the form
+     carried, `superseded` included.
+- **Alternatives:**
+  - **`reviewed_by` and `reviewed_at` columns on `memos`.** Cheaper to read, but they keep only
+    the last verdict, and two places would say who reviewed. Rejected: the table is the one
+    record, and the entry page is its only reader for now.
+  - **Any channel raises the confidence.** Simpler, and it would make an agent's verdict
+    indistinguishable from a person's in exactly the field that ranks what agents read. Rejected.
+  - **Order the pack by status as well as confidence.** Two fields would then say how far to
+    trust a memo, and reconciliation would still need its own test for "a person signed this
+    off". Rejected.
+- **Consequences:** memos validated before this change keep their confidence and have no history:
+  nobody can say now who validated them, or where. A verified memo that turns out wrong has to be
+  rejected or marked obsolete by hand, because reconciliation flags what contradicts it and never
+  fixes it. Edits to a memo's text are still not recorded ([design](design.md), §5).
+- **Revisit when:** people review in batches — a queue, bulk verdicts, suggested verdicts — which
+  may need a verdict to carry a note or the evidence an agent offered; or `verified` turns out to
+  be granted too easily, which argues for reserving it to a project's members.
