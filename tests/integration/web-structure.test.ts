@@ -61,11 +61,36 @@ describe("the UI's structure (ADR-0050)", () => {
       const res = await get(`/p/${project_.slug}${suffix}`);
       expect(res.status, `/p/<slug>${suffix}`).toBe(200);
       const html = await res.text();
-      // The project travels with the tabs: changing section cannot lose it.
-      expect(html, `the tabs of ${suffix || "/"} must point at the same project`).toContain(
+      // The project travels with the sidebar: changing section cannot lose it.
+      expect(html, `the sidebar of ${suffix || "/"} must point at the same project`).toContain(
         `/p/${project_.slug}/health`,
       );
     }
+  }, 120_000);
+
+  /**
+   * ADR-0092: the section's name moved from a tab into the heading. A section that forgets either
+   * the heading or its sidebar mark leaves the reader not knowing where they are.
+   */
+  it("each section names itself in its heading and is the one marked in the sidebar", async () => {
+    const sections: [string, string][] = [
+      ["", "Memory"],
+      ["/review", "Review"],
+      ["/ask", "Ask"],
+      ["/agents", "What agents see"],
+      ["/health", "Health"],
+      ["/map", "Map"],
+      ["/code", "Code"],
+      ["/settings", "Settings"],
+    ];
+    const wrong: string[] = [];
+    for (const [suffix, label] of sections) {
+      const html = await (await get(`/p/${project_.slug}${suffix}`)).text();
+      if (!html.includes(`<h1 class="section-title">${label}</h1>`)) wrong.push(`${suffix || "/"}: no heading "${label}"`);
+      const current = [...html.matchAll(/<a class="side-item on" href="([^"]+)"/g)].map((m) => m[1]);
+      if (current.length !== 1 || current[0] !== `/p/${project_.slug}${suffix}`) wrong.push(`${suffix || "/"}: sidebar marks ${current.join(", ") || "nothing"}`);
+    }
+    expect(wrong).toEqual([]);
   }, 120_000);
 
   it("the old addresses still lead somewhere", async () => {

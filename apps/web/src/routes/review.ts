@@ -3,7 +3,7 @@ import { html } from "hono/html";
 import { isReviewDecision, nextReview, NotAReviewerError, resolveReview, type Memo, type PendingReview } from "@cortex/core";
 import { layout, type Html } from "../views/layout.js";
 import { confidenceBadge, empty, panel, statusBadge, typeBadge } from "../views/components.js";
-import { projectHeader } from "../views/project-nav.js";
+import { projectPage } from "../views/project-nav.js";
 import { requireProjectPage, type ProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -19,8 +19,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const notAReviewer = (page: ProjectPage, user: WebEnv["Variables"]["user"]) =>
   layout(
     page.project.name,
-    html`${projectHeader(page, "memory")}
-      <div class="empty">Only the owner of this project, its members or an administrator review its memos.</div>`,
+    projectPage(page, "review", empty("Only the owner of this project, its members or an administrator review its memos.")),
     user,
   );
 
@@ -88,7 +87,7 @@ reviewRoutes.get("/p/:slug/review", async (c) => {
         "Nothing to review. When something new is saved about a memo already here, the older one comes up for you to judge.",
         html`<a class="button secondary" href="/p/${page.project.slug}">Back to the memory</a>`,
       );
-  return c.html(layout(`Review · ${page.project.name}`, html`${projectHeader(page, "review")}${body}`, user));
+  return c.html(layout(`Review · ${page.project.name}`, projectPage(page, "review", body), user));
 });
 
 reviewRoutes.post("/p/:slug/review", async (c) => {

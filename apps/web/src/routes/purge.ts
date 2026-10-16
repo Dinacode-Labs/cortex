@@ -13,7 +13,7 @@ import { contextEntryStatus, contextEntryTypeInput, type EntrySortField } from "
 import { parseDateBlock, type DateBlockSpan } from "../date-blocks.js";
 import { layout } from "../views/layout.js";
 import { empty, panel, warn } from "../views/components.js";
-import { projectHeader } from "../views/project-nav.js";
+import { projectPage } from "../views/project-nav.js";
 import { requireProjectPage, type ProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -113,8 +113,8 @@ const onlyManagers = (c: Context<WebEnv>, page: ProjectPage) =>
   c.html(
     layout(
       "Not allowed",
-      html`${projectHeader(page, "memory")}
-        ${empty("Only the owner of this project or an administrator can purge its entries.")}`,
+      projectPage(page, "memory", html`
+        ${empty("Only the owner of this project or an administrator can purge its entries.")}`),
       c.get("user"),
     ),
     403,
@@ -199,8 +199,7 @@ function confirmation(page: ProjectPage, input: ConfirmationInput) {
     ["confirm", "1"],
   ];
 
-  return html`
-    ${projectHeader(page, "memory")}
+  return projectPage(page, "memory", html`
     ${panel(
       `Purge ${going.length} ${noun} for good?`,
       html`${warn(
@@ -226,5 +225,5 @@ function confirmation(page: ProjectPage, input: ConfirmationInput) {
           <button class="danger" type="submit">Purge ${going.length} ${noun} permanently</button>
           <a class="button quiet" href="${memoryUrl(slug, filters)}">Cancel</a>
         </form>`,
-    )}`;
+    )}`);
 }

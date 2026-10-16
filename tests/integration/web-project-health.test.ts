@@ -80,6 +80,23 @@ function cardOf(page: string, slug: string): string {
 }
 
 describe("project cards read the last lint (ADR-0089)", () => {
+  /*
+   * ADR-0092: the sidebar marks Health with what the last lint found, read the way the cards
+   * read it, so moving between a project's sections never runs a lint.
+   */
+  it("the sidebar warns on Health from the last lint, without running one", async () => {
+    configureCore({
+      health: lintForbidden,
+      healthSnapshots: {
+        record: async () => {},
+        latest: async () => new Map([[linted.id, { contradictions: 1, duplicates: 2, checkedAt: new Date() }]]),
+      },
+    });
+
+    const html = await (await get(`/p/${linted.slug}/ask`)).text();
+    expect(html).toMatch(/<span class="side-alarm" title="3 findings at the last check">.*?3<\/span>/s);
+  });
+
   it("the projects page and a client's page paint their cards without linting anything", async () => {
     configureCore({ health: lintForbidden });
 

@@ -66,6 +66,7 @@
   --ease:cubic-bezier(.2,.8,.3,1);
   --fast:130ms;
   --page:1120px;
+  --page-wide:1360px;
 
   /* A <select> takes no pseudo-element to mask, so the chevron carries its own stroke colour. */
   --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' d='M7 1.9a5.1 5.1 0 1 0 0 10.2A5.1 5.1 0 0 0 7 1.9Zm3.9 8.9 3.2 3.2'/%3E%3C/svg%3E");
@@ -382,16 +383,48 @@ a.pill.active { color:var(--on-accent); background:var(--accent); border-color:v
 a.back { display:inline-block; margin-bottom:var(--s-4); color:var(--muted); font-size:var(--t-sm); }
 a.back:hover { color:var(--ink); text-decoration:none; }
 
-/* --- Project header and tabs --------------------------------------------- */
+/* --- Project shell ------------------------------------------------------- */
 
-.project-head { margin-bottom:var(--s-5); border-bottom:1px solid var(--line); }
-/* Breadcrumbs: the path up to the root, above the title and not competing with it. */
+main:has(> .project-shell) { max-width:var(--page-wide); }
+.project-shell { display:grid; grid-template-columns:216px minmax(0,1fr); gap:var(--s-6); align-items:start; }
+.project-side { position:sticky; top:calc(56px + var(--s-5)); max-height:calc(100vh - 56px - var(--s-6));
+  overflow-y:auto; scrollbar-width:thin; }
+.project-side .crumbs { margin-bottom:var(--s-1); padding:0 var(--s-3); font-size:var(--t-xs); }
+.project-name { padding:0 var(--s-3); font-size:var(--t-lg); font-weight:600; line-height:1.3;
+  color:var(--ink); overflow-wrap:anywhere; }
+.project-meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); min-height:22px;
+  padding:2px var(--s-3) 0; font-size:var(--t-xs); color:var(--faint); }
+.side-nav { display:flex; flex-direction:column; gap:2px; margin-top:var(--s-4); }
+.side-label { margin:var(--s-4) 0 var(--s-1); padding:0 var(--s-3); font-size:var(--t-xs); font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--faint); }
+.side-label:first-child { margin-top:0; }
+.side-item {
+  display:flex; align-items:center; gap:var(--s-2); min-height:36px; padding:0 var(--s-3);
+  border-radius:var(--r-md); color:var(--text); font-size:var(--t-sm); font-weight:500; white-space:nowrap;
+  transition:color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.side-item:hover { color:var(--ink); background:var(--surface-2); text-decoration:none; }
+.side-item.on { color:var(--ink); font-weight:600; background:var(--surface); box-shadow:0 0 0 1px var(--line), var(--shadow-1); }
+.nav-icon { flex:none; color:var(--muted); }
+.side-item.on .nav-icon { color:var(--accent); }
+.side-count { margin-left:auto; font:500 var(--t-xs) var(--mono); color:var(--faint); }
+.side-attn { margin-left:auto; display:inline-flex; align-items:center; justify-content:center;
+  min-width:22px; height:20px; padding:0 var(--s-2); border-radius:var(--r-full);
+  font:600 var(--t-xs)/1 var(--mono); color:var(--on-accent); background:var(--accent); }
+.side-alarm { margin-left:auto; display:inline-flex; align-items:center; gap:var(--s-1);
+  font:600 var(--t-xs) var(--mono); color:var(--danger); }
+.side-alarm .nav-icon { color:inherit; }
+.side-sep { display:block; height:1px; margin:var(--s-3); background:var(--line); }
+.project-main { min-width:0; }
+.project-main > .sub { margin-bottom:var(--s-4); }
+.section-title { margin-bottom:var(--s-4); }
+
+/* Breadcrumbs: the path up to the root, above the project's name and not competing with it. */
 .crumbs { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-1);
   margin-bottom:var(--s-2); font-size:var(--t-sm); color:var(--muted); }
+.crumbs a { color:var(--muted); }
 .crumbs .sep { color:var(--faint); }
-.crumbs .here { color:var(--muted); font-weight:500; }
-.project-title { display:flex; align-items:center; gap:var(--s-3); flex-wrap:wrap; }
-.project-title .sub { margin-left:auto; }
+
 .tabs { display:flex; gap:var(--s-1); margin-top:var(--s-4); overflow-x:auto; scrollbar-width:none; }
 .tabs::-webkit-scrollbar { display:none; }
 .admin-tabs { margin-bottom:var(--s-5); border-bottom:1px solid var(--line); }
@@ -494,7 +527,13 @@ tr:last-child td { border-bottom:none; }
   h1 { font-size:22px; }
   .grid, .project-grid { grid-template-columns:1fr; }
   .project-children { margin-left:0; padding-left:var(--s-3); }
-  .project-title .sub { margin-left:0; flex-basis:100%; }
+  .project-shell { grid-template-columns:minmax(0,1fr); gap:var(--s-4); }
+  .project-side { position:static; max-height:none; overflow:visible; }
+  /* Wraps, not scrolls: a scrolling row hid the current section, and only a script could show it. */
+  .side-nav { flex-direction:row; flex-wrap:wrap; gap:var(--s-1); margin-top:var(--s-3); padding-bottom:var(--s-2);
+    border-bottom:1px solid var(--line); }
+  .side-label, .side-sep { display:none; }
+  .side-item { flex:none; }
   .meta { grid-template-columns:1fr; gap:0; }
   .meta dt { margin-top:var(--s-3); }
 }
