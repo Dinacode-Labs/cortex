@@ -44,8 +44,8 @@ entriesRoutes.get("/entry/:id", async (c) => {
 
   const iso = (d: unknown) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d ?? "").slice(0, 10));
   const temporalBadge = entry.validTo
-    ? badge(`no longer in force since ${iso(entry.validTo)}`, "#cf222e")
-    : badge("in force", "#1a7f37");
+    ? badge(`no longer in force since ${iso(entry.validTo)}`, "danger")
+    : badge("in force", "ok");
 
   const project = projectName ? await findProjectByName(projectName) : null;
   const back = project?.slug ? `/p/${project.slug}` : "/";

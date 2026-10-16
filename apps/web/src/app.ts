@@ -43,15 +43,15 @@ export function createApp(): Hono<WebEnv> {
 
   // Favicon: the operator's logo if there is one, otherwise the Cortex mark. At 16 px each cell
   // is 2 px and a 0.5 stroke is exactly 1 px. On a dark tab the pieces go solid and light: hollow
-  // ones would not show.
+  // ones would not show. Colours copied from the stylesheet, which never reaches an icon.
   app.get("/favicon.svg", (c) => {
     const svg =
       getBrandLogoSvg() ??
       markSvg({
-        ink: "#5b6673",
-        accent: "#1a6dff",
+        ink: "#545e6b",
+        accent: "#2a5bd7",
         hollow: { fill: "#ffffff", strokeWidth: 0.5 },
-        style: "@media (prefers-color-scheme:dark){path{fill:#f2f5f8;stroke:#f2f5f8}}",
+        style: "@media (prefers-color-scheme:dark){path{fill:#eef1f5;stroke:#eef1f5}rect{fill:#86a8ff}}",
       });
     return c.body(svg, 200, { "Content-Type": "image/svg+xml", "Cache-Control": "public, max-age=86400" });
   });

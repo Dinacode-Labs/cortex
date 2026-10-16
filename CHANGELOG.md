@@ -9,6 +9,10 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **The web UI has a dark mode.** It follows the operating system's setting, with nothing to
+  switch: every screen, the badges included, takes its colours from one palette with a light and
+  a dark side. It is the first step of a redesign of the web UI around checking what agents wrote
+  ([ADR-0092](docs/decisions.md#adr-0092)).
 - **A Review section in every project, for the memos something newer is about.** When a memo is
   saved — by an agent, a session or a person — the older memos of its project about the same
   thing (similarity 0.75 or more, `CORTEX_REVIEW_THRESHOLD`) wait for review. The newer one
@@ -159,6 +163,8 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **The web UI is set in IBM Plex Sans and IBM Plex Mono**, instead of Inter and JetBrains Mono,
+  with a deeper accent ([ADR-0092](docs/decisions.md#adr-0092)).
 - **Only a project's team judges its memos in the web UI.** Validating, rejecting, editing and
   reviewing a memo takes being the project's owner, a member of it or of a parent, or an admin.
   It used to take only being able to read it, which in a public project is anyone signed in. The

@@ -28,9 +28,9 @@ usageRoutes.get("/admin/usage", async (c) => {
   const money = (n: number) => (n > 0 ? `$${n.toFixed(4)}` : "—");
   // raw(): literal ATTRIBUTE fragments from this file (repeated table styles); they contain no
   // user or database data.
-  const th = raw('style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--color-border);font-size:12px;color:var(--color-text-muted)"');
-  const td = raw('style="padding:6px 10px;border-bottom:1px solid var(--color-border)"');
-  const tdr = raw('style="padding:6px 10px;border-bottom:1px solid var(--color-border);text-align:right;font-variant-numeric:tabular-nums"');
+  const th = raw('style="text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)"');
+  const td = raw('style="padding:6px 10px;border-bottom:1px solid var(--line)"');
+  const tdr = raw('style="padding:6px 10px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums"');
   const stat = (label: string, value: string) =>
     html`<div class="panel" style="flex:1;min-width:140px"><div class="sub">${label}</div><div style="font-size:24px;font-weight:700">${value}</div></div>`;
 
@@ -49,7 +49,7 @@ usageRoutes.get("/admin/usage", async (c) => {
   const spanRow = (s: (typeof traces)[number]["spans"][number]) => {
     const indent = s.parentSpanId ? 18 : 0;
     const toks = (s.inputTokens ?? 0) + (s.outputTokens ?? 0);
-    return html`<div style="padding:3px 0;padding-left:${indent}px;border-bottom:1px solid var(--color-border);font-size:13px">
+    return html`<div style="padding:3px 0;padding-left:${indent}px;border-bottom:1px solid var(--line);font-size:13px">
       <span class="sub" style="font-variant-numeric:tabular-nums">${s.spanType ?? ""}</span>
       ${(s.name ?? s.entityName ?? "").slice(0, 80)}
       ${s.durationMs != null ? html`<span class="sub"> · ${num(s.durationMs)}ms</span>` : ""}
