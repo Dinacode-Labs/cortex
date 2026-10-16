@@ -166,23 +166,35 @@ export function hitCard(entry: Memo, score: number, origin?: Html): Html {
   </a>`;
 }
 
+export interface ProjectRow {
+  project: AccessibleProject;
+  depth: number;
+  children: number;
+}
+
 /**
- * It lives here rather than on the home page because a client shows it inside itself too, for
- * its repos: were they two different cards, picking "Acme Portal" from the home page and
- * picking it from "Acme" would look like two different things, and they are the same.
+ * It lives here rather than on the home page because a client lists its repos with it too: were
+ * they two different lists, picking "Acme Portal" from the home page and picking it from "Acme"
+ * would look like two different things, and they are the same.
  */
-export function projectCard(p: AccessibleProject, health: Html): Html {
-  return html`<a class="project-card" href="/p/${p.slug}">
-    <div class="card-head">
-      <h2>${p.name}</h2>
-      ${visibilityPill(p.visibility)}
+export function projectTable(rows: ProjectRow[], healthOf: Map<string, Html>, waiting: Map<string, number>): Html {
+  return html`<div class="project-table">
+    <div class="project-row project-head" aria-hidden="true">
+      <span>Project</span><span>Entries</span><span>To review</span><span>Last health check</span><span>Owner</span>
     </div>
-    <div class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</div>
-    <div class="card-foot">
-      <span>${p.entryCount} ${p.entryCount === 1 ? "entry" : "entries"}</span>
-      ${health}
-    </div>
-  </a>`;
+    ${rows.map(({ project: p, depth, children }) => {
+      const queued = waiting.get(p.id);
+      return html`<a class="project-row" href="/p/${p.slug}" style="--depth:${depth}">
+        <span class="project-cell">${depth ? html`<span class="tree" aria-hidden="true"></span>` : ""}<b>${p.name}</b>
+          ${children ? html`<span class="badge tone-neutral">client · ${children} ${children === 1 ? "project" : "projects"}</span>` : ""}
+          ${p.visibility === "private" ? visibilityPill("private") : ""}</span>
+        <span class="project-num">${p.entryCount}</span>
+        <span>${queued ? html`<span class="side-attn" title="Memos waiting for a verdict">${queued}</span>` : html`<span class="faint">—</span>`}</span>
+        <span>${healthOf.get(p.id) ?? ""}</span>
+        <span class="owner">${p.ownerEmail ?? html`<span class="unclaimed">unclaimed</span>`}</span>
+      </a>`;
+    })}
+  </div>`;
 }
 
 /**

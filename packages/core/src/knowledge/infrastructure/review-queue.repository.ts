@@ -22,13 +22,14 @@ export class PgReviewQueue implements ReviewQueue {
 
   // A review only stands while both memos are still in force: once either was discarded,
   // superseded or purged, there is nothing left to compare.
-  private live(projectId: string) {
+  private live(projectId: string | string[]) {
+    const ids = Array.isArray(projectId) ? projectId : [projectId];
     return this.sql`
-      SELECT q.memo_id, q.newer_memo_id, q.similarity, q.priority, q.skipped_at, q.created_at
+      SELECT q.project_id, q.memo_id, q.newer_memo_id, q.similarity, q.priority, q.skipped_at, q.created_at
         FROM review_queue q
         JOIN memos m ON m.id = q.memo_id
         JOIN memos n ON n.id = q.newer_memo_id
-       WHERE q.project_id = ${projectId} AND q.status = 'pending'
+       WHERE q.project_id = ANY(${ids}) AND q.status = 'pending'
          AND m.valid_to IS NULL AND m.status NOT IN ('rejected', 'obsolete', 'superseded')
          AND n.valid_to IS NULL AND n.status NOT IN ('rejected', 'obsolete', 'superseded')
     `;
@@ -62,6 +63,14 @@ export class PgReviewQueue implements ReviewQueue {
   async pendingCount(projectId: string): Promise<number> {
     const [row] = (await this.sql`SELECT count(DISTINCT memo_id)::int AS n FROM (${this.live(projectId)}) live`) as unknown as Row[];
     return (row?.n as number) ?? 0;
+  }
+
+  async pendingCounts(projectIds: string[]): Promise<Map<string, number>> {
+    if (projectIds.length === 0) return new Map();
+    const rows = (await this.sql`
+      SELECT project_id, count(DISTINCT memo_id)::int AS n FROM (${this.live(projectIds)}) live GROUP BY project_id
+    `) as unknown as Row[];
+    return new Map(rows.map((r) => [r.project_id as string, Number(r.n)]));
   }
 
   async isPending(projectId: string, memoId: string): Promise<boolean> {

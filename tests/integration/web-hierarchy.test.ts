@@ -91,11 +91,10 @@ describe("the project hierarchy in the UI", () => {
     expect(html).not.toContain('class="crumbs"');
   }, 60_000);
 
-  it("a client shows its repos, with the same cards as the home page", async () => {
+  it("a client shows its repos, with the same rows as the home page", async () => {
     const html = await (await get(`/p/${cliente.slug}`)).text();
     expect(html).toContain("Projects in this client");
-    expect(html).toContain(`href="/p/${child_.slug}"`);
-    expect(html).toContain("project-card");
+    expect(html).toContain(`<a class="project-row" href="/p/${child_.slug}"`);
   }, 60_000);
 
   it("somebody else's private child_ does not show up by looking at the parent_", async () => {
@@ -108,13 +107,15 @@ describe("the project hierarchy in the UI", () => {
     expect((await get(`/p/${hijoPrivado.slug}`)).status).toBe(403);
   }, 60_000);
 
-  it("the home page groups the children under their client instead of mixing them in as siblings", async () => {
+  it("the home page lists the children under their client instead of mixing them in as siblings", async () => {
     const html = await (await get("/")).text();
-    // THIS client's group: the home page lists every public project in the test database, so
-    // the first group on the page need not be ours.
-    const group = html.split('class="project-group"').find((g) => g.includes(`href="/p/${cliente.slug}"`));
-    expect(group, "the client must be painted as a group, not as a loose card").toBeTruthy();
-    expect(group!.split('class="project-children"')[1] ?? "").toContain(`href="/p/${child_.slug}"`);
+    // The home page lists every public project in the test database, so the rows around ours
+    // need not be ours: what matters is the child coming right under its client, one level in.
+    const rows = [...html.matchAll(/<a class="project-row" href="([^"]+)" style="--depth:(\d+)"/g)].map((m) => `${m[1]}@${m[2]}`);
+    const client = rows.indexOf(`/p/${cliente.slug}@0`);
+    expect(client, "the client must be a top-level row").toBeGreaterThanOrEqual(0);
+    expect(rows.slice(client + 1)).toContain(`/p/${child_.slug}@1`);
+    expect(rows.slice(0, client)).not.toContain(`/p/${child_.slug}@1`);
   }, 120_000);
 
   it("what the agents see for a child says which part belongs to the client", async () => {

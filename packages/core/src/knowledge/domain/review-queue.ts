@@ -33,6 +33,8 @@ export interface ReviewQueue {
   /** Not skipped first, then the highest priority. Memos no longer in force drop out. */
   next(projectId: string): Promise<PendingReview | null>;
   pendingCount(projectId: string): Promise<number>;
+  /** A project with nothing waiting is absent. */
+  pendingCounts(projectIds: string[]): Promise<Map<string, number>>;
   isPending(projectId: string, memoId: string): Promise<boolean>;
   resolve(memoId: string, resolution: ReviewResolution, by: string): Promise<void>;
   skip(memoId: string): Promise<void>;

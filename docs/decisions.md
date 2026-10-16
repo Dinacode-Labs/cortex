@@ -3197,11 +3197,11 @@ decisions they carried stay recorded here.
 
 <a id="adr-0092"></a>
 
-## ADR-0092 · The web UI is redesigned around checking, in five steps, and its palette gets a dark mode
+## ADR-0092 · The web UI is redesigned around checking, in steps, and its palette gets a dark mode
 
 - **Status:** accepted as a hypothesis (2026-10-16). Revises the shape in [0050](#adr-0050) (the
   row of tabs becomes a sidebar) and the visual language in [0053](#adr-0053) (typeface, dark
-  mode). It lands in five pull requests; this record covers all of them.
+  mode). It lands in six pull requests; this record covers all of them.
 - **Context:** the UI's job is settled ([0050](#adr-0050), [design](design.md)): a person audits
   and repairs a memory that machines wrote. A pass over the screens with that job in mind found
   their form working against it:
@@ -3214,13 +3214,14 @@ decisions they carried stay recorded here.
     memos being compared are never side by side;
   - an entry's page leaves the project, and its verdict sits at the bottom, under the metadata;
   - Health shows counts and links but no way to act on them;
+  - the projects page says nothing of what waits in Review, and loses a client's grandchildren;
   - there is no dark mode, and every badge carried its colour in an inline `style`, which no
     media query reaches;
   - Inter is the default of half the web. IBM Plex draws a sans and a mono on one skeleton, which
     suits pages that set prose and identifiers side by side.
 - **Decision:** keep what [0042](#adr-0042) and [0053](#adr-0053) settled — server-rendered, no
   build, one stylesheet, one accent, colour only where it means something — and change the form,
-  in five steps that each work on their own:
+  in six steps that each work on their own:
   1. **Palette and type.** Every colour is a token, and dark mode redefines all of them under
      `prefers-color-scheme: dark`: it follows the operating system and needs no script, cookie or
      switch. A badge names a tone (`ok`, `warn`, `danger`, `neutral`, `accent`) or a memo type,
@@ -3237,6 +3238,9 @@ decisions they carried stay recorded here.
      both; and **the entry page inside the project**, its verdict at the top of a side column
      next to the history.
   5. **Health with a summary and an action for each finding.**
+  6. **The projects page as rows**, each project's children indented under it, saying how many
+     memos wait for the viewer's verdict and, above the list, where. A count only shows where the
+     viewer may give the verdict.
 - **Alternatives:**
   - **A theme switch stored in a cookie.** It lets a person override the system, at the cost of a
     script or a round trip. Not now: following the system covers what was asked, and with every
@@ -3246,7 +3250,7 @@ decisions they carried stay recorded here.
     several screens look.
   - **Keep the cards and restyle them.** Cards suit things you choose between, like projects.
     Claims you scan for the wrong one read better as rows.
-- **Consequences:** until the five steps land, screens from before and after sit side by side.
+- **Consequences:** until the six steps land, screens from before and after sit side by side.
   The map keeps its own colours (`graph.js`) and stays dark in both modes. The favicon writes the
   palette's colours out, because no stylesheet reaches it. Some of what the redesign shows needs
   data the screens do not read today — counts per status, memos waiting per project, whether a

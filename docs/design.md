@@ -85,7 +85,7 @@ the last check found something. Each section names itself in its page's heading.
 ```
 [Cortex]   [ Search everything… ]              Projects · Admin* · you · Sign out
 
-/                       the projects you can reach — entries, visibility, last health check
+/                       the projects you can reach — entries, what waits for you, last health check
 /p/<slug>               Memory           what is remembered, filtered and ordered, plus "Add"
 /p/<slug>/review        Review           one older memo at a time that something newer is about;
                                          every decision brings the next (its team only)
@@ -128,7 +128,7 @@ So the hierarchy is drawn where it is felt, without any new screen:
 
 - the sidebar carries a **breadcrumb** to the root, every level linked;
 - a parent lists **its children** on its Memory screen, with the same cards as the landing page;
-- the landing page **groups children under their parent** instead of flattening them;
+- the landing page **lists children under their parent**, indented, instead of flattening them;
 - **What agents see** marks each inherited entry with the project it comes from;
 - a parent gets **Across this client**: the shared stack, the contradictions between its
   projects, and — from its Memory screen — a search that can descend into them

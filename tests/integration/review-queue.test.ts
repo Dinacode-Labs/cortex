@@ -280,3 +280,18 @@ describe("an older memo's own page", () => {
     expect(await (await page(`/entry/${stale}`, outsiderCookie)).text()).not.toContain("Compare them");
   });
 });
+
+/*
+ * ADR-0092: the verdicts waiting only showed inside each project's Review, so nobody knew to go and
+ * look. The projects page says where they wait, to whoever may give them.
+ */
+describe("the projects page", () => {
+  it("says how many verdicts wait, and in which project, to the team only", async () => {
+    const project = await createProject(`Queue home ${RID}`, { ownerEmail: OWNER, visibility: "public" });
+    await staleAndFresh(project);
+    const home = (cookie: string) => page("/", cookie).then((r) => r.text());
+
+    expect(await home(ownerCookie)).toMatch(new RegExp(`href="/p/${project.slug}/review">[^<]*<span class="button-count">1</span>`));
+    expect(await home(outsiderCookie)).not.toContain(`/p/${project.slug}/review`);
+  });
+});
