@@ -50,6 +50,13 @@ beforeAll(async () => {
   project_ = await createProject(`Styles ${RID}`, { ownerEmail: USER });
   const { entry } = await saveContext({ content: `Some decision or other ${RID}.`, project: project_.name, createdBy: USER });
   entryId = entry.id;
+  // The same thing worded twice, so the Review section has an older memo to put up for judging.
+  for (const content of [
+    "The retry backoff is exponential, capped at 60 seconds, with jitter.",
+    "The retry backoff is exponential, capped at 60 seconds, with random jitter to avoid synchronisation.",
+  ]) {
+    await saveContext({ content, project: project_.name, type: "decision", createdBy: USER }, { useClassifier: false });
+  }
 }, 120_000);
 
 afterAll(() => {
@@ -69,6 +76,7 @@ describe("the UI's styles", () => {
       `/p/${project_.slug}?capture=1`,
       `/p/${project_.slug}?sort=created&group=week`,
       `/p/${project_.slug}/review`,
+      `/p/${project_.slug}/review?done=keep`,
       `/p/${project_.slug}/health`,
       `/p/${project_.slug}/agents`,
       `/p/${project_.slug}/settings`,
@@ -80,10 +88,14 @@ describe("the UI's styles", () => {
       "/admin/agents",
     ];
     const sinEstilo = new Set<string>();
+    const painted: string[] = [];
     for (const path of paths) {
       const html = await (await web.request(path, { headers: { cookie } })).text();
+      painted.push(html);
       for (const c of clasesDe(html)) if (!CSS.includes(`.${c}`)) sinEstilo.add(`${c} (${path})`);
     }
+    // An empty Review queue paints none of the comparison: make sure this run saw one.
+    expect(painted.some((html) => html.includes('class="compare"'))).toBe(true);
     expect([...sinEstilo]).toEqual([]);
   }, 180_000);
 

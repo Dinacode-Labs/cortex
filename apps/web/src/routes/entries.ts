@@ -8,6 +8,7 @@ import {
   checkProjectAccess,
   findProjectByName,
   getEntryDetail,
+  isAwaitingReview,
   isReviewVerdict,
   NotAManagerError,
   purgeEntries,
@@ -18,8 +19,9 @@ import {
   type ReviewVerdict,
 } from "@cortex/core";
 import { layout } from "../views/layout.js";
-import { badge, confidenceBadge, panel, statusBadge, typeBadge } from "../views/components.js";
-import { deniedPage } from "../middleware/access.js";
+import { badge, confidenceMeter, panel, statusBadge, typeBadge, typeTag } from "../views/components.js";
+import { projectPage } from "../views/project-nav.js";
+import { deniedPage, requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
 export const entriesRoutes = new Hono<WebEnv>();
@@ -48,74 +50,95 @@ entriesRoutes.get("/entry/:id", async (c) => {
     : badge("in force", "ok");
 
   const project = projectName ? await findProjectByName(projectName) : null;
-  const back = project?.slug ? `/p/${project.slug}` : "/";
   const entryProject = access.status === "ok" ? access.project : null;
   const canReview = await canReviewEntryProject(c.get("user"), entryProject);
   const editing = canReview && c.req.query("edit") === "1";
   const canPurge = await canManageEntryProject(c.get("user"), entryProject);
   const confirmingPurge = canPurge && c.req.query("purge") === "1";
+  const page = project?.slug ? await requireProjectPage(c, project.slug) : null;
+  const projectView = page instanceof Response ? null : page;
+  const waiting = projectView?.reviewer && entryProject ? await isAwaitingReview(entryProject, entry.id) : false;
 
-  const body = html`
-    <p><a class="back" href="${back}">← ${projectName ?? "Projects"}</a></p>
-    <div class="card-head" style="margin-bottom:8px">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)} ${temporalBadge}</div>
+  const main = html`
     ${editing
       ? panel(
           "Edit",
           html`<form method="post" action="/entry/${entry.id}/edit">
-            <input type="text" name="title" value="${entry.title}" required style="width:100%;margin-bottom:8px">
-            <textarea name="content" rows="14" required>${entry.content}</textarea>
-            <div class="row" style="margin-top:12px">
+            <input type="text" name="title" value="${entry.title}" required aria-label="Title" class="wide">
+            <textarea name="content" rows="14" required aria-label="Content">${entry.content}</textarea>
+            <div class="row">
               <button type="submit">Save changes</button>
               <a class="button quiet" href="/entry/${entry.id}">Cancel</a>
             </div>
           </form>`,
           { help: "Correcting what an agent wrote is the point of this screen. The change is re-indexed, so it stays findable." },
         )
-      : html`<div class="page-head row-between">
-            <h1>${entry.title}</h1>
-            <div class="row">
-              ${canReview ? html`<a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a>` : ""}
-              ${canPurge ? html`<a class="button danger" href="/entry/${entry.id}?purge=1">Purge</a>` : ""}
-            </div>
-          </div>
-          ${confirmingPurge ? purgeConfirmation(entry.id) : ""}
-          <div class="content-block">${entry.content}</div>`}
+      : html`<div class="entry-heading">${typeTag(entry.type)}<span class="entry-source">${entry.sourceReference ?? entry.sourceType}</span>${temporalBadge}</div>
+          <h1>${entry.title}</h1>
+          <p class="prose">${entry.content}</p>
+          ${canReview || canPurge
+            ? html`<div class="row entry-actions">
+                ${canReview ? html`<a class="button secondary" href="/entry/${entry.id}?edit=1">Edit</a>` : ""}
+                ${canPurge ? html`<a class="button quiet danger-text" href="/entry/${entry.id}?purge=1">Purge…</a>` : ""}
+              </div>`
+            : ""}
+          ${confirmingPurge ? purgeConfirmation(entry.id) : ""}`}
+    <section class="entry-section">
+      <h2 class="eyebrow">Related entities</h2>
+      ${entityTags}
+    </section>
+    ${source?.rawContent
+      ? html`<details class="entry-section source">
+          <summary>Original source · ${entry.sourceType}</summary>
+          <div class="content-block">${source.rawContent}</div>
+        </details>`
+      : ""}`;
 
-    ${panel("Metadata", html`<dl class="meta">
-        <dt>Project</dt><dd>${projectName ?? "—"}</dd>
-        <dt>Type</dt><dd>${entry.type}</dd>
-        <dt>Status</dt><dd>${statusBadge(entry.status)}</dd>
-        <dt>Confidence</dt><dd>${entry.confidence}</dd>
-        <dt>Source</dt><dd>${entry.sourceType}${entry.sourceReference ? html` · ${entry.sourceReference}` : ""}</dd>
-        <dt>Author</dt><dd>${entry.createdBy ?? "—"}</dd>
-        <dt>Validity</dt><dd>${entry.validTo ? html`closed on ${iso(entry.validTo)} (${entry.validity})` : "in force"}</dd>
-        <dt>Valid from</dt><dd>${iso(entry.validFrom)}</dd>
-        <dt>Created</dt><dd>${entry.createdAt instanceof Date ? entry.createdAt.toISOString() : entry.createdAt}</dd>
-    </dl>`)}
-    ${panel("Related entities", entityTags)}
-
-    ${source?.rawContent ? panel("Original source", html`<div class="content-block">${source.rawContent}</div>`) : ""}
+  const aside = html`
     ${panel(
       "Is this still true?",
-      html`${canReview
-        ? html`<div class="row">
+      canReview
+        ? html`<div class="verdicts">
             ${validateForm("validated", "Yes, it holds")}
-            ${validateForm("rejected", "No, it is wrong")}
             ${validateForm("obsolete", "It was, not any more")}
+            ${validateForm("rejected", "No, it is wrong")}
           </div>`
-        : html`<p class="sub">${NOT_ON_THE_TEAM}</p>`}
-      ${reviewHistory(reviews, iso)}`,
-      { help: "An agent wrote this. “Yes, it holds” marks it verified, and what is verified is what agents are told first." },
-    )}`;
-  return c.html(layout(entry.title, body, c.get("user")));
+        : html`<p class="sub">${NOT_ON_THE_TEAM}</p>`,
+      { help: "An agent may have written this. “Yes, it holds” marks it verified, and what is verified is what agents are told first." },
+    )}
+    ${panel(
+      null,
+      html`<h2 class="eyebrow">Details</h2>
+        <dl class="facts">
+          <dt>Status</dt><dd>${statusBadge(entry.status)}</dd>
+          <dt>Confidence</dt><dd>${confidenceMeter(entry.confidence)}</dd>
+          <dt>Validity</dt><dd>${entry.validTo ? html`closed on ${iso(entry.validTo)} (${entry.validity})` : "in force"}</dd>
+          <dt>Valid from</dt><dd>${iso(entry.validFrom)}</dd>
+          <dt>Source</dt><dd class="mono">${entry.sourceType}${entry.sourceReference ? html` · ${entry.sourceReference}` : ""}</dd>
+          <dt>Author</dt><dd>${entry.createdBy ?? "—"}</dd>
+          <dt>Created</dt><dd class="mono">${(entry.createdAt instanceof Date ? entry.createdAt.toISOString() : String(entry.createdAt)).slice(0, 16).replace("T", " ")} UTC</dd>
+          <dt>Project</dt><dd>${projectName ?? "—"}</dd>
+        </dl>`,
+    )}
+    ${panel(null, html`<h2 class="eyebrow">History</h2>${reviewHistory(reviews, iso)}`)}`;
+
+  const notice = waiting
+    ? html`<div class="notice-accent" role="note">
+        <span>Something newer was saved about this memo. It is waiting in Review.</span>
+        <a class="button secondary" href="/p/${project!.slug}/review">Compare them</a>
+      </div>`
+    : "";
+  const back = project?.slug ? html`<a class="back" href="/p/${project.slug}">← Memory</a>` : html`<a class="back" href="/">← Projects</a>`;
+  const body = html`${back}${notice}<div class="entry-layout"><article class="entry-main-col">${main}</article><aside class="entry-aside">${aside}</aside></div>`;
+  return c.html(layout(entry.title, projectView ? projectPage(projectView, "memory", body, null) : body, c.get("user")));
 });
 
 function reviewHistory(reviews: MemoReview[], day: (d: unknown) => string) {
   if (!reviews.length) return html`<p class="sub">Nobody has reviewed it yet.</p>`;
   const where = (r: MemoReview) => (r.channel === "web" ? "here" : "by an agent, through MCP");
-  return html`<dl class="meta">
-    ${reviews.map((r) => html`<dt>${day(r.reviewedAt)}</dt><dd>${statusBadge(r.verdict)} ${r.reviewedBy ?? "nobody signed in"}, ${where(r)}</dd>`)}
-  </dl>`;
+  return html`<ol class="timeline">
+    ${reviews.map((r) => html`<li><time class="mono">${day(r.reviewedAt)}</time> ${statusBadge(r.verdict)} ${r.reviewedBy ?? "nobody signed in"}, ${where(r)}</li>`)}
+  </ol>`;
 }
 
 function purgeConfirmation(entryId: string) {

@@ -98,7 +98,8 @@ the last check found something. Each section names itself in its page's heading.
 /p/<slug>/settings      Settings         visibility, owner, parent, language, what it keeps,
                                          what the agents are told, members (managers only)
 
-/entry/<id>             read, edit, and say whether it still holds
+/entry/<id>             read, edit, and say whether it still holds — inside its project, and
+                        saying when it waits in Review
 /search?q=              across everything you can see
 /admin/usage            what the inference costs (admins only)
 /admin/agents           what every agent is told, before any project adds to it (admins only)

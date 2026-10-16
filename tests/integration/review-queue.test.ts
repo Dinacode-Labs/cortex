@@ -143,8 +143,10 @@ describe("the Review section", () => {
 
     const res = await decide(project, head, "keep");
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe(`/p/${project.slug}/review`);
+    expect(res.headers.get("location")).toBe(`/p/${project.slug}/review?done=keep`);
     expect((await nextReview(project))!.memo.id).toBe(other);
+    // The memo decided on is gone from view, so the next screen says what happened to it.
+    expect(await (await page(res.headers.get("location")!)).text()).toContain("Kept, and marked verified.");
   });
 
   it("keeping it vouches for it: the memo is verified and leaves the queue", async () => {
@@ -252,5 +254,29 @@ describe("who reviews", () => {
     const memo = (await getEntryDetail(id))!.entry;
     expect([memo.status, memo.title]).toEqual(["pending_validation", expect.not.stringContaining("Hijacked")]);
     expect(await (await page(`/entry/${id}`, outsiderCookie)).text()).not.toContain(`/entry/${id}?edit=1`);
+  });
+});
+
+/*
+ * ADR-0092: an entry's page used to leave its project, and nothing on it said something newer had
+ * put it in question -- whoever read it had to find the Review queue on their own.
+ */
+describe("an older memo's own page", () => {
+  it("is read inside its project and says it waits in Review, until somebody decides", async () => {
+    const project = await newProject("entry-page");
+    const { stale } = await staleAndFresh(project);
+
+    const before = await (await page(`/entry/${stale}`)).text();
+    expect(before).toContain('class="project-shell"');
+    expect(before).toContain(`href="/p/${project.slug}/review">Compare them`);
+
+    await decide(project, stale, "keep");
+    expect(await (await page(`/entry/${stale}`)).text()).not.toContain("Compare them");
+  });
+
+  it("does not send somebody off the team to a queue they cannot open", async () => {
+    const project = await createProject(`Queue entry-public ${RID}`, { ownerEmail: OWNER, visibility: "public" });
+    const { stale } = await staleAndFresh(project);
+    expect(await (await page(`/entry/${stale}`, outsiderCookie)).text()).not.toContain("Compare them");
   });
 });

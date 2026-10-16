@@ -20,3 +20,7 @@ export async function nextReview(project: Pick<ProjectRef, "id">): Promise<Pendi
 export async function pendingReviewCount(project: Pick<ProjectRef, "id">): Promise<number> {
   return port("reviewQueue").pendingCount(project.id);
 }
+
+export async function isAwaitingReview(project: Pick<ProjectRef, "id">, memoId: string): Promise<boolean> {
+  return port("reviewQueue").isPending(project.id, memoId);
+}
