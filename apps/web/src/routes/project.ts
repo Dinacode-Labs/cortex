@@ -22,6 +22,7 @@ import {
   listAccessibleProjects,
   listEntries,
   renderContextPack,
+  reviewsAwaiting,
   searchProjectCode,
   validateEntry,
   type EntrySort,
@@ -35,7 +36,7 @@ import {
   joinHtml,
   menu,
   panel,
-  projectCard,
+  projectTable,
   scoreBadge,
   searchForm,
   segmented,
@@ -99,7 +100,7 @@ projectRoutes.get("/p/:slug", async (c) => {
     facets
       .filter((f) => (!only.type || f.type === only.type) && (!only.status || f.status === only.status))
       .reduce((n, f) => n + f.count, 0);
-  const healthOf = await projectHealths(children);
+  const [healthOf, waitingInChildren] = await Promise.all([projectHealths(children), reviewsAwaiting(user, children)]);
   const base = `/p/${project.slug}`;
   const listState: Record<string, string> = {
     ...(type ? { type } : {}),
@@ -188,7 +189,7 @@ projectRoutes.get("/p/:slug", async (c) => {
   const childrenSection = children.length
     ? panel(
         "Projects in this client",
-        html`<div class="project-grid">${children.map((h) => projectCard(h, healthOf.get(h.id) ?? html``))}</div>`,
+        projectTable(children.map((child) => ({ project: child, depth: 0, children: 0 })), healthOf, waitingInChildren),
         { help: "Everything remembered here is also part of what their agents are told." },
       )
     : html``;

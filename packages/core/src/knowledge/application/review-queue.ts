@@ -4,6 +4,8 @@ import type { Memo } from "../domain/memo.js";
 import type { SearchHit } from "../domain/memo-index.js";
 import { olderMemosToReview, type PendingReview } from "../domain/review-queue.js";
 import type { ProjectRef } from "../../projects/domain/project.js";
+import type { SessionUser } from "../../auth/domain/session-user.js";
+import { canReviewProject } from "../../projects/application/projects.js";
 
 /** Below the reconciler's band (0.82) on purpose: a contradiction is usually worded differently. */
 export const REVIEW_THRESHOLD = getEnvNum("CORTEX_REVIEW_THRESHOLD", 0.75);
@@ -23,4 +25,12 @@ export async function pendingReviewCount(project: Pick<ProjectRef, "id">): Promi
 
 export async function isAwaitingReview(project: Pick<ProjectRef, "id">, memoId: string): Promise<boolean> {
   return port("reviewQueue").isPending(project.id, memoId);
+}
+
+/** Only where the viewer may judge: a count they can do nothing about is noise (docs/design.md §1). */
+export async function reviewsAwaiting(viewer: SessionUser | null, projects: Pick<ProjectRef, "id">[]): Promise<Map<string, number>> {
+  const counts = await port("reviewQueue").pendingCounts(projects.map((p) => p.id));
+  const awaiting = new Map<string, number>();
+  for (const [projectId, n] of counts) if (await canReviewProject({ id: projectId }, viewer)) awaiting.set(projectId, n);
+  return awaiting;
 }

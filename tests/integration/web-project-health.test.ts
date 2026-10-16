@@ -74,8 +74,8 @@ afterEach(() => resetCore());
 const get = (path: string) => createWebApp().request(path, { headers: { cookie } });
 
 function cardOf(page: string, slug: string): string {
-  const start = page.indexOf(`<a class="project-card" href="/p/${slug}">`);
-  if (start < 0) throw new Error(`no card for ${slug}`);
+  const start = page.indexOf(`<a class="project-row" href="/p/${slug}"`);
+  if (start < 0) throw new Error(`no row for ${slug}`);
   return page.slice(start, page.indexOf("</a>", start));
 }
 
@@ -119,6 +119,6 @@ describe("project cards read the last lint (ADR-0089)", () => {
       },
     });
 
-    expect(cardOf(await (await get("/")).text(), linted.slug!)).toContain("5 to review");
+    expect(cardOf(await (await get("/")).text(), linted.slug!)).toContain("5 findings");
   });
 });

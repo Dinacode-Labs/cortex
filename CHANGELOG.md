@@ -168,6 +168,11 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **The projects page is a list, and says where verdicts wait.** One row per project — entries,
+  memos waiting for your verdict, last health check, owner — with each client's projects
+  indented under it, at every depth: a grandchild used to go unlisted. Above the list, how many
+  older memos wait for you and a way into each project's Review. A client's own page lists its
+  projects the same way ([ADR-0092](docs/decisions.md#adr-0092)).
 - **Review sets the older memo beside what came in since**, with the decision under both, and
   after each decision the next screen says what was done. With JavaScript on, K keeps, D discards,
   S skips and R opens the rewrite. **An entry's page stays inside its project**: its verdict sits

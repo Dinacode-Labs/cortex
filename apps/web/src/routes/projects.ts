@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import { addProjectMember, deleteProject, getAgentPrompts, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, ProjectNotEmptyError, removeProjectMember, updateProject, keepsType } from "@cortex/core";
+import { addProjectMember, deleteProject, getAgentPrompts, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, ProjectNotEmptyError, removeProjectMember, reviewsAwaiting, updateProject, keepsType } from "@cortex/core";
 import {
   contextEntryType,
   getBrandName,
@@ -9,8 +9,8 @@ import {
   type Language,
   type ProjectCriteria,
 } from "@cortex/shared";
-import { layout, type Html } from "../views/layout.js";
-import { projectCard } from "../views/components.js";
+import { layout } from "../views/layout.js";
+import { projectTable, type ProjectRow } from "../views/components.js";
 import { projectHealths } from "../project-summary.js";
 import { projectPage } from "../views/project-nav.js";
 import { criteriaPanel } from "../views/project-criteria.js";
@@ -38,14 +38,10 @@ projectsRoutes.get("/", async (c) => {
     const p = projects.find((x) => x.name === old);
     if (p?.slug) return c.redirect(`/p/${p.slug}`, 301);
   }
-  const healthOf = await projectHealths(projects);
-  const card = (p: (typeof projects)[number]): Html => projectCard(p, healthOf.get(p.id) ?? html``);
+  const [healthOf, waiting] = await Promise.all([projectHealths(projects), reviewsAwaiting(user, projects)]);
 
-  // Children are painted INSIDE their parent, not loose in the same list. A client with three
-  // repos took up four sibling cards that gave no hint of having anything to do with each
-  // other, and the relationship -- which pack inheritance and permissions hang off -- could
-  // only be seen by going into Settings. Anyone without a hierarchy notices nothing: with no
-  // children there are no groups and the grid is exactly what it was.
+  // Listed as siblings, a client's repos hid the relation that inheritance and permissions hang off.
+  // Every level is walked: a grandchild used to go unlisted.
   const visible = new Set(projects.map((p) => p.id));
   const childrenOf = new Map<string, typeof projects>();
   for (const p of projects) {
@@ -56,20 +52,29 @@ projectsRoutes.get("/", async (c) => {
     if (!p.parentId || !visible.has(p.parentId)) continue;
     childrenOf.set(p.parentId, [...(childrenOf.get(p.parentId) ?? []), p]);
   }
-  const roots = projects.filter((p) => !p.parentId || !visible.has(p.parentId));
+  const rows: ProjectRow[] = [];
+  const walk = (p: (typeof projects)[number], depth: number): void => {
+    const children = childrenOf.get(p.id) ?? [];
+    rows.push({ project: p, depth, children: children.length });
+    for (const child of children) walk(child, depth + 1);
+  };
+  for (const root of projects.filter((p) => !p.parentId || !visible.has(p.parentId))) walk(root, 0);
 
-  const groups = roots
-    .filter((p) => childrenOf.has(p.id))
-    .map(
-      (p) => html`<section class="project-group">
-        ${card(p)}
-        <div class="project-children">
-          <p class="sub">${childrenOf.get(p.id)!.length} project${childrenOf.get(p.id)!.length === 1 ? "" : "s"} in this client</p>
-          <div class="project-grid">${childrenOf.get(p.id)!.map(card)}</div>
+  const queues = projects.filter((p) => waiting.has(p.id));
+  const waitingTotal = queues.reduce((n, p) => n + waiting.get(p.id)!, 0);
+  const waitingBanner = queues.length
+    ? html`<section class="waiting">
+        <div class="waiting-text">
+          <h2>${waitingTotal} older ${waitingTotal === 1 ? "memo waits" : "memos wait"} for your verdict</h2>
+          <p class="sub">Something newer was saved about each one. The newer memo is taken as true; whether the older one still holds is your call.</p>
         </div>
-      </section>`,
-    );
-  const standalone = roots.filter((p) => !childrenOf.has(p.id)).map(card);
+        <div class="row">
+          ${queues.map(
+            (p, i) => html`<a class="button ${i ? "secondary" : ""}" href="/p/${p.slug}/review">${p.name} <span class="button-count">${waiting.get(p.id)}</span></a>`,
+          )}
+        </div>
+      </section>`
+    : html``;
 
   // An empty list is not an error: almost always it is somebody who has just arrived. Telling
   // them "you have no projects" helps nobody; telling them how to create the first one does.
@@ -89,11 +94,9 @@ cortex setup --all</pre>
   const body = html`
     <div class="page-head">
       <h1>Projects</h1>
-      <p class="sub">What ${getBrandName()} remembers, one project at a time.</p>
+      <p class="sub">What ${getBrandName()} remembers, one project at a time. Agents write it; you check it.</p>
     </div>
-    ${projects.length
-      ? html`${groups}${standalone.length ? html`<div class="project-grid">${standalone}</div>` : ""}`
-      : emptyState}`;
+    ${projects.length ? html`${waitingBanner}${projectTable(rows, healthOf, waiting)}` : emptyState}`;
   return c.html(layout("Projects", body, { user, active: "projects" }));
 });
 

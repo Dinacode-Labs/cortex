@@ -17,5 +17,5 @@ function healthBadge(snapshot: HealthSnapshot | undefined): Html {
   const checked = `Checked ${snapshot.checkedAt.toISOString().slice(0, 16).replace("T", " ")} UTC`;
   const warnings = snapshot.contradictions + snapshot.duplicates;
   if (warnings === 0) return html`<span class="health ok" title="${checked}">✓ healthy</span>`;
-  return html`<span class="health warn" title="${checked}">${warnings} to review</span>`;
+  return html`<span class="health warn" title="${checked}">${warnings} ${warnings === 1 ? "finding" : "findings"}</span>`;
 }
