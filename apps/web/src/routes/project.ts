@@ -13,6 +13,7 @@ import {
   type SortDirection,
 } from "@cortex/shared";
 import {
+  checkEntryAccess,
   describeCriteria,
   entryFacets,
   getAcrossClient,
@@ -22,6 +23,7 @@ import {
   listEntries,
   renderContextPack,
   searchProjectCode,
+  validateEntry,
   type EntrySort,
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
@@ -37,6 +39,7 @@ import {
   scoreBadge,
   searchForm,
   segmented,
+  stateMark,
   statusBadge,
   statusLabel,
   typeBadge,
@@ -64,6 +67,8 @@ export const projectRoutes = new Hono<WebEnv>();
 /** Links an entry from the pack or the lint: seeing something wrong and being unable to touch
  *  it teaches people to ignore the warnings, which is exactly what we do not want (ADR-0050). */
 const linkEntry = (id: string, text: Html | string): Html => html`<a href="/entry/${id}">${text}</a>`;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 projectRoutes.get("/p/:slug", async (c) => {
   const user = c.get("user")!;
@@ -168,7 +173,7 @@ projectRoutes.get("/p/:slug", async (c) => {
           <div class="row" style="margin-top:12px">
             <select name="type">
               <option value="">Classify automatically</option>
-              ${contextEntryType.options.map((t) => html`<option value="${t}">${t}</option>`)}
+              ${contextEntryType.options.map((t) => html`<option value="${t}" ${t === type ? "selected" : ""}>${t}</option>`)}
             </select>
             <button type="submit">Save</button>
             <a class="button quiet" href="${base}">Cancel</a>
@@ -359,67 +364,144 @@ projectRoutes.get("/p/:slug/health", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project } = res;
+  const { project, reviewer } = res;
   const r = await lintProject(project.name);
+  const base = `/p/${project.slug}`;
 
   const searchLink = (text: string) =>
     `/search?q=${encodeURIComponent(text)}&project=${encodeURIComponent(project.name)}`;
 
-  const card = (title: string, help: string, tone: Tone, items: Html[]) =>
-    panel(
-      title,
-      items.length
-        ? html`<ul class="findings">${items.map((i) => html`<li>${i}</li>`)}</ul>`
-        : html`<p class="sub">Nothing to report.</p>`,
-      { help, actions: badge(String(items.length), items.length ? tone : "neutral") },
-    );
+  const tile = (id: string, label: string, value: Html | string, found: number, tone: Tone, state: string) =>
+    html`<a class="tile" href="#${id}">
+      <span class="tile-label">${label}</span>
+      <span class="tile-value">${value}</span>
+      ${found ? stateMark(tone, state) : stateMark("ok", "Clean")}
+    </a>`;
+
+  const settleForm = (keep: string, retire: string) =>
+    html`<form method="post" action="${base}/health/settle">
+      <input type="hidden" name="keep" value="${keep}">
+      <input type="hidden" name="retire" value="${retire}">
+      <button class="secondary" type="submit">Keep this one, retire the other</button>
+    </form>`;
+  const side = (title: string, id: string | null, otherId: string | null) =>
+    html`<div class="pair-side">
+      ${id ? html`<a class="pair-title" href="/entry/${id}">${title}</a>` : html`<span class="pair-title">${title}</span>`}
+      ${reviewer && id && otherId ? settleForm(id, otherId) : ""}
+    </div>`;
+  const pair = (p: { a: string; b: string; aId: string | null; bId: string | null }, score?: number) =>
+    html`<div class="finding-pair">
+      ${side(p.a, p.aId, p.bId)}
+      <span class="pair-link ${score === undefined ? "" : "same"}" role="img" aria-label="${score === undefined ? "contradicts" : `the same as, ${score.toFixed(2)}`}">${score === undefined ? "⟷" : html`≈<small>${score.toFixed(2)}</small>`}</span>
+      ${side(p.b, p.bId, p.aId)}
+    </div>`;
+  const block = (id: string, title: string, help: string, tone: Tone, items: Html[]) =>
+    panel(title, items.length ? html`<div class="findings-list">${items}</div>` : html`<p>${stateMark("ok", "Nothing to report.")}</p>`, {
+      id,
+      help,
+      actions: badge(String(items.length), items.length ? tone : "neutral"),
+    });
+
+  const reviewedShare = r.totalEntries ? Math.round(((r.totalEntries - r.neverReviewed) / r.totalEntries) * 100) : 100;
 
   const body = projectPage(res, "health", html`
-    <p class="sub">Whether this memory can still be trusted. Every finding links to what it is about.</p>
-    ${card(
-      "⚠️ Contradictions",
+    <p class="sub lead">
+      Whether this memory can still be trusted. Every finding opens what it is about${reviewer ? ", and a clash between two memos can be settled from here" : ""}.
+    </p>
+    ${c.req.query("settled") === "1"
+      ? html`<p class="flash" role="status">Kept one and retired the other: it no longer counts as current, and its page keeps the record.</p>`
+      : ""}
+    <div class="tiles">
+      ${tile("contradictions", "Contradictions", String(r.contradictions.length), r.contradictions.length, "danger", "Resolve first")}
+      ${tile("gaps", "Incidents with no decision", String(r.gaps.length), r.gaps.length, "warn", "Worth a look")}
+      ${tile("duplicates", "Possible duplicates", String(r.duplicates.length), r.duplicates.length, "warn", "Worth a look")}
+      ${tile("orphans", "Orphan entities", String(r.orphanEntities.length), r.orphanEntities.length, "neutral", "Usually harmless")}
+      ${tile("unreviewed", "Never reviewed by a person", html`${r.neverReviewed} <small>of ${r.totalEntries}</small>`, r.neverReviewed, "warn", "Worth a look")}
+    </div>
+    ${block(
+      "contradictions",
+      "Contradictions",
       "Two things recorded as current that cannot both be true. An agent will believe whichever it reads first.",
       "danger",
-      r.contradictions.map((x) => html`${x.aId ? linkEntry(x.aId, x.a) : x.a} <b>⟷</b> ${x.bId ? linkEntry(x.bId, x.b) : x.b}`),
+      r.contradictions.map((x) => pair(x)),
     )}
-    ${card(
-      "🕳️ Incidents with no decision",
+    ${block(
+      "gaps",
+      "Incidents with no decision",
       "Something went wrong repeatedly and nothing was decided about it. These are the gaps that bite twice.",
       "warn",
-      r.gaps.map((g) => html`<a href="${searchLink(g.area)}"><b>${g.area}</b></a> <span class="sub">(${g.type})</span> — ${g.incidents} ${g.incidents === 1 ? "incident" : "incidents"}, no decisions`),
+      r.gaps.map(
+        (g) => html`<div class="finding-row">
+          <div class="what"><a href="${searchLink(g.area)}"><b>${g.area}</b></a>
+            <span class="sub">${g.type} · ${g.incidents} ${g.incidents === 1 ? "incident" : "incidents"}, no decisions</span></div>
+          ${reviewer ? html`<a class="button secondary" href="${base}?capture=1&type=decision">Record a decision</a>` : ""}
+        </div>`,
+      ),
     )}
-    ${card(
-      "🔁 Possible duplicates",
+    ${block(
+      "duplicates",
+      "Possible duplicates",
       "The same thing recorded twice. Harmless until they drift apart and become a contradiction.",
       "warn",
-      r.duplicates.map((d) => html`${badge(d.score.toFixed(2), "warn")} ${d.aId ? linkEntry(d.aId, d.a) : d.a} <b>≈</b> ${d.bId ? linkEntry(d.bId, d.b) : d.b}`),
+      r.duplicates.map((d) => pair(d, d.score)),
     )}
-    ${card(
-      "🧩 Orphan entities",
+    ${block(
+      "orphans",
+      "Orphan entities",
       "Names mentioned once and never connected to anything. Usually a typo or a one-off.",
       "neutral",
-      r.orphanEntities.map((e) => html`<a href="${searchLink(e.name)}">${e.name}</a> <span class="sub">(${e.type})</span>`),
+      r.orphanEntities.map(
+        (e) => html`<div class="finding-row">
+          <div class="what"><code>${e.name}</code> <span class="sub">${e.type} · mentioned once</span></div>
+          <a class="button quiet" href="${searchLink(e.name)}">Where it is mentioned</a>
+        </div>`,
+      ),
     )}
     ${panel(
       "Nobody has reviewed these",
       r.neverReviewed
-        ? html`<p class="sub">
-              <b>${r.neverReviewed}</b> of this project's current entries have never been confirmed or corrected by a
-              person. Agents wrote them; until somebody says whether they hold, confidence and status carry no
-              information and the pack cannot favour what is trustworthy.
-            </p>
-            <a class="button secondary" href="/p/${project.slug}?status=pending_validation">Start reviewing</a>`
+        ? html`<div class="finding-row">
+            <div class="what">
+              <div class="meter" role="img" aria-label="${reviewedShare}% reviewed"><span style="width:${reviewedShare}%"></span></div>
+              <p class="sub"><b>${r.totalEntries - r.neverReviewed} of ${r.totalEntries}</b> current entries have been through a person.</p>
+            </div>
+            <a class="button secondary" href="${base}?status=pending_validation">Start reviewing</a>
+          </div>`
         : html`<p class="sub">Everything current has been through a person. That is what makes the rest worth trusting.</p>`,
-      { actions: badge(String(r.neverReviewed), r.neverReviewed ? "warn" : "ok") },
+      {
+        id: "unreviewed",
+        help: "Agents wrote them. Until somebody says whether they hold, confidence and status carry no information and what agents see cannot favour what is trustworthy.",
+        actions: badge(String(r.neverReviewed), r.neverReviewed ? "warn" : "ok"),
+      },
     )}
-    ${panel(
-      "Other numbers",
-      html`<p class="sub">
-        Low confidence: <b>${r.lowConfidence}</b> · superseded or obsolete: <b>${r.staleHistorical}</b> ·
-        total entries: <b>${r.totalEntries}</b>
-      </p>`,
-    )}`);
+    <p class="sub">
+      Low confidence: <b>${r.lowConfidence}</b> · superseded or obsolete: <b>${r.staleHistorical}</b> ·
+      total entries: <b>${r.totalEntries}</b>
+    </p>`);
   return c.html(layout(`${project.name} · Health`, body, { user }));
+});
+
+/** Keep one, retire the other: the lint's own advice (`planLintActions`), as two web verdicts (ADR-0090). */
+projectRoutes.post("/p/:slug/health/settle", async (c) => {
+  const user = c.get("user")!;
+  const res = await requireProjectPage(c, c.req.param("slug"));
+  if (res instanceof Response) return res;
+  const back = `/p/${res.project.slug}/health`;
+  if (!res.reviewer) {
+    const refusal = empty("Only the owner of this project, its members or an administrator settle its findings.");
+    return c.html(layout("Not allowed", projectPage(res, "health", refusal), user), 403);
+  }
+  const form = await c.req.parseBody();
+  const keep = String(form.keep ?? "");
+  const retire = String(form.retire ?? "");
+  if (!UUID.test(keep) || !UUID.test(retire) || keep === retire) return c.redirect(back);
+  for (const id of [keep, retire]) {
+    const access = await checkEntryAccess(user, id);
+    if (access.status !== "ok" || access.project?.id !== res.project.id) return c.redirect(back);
+  }
+  await validateEntry(keep, "validated", { email: user.email, channel: "web" });
+  await validateEntry(retire, "obsolete", { email: user.email, channel: "web" });
+  return c.redirect(`${back}?settled=1`);
 });
 
 /**

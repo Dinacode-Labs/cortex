@@ -22,6 +22,9 @@ export class PgHealthReader implements HealthReader {
       LEFT JOIN entities et ON et.id=r.target_id
       LEFT JOIN memos cet ON cet.id=r.target_id
       WHERE r.relation_type='contradicts'
+        -- A side somebody retired settles the clash, though only a verdict, not an end date, says so.
+        AND (ces.id IS NULL OR (ces.valid_to IS NULL AND ces.status NOT IN ('rejected', 'obsolete', 'superseded')))
+        AND (cet.id IS NULL OR (cet.valid_to IS NULL AND cet.status NOT IN ('rejected', 'obsolete', 'superseded')))
         AND (ces.project_id=${pid} OR cet.project_id=${pid}
              OR es.id IN (SELECT me.entity_id FROM memo_entities me JOIN memos c ON c.id=me.memo_id WHERE c.project_id=${pid})
              OR et.id IN (SELECT me.entity_id FROM memo_entities me JOIN memos c ON c.id=me.memo_id WHERE c.project_id=${pid}))
@@ -48,7 +51,7 @@ export class PgHealthReader implements HealthReader {
       WITH current_entries AS (
         SELECT id, title, type, NULLIF(COALESCE(metadata->>'file', source_reference), '') AS doc_key
         FROM memos
-        WHERE project_id=${projectId} AND valid_to IS NULL
+        WHERE project_id=${projectId} AND valid_to IS NULL AND status NOT IN ('rejected', 'obsolete', 'superseded')
       )
       SELECT ca.title AS a, cb.title AS b, ca.id AS a_id, cb.id AS b_id,
              (1 - (a.vector <=> b.vector)) AS score

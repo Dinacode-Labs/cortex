@@ -581,6 +581,35 @@ input.wide { width:100%; margin-bottom:var(--s-2); }
 
 /* --- Health -------------------------------------------------------------- */
 
+.tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:var(--s-3); margin-bottom:var(--s-5); }
+.tile { display:flex; flex-direction:column; gap:var(--s-1); padding:var(--s-4); color:var(--text);
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl); box-shadow:var(--shadow-1); }
+a.tile:hover { color:var(--text); text-decoration:none; border-color:var(--line-strong); }
+.tile-label { min-height:2.7em; font-size:var(--t-sm); line-height:1.35; color:var(--muted); }
+.tile-value { font-size:var(--t-2xl); font-weight:600; line-height:1.1; color:var(--ink); font-variant-numeric:tabular-nums; }
+.tile-value small { font-size:var(--t-sm); font-weight:500; color:var(--muted); }
+.state { display:inline-flex; align-items:center; gap:var(--s-1); font-size:var(--t-sm); font-weight:600; }
+.state-icon { flex:none; }
+.state-danger { color:var(--danger); }
+.state-warn { color:var(--warn); }
+.state-ok { color:var(--ok); }
+.state-neutral, .state-accent { color:var(--muted); font-weight:500; }
+.findings-list > * + * { border-top:1px solid var(--line); }
+.finding-pair { display:flex; flex-wrap:wrap; align-items:stretch; gap:var(--s-3); padding:var(--s-3) 0; }
+.pair-side { flex:1 1 260px; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-3);
+  padding:var(--s-3) var(--s-4); background:var(--surface-2); border:1px solid var(--line); border-radius:var(--r-lg); }
+.pair-title { font-weight:600; color:var(--ink); overflow-wrap:anywhere; }
+.pair-side form { margin-top:auto; }
+.pair-link { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:0 0 40px;
+  font-size:var(--t-xl); color:var(--danger); }
+.pair-link.same { color:var(--warn); }
+.pair-link small { font:500 var(--t-xs) var(--mono); }
+.finding-row { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2) var(--s-3); padding:var(--s-3) 0; }
+.finding-row .what { flex:1 1 320px; min-width:0; }
+.finding-row code { color:var(--ink); }
+.meter { position:relative; height:8px; margin-bottom:var(--s-2); overflow:hidden; border-radius:var(--r-full); background:var(--line); }
+.meter > span { position:absolute; top:0; bottom:0; left:0; border-radius:var(--r-full); background:var(--accent); }
+
 .findings { margin:0; padding:0; list-style:none; }
 .findings li { padding:var(--s-2) 0; border-top:1px solid var(--line); font-size:var(--t-sm); }
 .findings li:first-child { border-top:none; }
