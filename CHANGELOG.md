@@ -163,6 +163,11 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **Review sets the older memo beside what came in since**, with the decision under both, and
+  after each decision the next screen says what was done. With JavaScript on, K keeps, D discards,
+  S skips and R opens the rewrite. **An entry's page stays inside its project**: its verdict sits
+  at the top of a side column next to its history, the text reads as prose, and it says when the
+  memo waits in Review ([ADR-0092](docs/decisions.md#adr-0092)).
 - **Memory lists one claim per row** instead of a grid of cards: type, source, status,
   confidence — now a four-step meter — and time line up down the page. The three rows of filter
   pills become a status control that says how many memos each status leaves, and folded menus for

@@ -85,7 +85,7 @@ function healthMark(page: ProjectPage): Html {
 }
 
 /** A link shows only to whoever can use it: a link leading to an empty screen is worse than none. */
-export function projectPage(page: ProjectPage, active: Section, body: Html): Html {
+export function projectPage(page: ProjectPage, active: Section, body: Html, heading: Html | string | null = LABELS[active]): Html {
   const { project, manager, reviewer, pendingReviews, ancestors, children } = page;
   const base = `/p/${project.slug}`;
   const count = "entryCount" in project ? project.entryCount : null;
@@ -118,7 +118,7 @@ export function projectPage(page: ProjectPage, active: Section, body: Html): Htm
       </nav>
     </aside>
     <div class="project-main">
-      <h1 class="section-title">${LABELS[active]}</h1>
+      ${heading === null ? "" : html`<h1 class="section-title">${heading}</h1>`}
       ${body}
     </div>
   </div>`;

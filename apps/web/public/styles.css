@@ -491,6 +491,61 @@ main:has(> .project-shell) { max-width:var(--page-wide); }
 .section-bar { display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap; margin-bottom:var(--s-4); }
 .section-bar > form { flex:1; min-width:260px; }
 
+.lead { max-width:70ch; margin-bottom:var(--s-5); }
+.flash { margin-bottom:var(--s-4); padding:var(--s-2) var(--s-3); border-radius:var(--r-lg);
+  font-size:var(--t-sm); font-weight:500; color:var(--ok); background:var(--ok-soft); }
+.compare { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:var(--s-4);
+  align-items:start; margin-bottom:var(--s-4); }
+h2.compare-label, h2.eyebrow { margin-bottom:var(--s-2); font-size:var(--t-xs); font-weight:600; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--faint); }
+.memo-panel { padding:var(--s-4) var(--s-5); background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--r-xl); box-shadow:var(--shadow-1); }
+.memo-panel.question { border:2px solid var(--accent); }
+.memo-meta { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-1) var(--s-3); }
+.memo-source, .memo-date { font:var(--t-xs) var(--mono); color:var(--faint); }
+.memo-date { margin-left:auto; }
+.memo-title { margin-top:var(--s-2); font-size:var(--t-lg); line-height:1.35; }
+.memo-title a { color:var(--ink); }
+.memo-title a:hover { color:var(--accent); }
+.memo-text { margin-top:var(--s-2); max-width:70ch; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
+.memo-foot { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin-top:var(--s-4);
+  padding-top:var(--s-3); border-top:1px solid var(--line); }
+.rewrite { margin-top:var(--s-4); padding-top:var(--s-3); border-top:1px solid var(--line); }
+.rewrite > summary, details.source > summary { cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--muted); }
+.rewrite form { margin-top:var(--s-3); }
+.rewrite form > .row, .entry-main-col form > .row { margin-top:var(--s-3); }
+.key-hint { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px;
+  margin-left:var(--s-2); padding:0 var(--s-1); font:500 var(--t-xs)/1 var(--mono); color:var(--muted);
+  background:var(--surface-2); border:1px solid var(--line-strong); border-radius:var(--r-sm); }
+/* Its display would otherwise override [hidden]. */
+.key-hint[hidden] { display:none; }
+
+.entry-layout { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:var(--s-6); align-items:start; margin-top:var(--s-2); }
+.entry-main-col { min-width:0; }
+.entry-main-col h1 { margin-top:var(--s-2); }
+.entry-heading { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2) var(--s-3); }
+.prose { max-width:68ch; margin-top:var(--s-3); font-size:var(--t-lg); line-height:1.7;
+  white-space:pre-wrap; overflow-wrap:anywhere; }
+.entry-actions { margin-top:var(--s-4); }
+.button.quiet.danger-text, .button.quiet.danger-text:hover { color:var(--danger); }
+.entry-section { margin-top:var(--s-6); }
+details.source .content-block { margin-top:var(--s-2); }
+.entry-aside .panel { padding:var(--s-4); }
+.verdicts { display:flex; flex-direction:column; gap:var(--s-2); }
+.verdicts form, .verdicts button { width:100%; }
+.verdicts button { justify-content:flex-start; height:40px; }
+.facts { display:grid; grid-template-columns:96px minmax(0,1fr); gap:var(--s-2) var(--s-3); margin:0; font-size:var(--t-sm); }
+.facts dt { color:var(--muted); }
+.facts dd { margin:0; overflow-wrap:anywhere; }
+.mono { font-family:var(--mono); font-size:var(--t-xs); }
+.timeline { display:flex; flex-direction:column; gap:var(--s-2); margin:0; padding:0; list-style:none; font-size:var(--t-sm); }
+.timeline time { display:block; color:var(--faint); }
+.notice-accent { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin:var(--s-3) 0;
+  padding:var(--s-3) var(--s-4); font-size:var(--t-sm); color:var(--ink);
+  background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--r-lg); }
+.notice-accent span { flex:1 1 320px; }
+input.wide { width:100%; margin-bottom:var(--s-2); }
+
 /* --- Projects home page -------------------------------------------------- */
 
 .project-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--s-3); }
@@ -567,6 +622,10 @@ tr:last-child td { border-bottom:none; }
 .signin .content-block { margin-top:var(--s-4); }
 
 /* --- Responsive ---------------------------------------------------------- */
+
+@media (max-width:1000px) {
+  .entry-layout { grid-template-columns:minmax(0,1fr); }
+}
 
 @media (max-width:820px) {
   /* Anchored to its own button, a menu ran off the edge of a phone. */
