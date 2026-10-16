@@ -157,15 +157,15 @@ still true, plus what the rework did not touch.
 3. **Almost no pagination.** Fixed limits (60 entries, 15 results, 10 code hits) with no
    indication that there is more. The one exception is Memory sorted by date: it says when the
    page stops short, marks a date block the limit cut in half, and offers more up to 600.
-4. **No dark mode.** The palette is light-only. The layout is responsive as of the rework, so
-   a phone works; a dark room does not.
-5. **The shared stack shows what the extractor wrote, noise and all.** «Across this client»
+4. **The shared stack shows what the extractor wrote, noise and all.** «Across this client»
    filters out the entity types that are pure hierarchy noise today, but a ticket id recorded
    as a module still reaches the list. It gets better when the extractor does, not here.
-6. **Editing has no history.** Verdicts do — who said a memo holds, and from where
+5. **Editing has no history.** Verdicts do — who said a memo holds, and from where
    ([ADR-0090](decisions.md#adr-0090)) — but a correction to the text overwrites, leaving only
    `updated_at`. For a system whose whole argument is traceability, that is a gap worth closing
    when someone needs it.
+
+**Closed on 2026-10-16:** no dark mode ([0092](decisions.md#adr-0092)).
 
 **Closed on 2026-09-15:** the empty landing page ([0052](decisions.md#adr-0052)); visibility
 and owner being unchangeable and member management being invisible
@@ -190,8 +190,8 @@ Ask, in order:
 
 ## 7. Visual language
 
-Deliberately plain, and it should stay that way: Inter, monospace for identifiers and content,
-**one** accent colour, and badges carrying the only semantic colour on the page (type, status,
+Deliberately plain, and it should stay that way: IBM Plex Sans, IBM Plex Mono for identifiers
+and content, **one** accent colour, and badges carrying the only semantic colour on the page (type, status,
 confidence). Density over decoration — these are lists of claims to be scanned, and the reader
 is looking for the wrong one.
 
@@ -208,5 +208,8 @@ Two tests hold the line: every class a page emits must have a rule behind it, an
 stylesheet's braces must balance. And the stylesheet URL carries the release version, because
 without it a browser keeps the old copy and a deployed redesign simply does not arrive.
 
-One known deficit: no dark mode. Now a matter of redefining tokens under a media query rather
-than a rewrite.
+Dark mode follows the operating system: the colour tokens are redefined under
+`prefers-color-scheme: dark`, and nothing else changes ([ADR-0092](decisions.md#adr-0092)). That
+holds only while every colour is a token — a badge names a tone (`ok`, `warn`, `danger`,
+`neutral`, `accent`) or a memo type, never a colour — so two more tests watch it: every colour
+token has its dark value, and neither a rule nor a template writes a colour of its own.

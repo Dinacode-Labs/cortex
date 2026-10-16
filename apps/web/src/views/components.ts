@@ -23,35 +23,30 @@ export function joinHtml(parts: Html[], sep = ""): Html {
 // These maps are that meaning, which is why they live together: when a state changes colour it
 // changes here and everywhere at once.
 
-const STATUS_COLORS: Record<string, string> = {
-  pending_validation: "#9a5b00",
-  validated: "#0f7b3d",
-  rejected: "#b3261e",
-  superseded: "#5b6673",
-  obsolete: "#5b6673",
-  draft: "#5b6673",
-  active: "#0f7b3d",
-  archived: "#5b6673",
+export type Tone = "accent" | "ok" | "warn" | "danger" | "neutral";
+
+const STATUS_TONES: Record<string, Tone> = {
+  pending_validation: "warn",
+  validated: "ok",
+  rejected: "danger",
+  superseded: "neutral",
+  obsolete: "neutral",
+  draft: "neutral",
+  active: "ok",
+  archived: "neutral",
 };
 
-const TYPE_COLORS: Record<string, string> = {
-  decision: "#1a6dff",
-  constraint: "#9a5b00",
-  incident: "#b3261e",
-  risk: "#b3261e",
-  technical_debt: "#8a4b00",
-  convention: "#0f7b3d",
-  architecture: "#6b3fa0",
-};
+const TYPES_WITH_A_COLOUR = new Set(["decision", "constraint", "incident", "risk", "technical_debt", "convention", "architecture"]);
 
-export function badge(text: string, color: string): Html {
-  return html`<span class="badge" style="color:${color};background:${color}14">${text}</span>`;
+export function badge(text: string, tone: Tone = "neutral"): Html {
+  return html`<span class="badge tone-${tone}">${text}</span>`;
 }
 
-export const statusBadge = (s: string): Html => badge(s, STATUS_COLORS[s] ?? "#5b6673");
-export const typeBadge = (t: string): Html => badge(t, TYPE_COLORS[t] ?? "#5b6673");
-export const confidenceBadge = (c: string): Html => badge(`conf: ${c}`, "#5b6673");
-export const scoreBadge = (n: number): Html => badge(n.toFixed(2), "#1a6dff");
+export const statusBadge = (s: string): Html => badge(s, STATUS_TONES[s]);
+export const typeBadge = (t: string): Html =>
+  TYPES_WITH_A_COLOUR.has(t) ? html`<span class="badge type-${t}">${t}</span>` : badge(t);
+export const confidenceBadge = (c: string): Html => badge(`conf: ${c}`);
+export const scoreBadge = (n: number): Html => badge(n.toFixed(2), "accent");
 
 export interface PanelOptions {
   help?: Html | string;

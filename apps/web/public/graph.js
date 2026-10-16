@@ -45,8 +45,9 @@ function colorFor(group){
     if(n && n._kind==="entry") window.location = "/entry/"+n.id;
   });
   const types=[...new Set(g.nodes.map(n=>n._group||n.group).filter(x=>x&&!x.startsWith("entry:")))];
+  const swatch=(color, shape)=>'<span class="legend-swatch '+shape+'" style="background:'+color+'"></span>';
   document.getElementById("legend").innerHTML =
     "Nodes: "+g.nodes.length+" · Edges: "+g.edges.length+" &nbsp; | &nbsp; " +
-    types.map(t=>'<span style="color:'+colorFor(t)+'">●</span> '+t).join(" &nbsp; ") +
-    ' &nbsp; <span style="color:'+entryColor+'">▦</span> entry';
+    types.map(t=>swatch(colorFor(t), "dot")+t).join(" &nbsp; ") +
+    ' &nbsp; '+swatch(entryColor, "box")+'entry';
 })();

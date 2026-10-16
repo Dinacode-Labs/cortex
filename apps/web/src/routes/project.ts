@@ -25,7 +25,7 @@ import {
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
-import { badge, empty, entrySelection, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge, warn } from "../views/components.js";
+import { badge, empty, entrySelection, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge, warn, type Tone } from "../views/components.js";
 import { parseDateGrouping } from "../date-blocks.js";
 import { projectHealths } from "../project-summary.js";
 import { ENTRIES_PAGE, entryList, groupingPills, parsePageLimit } from "../views/entry-list.js";
@@ -296,7 +296,7 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
       : ""}
     ${pack.sections.map(sec)}
     ${pack.sensitiveModules.length
-      ? panel("Sensitive modules", html`<div class="row">${joinHtml(pack.sensitiveModules.map((m) => badge(m, "#8a4b00")), " ")}</div>`)
+      ? panel("Sensitive modules", html`<div class="row">${joinHtml(pack.sensitiveModules.map((m) => badge(m, "warn")), " ")}</div>`)
       : ""}
     ${pack.relevantToArea.length
       ? panel(
@@ -326,13 +326,13 @@ projectRoutes.get("/p/:slug/health", async (c) => {
   const searchLink = (text: string) =>
     `/search?q=${encodeURIComponent(text)}&project=${encodeURIComponent(project.name)}`;
 
-  const card = (title: string, help: string, color: string, items: Html[]) =>
+  const card = (title: string, help: string, tone: Tone, items: Html[]) =>
     panel(
       title,
       items.length
         ? html`<ul class="findings">${items.map((i) => html`<li>${i}</li>`)}</ul>`
         : html`<p class="sub">Nothing to report.</p>`,
-      { help, actions: badge(String(items.length), items.length ? color : "#5b6673") },
+      { help, actions: badge(String(items.length), items.length ? tone : "neutral") },
     );
 
   const body = html`
@@ -341,25 +341,25 @@ projectRoutes.get("/p/:slug/health", async (c) => {
     ${card(
       "⚠️ Contradictions",
       "Two things recorded as current that cannot both be true. An agent will believe whichever it reads first.",
-      "#cf222e",
+      "danger",
       r.contradictions.map((x) => html`${x.aId ? linkEntry(x.aId, x.a) : x.a} <b>⟷</b> ${x.bId ? linkEntry(x.bId, x.b) : x.b}`),
     )}
     ${card(
       "🕳️ Incidents with no decision",
       "Something went wrong repeatedly and nothing was decided about it. These are the gaps that bite twice.",
-      "#bc4c00",
+      "warn",
       r.gaps.map((g) => html`<a href="${searchLink(g.area)}"><b>${g.area}</b></a> <span class="sub">(${g.type})</span> — ${g.incidents} ${g.incidents === 1 ? "incident" : "incidents"}, no decisions`),
     )}
     ${card(
       "🔁 Possible duplicates",
       "The same thing recorded twice. Harmless until they drift apart and become a contradiction.",
-      "#9a6700",
-      r.duplicates.map((d) => html`${badge(d.score.toFixed(2), "#9a6700")} ${d.aId ? linkEntry(d.aId, d.a) : d.a} <b>≈</b> ${d.bId ? linkEntry(d.bId, d.b) : d.b}`),
+      "warn",
+      r.duplicates.map((d) => html`${badge(d.score.toFixed(2), "warn")} ${d.aId ? linkEntry(d.aId, d.a) : d.a} <b>≈</b> ${d.bId ? linkEntry(d.bId, d.b) : d.b}`),
     )}
     ${card(
       "🧩 Orphan entities",
       "Names mentioned once and never connected to anything. Usually a typo or a one-off.",
-      "#57606a",
+      "neutral",
       r.orphanEntities.map((e) => html`<a href="${searchLink(e.name)}">${e.name}</a> <span class="sub">(${e.type})</span>`),
     )}
     ${panel(
@@ -372,7 +372,7 @@ projectRoutes.get("/p/:slug/health", async (c) => {
             </p>
             <a class="button secondary" href="/p/${project.slug}?status=pending_validation">Start reviewing</a>`
         : html`<p class="sub">Everything current has been through a person. That is what makes the rest worth trusting.</p>`,
-      { actions: badge(String(r.neverReviewed), r.neverReviewed ? "#9a5b00" : "#0f7b3d") },
+      { actions: badge(String(r.neverReviewed), r.neverReviewed ? "warn" : "ok") },
     )}
     ${panel(
       "Other numbers",
@@ -434,12 +434,12 @@ projectRoutes.get("/p/:slug/across", async (c) => {
     ${panel("Shared across these projects", stack, {
       help:
         "Technologies, modules, services, integrations and vendors that appear in the memory of two or more of them. It is what has been written down, not an inventory of the architecture.",
-      actions: badge(String(sharedStack.length), sharedStack.length ? "#1a6dff" : "#5b6673"),
+      actions: badge(String(sharedStack.length), sharedStack.length ? "accent" : "neutral"),
     })}
     ${panel("Contradictions between projects", choques, {
       help:
         "Two things recorded as current in different projects that cannot both be true. An agent in either one will only ever see its own side.",
-      actions: badge(String(contradictions.length), contradictions.length ? "#cf222e" : "#5b6673"),
+      actions: badge(String(contradictions.length), contradictions.length ? "danger" : "neutral"),
     })}`;
   return c.html(layout(`${project.name} · Across this client`, body, { user }));
 });

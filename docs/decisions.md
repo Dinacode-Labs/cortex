@@ -3194,3 +3194,63 @@ decisions they carried stay recorded here.
     nothing to decide;
   - or the queue grows faster than people clear it, which argues for a higher threshold or a cap
     per memo.
+
+<a id="adr-0092"></a>
+
+## ADR-0092 · The web UI is redesigned around checking, in five steps, and its palette gets a dark mode
+
+- **Status:** accepted as a hypothesis (2026-10-16). Revises the shape in [0050](#adr-0050) (the
+  row of tabs becomes a sidebar) and the visual language in [0053](#adr-0053) (typeface, dark
+  mode). It lands in five pull requests; this record covers all of them.
+- **Context:** the UI's job is settled ([0050](#adr-0050), [design](design.md)): a person audits
+  and repairs a memory that machines wrote. A pass over the screens with that job in mind found
+  their form working against it:
+  - a project carries up to ten tabs in one row, and Review — the job the UI exists for — is one
+    of them;
+  - Memory lays claims out as a grid of cards cut at three lines, behind three rows of filter
+    pills (fourteen types, six statuses, four orders), so looking for the wrong claim means
+    reading a mosaic;
+  - Review stacks the older memo, the newer ones and the decision one under another: the two
+    memos being compared are never side by side;
+  - an entry's page leaves the project, and its verdict sits at the bottom, under the metadata;
+  - Health shows counts and links but no way to act on them;
+  - there is no dark mode, and every badge carried its colour in an inline `style`, which no
+    media query reaches;
+  - Inter is the default of half the web. IBM Plex draws a sans and a mono on one skeleton, which
+    suits pages that set prose and identifiers side by side.
+- **Decision:** keep what [0042](#adr-0042) and [0053](#adr-0053) settled — server-rendered, no
+  build, one stylesheet, one accent, colour only where it means something — and change the form,
+  in five steps that each work on their own:
+  1. **Palette and type.** Every colour is a token, and dark mode redefines all of them under
+     `prefers-color-scheme: dark`: it follows the operating system and needs no script, cookie or
+     switch. A badge names a tone (`ok`, `warn`, `danger`, `neutral`, `accent`) or a memo type,
+     never a colour. IBM Plex Sans and IBM Plex Mono replace Inter and JetBrains Mono.
+     `tests/web-palette.test.ts` holds it: every colour token has a dark value, and neither a
+     rule nor a template writes a colour of its own.
+  2. **A sidebar per project** instead of the tabs, in two groups — *Check* (Memory, Review,
+     Health, Across this client) and *Explore* (Ask, What agents see, Map, Code) — with Settings
+     apart. Review says how many memos wait; Health, whether the last lint found something.
+  3. **Memory as rows**: one line per claim, with type, status, confidence, source and time
+     aligned; status as a segmented control with counts; type, order and grouping in `<details>`
+     menus that need no script.
+  4. **Review side by side**, the older memo against what came in since, with the decision under
+     both; and **the entry page inside the project**, its verdict at the top of a side column
+     next to the history.
+  5. **Health with a summary and an action for each finding.**
+- **Alternatives:**
+  - **A theme switch stored in a cookie.** It lets a person override the system, at the cost of a
+    script or a round trip. Not now: following the system covers what was asked, and with every
+    colour a token a switch is an addition later, not a rewrite.
+  - **Keep Inter.** Safe and familiar; the mockup showed both, and Plex was chosen for its mono.
+  - **One pull request.** Quicker to land and impossible to review: every step changes how
+    several screens look.
+  - **Keep the cards and restyle them.** Cards suit things you choose between, like projects.
+    Claims you scan for the wrong one read better as rows.
+- **Consequences:** until the five steps land, screens from before and after sit side by side.
+  The map keeps its own colours (`graph.js`) and stays dark in both modes. The favicon writes the
+  palette's colours out, because no stylesheet reaches it. Some of what the redesign shows needs
+  data the screens do not read today — counts per status, memos waiting per project, whether a
+  memo is in Review — and each arrives with the step that shows it.
+- **Revisit when:** somebody needs a theme other than the system's; a step turns out to need
+  client-side code beyond enhancement, which is [0042](#adr-0042)'s threshold; or Review is used
+  less from the sidebar than it was from the tabs, which says the grouping is wrong.
