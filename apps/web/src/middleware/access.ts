@@ -5,10 +5,12 @@ import {
   canReviewProject,
   checkProjectAccess,
   findProjectBySlug,
+  latestProjectHealth,
   listAccessibleProjects,
   listProjectAncestors,
   pendingReviewCount,
   type AccessibleProject,
+  type HealthSnapshot,
   type ProjectRef,
   type SessionUser,
 } from "@cortex/core";
@@ -57,6 +59,7 @@ export interface ProjectPage {
    * is a client -- the "Across this client" tab and the repo list only exist when it has some.
    */
   children: AccessibleProject[];
+  health: HealthSnapshot | undefined;
 }
 
 /**
@@ -85,5 +88,6 @@ export async function requireProjectPage(
     pendingReviews: reviewer ? await pendingReviewCount(base) : 0,
     ancestors: base.parentId ? await listProjectAncestors(base.id) : [],
     children: accessible.filter((p) => p.parentId === base.id),
+    health: (await latestProjectHealth([base.id])).get(base.id),
   };
 }

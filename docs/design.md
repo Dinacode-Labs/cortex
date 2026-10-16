@@ -77,7 +77,10 @@ These are settled and not up for renegotiation without an ADR:
 
 The project is the unit of access, of context packs, and of what a developer has in mind when
 they open the UI. So it is the unit of the interface too, and it lives in the URL where it
-cannot be lost.
+cannot be lost. Inside a project the sections hang off a sidebar ([ADR-0092](decisions.md#adr-0092)):
+what a person checks — Memory, Review, Health, Across this client — above what they consult — Ask,
+What agents see, Map, Code — and Settings apart. Review says how many memos wait; Health, whether
+the last check found something. Each section names itself in its page's heading.
 
 ```
 [Cortex]   [ Search everything… ]              Projects · Admin* · you · Sign out
@@ -101,7 +104,7 @@ cannot be lost.
 /admin/agents           what every agent is told, before any project adds to it (admins only)
 ```
 
-`*` only on a project that has children: a tab leading to an empty screen is worse than no tab.
+`*` only on a project that has children: a link leading to an empty screen is worse than no link.
 
 Labels are written for the person reading them, not for the internals: **Health**, not "Lint";
 **What agents see**, not "Context pack". Old URLs redirect permanently — a link someone pasted
@@ -122,7 +125,7 @@ pack silently mixed the client's knowledge with its own.
 
 So the hierarchy is drawn where it is felt, without any new screen:
 
-- the project header carries a **breadcrumb** to the root, every level linked;
+- the sidebar carries a **breadcrumb** to the root, every level linked;
 - a parent lists **its children** on its Memory screen, with the same cards as the landing page;
 - the landing page **groups children under their parent** instead of flattening them;
 - **What agents see** marks each inherited entry with the project it comes from;

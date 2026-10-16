@@ -39,6 +39,7 @@ async function otpDe(email: string): Promise<string> {
 
 let cookie: string;
 let project_: ProjectRef;
+let entryId: string;
 const previousAdmins = process.env.CORTEX_ADMIN_EMAIL;
 
 beforeAll(async () => {
@@ -47,7 +48,8 @@ beforeAll(async () => {
   const { token } = await verifyOtp(USER, await otpDe(USER));
   cookie = `cortex_session=${token}`;
   project_ = await createProject(`Styles ${RID}`, { ownerEmail: USER });
-  await saveContext({ content: `Some decision or other ${RID}.`, project: project_.name, createdBy: USER });
+  const { entry } = await saveContext({ content: `Some decision or other ${RID}.`, project: project_.name, createdBy: USER });
+  entryId = entry.id;
 }, 120_000);
 
 afterAll(() => {
@@ -66,11 +68,13 @@ describe("the UI's styles", () => {
       `/p/${project_.slug}`,
       `/p/${project_.slug}?capture=1`,
       `/p/${project_.slug}?sort=created&group=week`,
+      `/p/${project_.slug}/review`,
       `/p/${project_.slug}/health`,
       `/p/${project_.slug}/agents`,
       `/p/${project_.slug}/settings`,
       `/p/${project_.slug}/map`,
       `/p/${project_.slug}/code`,
+      `/entry/${entryId}`,
       "/search?q=decision",
       "/admin/usage",
       "/admin/agents",

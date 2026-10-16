@@ -163,6 +163,11 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **A project's sections hang off a sidebar** instead of a row of tabs: what to check (Memory,
+  Review, Health) above what to consult (Ask, What agents see, Map, Code), with Settings apart.
+  Review shows how many memos wait, and Health warns when the last check found contradictions or
+  duplicates. On a phone the sidebar becomes a row that scrolls
+  ([ADR-0092](docs/decisions.md#adr-0092)).
 - **The web UI is set in IBM Plex Sans and IBM Plex Mono**, instead of Inter and JetBrains Mono,
   with a deeper accent ([ADR-0092](docs/decisions.md#adr-0092)).
 - **Only a project's team judges its memos in the web UI.** Validating, rejecting, editing and

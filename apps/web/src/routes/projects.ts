@@ -12,7 +12,7 @@ import {
 import { layout, type Html } from "../views/layout.js";
 import { projectCard } from "../views/components.js";
 import { projectHealths } from "../project-summary.js";
-import { projectHeader } from "../views/project-nav.js";
+import { projectPage } from "../views/project-nav.js";
 import { criteriaPanel } from "../views/project-criteria.js";
 import { projectAgentPromptsPanel } from "../views/agent-prompts.js";
 import { requireProjectPage } from "../middleware/access.js";
@@ -105,8 +105,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
 
   // Whoever cannot manage sees who to ask, rather than a dead-end 403.
   if (!manager) {
-    const body = html`
-      ${projectHeader(res, "settings")}
+    const body = projectPage(res, "settings", html`
       <div class="panel">
         <h2>Access</h2>
         <p class="sub">
@@ -115,7 +114,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
             ? html`It is managed by <b>${project.ownerEmail}</b> — ask them for changes.`
             : "It has no owner yet; an administrator can claim it."}
         </p>
-      </div>`;
+      </div>`);
     return c.html(layout(`${project.name} · Access`, body, { user }));
   }
 
@@ -127,8 +126,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   // The cycle check is done by the domain, which is what knows the whole ancestor chain.
   const others = (await listAccessibleProjects(user)).filter((o) => o.slug && o.id !== project.id);
 
-  const body = html`
-    ${projectHeader(res, "settings")}
+  const body = projectPage(res, "settings", html`
     ${notice ? html`<div class="warn">${notice}</div>` : ""}
 
     <div class="panel">
@@ -231,7 +229,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
               <button class="danger" type="submit">Delete project</button>
             </form>`
         : ""}
-    </div>`;
+    </div>`);
   return c.html(layout(`${project.name} · Settings`, body, { user }));
 });
 

@@ -30,7 +30,7 @@ import { parseDateGrouping } from "../date-blocks.js";
 import { projectHealths } from "../project-summary.js";
 import { ENTRIES_PAGE, entryList, groupingPills, parsePageLimit } from "../views/entry-list.js";
 import { mdLite } from "../views/md.js";
-import { projectHeader } from "../views/project-nav.js";
+import { projectPage } from "../views/project-nav.js";
 import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -146,8 +146,7 @@ projectRoutes.get("/p/:slug", async (c) => {
       )
     : html``;
 
-  const body = html`
-    ${projectHeader(res, "memory")}
+  const body = projectPage(res, "memory", html`
     ${childrenSection}
     <div class="section-bar">
       ${searchForm(
@@ -184,7 +183,7 @@ projectRoutes.get("/p/:slug", async (c) => {
       : empty(
           type ? html`Nothing of type <b>${type}</b> here yet.` : "Nothing here yet.",
           type ? html`<a class="button secondary" href="${withFilters({ type: "" })}">Show all types</a>` : html`<a class="button" href="${base}?capture=1">Add the first entry</a>`,
-        )}`;
+        )}`);
   return c.html(layout(project.name, body, { user }));
 });
 
@@ -213,8 +212,7 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
       : html`<div class="warn">⚠️ No language model is configured, so this is search only.</div>${sources}`;
   }
 
-  const body = html`
-    ${projectHeader(res, "ask")}
+  const body = projectPage(res, "ask", html`
     ${panel(
       null,
       html`<form class="row" method="get" action="/p/${project.slug}/ask">
@@ -223,7 +221,7 @@ projectRoutes.get("/p/:slug/ask", async (c) => {
       </form>`,
       { help: "The retrieval agent answers from what is saved, and cites what it used." },
     )}
-    ${q ? html`<h2 style="font-size:17px">${q}</h2>${answerHtml}` : ""}`;
+    ${q ? html`<h2 style="font-size:17px">${q}</h2>${answerHtml}` : ""}`);
   return c.html(layout(`${project.name} · Ask`, body, { user }));
 });
 
@@ -267,8 +265,7 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
         )
       : html``;
 
-  const body = html`
-    ${projectHeader(res, "agents")}
+  const body = projectPage(res, "agents", html`
     <p class="sub">
       This is exactly what an agent is told when it opens a session on this project —
       ${pack.totalEntries} ${pack.totalEntries === 1 ? "entry" : "entries"} in total,
@@ -305,7 +302,7 @@ projectRoutes.get("/p/:slug/agents", async (c) => {
             (h) => html`<li>${scoreBadge(h.score)} ${linkEntry(h.entry.id, h.entry.title)}</li>`,
           )}</ul>`,
         )
-      : ""}`;
+      : ""}`);
   return c.html(layout(`${project.name} · What agents see`, body, { user }));
 });
 
@@ -335,8 +332,7 @@ projectRoutes.get("/p/:slug/health", async (c) => {
       { help, actions: badge(String(items.length), items.length ? tone : "neutral") },
     );
 
-  const body = html`
-    ${projectHeader(res, "health")}
+  const body = projectPage(res, "health", html`
     <p class="sub">Whether this memory can still be trusted. Every finding links to what it is about.</p>
     ${card(
       "⚠️ Contradictions",
@@ -380,7 +376,7 @@ projectRoutes.get("/p/:slug/health", async (c) => {
         Low confidence: <b>${r.lowConfidence}</b> · superseded or obsolete: <b>${r.staleHistorical}</b> ·
         total entries: <b>${r.totalEntries}</b>
       </p>`,
-    )}`;
+    )}`);
   return c.html(layout(`${project.name} · Health`, body, { user }));
 });
 
@@ -424,8 +420,7 @@ projectRoutes.get("/p/:slug/across", async (c) => {
       )}</ul>`
     : html`<p class="sub">Nothing to report. Health checks each project on its own; this is the part nobody else looks at.</p>`;
 
-  const body = html`
-    ${projectHeader(res, "across")}
+  const body = projectPage(res, "across", html`
     <p class="sub">
       What these ${children.length} projects have in common, and where they disagree. Each project only ever reads
       what this client knows, never what a sibling knows — so this is the one place a conflict between two of
@@ -440,7 +435,7 @@ projectRoutes.get("/p/:slug/across", async (c) => {
       help:
         "Two things recorded as current in different projects that cannot both be true. An agent in either one will only ever see its own side.",
       actions: badge(String(contradictions.length), contradictions.length ? "danger" : "neutral"),
-    })}`;
+    })}`);
   return c.html(layout(`${project.name} · Across this client`, body, { user }));
 });
 
@@ -455,8 +450,7 @@ projectRoutes.get("/p/:slug/map", async (c) => {
   // to keep the last, or the box can never be ticked again.
   const includeEntries = (c.req.queries("entries")?.at(-1) ?? "1") !== "0";
 
-  const body = html`
-    ${projectHeader(res, "map")}
+  const body = projectPage(res, "map", html`
     <p class="sub">How this project's knowledge connects, and where it does not.</p>
     ${panel(
       null,
@@ -469,7 +463,7 @@ projectRoutes.get("/p/:slug/map", async (c) => {
     <div id="legend"></div>
     <div id="net" data-project="${project.name}" data-entries="${includeEntries ? "1" : "0"}"></div>
     <script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
-    <script src="/graph.js"></script>`;
+    <script src="/graph.js"></script>`);
   return c.html(layout(`${project.name} · Map`, body, { user }));
 });
 
@@ -495,11 +489,10 @@ projectRoutes.get("/p/:slug/code", async (c) => {
       : empty(html`No results. Has this repository been indexed? An operator runs <code>cortex-admin index-code</code>.`);
   }
 
-  const body = html`
-    ${projectHeader(res, "code")}
+  const body = projectPage(res, "code", html`
     ${panel(null, searchForm(`/p/${project.slug}/code`, q, "e.g. where is the user's phone number verified"), {
       help: "Hybrid search, semantic and lexical, over this project's indexed code.",
     })}
-    ${q ? html`<h2 style="font-size:16px">"${q}"</h2>${results}` : ""}`;
+    ${q ? html`<h2 style="font-size:16px">"${q}"</h2>${results}` : ""}`);
   return c.html(layout(`${project.name} · Code`, body, { user }));
 });
