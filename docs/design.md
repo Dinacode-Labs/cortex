@@ -84,6 +84,8 @@ cannot be lost.
 
 /                       the projects you can reach — entries, visibility, last health check
 /p/<slug>               Memory           what is remembered, filtered and ordered, plus "Add"
+/p/<slug>/review        Review           one older memo at a time that something newer is about;
+                                         every decision brings the next (its team only)
 /p/<slug>/ask           Ask
 /p/<slug>/agents        What agents see  the pack, with every entry linked
 /p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked

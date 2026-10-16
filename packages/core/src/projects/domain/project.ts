@@ -34,6 +34,19 @@ export async function decideProjectAccess(
   deps: { isAdmin: boolean; isMember: (projectId: string) => Promise<boolean> },
 ): Promise<boolean> {
   if (!chain.some((node) => node.visibility === "private")) return true;
+  return isOnProjectTeam(chain, viewer, deps);
+}
+
+/**
+ * Whoever works on the project: an admin, or the owner or a member of it or of any ancestor. It
+ * is who may judge its memos, which a public project would otherwise open to anyone signed in
+ * (ADR-0091).
+ */
+export async function isOnProjectTeam(
+  chain: ProjectChainNode[],
+  viewer: SessionUser | null,
+  deps: { isAdmin: boolean; isMember: (projectId: string) => Promise<boolean> },
+): Promise<boolean> {
   if (!viewer) return false;
   if (deps.isAdmin) return true;
   const e = viewer.email.toLowerCase();

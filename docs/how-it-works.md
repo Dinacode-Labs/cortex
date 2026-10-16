@@ -454,6 +454,14 @@ to does not count as one: an entry gets reclassified, re-embedded and corrected 
 without any of that making it truer ([ADR-0067](decisions.md#adr-0067)). Quality rises over
 time without slowing capture down.
 
+**Review when something newer arrives.** New knowledge is taken as valid. What may no longer
+hold is the older memo it talks about, and that is a person's call. So every memo saved by an
+agent, a session or a person puts the older memos of its project about the same thing
+(similarity 0.75 or more, `CORTEX_REVIEW_THRESHOLD`) in a review queue. The project's
+**Review** section shows them one at a time, next to what came in since. Whoever works on the
+project decides whether each still holds, is discarded, or is rewritten, and lands straight on
+the next one ([ADR-0091](decisions.md#adr-0091)). Bulk ingestion raises no reviews.
+
 **Secrets.** Before the LLM sees anything, and again before storing, **secrets are
 stripped**: PEM keys, JWTs, `sk-…`, GitHub, Slack, AWS and Google tokens, `Bearer …` and
 `Basic …` headers, `api_key=…`, passwords inside connection strings, and `Cookie` headers.

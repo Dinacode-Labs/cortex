@@ -40,8 +40,11 @@ Working, and in daily use by a team:
 
 - **Nobody validates.** 608 current entries, **608 unreviewed**. A person's validation now
   reaches the pack -- it makes the memo `verified`, which is what the pack orders by -- and every
-  verdict is recorded ([ADR-0090](decisions.md#adr-0090)). What is left is the cost of doing it:
-  one memo at a time, with no queue, no verdicts in bulk and nothing suggesting one.
+  verdict is recorded ([ADR-0090](decisions.md#adr-0090)). The Review section queues the older
+  memos something newer is about and brings them one after another
+  ([ADR-0091](decisions.md#adr-0091)). What is left is judging each pair before a person sees it:
+  an agent saying how important the memo is, what it repeats and what it contradicts, and
+  recommending to keep, discard or rewrite it. Its verdict would also set the queue's order.
 - **`search` and `ask` do not inherit from the parent.** The context pack climbs the ancestor
   chain and search does not, so inside a child project you do not find what is stored in the
   client. With real hierarchies being set up right now, this already shows.

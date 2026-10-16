@@ -2,10 +2,12 @@ import type { Context } from "hono";
 import { html } from "hono/html";
 import {
   canManageProject,
+  canReviewProject,
   checkProjectAccess,
   findProjectBySlug,
   listAccessibleProjects,
   listProjectAncestors,
+  pendingReviewCount,
   type AccessibleProject,
   type ProjectRef,
   type SessionUser,
@@ -43,6 +45,9 @@ export interface ProjectPage {
   project: AccessibleProject;
   /** Whether the viewer can change visibility, owner and members (ADR-0051). */
   manager: boolean;
+  /** Whether the viewer may judge its memos, and how many wait for it (ADR-0091). */
+  reviewer: boolean;
+  pendingReviews: number;
   /** From the root to the direct parent, for the breadcrumb and for saying what inherits what. */
   ancestors: ProjectRef[];
   /**
@@ -72,9 +77,12 @@ export async function requireProjectPage(
   const accessible = await listAccessibleProjects(viewer);
   const withCount = accessible.find((p) => p.slug === slug);
   const base = withCount ?? { ...(await findProjectBySlug(slug))!, entryCount: 0 };
+  const reviewer = await canReviewProject(base, viewer);
   return {
     project: base,
     manager: await canManageProject(viewer, slug),
+    reviewer,
+    pendingReviews: reviewer ? await pendingReviewCount(base) : 0,
     ancestors: base.parentId ? await listProjectAncestors(base.id) : [],
     children: accessible.filter((p) => p.parentId === base.id),
   };
