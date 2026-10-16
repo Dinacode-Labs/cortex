@@ -91,7 +91,7 @@ the last check found something. Each section names itself in its page's heading.
                                          every decision brings the next (its team only)
 /p/<slug>/ask           Ask
 /p/<slug>/agents        What agents see  the pack, with every entry linked
-/p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked
+/p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked, a clash settled
 /p/<slug>/across        Across this client   what its projects share and where they disagree*
 /p/<slug>/map           Map
 /p/<slug>/code          Code
@@ -152,10 +152,10 @@ still true, plus what the rework did not touch.
 
 **Still open:**
 
-1. **`/health` links but does not act.** Every finding now opens the entries behind it, which
-   was the worst of it — but merging a duplicate or resolving a contradiction still means
-   editing each entry by hand. `core` has `planLintActions` and `saveWithReconciliation`; the
-   screen does not use them yet.
+1. **`/health` settles, but does not merge.** A contradiction or a duplicate is settled where it
+   is shown — keep one, retire the other ([ADR-0092](decisions.md#adr-0092)) — but folding two
+   duplicates into one entry still means editing by hand. `core` has `saveWithReconciliation`;
+   the screen does not use it yet.
 2. **No entity pages.** Entities appear as tags that run a search. `resolveEntity`, `relate`
    and the graph all know more than the UI shows.
 3. **Almost no pagination.** Fixed limits (60 entries, 15 results, 10 code hits) with no

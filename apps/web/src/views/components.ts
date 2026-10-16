@@ -57,6 +57,21 @@ export function confidenceMeter(c: string): Html {
   return html`<span class="confidence conf-${c}" title="Confidence: ${c}"><i></i><i></i><i></i><i></i><span>${c}</span></span>`;
 }
 
+const STATE_ICONS: Partial<Record<Tone, string>> = {
+  danger: '<path d="M8 2 14.5 13.5h-13Z"/><path d="M8 6.5v3M8 11.5v.1"/>',
+  warn: '<circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.1"/>',
+  ok: '<path d="m3 8.5 3 3 7-7"/>',
+};
+
+/** Never colour alone: a word, and an icon. `raw()` only over the drawings above. */
+export function stateMark(tone: Tone, label: string): Html {
+  const paths = STATE_ICONS[tone];
+  const drawing = paths
+    ? raw(`<svg class="state-icon" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`)
+    : "";
+  return html`<span class="state state-${tone}">${drawing}${label}</span>`;
+}
+
 export interface Choice {
   label: Html | string;
   href: string;
@@ -85,10 +100,11 @@ export function menu(label: string, current: Html | string, choices: Choice[]): 
 export interface PanelOptions {
   help?: Html | string;
   actions?: Html;
+  id?: string;
 }
 
 export function panel(title: string | null, body: Html, opts: PanelOptions = {}): Html {
-  return html`<section class="panel">
+  return html`<section class="panel" ${opts.id ? html`id="${opts.id}"` : ""}>
     ${title
       ? html`<div class="row-between" style="margin-bottom:8px">
           <h2>${title}</h2>${opts.actions ?? ""}

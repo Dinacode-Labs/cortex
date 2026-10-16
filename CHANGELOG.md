@@ -9,6 +9,11 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Health settles what it finds.** A summary at the top says what is wrong and how badly. Each
+  side of a contradiction or a duplicate offers "Keep this one, retire the other": the memo kept
+  becomes verified, the other obsolete, and both verdicts are recorded as if given on their pages.
+  An incident with no decision offers to record one. Only the project's team sees the buttons
+  ([ADR-0092](docs/decisions.md#adr-0092)).
 - **The web UI has a dark mode.** It follows the operating system's setting, with nothing to
   switch: every screen, the badges included, takes its colours from one palette with a light and
   a dark side. It is the first step of a redesign of the web UI around checking what agents wrote
@@ -265,6 +270,10 @@ fixes things.
   generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
 
 ### Fixed
+- **Health stops listing a clash somebody already settled.** A memo marked obsolete, rejected or
+  superseded still counted as a duplicate or as one side of a contradiction, in the web UI and in
+  the MCP lint alike, because only an end date took a memo out of the lint
+  ([ADR-0092](docs/decisions.md#adr-0092)).
 - **Correcting a memo strips secrets, as saving one does.** An edit from the web UI or `PATCH
   /entries/:id` stored its text as typed, so a pasted log kept its tokens.
 - **The web UI's validate form only takes a verdict.** It wrote whatever status the form carried,
