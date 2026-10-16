@@ -257,7 +257,7 @@ describe("HTTP apps (end-to-end guards, with no real server)", () => {
     expect(bodyHtml).toContain("&lt;script&gt;");
     expect(bodyHtml).not.toContain("<script>alert");
 
-    // The same content goes through entryCard (the dashboard) and through the search view:
+    // The same content goes through the Memory rows and through the search view:
     // it covers the sinks of the whole render tree, not just the detail page.
     const dash = await web.request(`/p/${prvOwn.slug}`, { headers: { cookie: `cortex_session=${token}` } });
     expect(dash.status).toBe(200);

@@ -72,7 +72,7 @@ const stillThere = async (ids: string[]) =>
   (await Promise.all(ids.map(getEntryDetail))).flatMap((d, i) => (d ? [ids[i]!] : []));
 
 describe("deleting entries in bulk from the Memory screen", () => {
-  it("whoever manages the project gets a box on every card, inside a form that posts them", async () => {
+  it("whoever manages the project gets a box on every row, inside a form that posts them", async () => {
     const ids = await seedEntries();
     const html = await (await get(`/p/${project_.slug}`)).text();
     expect(html).toContain(`action="/p/${project_.slug}/purge"`);
@@ -82,7 +82,7 @@ describe("deleting entries in bulk from the Memory screen", () => {
 
   it("'Select all visible' works without JavaScript: it is a link that ticks every box", async () => {
     const html = await (await get(`/p/${project_.slug}?select=all`)).text();
-    const boxes = [...html.matchAll(/<input class="card-pick"[^>]*>/g)].map((m) => m[0]);
+    const boxes = [...html.matchAll(/<input class="row-pick"[^>]*>/g)].map((m) => m[0]);
     expect(boxes.length).toBeGreaterThan(0);
     expect(boxes.filter((b) => !b.includes("checked"))).toEqual([]);
     expect(html).toContain("Clear selection");

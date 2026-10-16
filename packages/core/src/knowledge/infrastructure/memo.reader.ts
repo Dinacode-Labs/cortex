@@ -3,8 +3,8 @@ import { rowToMemo } from "./memo.row.js";
 import { rowToSource } from "./source.row.js";
 import { rowToReview } from "./review.row.js";
 import { rowToEntity } from "../../graph/infrastructure/entity.row.js";
-import type { EntryDetail, EntrySort, MemoListFilter, MemoReader, ProjectGraphData } from "../domain/memo-reader.js";
-import type { Memo, MemoType } from "../domain/memo.js";
+import type { EntryDetail, EntrySort, MemoFacet, MemoListFilter, MemoReader, ProjectGraphData } from "../domain/memo-reader.js";
+import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
 import type { Entity } from "../../graph/domain/entity.js";
 
 export class PgMemoReader implements MemoReader {
@@ -168,6 +168,13 @@ export class PgMemoReader implements MemoReader {
   async countInProject(projectId: string): Promise<number> {
     const rows = await this.sql`SELECT count(*)::int AS n FROM memos WHERE project_id = ${projectId}`;
     return Number((rows as unknown as Row[])[0]!.n);
+  }
+
+  async facets(projectId: string): Promise<MemoFacet[]> {
+    const rows = (await this.sql`
+      SELECT type, status, count(*)::int AS n FROM memos WHERE project_id = ${projectId} GROUP BY type, status
+    `) as unknown as Row[];
+    return rows.map((r) => ({ type: r.type as MemoType, status: r.status as MemoStatus, count: Number(r.n) }));
   }
 
   async disputedAreas(

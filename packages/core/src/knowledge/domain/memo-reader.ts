@@ -35,6 +35,13 @@ export interface ProjectGraphData {
   mentions: { memoId: string; entityId: string }[];
 }
 
+/** Only the pairs that exist: a count of zero is absent. */
+export interface MemoFacet {
+  type: MemoType;
+  status: MemoStatus;
+  count: number;
+}
+
 export interface MemoReader {
   projectsWithCounts(): Promise<{ entity: Entity; entryCount: number }[]>;
   list(filter: MemoListFilter): Promise<Memo[]>;
@@ -45,6 +52,7 @@ export interface MemoReader {
   byType(projectIds: string[], type: MemoType, asOf: Date | undefined, limit: number): Promise<Memo[]>;
   moduleNames(projectId: string): Promise<string[]>;
   countInProject(projectId: string): Promise<number>;
+  facets(projectId: string): Promise<MemoFacet[]>;
   /** Entities recorded as contradicting each other, and the current memos hanging off one side only. */
   disputedAreas(projectIds: string[], limit: number): Promise<{ entryId: string; area: string; against: string }[]>;
 }

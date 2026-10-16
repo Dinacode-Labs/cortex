@@ -1,10 +1,10 @@
 import { port } from "../../composition.js";
 import { findProjectIdByName } from "../../projects/application/projects.js";
-import type { EntryDetail, EntrySort } from "../domain/memo-reader.js";
+import type { EntryDetail, EntrySort, MemoFacet } from "../domain/memo-reader.js";
 import type { Memo, MemoStatus, MemoType } from "../domain/memo.js";
 import type { Entity } from "../../graph/domain/entity.js";
 
-export type { EntryDetail, EntrySort } from "../domain/memo-reader.js";
+export type { EntryDetail, EntrySort, MemoFacet } from "../domain/memo-reader.js";
 
 export async function listProjects(): Promise<{ entity: Entity; entryCount: number }[]> {
   return port("memoReader").projectsWithCounts();
@@ -45,6 +45,11 @@ export async function listEntries(filter: ListEntriesFilter = {}): Promise<Memo[
     limit: filter.limit ?? 100,
     sort: filter.sort ?? { by: "created", dir: "desc" },
   });
+}
+
+export async function entryFacets(project: string): Promise<MemoFacet[]> {
+  const projectId = await findProjectIdByName(project);
+  return projectId ? port("memoReader").facets(projectId) : [];
 }
 
 export async function getEntryDetail(id: string): Promise<EntryDetail | null> {
