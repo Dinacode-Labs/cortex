@@ -1,6 +1,5 @@
 import { html, raw } from "hono/html";
 import type { AccessibleProject } from "@cortex/core";
-import type { EntrySortField } from "@cortex/shared";
 import { visibilityPill } from "./project-nav.js";
 import type { Html } from "./layout.js";
 import { ASSET_VERSION } from "../version.js";
@@ -42,11 +41,46 @@ export function badge(text: string, tone: Tone = "neutral"): Html {
   return html`<span class="badge tone-${tone}">${text}</span>`;
 }
 
-export const statusBadge = (s: string): Html => badge(s, STATUS_TONES[s]);
+const STATUS_LABELS: Record<string, string> = { pending_validation: "pending" };
+export const statusLabel = (s: string): string => STATUS_LABELS[s] ?? s;
+
+export const statusBadge = (s: string): Html => badge(statusLabel(s), STATUS_TONES[s]);
 export const typeBadge = (t: string): Html =>
   TYPES_WITH_A_COLOUR.has(t) ? html`<span class="badge type-${t}">${t}</span>` : badge(t);
 export const confidenceBadge = (c: string): Html => badge(`conf: ${c}`);
 export const scoreBadge = (n: number): Html => badge(n.toFixed(2), "accent");
+
+export const typeTag = (t: string): Html =>
+  html`<span class="type-tag ${TYPES_WITH_A_COLOUR.has(t) ? `type-${t}` : ""}">${t}</span>`;
+
+export function confidenceMeter(c: string): Html {
+  return html`<span class="confidence conf-${c}" title="Confidence: ${c}"><i></i><i></i><i></i><i></i><span>${c}</span></span>`;
+}
+
+export interface Choice {
+  label: Html | string;
+  href: string;
+  on: boolean;
+  count?: number;
+}
+
+const choiceCount = (c: Choice, cls: string): Html => (c.count === undefined ? html`` : html`<span class="${cls}">${c.count}</span>`);
+
+export function segmented(label: string, choices: Choice[]): Html {
+  return html`<nav class="segmented" aria-label="${label}">${choices.map(
+    (c) => html`<a class="${c.on ? "on" : ""} ${c.count === 0 ? "zero" : ""}" href="${c.href}" ${c.on ? html`aria-current="true"` : ""}>${c.label}${choiceCount(c, "segment-count")}</a>`,
+  )}</nav>`;
+}
+
+/** `<details>` and links, so it works with no script (ADR-0042). */
+export function menu(label: string, current: Html | string, choices: Choice[]): Html {
+  return html`<details class="menu">
+    <summary><span class="menu-label">${label}</span> ${current}</summary>
+    <div class="menu-list">${choices.map(
+      (c) => html`<a class="${c.on ? "on" : ""}" href="${c.href}">${c.label}${choiceCount(c, "menu-count")}</a>`,
+    )}</div>
+  </details>`;
+}
 
 export interface PanelOptions {
   help?: Html | string;
@@ -80,25 +114,6 @@ export function warn(message: Html | string, kind: "notice" | "contradiction" = 
   return html`<div class="warn ${kind === "contradiction" ? "contradiction" : ""}">${message}</div>`;
 }
 
-export interface EntryPick {
-  checked: boolean;
-}
-
-export function entryCard(entry: Memo, dated?: EntrySortField, pick?: EntryPick): Html {
-  const card = html`<a class="card" href="/entry/${entry.id}">
-    <div class="card-head">${typeBadge(entry.type)} ${statusBadge(entry.status)} ${confidenceBadge(entry.confidence)}</div>
-    <h3>${entry.title}</h3>
-    <p>${entry.summary ?? entry.content}</p>
-    ${dated ? entryDate(entry, dated) : ""}
-    ${entry.sourceReference ? html`<div class="src">${entry.sourceReference}</div>` : ""}
-  </a>`;
-  if (!pick) return card;
-  return html`<div class="card-select">
-    <input class="card-pick" type="checkbox" name="ids" value="${entry.id}" aria-label="Select: ${entry.title}" ${pick.checked ? "checked" : ""}>
-    ${card}
-  </div>`;
-}
-
 export interface EntrySelectionOptions {
   action: string;
   hidden: Record<string, string>;
@@ -120,12 +135,6 @@ export function entrySelection(list: Html, opts: EntrySelectionOptions): Html {
       ${list}
     </form>
     <script src="/select.js?v=${ASSET_VERSION}" defer></script>`;
-}
-
-function entryDate(entry: Memo, field: EntrySortField): Html {
-  const iso = (field === "updated" ? entry.updatedAt : entry.createdAt).toISOString();
-  const label = field === "updated" ? "Updated" : "Added";
-  return html`<div class="card-date">${label} <time datetime="${iso}">${iso.slice(0, 16).replace("T", " ")} UTC</time></div>`;
 }
 
 /**

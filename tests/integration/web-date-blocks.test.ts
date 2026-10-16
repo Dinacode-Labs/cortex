@@ -112,11 +112,11 @@ describe("the Memory list in date blocks", () => {
     ]);
   });
 
-  it("as a list it is one grid with no headings, and the choice is still offered", async () => {
+  it("as a list it is one run of rows with no headings, and the choice is still offered", async () => {
     const html = await get(`/p/${dated.slug}?sort=created&group=list`);
     expect(headings(html)).toEqual([]);
-    expect(html).toContain('class="grid"');
-    expect(html).toMatch(/class="pill active"[^>]*>List</);
+    expect(html).toContain('class="entry-rows"');
+    expect(html).toMatch(/class="on" href="[^"]*group=list[^"]*">List</);
   });
 
   it("the grouping survives the other filters, and they survive it", async () => {

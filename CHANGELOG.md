@@ -163,6 +163,11 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **Memory lists one claim per row** instead of a grid of cards: type, source, status,
+  confidence — now a four-step meter — and time line up down the page. The three rows of filter
+  pills become a status control that says how many memos each status leaves, and folded menus for
+  type, order and grouping that work without JavaScript. Status badges read `pending` rather than
+  `pending_validation` ([ADR-0092](docs/decisions.md#adr-0092)).
 - **A project's sections hang off a sidebar** instead of a row of tabs: what to check (Memory,
   Review, Health) above what to consult (Ask, What agents see, Map, Code), with Settings apart.
   Review shows how many memos wait, and Health warns when the last check found contradictions or

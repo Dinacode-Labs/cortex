@@ -78,27 +78,29 @@ describe("ordering a project's entries (in the query, before the limit)", () => 
 describe("the memory page's order selector", () => {
   const page = async (qs: string) =>
     (await createWebApp().request(`/p/${project_.slug}${qs}`, { headers: { cookie } })).text();
-  const cardOrder = (html: string) =>
+  const rowOrder = (html: string) =>
     [titles.first, titles.second, titles.third]
       .map((t) => ({ t, at: html.indexOf(t) }))
       .filter((x) => x.at >= 0)
       .sort((a, b) => a.at - b.at)
       .map((x) => x.t);
 
-  it("lists the cards in the order the URL asks for", async () => {
-    expect(cardOrder(await page(""))).toEqual([titles.third, titles.second, titles.first]);
-    expect(cardOrder(await page("?sort=created&dir=asc"))).toEqual([titles.first, titles.second, titles.third]);
-    expect(cardOrder(await page("?sort=updated&dir=desc"))).toEqual([titles.first, titles.third, titles.second]);
+  it("lists the rows in the order the URL asks for", async () => {
+    expect(rowOrder(await page(""))).toEqual([titles.third, titles.second, titles.first]);
+    expect(rowOrder(await page("?sort=created&dir=asc"))).toEqual([titles.first, titles.second, titles.third]);
+    expect(rowOrder(await page("?sort=updated&dir=desc"))).toEqual([titles.first, titles.third, titles.second]);
   });
 
-  it("each card says the date it is ordered by", async () => {
-    expect(await page("")).toMatch(/class="card-date">Added <time/);
-    expect(await page("?sort=updated")).toMatch(/class="card-date">Updated <time/);
+  it("each row says the date it is ordered by", async () => {
+    expect(await page("")).toMatch(/<time class="entry-time" datetime="[^"]+" title="Added /);
+    expect(await page("?sort=updated")).toMatch(/<time class="entry-time" datetime="[^"]+" title="Updated /);
   });
 
   it("changing the type or status keeps the order, and changing the order keeps the filters", async () => {
     const html = await page("?sort=updated&dir=asc&type=decision&status=pending_validation");
-    const hrefs = [...html.matchAll(/class="pill[^"]*" href="([^"]+)"/g)].map((m) => m[1]!.replaceAll("&amp;", "&"));
+    const controls = html.slice(html.indexOf('class="list-controls"'), html.search(/<form method="post"|class="entry-list"|class="empty"/));
+    const hrefs = [...controls.matchAll(/href="([^"]+)"/g)].map((m) => m[1]!.replaceAll("&amp;", "&"));
+    expect(hrefs.length).toBeGreaterThan(10);
     const lost = hrefs.filter((h) => {
       const qs = new URL(h, "http://x").searchParams;
       const keepsOrder = qs.get("sort") !== null && qs.get("dir") !== null;
@@ -106,10 +108,10 @@ describe("the memory page's order selector", () => {
       return !keepsOrder || !keepsFilters;
     });
     expect(lost).toEqual([]);
-    expect(html).toMatch(/class="pill active" href="[^"]*sort=updated&amp;dir=asc[^"]*">Least recently updated/);
+    expect(html).toMatch(/class="on" href="[^"]*sort=updated&amp;dir=asc[^"]*">Least recently updated/);
   });
 
   it("an unknown order falls back to the default instead of failing", async () => {
-    expect(cardOrder(await page("?sort=bogus&dir=sideways"))).toEqual([titles.third, titles.second, titles.first]);
+    expect(rowOrder(await page("?sort=bogus&dir=sideways"))).toEqual([titles.third, titles.second, titles.first]);
   });
 });

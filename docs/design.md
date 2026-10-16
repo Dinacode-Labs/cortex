@@ -196,7 +196,8 @@ Ask, in order:
 Deliberately plain, and it should stay that way: IBM Plex Sans, IBM Plex Mono for identifiers
 and content, **one** accent colour, and badges carrying the only semantic colour on the page (type, status,
 confidence). Density over decoration — these are lists of claims to be scanned, and the reader
-is looking for the wrong one.
+is looking for the wrong one. So claims are rows, every fact in the same column, and cards are
+kept for what a person chooses between, like projects ([ADR-0092](decisions.md#adr-0092)).
 
 It is a design system in one stylesheet, no framework ([ADR-0053](decisions.md#adr-0053)). The
 tokens at the top are the contract: one accent, a five-step ink ramp, spacing in multiples of

@@ -139,6 +139,19 @@ describe("the UI's structure (ADR-0050)", () => {
     expect(html).toMatch(/href="[^"]*status=pending_validation[^"]*type=decision|href="[^"]*type=decision[^"]*status=pending_validation/);
   }, 60_000);
 
+  /**
+   * ADR-0092: the status filter says how many each option leaves. A count taken over the whole
+   * project, ignoring the type chosen, would promise rows the list then does not show.
+   */
+  it("each status says how many it leaves, counted within the type chosen", async () => {
+    const count = (html: string, label: string) =>
+      html.match(new RegExp(`>${label}\\s*<span class="segment-count">(\\d+)</span>`))?.[1];
+    const everything = await (await get(`/p/${project_.slug}`)).text();
+    expect([count(everything, "All"), count(everything, "Pending"), count(everything, "Validated")]).toEqual(["1", "1", "0"]);
+    const incidents = await (await get(`/p/${project_.slug}?type=incident`)).text();
+    expect([count(incidents, "All"), count(incidents, "Pending")]).toEqual(["0", "0"]);
+  }, 60_000);
+
   it("Health says how many nobody has looked at and where to start", async () => {
     const html = await (await get(`/p/${project_.slug}/health`)).text();
     expect(html).toContain("Nobody has reviewed these");

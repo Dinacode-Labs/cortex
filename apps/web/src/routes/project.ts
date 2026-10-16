@@ -14,6 +14,7 @@ import {
 } from "@cortex/shared";
 import {
   describeCriteria,
+  entryFacets,
   getAcrossClient,
   getContextPack,
   lintProject,
@@ -25,10 +26,27 @@ import {
 } from "@cortex/core";
 import { askProjectContext } from "@cortex/agents";
 import { layout, type Html } from "../views/layout.js";
-import { badge, empty, entrySelection, joinHtml, panel, projectCard, scoreBadge, searchForm, statusBadge, typeBadge, warn, type Tone } from "../views/components.js";
-import { parseDateGrouping } from "../date-blocks.js";
+import {
+  badge,
+  empty,
+  entrySelection,
+  joinHtml,
+  menu,
+  panel,
+  projectCard,
+  scoreBadge,
+  searchForm,
+  segmented,
+  statusBadge,
+  statusLabel,
+  typeBadge,
+  typeTag,
+  warn,
+  type Tone,
+} from "../views/components.js";
+import { dateGroupings, parseDateGrouping } from "../date-blocks.js";
 import { projectHealths } from "../project-summary.js";
-import { ENTRIES_PAGE, entryList, groupingPills, parsePageLimit } from "../views/entry-list.js";
+import { ENTRIES_PAGE, GROUPING_LABELS, entryList, parsePageLimit } from "../views/entry-list.js";
 import { mdLite } from "../views/md.js";
 import { projectPage } from "../views/project-nav.js";
 import { requireProjectPage } from "../middleware/access.js";
@@ -68,7 +86,14 @@ projectRoutes.get("/p/:slug", async (c) => {
   const selectAll = c.req.query("select") === "all";
   const purged = Number(c.req.query("purged") ?? 0);
 
-  const entries = await listEntries({ project: project.name, type, status, sort: effectiveSort, limit: pageLimit + 1 });
+  const [entries, facets] = await Promise.all([
+    listEntries({ project: project.name, type, status, sort: effectiveSort, limit: pageLimit + 1 }),
+    entryFacets(project.name),
+  ]);
+  const countOf = (only: { type?: string; status?: string }) =>
+    facets
+      .filter((f) => (!only.type || f.type === only.type) && (!only.status || f.status === only.status))
+      .reduce((n, f) => n + f.count, 0);
   const healthOf = await projectHealths(children);
   const base = `/p/${project.slug}`;
   const listState: Record<string, string> = {
@@ -91,20 +116,27 @@ projectRoutes.get("/p/:slug", async (c) => {
     return qs.toString() ? `${base}?${qs}` : base;
   };
 
-  const typePills = [
-    html`<a class="pill ${!type ? "active" : ""}" href="${withFilters({ type: "" })}">All types</a>`,
-    ...contextEntryType.options.map(
-      (x) => html`<a class="pill ${type === x ? "active" : ""}" href="${withFilters({ type: x })}">${x}</a>`,
-    ),
-  ];
-
   // Filtering by status is what turns "348 unreviewed" into a list you can start from.
-  const statusPills = [
-    html`<a class="pill ${!status ? "active" : ""}" href="${withFilters({ status: "" })}">Any status</a>`,
-    ...contextEntryStatus.options.map(
-      (x) => html`<a class="pill ${status === x ? "active" : ""}" href="${withFilters({ status: x })}">${x}</a>`,
-    ),
-  ];
+  const capitalised = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+  const statusFilter = segmented("Status", [
+    { label: "All", href: withFilters({ status: "" }), on: !status, count: countOf({ type }) },
+    ...contextEntryStatus.options.map((x) => ({
+      label: capitalised(statusLabel(x)),
+      href: withFilters({ status: x }),
+      on: status === x,
+      count: countOf({ type, status: x }),
+    })),
+  ]);
+
+  const typeMenu = menu("Type", type ?? "all", [
+    { label: "All types", href: withFilters({ type: "" }), on: !type, count: countOf({ status }) },
+    ...contextEntryType.options.map((x) => ({
+      label: typeTag(x),
+      href: withFilters({ type: x }),
+      on: type === x,
+      count: countOf({ type: x, status }),
+    })),
+  ]);
 
   const sortOptions: (EntrySort & { label: string })[] = [
     { by: "created", dir: "desc", label: "Newest added" },
@@ -112,10 +144,20 @@ projectRoutes.get("/p/:slug", async (c) => {
     { by: "updated", dir: "desc", label: "Recently updated" },
     { by: "updated", dir: "asc", label: "Least recently updated" },
   ];
-  const sortPills = sortOptions.map(
-    (o) =>
-      html`<a class="pill ${effectiveSort.by === o.by && effectiveSort.dir === o.dir ? "active" : ""}" href="${withFilters({ sort: o.by, dir: o.dir })}">${o.label}</a>`,
+  const isCurrentSort = (o: EntrySort) => effectiveSort.by === o.by && effectiveSort.dir === o.dir;
+  const sortMenu = menu(
+    "Sort",
+    sortOptions.find(isCurrentSort)?.label ?? "",
+    sortOptions.map((o) => ({ label: o.label, href: withFilters({ sort: o.by, dir: o.dir }), on: isCurrentSort(o) })),
   );
+
+  const groupMenu = grouping
+    ? menu(
+        "Group",
+        GROUPING_LABELS[grouping],
+        dateGroupings.map((g) => ({ label: GROUPING_LABELS[g], href: withFilters({ group: g }), on: grouping === g })),
+      )
+    : html``;
 
   const captureForm = showCapture
     ? panel(
@@ -165,10 +207,10 @@ projectRoutes.get("/p/:slug", async (c) => {
       <a class="button secondary" href="${base}?capture=1">+ Add</a>
     </div>
     ${captureForm}
-    <div class="filters">${joinHtml(typePills, "")}</div>
-    <div class="filters">${joinHtml(statusPills, "")}</div>
-    <div class="filters">${joinHtml(sortPills, "")}</div>
-    ${grouping ? groupingPills(grouping, (g) => withFilters({ group: g })) : ""}
+    <div class="list-controls">
+      ${statusFilter}
+      <div class="menus">${typeMenu}${sortMenu}${groupMenu}</div>
+    </div>
     ${purged > 0 ? warn(`${purged} ${purged === 1 ? "entry" : "entries"} purged.`) : ""}
     ${entries.length
       ? res.manager
