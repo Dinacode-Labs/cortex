@@ -32,6 +32,17 @@ fixes things.
   (10) sets how many reviews per lane are drafted ahead. When the reconciler folds new information
   into a memo, the newer information now holds too. Migrations `0032_review_merged.sql` and
   `0033_merge_drafts.sql` ([ADR-0096](docs/decisions.md#adr-0096)).
+- **A daily email when something new waits in Review, for the projects you switch it on in.** It
+  is off by default: each person turns it on project by project, in the project's *Settings*,
+  which now shows to everyone on its team and not only to whoever manages it. One email a day
+  covers every project switched on, with how many memos wait in its two lanes and how many are
+  new, each linked to its Review section. It only goes when something new came in after the
+  previous email — and after the project was switched on, so the first one is not the whole
+  backlog — and it never carries a memo's text. Each project in the email has its own link to
+  turn it off. The worker sends it at `CORTEX_REVIEW_DIGEST_CRON` (`0 9 * * *` on its clock;
+  empty turns it off), and `cortex-admin review-digest [--dry-run]` sends it by hand. It needs a
+  real email provider. Migration `0034_review_digest.sql`
+  ([ADR-0097](docs/decisions.md#adr-0097)).
 - **Review also asks about the new memos.** Every memo saved from now on — by a session, an agent,
   a person or a connector — waits in a second lane of *Review*, *Not checked yet*, until someone on
   the project's team says whether it is right. It counts as true in the meantime. One memo at a

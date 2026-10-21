@@ -3090,6 +3090,8 @@ decisions they carried stay recorded here.
   are saved or reconciled rather than when linting; or the Health tab itself becomes too slow to
   open, which is the duplicate search to fix, not the card.
 
+<a id="adr-0090"></a>
+
 ## ADR-0090 · A person's "yes, it holds" makes a memo verified, and every verdict is recorded
 
 - **Status:** accepted as a hypothesis (2026-10-15). Adds a second way to earn confidence next to
@@ -3135,6 +3137,8 @@ decisions they carried stay recorded here.
 - **Revisit when:** people review in batches — a queue, bulk verdicts, suggested verdicts — which
   may need a verdict to carry a note or the evidence an agent offered; or `verified` turns out to
   be granted too easily, which argues for reserving it to a project's members.
+
+<a id="adr-0091"></a>
 
 ## ADR-0091 · New knowledge wins, and the older memos it touches wait in a queue for a person
 
@@ -3474,3 +3478,76 @@ decisions they carried stay recorded here.
 - **Revisit when:** the agent that judges each pair lands, which could draft only the merges it
   recommends; the drafts cost far more than the merges people make of them; people outrun the
   window; or merged memos keep coming back up for review against each other.
+
+<a id="adr-0097"></a>
+
+## ADR-0097 · Each person switches on, project by project, a daily email about what waits in Review
+
+- **Status:** accepted as a hypothesis (2026-10-23). Builds on [0091](#adr-0091) and
+  [0093](#adr-0093), whose two lanes it announces, and on [0028](#adr-0028), whose email
+  providers it reuses.
+- **Context:** the Review queue only fills; a person has to come to it. Both places that say how
+  many memos wait — the projects page and a project's sidebar — are inside the web UI, which a
+  developer opens through `cortex ui` when they already mean to. Agents save memos from every
+  session; each one waits in the second lane and can put up to six older ones in the first, and
+  none of that reaches the people who can judge them. The server already sends transactional
+  email (the sign-in code only) through a pluggable provider, and every deployment already runs a
+  scheduled worker.
+- **Decision:**
+  1. **A daily digest, not an email per review.** The worker sends it on
+     `CORTEX_REVIEW_DIGEST_CRON` (default `0 9 * * *`, on the container's clock, which `TZ`
+     moves); an empty value turns it off. `cortex-admin review-digest` runs it by hand, and
+     `--dry-run` prints what it would send without recording anything.
+  2. **Off by default, switched on per project and per person.** A project's Settings has a
+     *Your notifications* panel with one checkbox. A person can hear about one project and not
+     another, and a project nobody switched on sends nothing. Switching on a client does not
+     cover its children: each project has its own switch.
+  3. **Only the project's team can switch it on**: whoever may judge its memos
+     ([0091](#adr-0091)), admins included, since they chose to. Settings is therefore shown to
+     the team, with that panel for everyone and the rest for whoever manages the project, as
+     before. Every run checks access again: whoever left the team stops getting it, and their
+     switch goes with them.
+  4. **One email a day per person, only when something is new.** It lists every project they
+     switched on that has memos waiting in either lane — how many, and how many are new — each
+     linked to its Review section. A memo is new when it entered the queue after the person's
+     previous digest and after they switched that project on; otherwise the first email would be
+     the whole backlog. A queue that only sits there sends nothing: the same number every morning
+     teaches people to ignore it.
+  5. **Off in one click, per project.** Each project in the email has its own link that turns it
+     off for that project only. The link opens a page with a button: the POST turns it off, never
+     the GET, because mail scanners follow links. Its token is random, stored hashed and valid
+     for 30 days, like the secrets `auth` keeps.
+  6. **No memo text leaves by email.** The digest says where and how many, never what: a memo
+     can hold what a person would not forward, and an email can be forwarded.
+  7. **A `notifications` module in `core`** holds the use case and its port. The counts come from
+     both queues' ports in `knowledge`, access from `projects`, and the email through
+     `port("email")`. Migration `0034_review_digest.sql` records who switched which project on
+     and when, when each person was last emailed, and the unsubscribe tokens.
+- **Alternatives:**
+  - **On by default for the whole team, with one switch per person.** It reaches the people who
+    never open the UI, who are the ones a reminder is for. Rejected: mail nobody asked for, and a
+    member of a client would be sent every child project's queue with no way to keep only some.
+  - **A switch on a client that covers its children.** Fewer clicks for whoever follows a whole
+    client. Rejected for now: a child added later would start mailing people who never chose it.
+  - **An email as soon as a memo enters the queue.** Every save can queue up to seven memos, and
+    grouping them in a window needs a timer the server does not have. Rejected.
+  - **A weekly digest.** Less mail, and reviews a week old. Rejected: the newer memo is what
+    agents are told now, so the older one it contradicts should be looked at soon.
+  - **Signed links (HMAC) instead of stored tokens.** No table, but a new secret every
+    deployment has to set and rotate. Rejected: `auth` already keeps random tokens hashed.
+  - **Unsubscribing on the GET.** One click fewer, and a link scanner would unsubscribe people
+    who never clicked. Rejected.
+  - **The memos' text in the email**, so a person could judge without opening the UI. Rejected
+    for the reason in 6, and the judging happens in Review anyway.
+- **Consequences:** nobody gets anything until they switch it on, so a project nobody follows
+  keeps filling unseen, as before. Only someone with an account can switch it on, so a typo in a
+  member's address never mails a stranger. A deployment on `CORTEX_EMAIL_PROVIDER=log` prints the
+  digests to the worker's log. A digest is recorded as sent before it goes, so two runs cannot
+  both send it; a crash in between costs that person one digest. Emails carry no
+  `List-Unsubscribe` header: `EmailMessage` has no headers, and the one-click rules mail providers
+  enforce are meant for senders of thousands a day.
+- **Revisit when:** few people switch it on and Review still goes unvisited, which argues for on
+  by default after all; people switch it off rather than review, which says the digest is noise
+  and argues for a narrower "new" or a weekly cadence; following a client project by project
+  turns into a chore; or the agent that judges each review lands ([0091](#adr-0091)), and the
+  digest can say which reviews matter.

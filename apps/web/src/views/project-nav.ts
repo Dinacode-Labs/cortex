@@ -115,7 +115,7 @@ export function projectPage(page: ProjectPage, active: Section, body: Html, head
         ${check}
         <p class="side-label">Explore</p>
         ${explore}
-        ${manager ? html`<span class="side-sep"></span>${item(link("settings", "/settings"))}` : ""}
+        ${manager || reviewer ? html`<span class="side-sep"></span>${item(link("settings", "/settings"))}` : ""}
       </nav>
     </aside>
     <div class="project-main">

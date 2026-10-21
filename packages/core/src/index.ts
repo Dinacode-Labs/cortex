@@ -95,6 +95,15 @@ export type { SessionUser } from "./auth/domain/session-user.js";
 export type { EmailSender, EmailMessage } from "./auth/domain/email.js";
 export { sendOtpEmail } from "./auth/application/otp-email.js";
 export { getEmailSender, setEmailSender, validateEmailConfig } from "./auth/infrastructure/email-senders.js";
+export {
+  reviewDigestOn,
+  sendReviewDigests,
+  setReviewDigest,
+  unsubscribeLink,
+  unsubscribeWithToken,
+  type DigestRun,
+  type UnsubscribeLink,
+} from "./notifications/application/review-digest.js";
 export { captureBatch, relateEntries, type BatchItem, type BatchItemResult } from "./capture/application/capture.js";
 export { extractFileText, setMediaExtractor, type ExtractedFile, type MediaExtractorHooks } from "./capture/infrastructure/extract.js";
 export {

@@ -1,6 +1,6 @@
 import type { Row, Sql } from "@cortex/database";
 import { rowToMemo } from "./memo.row.js";
-import type { OlderMemo, PendingReview, ReviewCandidate, ReviewQueue, ReviewResolution } from "../domain/review-queue.js";
+import type { OlderMemo, PendingReview, QueuedMemo, ReviewCandidate, ReviewQueue, ReviewResolution } from "../domain/review-queue.js";
 
 export class PgReviewQueue implements ReviewQueue {
   constructor(private readonly sql: Sql) {}
@@ -80,6 +80,21 @@ export class PgReviewQueue implements ReviewQueue {
       SELECT project_id, count(DISTINCT memo_id)::int AS n FROM (${this.live(projectIds)}) live GROUP BY project_id
     `) as unknown as Row[];
     return new Map(rows.map((r) => [r.project_id as string, Number(r.n)]));
+  }
+
+  async queuedMemos(projectIds: string[]): Promise<Map<string, QueuedMemo[]>> {
+    if (projectIds.length === 0) return new Map();
+    const rows = (await this.sql`
+      SELECT project_id, memo_id, max(created_at) AS last_queued_at
+        FROM (${this.live(projectIds)}) live
+       GROUP BY project_id, memo_id
+    `) as unknown as Row[];
+    const queued = new Map<string, QueuedMemo[]>();
+    for (const r of rows) {
+      const projectId = r.project_id as string;
+      queued.set(projectId, [...(queued.get(projectId) ?? []), { memoId: r.memo_id as string, lastQueuedAt: new Date(r.last_queued_at as string) }]);
+    }
+    return queued;
   }
 
   async isPending(projectId: string, memoId: string): Promise<boolean> {

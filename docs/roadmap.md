@@ -42,11 +42,12 @@ Working, and in daily use by a team:
   reaches the pack -- it makes the memo `verified`, which is what the pack orders by -- and every
   verdict is recorded ([ADR-0090](decisions.md#adr-0090)). The Review section queues the older
   memos something newer is about and brings them one after another
-  ([ADR-0091](decisions.md#adr-0091)). What is left is judging each pair before a person sees it:
-  an agent saying how important the memo is, what it repeats and what it contradicts, and
-  recommending to keep, discard, rewrite or merge it. Its verdict would also set the queue's order.
-  A merge is already drafted ahead by an agent for the next reviews of each lane, whether or not
-  it is the right call ([ADR-0096](decisions.md#adr-0096)).
+  ([ADR-0091](decisions.md#adr-0091)), and whoever switches it on in a project gets a daily email
+  when something new waits there ([ADR-0097](decisions.md#adr-0097)). What is left is judging
+  each pair before a person sees it: an agent saying how important the memo is, what it repeats
+  and what it contradicts, and recommending to keep, discard, rewrite or merge it. Its verdict
+  would also set the queue's order. A merge is already drafted ahead by an agent for the next
+  reviews of each lane, whether or not it is the right call ([ADR-0096](decisions.md#adr-0096)).
 - **`search` and `ask` do not inherit from the parent.** The context pack climbs the ancestor
   chain and search does not, so inside a child project you do not find what is stored in the
   client. With real hierarchies being set up right now, this already shows.

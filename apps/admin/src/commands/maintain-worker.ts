@@ -1,20 +1,22 @@
 import { writeFileSync } from "node:fs";
 import { getSql } from "@cortex/database";
 import cron from "node-cron";
+import { draftMergesAhead, pruneMergeDrafts, sendReviewDigests, validateEmailConfig } from "@cortex/core";
 import { runMaintenance, wireLlm } from "@cortex/agents";
-import { draftMergesAhead, pruneMergeDrafts } from "@cortex/core";
 
 const MERGE_DRAFT_EVERY_MS = 60_000;
 
 /**
- * The maintenance worker: it runs the `runMaintenance` pipeline periodically (the loops of
- * section 12 -- enrich/resolve/temporal/lint). Meant to run on the server as a
- * process/service (docker-compose) or through the system's cron calling `maintain`.
+ * The scheduled worker: it runs the `runMaintenance` pipeline periodically (the loops of
+ * section 12 -- enrich/resolve/temporal/lint), drafts the merges Review proposes (ADR-0096) and
+ * sends the review digest (ADR-0097). Meant to run on the server as a process/service
+ * (docker-compose) or through the system's cron calling `maintain` and `review-digest`.
  *
  * Usage: cortex-admin maintain-worker
  * Env: CORTEX_MAINTAIN_CRON (a cron expression; default "0 3 * * *" = 03:00 daily),
  *      CORTEX_MERGE_DRAFTS_AHEAD (reviews per lane whose merge is drafted ahead, every minute; 0 = none),
  *      CORTEX_MAINTAIN_ON_START=1 to run once at startup,
+ *      CORTEX_REVIEW_DIGEST_CRON (default "0 9 * * *"; empty turns the digest off),
  *      CORTEX_WORKER_HEARTBEAT_FILE (the heartbeat file; default /tmp/cortex-worker.heartbeat).
  *
  * The heartbeat exists because this process listens on no port: without it, a hung worker (a
@@ -38,24 +40,13 @@ export async function run(): Promise<void> {
       ON CONFLICT (name) DO UPDATE SET beat_at = now()
     `.catch(() => {});
   };
+
   const expr = process.env.CORTEX_MAINTAIN_CRON ?? "0 3 * * *";
   if (!cron.validate(expr)) {
     console.error(`Invalid CORTEX_MAINTAIN_CRON: "${expr}"`);
     process.exit(1);
   }
-  let running = false;
-  async function tick(): Promise<void> {
-    if (running) { console.log("[worker] tick skipped (a previous run is still in progress)."); return; }
-    running = true;
-    try {
-      await runMaintenance();
-    } catch (e) {
-      console.error("[worker] maintenance error:", (e as Error).message);
-    } finally {
-      running = false;
-      beat();
-    }
-  }
+  const maintain = oneAtATime("maintenance", async () => void (await runMaintenance()), beat);
   // Every minute rather than with the nightly run: a review raised now should find its merge
   // drafted by the time a person opens it (ADR-0096).
   let drafting = false;
@@ -77,6 +68,49 @@ export async function run(): Promise<void> {
   setInterval(beat, 30_000).unref();
   setInterval(() => void draftMerges(), MERGE_DRAFT_EVERY_MS).unref();
   void draftMerges();
-  cron.schedule(expr, tick);
-  if (process.env.CORTEX_MAINTAIN_ON_START === "1") void tick();
+  cron.schedule(expr, maintain);
+  scheduleReviewDigest(beat);
+  if (process.env.CORTEX_MAINTAIN_ON_START === "1") void maintain();
+}
+
+function scheduleReviewDigest(beat: () => void): void {
+  const expr = (process.env.CORTEX_REVIEW_DIGEST_CRON ?? "0 9 * * *").trim();
+  if (!expr) {
+    console.log("[worker] review digest off (CORTEX_REVIEW_DIGEST_CRON is empty).");
+    return;
+  }
+  if (!cron.validate(expr)) {
+    console.error(`Invalid CORTEX_REVIEW_DIGEST_CRON: "${expr}"`);
+    process.exit(1);
+  }
+  // A broken email setup turns the digest off, not the worker: maintenance does not need email.
+  try {
+    for (const warning of validateEmailConfig()) console.warn(warning);
+  } catch (e) {
+    console.error(`[worker] review digest off: ${(e as Error).message}`);
+    return;
+  }
+  const digest = oneAtATime("review digest", async () => {
+    const run = await sendReviewDigests();
+    console.log(`[digest] ${run.sent.length} sent, ${run.failed.length} failed.`);
+    for (const failure of run.failed) console.error(`  [digest] ${failure.email}: ${failure.error}`);
+  }, beat);
+  console.log(`[worker] review digest scheduled: "${expr}".`);
+  cron.schedule(expr, digest);
+}
+
+function oneAtATime(name: string, job: () => Promise<void>, afterEach: () => void): () => Promise<void> {
+  let running = false;
+  return async () => {
+    if (running) { console.log(`[worker] ${name} skipped (a previous run is still in progress).`); return; }
+    running = true;
+    try {
+      await job();
+    } catch (e) {
+      console.error(`[worker] ${name} error:`, (e as Error).message);
+    } finally {
+      running = false;
+      afterEach();
+    }
+  };
 }

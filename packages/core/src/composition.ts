@@ -32,6 +32,8 @@ import type { ProjectRepository } from "./projects/domain/project-repository.js"
 import { PgProjectRepository } from "./projects/infrastructure/project.repository.js";
 import type { AgentPromptRepository } from "./projects/domain/agent-prompt-repository.js";
 import { PgAgentPromptRepository } from "./projects/infrastructure/agent-prompt.repository.js";
+import type { DigestSubscriptions } from "./notifications/domain/digest-subscriptions.js";
+import { PgDigestSubscriptions } from "./notifications/infrastructure/digest-subscriptions.repository.js";
 
 export interface CorePorts {
   memos: MemoRepository;
@@ -48,6 +50,7 @@ export interface CorePorts {
   usage: UsageRepository;
   auth: AuthRepository;
   email: EmailSender;
+  digestSubscriptions: DigestSubscriptions;
   sessionCaptures: SessionCaptureRepository;
   codeIndex: CodeIndex;
   sourceTree: SourceTree;
@@ -68,6 +71,7 @@ const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   usage: () => new PgUsageRepository(getSql()),
   auth: () => new PgAuthRepository(getSql()),
   email: () => getEmailSender(),
+  digestSubscriptions: () => new PgDigestSubscriptions(getSql()),
   sessionCaptures: () => new PgSessionCaptureRepository(getSql()),
   codeIndex: () => new PgCodeIndex(getSql(), getEmbeddingProvider()),
   sourceTree: () => new FsSourceTree(),
