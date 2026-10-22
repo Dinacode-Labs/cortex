@@ -4,12 +4,14 @@ import { canReviewProject, NotAReviewerError } from "../../projects/application/
 import type { ProjectRef } from "../../projects/domain/project.js";
 import type { Memo } from "../domain/memo.js";
 import { confidenceAfterReview, type Reviewer, type ReviewVerdict } from "../domain/review.js";
-import type { ReviewDecision } from "../domain/review-queue.js";
+import type { ReviewDecision, ReviewResolution } from "../domain/review-queue.js";
 import { updateEntryFields } from "./dedup.js";
 
 export async function validateEntry(id: string, verdict: ReviewVerdict, reviewer: Reviewer): Promise<Memo | null> {
   return port("memos").review(id, { verdict, reviewer, confidence: confidenceAfterReview(verdict, reviewer.channel) });
 }
+
+const RESOLUTION: Record<Exclude<ReviewDecision, "skip">, ReviewResolution> = { keep: "kept", discard: "discarded", modify: "modified" };
 
 /**
  * A decision in the Review section, always from the web: keeping or rewriting a memo is a person
@@ -27,26 +29,41 @@ export async function resolveReview(
   const queue = port("reviewQueue");
   if (!(await queue.isPending(project.id, memoId))) return;
 
-  const reviewer: Reviewer = { email: actor.email, channel: "web" };
-  switch (decision) {
-    case "skip":
-      await queue.skip(memoId);
-      return;
-    case "keep":
-      await validateEntry(memoId, "validated", reviewer);
-      await queue.resolve(memoId, "kept", actor.email);
-      return;
-    case "discard":
-      await validateEntry(memoId, "obsolete", reviewer);
-      await queue.resolve(memoId, "discarded", actor.email);
-      return;
-    case "modify": {
-      const rewritten = content?.trim();
-      if (!rewritten) return;
-      await updateEntryFields(memoId, { content: rewritten });
-      await validateEntry(memoId, "validated", reviewer);
-      await queue.resolve(memoId, "modified", actor.email);
-      return;
-    }
+  if (decision === "skip") return queue.skip(memoId);
+  if (await judge(memoId, decision, "obsolete", actor, content)) await queue.resolve(memoId, RESOLUTION[decision], actor.email);
+}
+
+/**
+ * The same decisions on a memo nobody has checked yet, except that discarding it rejects it: it was
+ * never true, where an older memo held once (ADR-0093). The verdict itself takes it out of the lane.
+ */
+export async function resolveUnchecked(
+  project: Pick<ProjectRef, "id" | "name">,
+  memoId: string,
+  decision: ReviewDecision,
+  actor: SessionUser,
+  content?: string,
+): Promise<void> {
+  if (!(await canReviewProject(project, actor))) throw new NotAReviewerError(project.name);
+  const queue = port("verificationQueue");
+  if (!(await queue.isPending(project.id, memoId))) return;
+
+  if (decision === "skip") return queue.skip(memoId);
+  await judge(memoId, decision, "rejected", actor, content);
+}
+
+async function judge(
+  memoId: string,
+  decision: Exclude<ReviewDecision, "skip">,
+  discardedAs: Extract<ReviewVerdict, "obsolete" | "rejected">,
+  actor: SessionUser,
+  content?: string,
+): Promise<boolean> {
+  if (decision === "modify") {
+    const rewritten = content?.trim();
+    if (!rewritten) return false;
+    await updateEntryFields(memoId, { content: rewritten });
   }
+  await validateEntry(memoId, decision === "discard" ? discardedAs : "validated", { email: actor.email, channel: "web" });
+  return true;
 }

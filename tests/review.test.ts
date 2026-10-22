@@ -1,7 +1,17 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { configureCore, confidenceAfterReview, isReviewVerdict, resetCore, validateEntry } from "../packages/core/src/index";
+import {
+  configureCore,
+  confidenceAfterReview,
+  isReviewVerdict,
+  NotAReviewerError,
+  resetCore,
+  resolveUnchecked,
+  validateEntry,
+} from "../packages/core/src/index";
 import type { MemoRepository } from "../packages/core/src/knowledge/domain/memo-repository";
 import type { ReviewWrite } from "../packages/core/src/knowledge/domain/review";
+import type { VerificationQueue } from "../packages/core/src/knowledge/domain/verification-queue";
+import type { ProjectRepository } from "../packages/core/src/projects/domain/project-repository";
 
 afterEach(() => resetCore());
 
@@ -55,5 +65,70 @@ describe("validating an entry", () => {
       { id: "m1", write: { verdict: "validated", reviewer: { email: "ana@example.com", channel: "web" }, confidence: "verified" } },
       { id: "m2", write: { verdict: "validated", reviewer: { email: null, channel: "mcp" }, confidence: null } },
     ]);
+  });
+});
+
+/*
+ * The same key decides both lanes of Review, and it must not record the same verdict: an older memo
+ * discarded held once, so it is obsolete; a new memo rejected was never true (ADR-0093).
+ */
+describe("a decision on a memo nobody has checked", () => {
+  const OWNER = { email: "ana@example.com" };
+  const project = { id: "p1", name: "Acme" };
+
+  function wire({ waiting }: { waiting: boolean }) {
+    const verdicts: { id: string; write: ReviewWrite }[] = [];
+    const skipped: string[] = [];
+    configureCore({
+      projects: {
+        chain: async () => [{ id: "p1", visibility: "private", ownerEmail: OWNER.email }],
+        isMember: async () => false,
+      } as unknown as ProjectRepository,
+      memos: {
+        review: async (id: string, write: ReviewWrite) => {
+          verdicts.push({ id, write });
+          return null;
+        },
+      } as unknown as MemoRepository,
+      verificationQueue: {
+        isPending: async () => waiting,
+        skip: async (id: string) => {
+          skipped.push(id);
+        },
+      } as unknown as VerificationQueue,
+    });
+    return { verdicts, skipped };
+  }
+
+  it("rejecting it records that it is wrong, not that it stopped being true", async () => {
+    const { verdicts } = wire({ waiting: true });
+    await resolveUnchecked(project, "m1", "discard", OWNER);
+    expect(verdicts.map((v) => v.write.verdict)).toEqual(["rejected"]);
+  });
+
+  it("confirming it is a person vouching for it, so it becomes verified", async () => {
+    const { verdicts } = wire({ waiting: true });
+    await resolveUnchecked(project, "m1", "keep", OWNER);
+    expect(verdicts).toEqual([
+      { id: "m1", write: { verdict: "validated", reviewer: { email: OWNER.email, channel: "web" }, confidence: "verified" } },
+    ]);
+  });
+
+  it("skipping it gives no verdict", async () => {
+    const { verdicts, skipped } = wire({ waiting: true });
+    await resolveUnchecked(project, "m1", "skip", OWNER);
+    expect([verdicts, skipped]).toEqual([[], ["m1"]]);
+  });
+
+  it("a memo no longer waiting -- a second click, a stale tab -- is left alone", async () => {
+    const { verdicts, skipped } = wire({ waiting: false });
+    await resolveUnchecked(project, "m1", "discard", OWNER);
+    expect([verdicts, skipped]).toEqual([[], []]);
+  });
+
+  it("somebody off the team is refused before anything is written", async () => {
+    const { verdicts } = wire({ waiting: true });
+    await expect(resolveUnchecked(project, "m1", "keep", { email: "passer-by@example.com" })).rejects.toBeInstanceOf(NotAReviewerError);
+    expect(verdicts).toEqual([]);
   });
 });

@@ -6,6 +6,7 @@ import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } f
 import type { SummarizableMemo } from "../domain/memo-repository.js";
 import type { SearchHit } from "../domain/memo-index.js";
 import { queueReviewsOf } from "./review-queue.js";
+import { queueForVerification } from "./verification-queue.js";
 import { port } from "../../composition.js";
 
 export { decideReclassification } from "../domain/memo.js";
@@ -136,6 +137,8 @@ export async function saveContext(
     wantsWarnings || wantsReviews ? await port("memoIndex").similar(draft.embedText, { projectId, excludeId: entry.id }, 6) : [];
   const warnings = wantsWarnings ? await detectImprovements(entry, neighbours, entityIds) : [];
   if (wantsReviews) await queueReviewsOf(entry, neighbours);
+  // Bulk ingestion included: what nobody has checked waits whatever brought it in (ADR-0093).
+  await queueForVerification(entry);
   return { entry, warnings };
 }
 

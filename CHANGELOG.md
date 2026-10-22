@@ -9,6 +9,15 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Review also asks about the new memos.** Every memo saved from now on — by a session, an agent,
+  a person or a connector — waits in a second lane of *Review*, *Not checked yet*, until someone on
+  the project's team says whether it is right. It counts as true in the meantime. One memo at a
+  time, with the same keys as the older lane: it is right (it becomes `verified`), reject it,
+  rewrite it, or skip it. Decisions and constraints come first, as in the pack, and each memo is
+  shown next to the older ones it put up for review. A verdict on the memo's page or in the other
+  lane takes it out as well; an agent's verdict through MCP does not. Memos saved before this
+  release are not added. Migration `0031_verification_queue.sql`
+  ([ADR-0093](docs/decisions.md#adr-0093)).
 - **Health settles what it finds.** A summary at the top says what is wrong and how badly. Each
   side of a contradiction or a duplicate offers "Keep this one, retire the other": the memo kept
   becomes verified, the other obsolete, and both verdicts are recorded as if given on their pages.

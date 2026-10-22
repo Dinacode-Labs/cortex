@@ -18,6 +18,11 @@ export interface NewerMemo {
   similarity: number;
 }
 
+export interface OlderMemo {
+  memo: Memo;
+  similarity: number;
+}
+
 /** One older memo, with every newer one that made it worth a second look. */
 export interface PendingReview {
   memo: Memo;
@@ -36,6 +41,8 @@ export interface ReviewQueue {
   /** A project with nothing waiting is absent. */
   pendingCounts(projectIds: string[]): Promise<Map<string, number>>;
   isPending(projectId: string, memoId: string): Promise<boolean>;
+  /** The older memos a newer one raised that still wait, the most alike first. */
+  raisedBy(projectId: string, newerMemoId: string): Promise<OlderMemo[]>;
   resolve(memoId: string, resolution: ReviewResolution, by: string): Promise<void>;
   skip(memoId: string): Promise<void>;
 }

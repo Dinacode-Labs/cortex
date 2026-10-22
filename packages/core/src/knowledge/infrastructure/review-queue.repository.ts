@@ -1,6 +1,6 @@
 import type { Row, Sql } from "@cortex/database";
 import { rowToMemo } from "./memo.row.js";
-import type { PendingReview, ReviewCandidate, ReviewQueue, ReviewResolution } from "../domain/review-queue.js";
+import type { OlderMemo, PendingReview, ReviewCandidate, ReviewQueue, ReviewResolution } from "../domain/review-queue.js";
 
 export class PgReviewQueue implements ReviewQueue {
   constructor(private readonly sql: Sql) {}
@@ -76,6 +76,17 @@ export class PgReviewQueue implements ReviewQueue {
   async isPending(projectId: string, memoId: string): Promise<boolean> {
     const rows = (await this.sql`SELECT 1 FROM (${this.live(projectId)}) live WHERE memo_id = ${memoId} LIMIT 1`) as unknown as Row[];
     return rows.length > 0;
+  }
+
+  async raisedBy(projectId: string, newerMemoId: string): Promise<OlderMemo[]> {
+    const rows = (await this.sql`
+      SELECT m.*, live.similarity AS review_similarity
+        FROM (${this.live(projectId)}) live
+        JOIN memos m ON m.id = live.memo_id
+       WHERE live.newer_memo_id = ${newerMemoId}
+       ORDER BY live.similarity DESC
+    `) as unknown as Row[];
+    return rows.map((r) => ({ memo: rowToMemo(r), similarity: Number(r.review_similarity) }));
   }
 
   async resolve(memoId: string, resolution: ReviewResolution, by: string): Promise<void> {

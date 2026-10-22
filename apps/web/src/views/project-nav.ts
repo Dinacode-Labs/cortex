@@ -86,7 +86,8 @@ function healthMark(page: ProjectPage): Html {
 
 /** A link shows only to whoever can use it: a link leading to an empty screen is worse than none. */
 export function projectPage(page: ProjectPage, active: Section, body: Html, heading: Html | string | null = LABELS[active]): Html {
-  const { project, manager, reviewer, pendingReviews, ancestors, children } = page;
+  const { project, manager, reviewer, pendingReviews, uncheckedMemos, ancestors, children } = page;
+  const waiting = pendingReviews + uncheckedMemos;
   const base = `/p/${project.slug}`;
   const count = "entryCount" in project ? project.entryCount : null;
 
@@ -95,7 +96,7 @@ export function projectPage(page: ProjectPage, active: Section, body: Html, head
 
   const check = [
     item(link("memory", ""), count !== null ? html`<span class="side-count">${count}</span>` : html``),
-    reviewer ? item(link("review", "/review"), pendingReviews ? html`<span class="side-attn">${pendingReviews}</span>` : html``) : html``,
+    reviewer ? item(link("review", "/review"), waiting ? html`<span class="side-attn">${waiting}</span>` : html``) : html``,
     item(link("health", "/health"), healthMark(page)),
     children.length ? item(link("across", "/across")) : html``,
   ];
