@@ -6,11 +6,14 @@ import {
   createProject,
   getEntryDetail,
   nextReview,
+  nextUnchecked,
   pendingReviewCount,
   requestOtp,
   saveContext,
+  uncheckedCount,
   validateEntry,
   verifyOtp,
+  type MemoType,
   type ProjectRef,
 } from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
@@ -59,8 +62,8 @@ beforeAll(async () => {
 
 const newProject = (label: string): Promise<ProjectRef> => createProject(`Queue ${label} ${RID}`, { ownerEmail: OWNER });
 
-async function save(project: ProjectRef, content: string): Promise<string> {
-  const { entry } = await saveContext({ content, project: project.name, type: "decision", createdBy: OWNER }, { useClassifier: false });
+async function save(project: ProjectRef, content: string, type: MemoType = "decision"): Promise<string> {
+  const { entry } = await saveContext({ content, project: project.name, type, createdBy: OWNER }, { useClassifier: false });
   return entry.id;
 }
 
@@ -73,14 +76,17 @@ async function staleAndFresh(project: ProjectRef, [older, newer]: readonly [stri
 
 const page = (path: string, cookie = ownerCookie) => createWebApp().request(path, { headers: { cookie } });
 
-function decide(project: ProjectRef, memo: string, decision: string, cookie = ownerCookie, content?: string) {
-  const fields: Record<string, string> = { memo, decision, ...(content !== undefined ? { content } : {}) };
+function decide(project: ProjectRef, memo: string, decision: string, cookie = ownerCookie, content?: string, lane = "older") {
+  const fields: Record<string, string> = { lane, memo, decision, ...(content !== undefined ? { content } : {}) };
   return createWebApp().request(`/p/${project.slug}/review`, {
     method: "POST",
     headers: { cookie, "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(fields).toString(),
   });
 }
+
+const check = (project: ProjectRef, memo: string, decision: string, cookie = ownerCookie, content?: string) =>
+  decide(project, memo, decision, cookie, content, "new");
 
 /*
  * A new memo was only ever compared with the single nearest one, from 0.82 up, and what it said
@@ -143,7 +149,7 @@ describe("the Review section", () => {
 
     const res = await decide(project, head, "keep");
     expect(res.status).toBe(302);
-    expect(res.headers.get("location")).toBe(`/p/${project.slug}/review?done=keep`);
+    expect(res.headers.get("location")).toBe(`/p/${project.slug}/review?lane=older&done=keep`);
     expect((await nextReview(project))!.memo.id).toBe(other);
     // The memo decided on is gone from view, so the next screen says what happened to it.
     expect(await (await page(res.headers.get("location")!)).text()).toContain("Kept, and marked verified.");
@@ -203,6 +209,18 @@ describe("the Review section", () => {
     await decide(project, stale, "keep");
 
     expect(await pendingReviewCount(project)).toBe(0);
+  });
+
+  /* A form rendered before the lanes existed carries none; it can only have been the older lane's. */
+  it("a decision posted without a lane is the older lane's", async () => {
+    const project = await newProject("no-lane");
+    const { stale } = await staleAndFresh(project);
+    await createWebApp().request(`/p/${project.slug}/review`, {
+      method: "POST",
+      headers: { cookie: ownerCookie, "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ memo: stale, decision: "discard" }).toString(),
+    });
+    expect((await getEntryDetail(stale))!.entry.status).toBe("obsolete");
   });
 
   it("a second click on a decided memo changes nothing", async () => {
@@ -291,7 +309,101 @@ describe("the projects page", () => {
     await staleAndFresh(project);
     const home = (cookie: string) => page("/", cookie).then((r) => r.text());
 
-    expect(await home(ownerCookie)).toMatch(new RegExp(`href="/p/${project.slug}/review">[^<]*<span class="button-count">1</span>`));
+    // One older memo something newer is about, and the two memos nobody has checked yet.
+    expect(await home(ownerCookie)).toMatch(new RegExp(`href="/p/${project.slug}/review">[^<]*<span class="button-count">3</span>`));
     expect(await home(outsiderCookie)).not.toContain(`/p/${project.slug}/review`);
+  });
+});
+
+/*
+ * Only an older memo that something newer was about ever came up for a person. A new memo counted
+ * at once, and nobody was asked whether it was right unless they went looking for it (ADR-0093).
+ */
+describe("a memo nobody has checked yet", () => {
+  it("waits in the second lane whatever brought it in, bulk ingestion included", async () => {
+    const project = await newProject("unchecked");
+    await save(project, `The invoices are signed with the vendor key ${RID}.`);
+    await captureBatch(project.name, [{ content: `Releases are tagged from main only ${RID}.` }], OWNER);
+    expect(await uncheckedCount(project)).toBe(2);
+  });
+
+  it("what the pack hands over first comes first, and the newest within a type", async () => {
+    const project = await newProject("order");
+    const howTo = await save(project, `To rotate the signing keys, run the rotation script ${RID}.`, "how_to");
+    const earlier = await save(project, `Invoices are archived for ten years ${RID}.`);
+    const later = await save(project, `Payments go through the gateway queue ${RID}.`);
+
+    const seen: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const id = (await nextUnchecked(project))!.memo.id;
+      seen.push(id);
+      await check(project, id, "keep");
+    }
+    expect(seen).toEqual([later, earlier, howTo]);
+  });
+
+  it("leaves on a person's verdict on the web, and stays on an agent's through MCP", async () => {
+    const project = await newProject("verdicts");
+    const id = await save(project, `Sessions expire after eight hours ${RID}.`);
+
+    await validateEntry(id, "validated", { email: null, channel: "mcp" });
+    expect(await uncheckedCount(project)).toBe(1);
+
+    await validateEntry(id, "validated", { email: OWNER, channel: "web" });
+    expect(await uncheckedCount(project)).toBe(0);
+  });
+
+  it("keeping an older memo in the other lane checks it as well", async () => {
+    const project = await newProject("both-lanes");
+    const { stale, fresh } = await staleAndFresh(project);
+    await decide(project, stale, "keep");
+    expect((await nextUnchecked(project))!.memo.id).toBe(fresh);
+    expect(await uncheckedCount(project)).toBe(1);
+  });
+
+  it("is shown next to the older memos it put up for review", async () => {
+    const project = await newProject("touches");
+    const { stale, fresh } = await staleAndFresh(project);
+
+    const unchecked = (await nextUnchecked(project))!;
+    expect(unchecked.memo.id).toBe(fresh);
+    expect(unchecked.touches.map((t) => t.memo.id)).toEqual([stale]);
+
+    const html = await (await page(`/p/${project.slug}/review?lane=new`)).text();
+    expect(html).toContain("Is this right?");
+    expect(html).toContain("The older memo it touches");
+    expect(html).toContain('name="lane" value="new"');
+  });
+
+  it("confirming it makes it verified", async () => {
+    const project = await newProject("confirm");
+    const id = await save(project, `The audit log keeps every login ${RID}.`);
+    await check(project, id, "keep");
+
+    const memo = (await getEntryDetail(id))!.entry;
+    expect([memo.status, memo.confidence]).toEqual(["validated", "verified"]);
+  });
+
+  it("rejecting it says it was never true, and the next one comes up in the same lane", async () => {
+    const project = await newProject("reject");
+    const id = await save(project, `The staging database is wiped every night ${RID}.`);
+
+    const res = await check(project, id, "discard");
+    expect(res.headers.get("location")).toBe(`/p/${project.slug}/review?lane=new&done=discard`);
+    expect((await getEntryDetail(id))!.entry.status).toBe("rejected");
+    expect(await (await page(res.headers.get("location")!)).text()).toContain("Rejected: agents are no longer told it.");
+  });
+
+  it("opens Review on the new memos when no older one waits", async () => {
+    const project = await newProject("default-lane");
+    await save(project, `Feature flags live in the config service ${RID}.`);
+    expect(await (await page(`/p/${project.slug}/review`)).text()).toContain("Is this right?");
+  });
+
+  it("someone off the team cannot check it", async () => {
+    const project = await newProject("outsider-new");
+    const id = await save(project, `Backups are kept for thirty days ${RID}.`);
+    expect((await check(project, id, "keep", outsiderCookie)).status).toBe(403);
+    expect(await uncheckedCount(project)).toBe(1);
   });
 });

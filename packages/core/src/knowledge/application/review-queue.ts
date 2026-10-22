@@ -27,9 +27,15 @@ export async function isAwaitingReview(project: Pick<ProjectRef, "id">, memoId: 
   return port("reviewQueue").isPending(project.id, memoId);
 }
 
-/** Only where the viewer may judge: a count they can do nothing about is noise (docs/design.md §1). */
+/**
+ * Both lanes of Review together. Only where the viewer may judge: a count they can do nothing
+ * about is noise (docs/design.md §1).
+ */
 export async function reviewsAwaiting(viewer: SessionUser | null, projects: Pick<ProjectRef, "id">[]): Promise<Map<string, number>> {
-  const counts = await port("reviewQueue").pendingCounts(projects.map((p) => p.id));
+  const ids = projects.map((p) => p.id);
+  const [older, unchecked] = await Promise.all([port("reviewQueue").pendingCounts(ids), port("verificationQueue").pendingCounts(ids)]);
+  const counts = new Map(older);
+  for (const [projectId, n] of unchecked) counts.set(projectId, (counts.get(projectId) ?? 0) + n);
   const awaiting = new Map<string, number>();
   for (const [projectId, n] of counts) if (await canReviewProject({ id: projectId }, viewer)) awaiting.set(projectId, n);
   return awaiting;

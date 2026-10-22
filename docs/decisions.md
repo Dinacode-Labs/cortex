@@ -3138,7 +3138,8 @@ decisions they carried stay recorded here.
 
 ## ADR-0091 · New knowledge wins, and the older memos it touches wait in a queue for a person
 
-- **Status:** accepted as a hypothesis (2026-10-15). Builds on [0090](#adr-0090).
+- **Status:** accepted as a hypothesis (2026-10-15). Builds on [0090](#adr-0090). Its rejection of
+  a queue of every unreviewed memo is **revised by [0093](#adr-0093)**, for what comes in from then on.
 - **Context:** when a memo was saved, the memory compared it with the single nearest memo, and
   only from 0.82 similarity up, where the reconciler decides whether to merge, supersede or do
   nothing. An older memo the newer one contradicted in other words — the usual case: "a fixed
@@ -3258,3 +3259,56 @@ decisions they carried stay recorded here.
 - **Revisit when:** somebody needs a theme other than the system's; a step turns out to need
   client-side code beyond enhancement, which is [0042](#adr-0042)'s threshold; or Review is used
   less from the sidebar than it was from the tabs, which says the grouping is wrong.
+
+<a id="adr-0093"></a>
+
+## ADR-0093 · Every new memo waits for a person too, in a second lane of Review
+
+- **Status:** accepted as a hypothesis (2026-10-22). Revises one alternative [0091](#adr-0091)
+  rejected, going forward only; builds on [0090](#adr-0090).
+- **Context:** since [0091](#adr-0091) a person is asked about a memo only when something newer is
+  about it. The older one comes up; the newer one is taken as true and nobody is asked whether it
+  is right. Most memos are distilled by a model at the end of a session and enter with low
+  confidence, and nothing brought them in front of a person: checking them meant filtering Memory
+  by status and opening them one by one. [0091](#adr-0091) rejected a queue of every unreviewed
+  memo because it would start with hundreds and give no reason to begin with any of them. That
+  holds for the backlog, not for what comes in from now on.
+- **Decision:**
+  1. **New knowledge is still taken as valid** ([0091](#adr-0091)): nothing waits for a person
+     before it counts.
+  2. **Every memo saved with a project waits in a second lane of Review**, *Not checked yet*,
+     whatever brought it in — bulk ingestion included, unlike the older lane. Each memo is a row
+     in `verification_queue` (migration `0031_verification_queue.sql`). Memos saved before it
+     have no row, so the lane starts empty.
+  3. **It leaves the lane on a person's verdict on the web**, from either lane or from the memo's
+     page. That is read from `memo_reviews` ([0090](#adr-0090)), the one record of verdicts, so
+     nothing in the queue changes on a verdict. An agent's verdict through MCP leaves the memo
+     waiting. A memo that is no longer in force drops out.
+  4. **The same four decisions and keys as the older lane**, except that discarding a new memo
+     **rejects** it: it was never true, where an older memo discarded held once and is `obsolete`.
+  5. **The order is the pack's**: by the order of its sections, newest first within a type, the
+     types the pack leaves out after them, and what was skipped last. A wrong decision misleads
+     more than a wrong how-to.
+  6. **The new memo is shown next to the older memos it put up for review**, if any, so it is
+     judged knowing what it touches.
+  7. **One at a time, no verdicts in bulk**: `verified` keeps meaning that a person read it.
+  8. The count in the sidebar and on the projects page adds both lanes.
+- **Alternatives:**
+  - **Include the backlog**, every memo still `pending_validation`. Rejected for the reason
+    [0091](#adr-0091) gave: hundreds at once, and no reason to start anywhere.
+  - **Leave bulk ingestion out, as the older lane does.** It keeps a connector's first run from
+    filling the lane. Rejected: what a connector brings reaches agents as true like anything
+    else, and ordering by type keeps the decisions on top of it.
+  - **Verdicts in bulk from Memory**, with the selection the purge already uses. Faster, and
+    `verified` would stop meaning that somebody read the memo. Not now.
+  - **A status of its own instead of a table.** `status` holds the last verdict, and an agent
+    validating through MCP would have taken the memo out of the lane. Rejected.
+  - **One queue mixing both kinds.** Every screen would have to say which question it is asking.
+    Rejected: two lanes, each with its own question.
+- **Consequences:** the lane grows with every session and every connector run, and without a
+  model the order knows only type and date. A memo can wait in both lanes at once, because they
+  ask two different questions about it. A reconciler merge rewrites a memo without putting it
+  back in the lane; it never merges into one a person verified ([0090](#adr-0090)).
+- **Revisit when:** the lane grows faster than people clear it, which argues for a cap, a floor by
+  confidence or leaving a connector's runs out; an agent can suggest a verdict for each memo; or
+  people ask to verify in batches.

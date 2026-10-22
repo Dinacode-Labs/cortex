@@ -9,6 +9,7 @@ import {
   listAccessibleProjects,
   listProjectAncestors,
   pendingReviewCount,
+  uncheckedCount,
   type AccessibleProject,
   type HealthSnapshot,
   type ProjectRef,
@@ -47,9 +48,10 @@ export interface ProjectPage {
   project: AccessibleProject;
   /** Whether the viewer can change visibility, owner and members (ADR-0051). */
   manager: boolean;
-  /** Whether the viewer may judge its memos, and how many wait for it (ADR-0091). */
+  /** Whether the viewer may judge its memos, and how many wait in each lane of Review (ADR-0091, ADR-0093). */
   reviewer: boolean;
   pendingReviews: number;
+  uncheckedMemos: number;
   /** From the root to the direct parent, for the breadcrumb and for saying what inherits what. */
   ancestors: ProjectRef[];
   /**
@@ -86,6 +88,7 @@ export async function requireProjectPage(
     manager: await canManageProject(viewer, slug),
     reviewer,
     pendingReviews: reviewer ? await pendingReviewCount(base) : 0,
+    uncheckedMemos: reviewer ? await uncheckedCount(base) : 0,
     ancestors: base.parentId ? await listProjectAncestors(base.id) : [],
     children: accessible.filter((p) => p.parentId === base.id),
     health: (await latestProjectHealth([base.id])).get(base.id),
