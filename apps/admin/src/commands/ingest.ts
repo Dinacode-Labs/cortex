@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getEnvNum } from "@cortex/shared";
 import type { ConfidenceLevel, ContextEntryType, SourceType } from "@cortex/shared";
-import { indexMemos, registerUsageSink, saveContext } from "@cortex/core";
+import { indexMemos, queueReviewsOfBatch, registerUsageSink, saveContext, type Memo } from "@cortex/core";
 
 /**
  * Bulk context ingestion from a JSON file (an array of items) into a project. Two phases, to
@@ -44,6 +44,7 @@ export async function run(args: string[]): Promise<void> {
   console.log(`Ingesting ${items.length} items into "${project}" (llm=${USE_LLM})...`);
 
   const toEmbed: { memoId: string; text: string }[] = [];
+  const saved: Memo[] = [];
   let done = 0;
   let failed = 0;
   let cursor = 0;
@@ -67,6 +68,7 @@ export async function run(args: string[]): Promise<void> {
           { useClassifier: USE_LLM, detectImprovements: false, skipEmbedding: true },
         );
         toEmbed.push({ memoId: entry.id, text: `${entry.title}\n\n${entry.content}` });
+        saved.push(entry);
       } catch (e) {
         failed++;
         console.error(`  ✗ ${item.sourceReference ?? ""}: ${(e as Error).message}`);
@@ -83,6 +85,8 @@ export async function run(args: string[]): Promise<void> {
     batchSize: EMBED_BATCH,
     onProgress: (d) => console.log(`  phase 2: ${d}/${toEmbed.length}`),
   });
+  console.log("Phase 3: putting the older memos they are about up for review...");
+  await queueReviewsOfBatch(saved);
   console.log("Ingestion finished.");
 }
 

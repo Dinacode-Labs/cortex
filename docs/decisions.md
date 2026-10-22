@@ -3139,7 +3139,8 @@ decisions they carried stay recorded here.
 ## ADR-0091 · New knowledge wins, and the older memos it touches wait in a queue for a person
 
 - **Status:** accepted as a hypothesis (2026-10-15). Builds on [0090](#adr-0090). Its rejection of
-  a queue of every unreviewed memo is **revised by [0093](#adr-0093)**, for what comes in from then on.
+  a queue of every unreviewed memo is **revised by [0093](#adr-0093)**, for what comes in from then on;
+  leaving bulk ingestion out of the queue (point 2) is **revised by [0094](#adr-0094)**.
 - **Context:** when a memo was saved, the memory compared it with the single nearest memo, and
   only from 0.82 similarity up, where the reconciler decides whether to merge, supersede or do
   nothing. An older memo the newer one contradicted in other words — the usual case: "a fixed
@@ -3312,3 +3313,40 @@ decisions they carried stay recorded here.
 - **Revisit when:** the lane grows faster than people clear it, which argues for a cap, a floor by
   confidence or leaving a connector's runs out; an agent can suggest a verdict for each memo; or
   people ask to verify in batches.
+
+<a id="adr-0094"></a>
+
+## ADR-0094 · Bulk ingestion puts the older memos it touches up for review too
+
+- **Status:** accepted as a hypothesis (2026-10-22). Revises point 2 of [0091](#adr-0091), which
+  left bulk ingestion out of the queue of older memos.
+- **Context:** [0091](#adr-0091) left bulk ingestion out so that a connector's first run would not
+  bury the queue. The cost turned up elsewhere: a whole upload — an agent's memory, a
+  documentation folder, a repository's pull requests — reached the pack without anything in it
+  ever being set against what the project already held. That is when a contradiction is
+  likeliest, because an upload is another account of the same project. Since
+  [0093](#adr-0093) each of those memos waits in the second lane, but it is judged on its own,
+  without the older memo it contradicts beside it.
+- **Decision:**
+  1. **What `/capture/batch` and `cortex-admin ingest` add raises reviews like any save**, with the
+     same threshold and up to six neighbours, once the batch is embedded.
+  2. **The neighbours come from the vectors already stored** (`MemoIndex.neighboursOf`).
+     Embedding every memo a second time would double what a large upload costs.
+  3. **They are compared against the whole project, the upload included.**
+  4. **Only a memo saved before the newer one counts as older.** Within one upload every memo
+     finds the rest, and without this each pair would come up twice with the roles swapped. The
+     rule holds on every route; for a save one at a time it was already true.
+- **Alternatives:**
+  - **Compare only against what was there before the upload began.** Two files of the same upload
+    about the same thing would not be paired — a duplicate, which Health finds — at the price of
+    the client saying when the upload started. Rejected: a contradiction inside an upload is
+    worth a look as well.
+  - **Embed each memo again to search with it.** Simpler, and one more call to the provider per
+    memo. Rejected.
+  - **Keep bulk ingestion out, as [0091](#adr-0091) did.** Rejected for the reason above.
+- **Consequences:** a large upload into a project that already knows a lot raises many reviews at
+  once, ordered only by similarity. Each memo of a batch costs one more vector search, so
+  `/capture/batch` answers later by that much.
+- **Revisit when:** an upload buries the older lane, which argues for a cap per upload or a higher
+  threshold for bulk; or the search per memo makes `/capture/batch` slow enough for a client to
+  time out.

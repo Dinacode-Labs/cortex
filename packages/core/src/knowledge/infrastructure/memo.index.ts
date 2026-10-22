@@ -73,6 +73,20 @@ export class PgMemoIndex implements MemoIndex {
     return rows.map((row) => ({ entry: rowToMemo(row), score: 1 - Number(row.distance) }));
   }
 
+  async neighboursOf(memoId: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]> {
+    const rows = (await this.sql`
+      SELECT m.*, e.vector <=> q.vector AS distance
+      FROM embeddings q
+      JOIN embeddings e ON e.embedding_model = q.embedding_model AND e.embedding_version = q.embedding_version
+      JOIN memos m ON m.id = e.memo_id
+      WHERE q.memo_id = ${memoId} AND q.embedding_model = ${this.provider.model} AND q.embedding_version = ${this.provider.version}
+      ${this.scopeFilters(scope)}
+      ORDER BY distance ASC
+      LIMIT ${limit}
+    `) as unknown as Row[];
+    return rows.map((row) => ({ entry: rowToMemo(row), score: 1 - Number(row.distance) }));
+  }
+
   /** The lexical side brings precision on ids, proper nouns and jargon; the vector side, meaning. */
   async hybrid(queryText: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]> {
     const pool = Math.max(limit * 4, 40);

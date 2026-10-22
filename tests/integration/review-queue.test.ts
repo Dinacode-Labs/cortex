@@ -109,11 +109,28 @@ describe("saving a memo about something already remembered", () => {
     expect(queued).toEqual([]);
   });
 
-  /* A connector ingesting a repository's documents would otherwise bury the queue on its first run. */
-  it("bulk ingestion raises no reviews", async () => {
+  /*
+   * Bulk ingestion used to raise none, so a whole upload -- an agent's memory, a docs folder -- reached
+   * the pack without anything in it ever being set against what was already there (ADR-0094).
+   */
+  it("bulk ingestion raises them too, against what was there", async () => {
     const project = await newProject("bulk");
-    await captureBatch(project.name, BACKOFF.map((content) => ({ content })), OWNER);
-    expect(await pendingReviewCount(project)).toBe(0);
+    const stale = await save(project, BACKOFF[0]);
+    const [added] = await captureBatch(project.name, [{ content: BACKOFF[1] }], OWNER);
+
+    const review = (await nextReview(project))!;
+    expect(review.memo.id).toBe(stale);
+    expect(review.newer.map((n) => n.memo.id)).toEqual([added!.id]);
+  });
+
+  it("within one upload, the earlier memo is the older one, and a pair comes up once", async () => {
+    const project = await newProject("bulk-within");
+    const [first, second] = await captureBatch(project.name, BACKOFF.map((content) => ({ content })), OWNER);
+
+    expect(await pendingReviewCount(project)).toBe(1);
+    const review = (await nextReview(project))!;
+    expect(review.memo.id).toBe(first!.id);
+    expect(review.newer.map((n) => n.memo.id)).toEqual([second!.id]);
   });
 
   it("a memo discarded elsewhere drops out of the queue", async () => {

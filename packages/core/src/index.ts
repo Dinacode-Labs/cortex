@@ -7,7 +7,7 @@ export * from "./knowledge/application/save.js";
 export * from "./knowledge/application/search.js";
 export * from "./knowledge/application/context-pack.js";
 export * from "./knowledge/application/review.js";
-export { isAwaitingReview, nextReview, pendingReviewCount, reviewsAwaiting, REVIEW_THRESHOLD } from "./knowledge/application/review-queue.js";
+export { isAwaitingReview, nextReview, pendingReviewCount, queueReviewsOfBatch, reviewsAwaiting, REVIEW_THRESHOLD } from "./knowledge/application/review-queue.js";
 export { isReviewDecision, type NewerMemo, type OlderMemo, type PendingReview, type ReviewDecision } from "./knowledge/domain/review-queue.js";
 export { nextUnchecked, uncheckedCount } from "./knowledge/application/verification-queue.js";
 export type { UncheckedMemo } from "./knowledge/domain/verification-queue.js";

@@ -10,9 +10,24 @@ import { canReviewProject } from "../../projects/application/projects.js";
 /** Below the reconciler's band (0.82) on purpose: a contradiction is usually worded differently. */
 export const REVIEW_THRESHOLD = getEnvNum("CORTEX_REVIEW_THRESHOLD", 0.75);
 
+export const REVIEW_NEIGHBOURS = 6;
+
 export async function queueReviewsOf(newer: Memo, neighbours: SearchHit[]): Promise<void> {
   if (!newer.projectId) return;
-  await port("reviewQueue").enqueue(newer.projectId, newer.id, olderMemosToReview(neighbours, REVIEW_THRESHOLD));
+  await port("reviewQueue").enqueue(newer.projectId, newer.id, olderMemosToReview(newer, neighbours, REVIEW_THRESHOLD));
+}
+
+/**
+ * Bulk ingestion embeds after saving, in batches, so its reviews wait until the vectors exist. Its
+ * neighbours come from the stored vectors: embedding every memo twice would double what a large
+ * upload costs (ADR-0094).
+ */
+export async function queueReviewsOfBatch(memos: Memo[]): Promise<void> {
+  for (const memo of memos) {
+    if (!memo.projectId) continue;
+    const neighbours = await port("memoIndex").neighboursOf(memo.id, { projectId: memo.projectId, excludeId: memo.id }, REVIEW_NEIGHBOURS);
+    await queueReviewsOf(memo, neighbours);
+  }
 }
 
 export async function nextReview(project: Pick<ProjectRef, "id">): Promise<PendingReview | null> {

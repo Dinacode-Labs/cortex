@@ -1,4 +1,6 @@
 import { saveContext } from "../../knowledge/application/save.js";
+import { queueReviewsOfBatch } from "../../knowledge/application/review-queue.js";
+import type { Memo } from "../../knowledge/domain/memo.js";
 import { findProjectIdByName } from "../../projects/application/projects.js";
 import { relate } from "../../graph/application/entities.js";
 import { type BatchItem, scrub } from "@cortex/shared";
@@ -33,6 +35,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
 
   const results: BatchItemResult[] = [];
   const toEmbed: { memoId: string; text: string }[] = [];
+  const added: Memo[] = [];
   for (const rawItem of items) {
     // Scrubbed here and not only inside `saveContext` because the embedding text (`toEmbed`)
     // is built from the item, not from the persisted entry.
@@ -63,9 +66,11 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
       { useClassifier, detectImprovements: false, skipEmbedding: true },
     );
     toEmbed.push({ memoId: entry.id, text: `${it.title ?? ""}\n\n${it.content}` });
+    added.push(entry);
     results.push({ ref: it.sourceReference ?? null, id: entry.id, action: "added" });
   }
   if (toEmbed.length) await port("memoIndex").indexMany(toEmbed, { batchSize: 32 });
+  await queueReviewsOfBatch(added);
   return results;
 }
 
