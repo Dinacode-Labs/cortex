@@ -5,7 +5,7 @@ import { isDerivedSummary, polarityContradicts, polarityTags, stripLeadingTitle,
 import { MemoDraft, decideReclassification, type ClassifierResult, type Memo } from "../domain/memo.js";
 import type { SummarizableMemo } from "../domain/memo-repository.js";
 import type { SearchHit } from "../domain/memo-index.js";
-import { queueReviewsOf } from "./review-queue.js";
+import { queueReviewsOf, REVIEW_NEIGHBOURS } from "./review-queue.js";
 import { queueForVerification } from "./verification-queue.js";
 import { port } from "../../composition.js";
 
@@ -131,10 +131,10 @@ export async function saveContext(
   if (projectId) await linkEntryToEntity(entry.id, projectId);
 
   const wantsWarnings = opts.detectImprovements ?? true;
-  // Bulk ingestion embeds later, in batches, and would flood the queue: it raises no reviews (ADR-0091).
+  // Bulk ingestion embeds later, in batches, and raises its reviews once the vectors exist (ADR-0094).
   const wantsReviews = !opts.skipEmbedding && projectId !== null;
   const neighbours =
-    wantsWarnings || wantsReviews ? await port("memoIndex").similar(draft.embedText, { projectId, excludeId: entry.id }, 6) : [];
+    wantsWarnings || wantsReviews ? await port("memoIndex").similar(draft.embedText, { projectId, excludeId: entry.id }, REVIEW_NEIGHBOURS) : [];
   const warnings = wantsWarnings ? await detectImprovements(entry, neighbours, entityIds) : [];
   if (wantsReviews) await queueReviewsOf(entry, neighbours);
   // Bulk ingestion included: what nobody has checked waits whatever brought it in (ADR-0093).

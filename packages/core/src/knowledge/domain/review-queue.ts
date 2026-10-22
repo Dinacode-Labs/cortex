@@ -50,8 +50,11 @@ export interface ReviewQueue {
 /**
  * The memos a newer one is about. New knowledge is taken as valid; these are the ones it may have
  * left behind. Similarity is the only signal until an agent judges each pair, so it is also the
- * priority for now.
+ * priority for now. Only memos saved before it count: within one bulk upload every memo finds the
+ * others, and without that each pair would come up twice, older and newer swapped (ADR-0094).
  */
-export function olderMemosToReview(neighbours: SearchHit[], threshold: number): ReviewCandidate[] {
-  return neighbours.filter((hit) => hit.score >= threshold).map((hit) => ({ memoId: hit.entry.id, similarity: hit.score }));
+export function olderMemosToReview(newer: Pick<Memo, "createdAt">, neighbours: SearchHit[], threshold: number): ReviewCandidate[] {
+  return neighbours
+    .filter((hit) => hit.score >= threshold && hit.entry.createdAt < newer.createdAt)
+    .map((hit) => ({ memoId: hit.entry.id, similarity: hit.score }));
 }

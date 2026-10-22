@@ -24,5 +24,7 @@ export interface MemoIndex {
     opts?: { batchSize?: number; onProgress?: (done: number) => void },
   ): Promise<void>;
   similar(queryText: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]>;
+  /** The nearest to a memo already indexed, from its stored vector: nothing is embedded again. */
+  neighboursOf(memoId: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]>;
   hybrid(queryText: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]>;
 }

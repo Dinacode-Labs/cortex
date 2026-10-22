@@ -32,8 +32,11 @@ fixes things.
   thing (similarity 0.75 or more, `CORTEX_REVIEW_THRESHOLD`) wait for review. The newer one
   counts at once. *Review* shows the older memos one at a time, next to what came in since, with
   four decisions: it still holds (it becomes `verified`), discard it, rewrite it, or skip it for
-  now. Each one brings up the next; nobody has to pick what to look at. Bulk ingestion raises
-  no reviews. Migration `0030_review_queue.sql` ([ADR-0091](docs/decisions.md#adr-0091)).
+  now. Each one brings up the next; nobody has to pick what to look at. Bulk uploads raise them
+  too — `connect-docs`, `connect-github`, any client of `/capture/batch` and `cortex-admin ingest` —
+  once the batch is embedded, and within one upload the earlier memo is the older one. Migration
+  `0030_review_queue.sql` ([ADR-0091](docs/decisions.md#adr-0091),
+  [ADR-0094](docs/decisions.md#adr-0094)).
 - **A person saying a memo holds now changes what agents are told.** "Yes, it holds" on a memo's
   page makes it `verified`, and the pack puts verified memos first; it used to change only the
   status, so a memo somebody had confirmed ranked below one nobody had read. Every verdict —
