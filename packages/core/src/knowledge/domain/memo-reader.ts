@@ -48,6 +48,8 @@ export interface MemoReader {
   detail(id: string): Promise<EntryDetail | null>;
   graphData(projectId: string, opts: { includeEntries: boolean; maxEntries: number }): Promise<ProjectGraphData>;
   decisions(projectId: string, limit: number): Promise<Memo[]>;
+  /** The memos still in force saved after `after` and up to `upTo`, the oldest first. */
+  savedBetween(projectId: string, after: Date, upTo: Date): Promise<Memo[]>;
   /** Current (or as of `asOf`), not rejected nor obsolete, the most reliable first. */
   byType(projectIds: string[], type: MemoType, asOf: Date | undefined, limit: number): Promise<Memo[]>;
   moduleNames(projectId: string): Promise<string[]>;

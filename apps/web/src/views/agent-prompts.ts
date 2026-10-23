@@ -13,6 +13,7 @@ const ROLE_SUMMARIES: Record<AgentRole, string> = {
   distiller: "turns a finished agent session into memos",
   reconciler: "decides whether a memo adds to, refines or replaces one that is nearly the same",
   merger: "merges a refining memo into the one it refines",
+  judge: "groups, each night, the day's memos with the ones they repeat or contradict, for Review",
 };
 
 function promptField(view: AgentPromptView, above: { label: string; text: string }, placeholder: string): Html {

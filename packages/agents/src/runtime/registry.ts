@@ -11,6 +11,7 @@ import { retrieverInstructions } from "../agents/retriever/instructions.js";
 import { distillerInstructions } from "../agents/distiller/instructions.js";
 import { mergerInstructions } from "../agents/merger/instructions.js";
 import { reconcilerInstructions } from "../agents/reconciler/instructions.js";
+import { judgeInstructions } from "../agents/judge/instructions.js";
 import type { AgentRole, RoleInstructions } from "./roles.js";
 import { defaultLanguage } from "@cortex/core";
 import { getLlmConfig } from "./llm-config.js";
@@ -23,6 +24,7 @@ const INSTRUCTIONS: Record<AgentRole, RoleInstructions> = {
   distiller: distillerInstructions,
   merger: mergerInstructions,
   reconciler: reconcilerInstructions,
+  judge: judgeInstructions,
 };
 
 export function defaultCriterion(role: AgentRole): string {
@@ -42,7 +44,7 @@ function build(): Mastra | null {
   // exporter (ADR-0016, part B). The agents are served from here so that `generate()` emits
   // spans.
   return new Mastra({
-    agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever"), distiller: mk("distiller"), merger: mk("merger"), reconciler: mk("reconciler") },
+    agents: { classifier: mk("classifier"), graph: mk("graph"), reranker: mk("reranker"), retriever: mk("retriever"), distiller: mk("distiller"), merger: mk("merger"), reconciler: mk("reconciler"), judge: mk("judge") },
     observability: new Observability({
       configs: { default: { serviceName: "cortex", exporters: [new CortexTraceExporter()] } },
     }),

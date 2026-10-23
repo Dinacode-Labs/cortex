@@ -1,5 +1,5 @@
 import { closeSql, getSql } from "@cortex/database";
-import { applyTemporalInvalidation, autoCurate, lintProject, listProjects, reclassifyProject, reconcileProject, resolveEntities } from "@cortex/core";
+import { applyTemporalInvalidation, autoCurate, lintProject, listProjects, reclassifyProject, reconcileProject, resolveEntities, sweepProject } from "@cortex/core";
 import { enrichProject } from "./enrich-project.js";
 import { shutdownObservability } from "../runtime/registry.js";
 
@@ -22,6 +22,8 @@ export interface MaintenanceReport {
   promoted: number;
   decayed: number;
   deduped: number;
+  /** Reviews the second pass raised, each a group of memos (ADR-0098). */
+  swept: number;
   reclassified: number;
 }
 
@@ -34,7 +36,7 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
     locked = rows[0]?.locked === true;
     if (!locked) {
       console.log("[maintain] another maintenance run is in progress (lock not acquired) -- skipping.");
-      return { ran: false, projects: [], enriched: {}, merged: 0, historical: 0, superseded: 0, promoted: 0, decayed: 0, deduped: 0, reclassified: 0 };
+      return { ran: false, projects: [], enriched: {}, merged: 0, historical: 0, superseded: 0, promoted: 0, decayed: 0, deduped: 0, swept: 0, reclassified: 0 };
     }
 
     const projects = only ? [only] : (await listProjects()).map((p) => p.entity.name);
@@ -75,13 +77,22 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
       if (d.deduped) console.log(`  [reconcile] ${p}: ${d.deduped} near-identical entries deduplicated`);
     }
 
+    // After the dedup, so what it already settled is not put to a person; before the lint, which
+    // then counts what is left.
+    let swept = 0;
+    for (const p of projects) {
+      const r = await sweepProject(p);
+      swept += r.raised;
+      if (r.raised) console.log(`  [sweep] ${p}: ${r.raised} review(s) raised from ${r.swept} memo(s) saved since the last pass (${r.judged} judged)`);
+    }
+
     for (const p of projects) {
       const l = await lintProject(p);
       console.log(`  [lint] ${p}: ${l.contradictions.length} contradictions · ${l.gaps.length} gaps · ${l.duplicates.length} dups · ${l.orphanEntities.length} orphans · ${l.lowConfidence} low-confidence · ${l.neverReviewed} never reviewed`);
     }
 
     console.log("[maintain] done.");
-    return { ran: true, projects, enriched, merged: res.merged, historical: t.historical, superseded: t.superseded, promoted: c.promoted, decayed: c.decayed, deduped, reclassified };
+    return { ran: true, projects, enriched, merged: res.merged, historical: t.historical, superseded: t.superseded, promoted: c.promoted, decayed: c.decayed, deduped, swept, reclassified };
   } finally {
     if (locked) { try { await conn`SELECT pg_advisory_unlock(${LOCK_KEY})`; } catch { /* best-effort */ } }
     await conn.release();

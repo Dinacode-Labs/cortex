@@ -1,6 +1,11 @@
 import type { Row, Sql } from "@cortex/database";
 import { rowToMemo } from "./memo.row.js";
-import type { OlderMemo, PendingReview, QueuedMemo, ReviewCandidate, ReviewQueue, ReviewResolution } from "../domain/review-queue.js";
+import type { Finding, OlderMemo, PendingReview, QueuedMemo, ReviewCandidate, ReviewQueue, ReviewResolution } from "../domain/review-queue.js";
+import { isGroupRelation, pairKey, type SweepGroup } from "../domain/review-sweep.js";
+
+function findingOf(row: Row): Finding | null {
+  return isGroupRelation(row.relation) ? { relation: row.relation, reason: (row.reason as string | null) ?? null } : null;
+}
 
 export class PgReviewQueue implements ReviewQueue {
   constructor(private readonly sql: Sql) {}
@@ -20,12 +25,38 @@ export class PgReviewQueue implements ReviewQueue {
     `;
   }
 
+  async raiseGroup(projectId: string, group: SweepGroup): Promise<void> {
+    const rows = group.members.map((m) => ({
+      project_id: projectId,
+      memo_id: group.anchorId,
+      newer_memo_id: m.memoId,
+      similarity: m.similarity,
+      priority: group.priority,
+      raised_by: "sweep",
+      relation: group.relation,
+      reason: group.reason,
+    }));
+    if (rows.length === 0) return;
+    await this.sql`
+      INSERT INTO review_queue ${this.sql(rows, "project_id", "memo_id", "newer_memo_id", "similarity", "priority", "raised_by", "relation", "reason")}
+      ON CONFLICT (memo_id, newer_memo_id) DO NOTHING
+    `;
+  }
+
+  async knownPairs(memoIds: string[]): Promise<Set<string>> {
+    if (memoIds.length < 2) return new Set();
+    const rows = (await this.sql`
+      SELECT memo_id, newer_memo_id FROM review_queue WHERE memo_id = ANY(${memoIds}) AND newer_memo_id = ANY(${memoIds})
+    `) as unknown as Row[];
+    return new Set(rows.map((r) => pairKey(r.memo_id as string, r.newer_memo_id as string)));
+  }
+
   // A review only stands while both memos are still in force: once either was discarded,
   // superseded or purged, there is nothing left to compare.
   private live(projectId: string | string[]) {
     const ids = Array.isArray(projectId) ? projectId : [projectId];
     return this.sql`
-      SELECT q.project_id, q.memo_id, q.newer_memo_id, q.similarity, q.priority, q.skipped_at, q.created_at
+      SELECT q.project_id, q.memo_id, q.newer_memo_id, q.similarity, q.priority, q.relation, q.reason, q.skipped_at, q.created_at
         FROM review_queue q
         JOIN memos m ON m.id = q.memo_id
         JOIN memos n ON n.id = q.newer_memo_id
@@ -54,7 +85,7 @@ export class PgReviewQueue implements ReviewQueue {
 
   async pending(projectId: string, memoId: string): Promise<PendingReview | null> {
     const newer = (await this.sql`
-      SELECT n.*, live.similarity AS review_similarity
+      SELECT n.*, live.similarity AS review_similarity, live.relation, live.reason
         FROM (${this.live(projectId)}) live
         JOIN memos n ON n.id = live.newer_memo_id
        WHERE live.memo_id = ${memoId}
@@ -65,7 +96,7 @@ export class PgReviewQueue implements ReviewQueue {
     if (!older) return null;
     return {
       memo: rowToMemo(older),
-      newer: newer.map((r) => ({ memo: rowToMemo(r), similarity: Number(r.review_similarity) })),
+      newer: newer.map((r) => ({ memo: rowToMemo(r), similarity: Number(r.review_similarity), finding: findingOf(r) })),
     };
   }
 

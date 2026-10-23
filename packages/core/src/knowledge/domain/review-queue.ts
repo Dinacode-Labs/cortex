@@ -1,5 +1,6 @@
 import type { Memo } from "./memo.js";
 import type { SearchHit } from "./memo-index.js";
+import type { GroupRelation, SweepGroup } from "./review-sweep.js";
 
 export type ReviewDecision = "keep" | "discard" | "modify" | "skip";
 export type ReviewResolution = "kept" | "discarded" | "modified" | "merged";
@@ -13,9 +14,16 @@ export interface ReviewCandidate {
   similarity: number;
 }
 
+/** What the nightly pass's agent said of a memo it set against an older one (ADR-0098). */
+export interface Finding {
+  relation: GroupRelation;
+  reason: string | null;
+}
+
 export interface NewerMemo {
   memo: Memo;
   similarity: number;
+  finding: Finding | null;
 }
 
 export interface OlderMemo {
@@ -40,6 +48,9 @@ export interface QueuedMemo {
  */
 export interface ReviewQueue {
   enqueue(projectId: string, newerMemoId: string, candidates: ReviewCandidate[]): Promise<void>;
+  raiseGroup(projectId: string, group: SweepGroup): Promise<void>;
+  /** Every pair among these memos ever queued, pending or decided, as `pairKey`s. */
+  knownPairs(memoIds: string[]): Promise<Set<string>>;
   /** Not skipped first, then the highest priority. Memos no longer in force drop out. */
   next(projectId: string): Promise<PendingReview | null>;
   /** The next ones, in the same order. */
