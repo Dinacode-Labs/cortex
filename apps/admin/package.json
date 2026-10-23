@@ -21,7 +21,7 @@
     "@cortex/mcp-server": "workspace:*",
     "@cortex/server": "workspace:*",
     "@cortex/shared": "workspace:*",
-    "node-cron": "^4.5.0"
+    "node-cron": "^4.6.0"
   },
   "license": "Apache-2.0"
 }
