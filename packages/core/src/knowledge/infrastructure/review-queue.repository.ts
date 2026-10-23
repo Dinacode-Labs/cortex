@@ -36,17 +36,23 @@ export class PgReviewQueue implements ReviewQueue {
   }
 
   async next(projectId: string): Promise<PendingReview | null> {
-    const [head] = (await this.sql`
+    const [head] = await this.upcoming(projectId, 1);
+    return head ?? null;
+  }
+
+  async upcoming(projectId: string, limit: number): Promise<PendingReview[]> {
+    const heads = (await this.sql`
       SELECT memo_id
         FROM (${this.live(projectId)}) live
        GROUP BY memo_id
        ORDER BY max(skipped_at) ASC NULLS FIRST, max(priority) DESC, min(created_at) ASC
-       LIMIT 1
+       LIMIT ${limit}
     `) as unknown as Row[];
-    if (!head) return null;
-    const memoId = head.memo_id as string;
-    const [older] = (await this.sql`SELECT * FROM memos WHERE id = ${memoId}`) as unknown as Row[];
-    if (!older) return null;
+    const reviews = await Promise.all(heads.map((h) => this.pending(projectId, h.memo_id as string)));
+    return reviews.filter((r): r is PendingReview => r !== null);
+  }
+
+  async pending(projectId: string, memoId: string): Promise<PendingReview | null> {
     const newer = (await this.sql`
       SELECT n.*, live.similarity AS review_similarity
         FROM (${this.live(projectId)}) live
@@ -54,6 +60,9 @@ export class PgReviewQueue implements ReviewQueue {
        WHERE live.memo_id = ${memoId}
        ORDER BY n.created_at DESC
     `) as unknown as Row[];
+    if (newer.length === 0) return null;
+    const [older] = (await this.sql`SELECT * FROM memos WHERE id = ${memoId}`) as unknown as Row[];
+    if (!older) return null;
     return {
       memo: rowToMemo(older),
       newer: newer.map((r) => ({ memo: rowToMemo(r), similarity: Number(r.review_similarity) })),

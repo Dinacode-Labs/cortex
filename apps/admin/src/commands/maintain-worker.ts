@@ -2,6 +2,9 @@ import { writeFileSync } from "node:fs";
 import { getSql } from "@cortex/database";
 import cron from "node-cron";
 import { runMaintenance, wireLlm } from "@cortex/agents";
+import { draftMergesAhead, pruneMergeDrafts } from "@cortex/core";
+
+const MERGE_DRAFT_EVERY_MS = 60_000;
 
 /**
  * The maintenance worker: it runs the `runMaintenance` pipeline periodically (the loops of
@@ -10,6 +13,7 @@ import { runMaintenance, wireLlm } from "@cortex/agents";
  *
  * Usage: cortex-admin maintain-worker
  * Env: CORTEX_MAINTAIN_CRON (a cron expression; default "0 3 * * *" = 03:00 daily),
+ *      CORTEX_MERGE_DRAFTS_AHEAD (reviews per lane whose merge is drafted ahead, every minute; 0 = none),
  *      CORTEX_MAINTAIN_ON_START=1 to run once at startup,
  *      CORTEX_WORKER_HEARTBEAT_FILE (the heartbeat file; default /tmp/cortex-worker.heartbeat).
  *
@@ -52,9 +56,27 @@ export async function run(): Promise<void> {
       beat();
     }
   }
+  // Every minute rather than with the nightly run: a review raised now should find its merge
+  // drafted by the time a person opens it (ADR-0096).
+  let drafting = false;
+  async function draftMerges(): Promise<void> {
+    if (drafting) return;
+    drafting = true;
+    try {
+      await pruneMergeDrafts();
+      const drafted = await draftMergesAhead();
+      if (drafted) console.log(`[worker] ${drafted} merge(s) drafted ahead for Review`);
+    } catch (e) {
+      console.error("[worker] merge drafting error:", (e as Error).message);
+    } finally {
+      drafting = false;
+    }
+  }
   console.log(`[worker] maintenance scheduled: "${expr}". Waiting...`);
   beat();
   setInterval(beat, 30_000).unref();
+  setInterval(() => void draftMerges(), MERGE_DRAFT_EVERY_MS).unref();
+  void draftMerges();
   cron.schedule(expr, tick);
   if (process.env.CORTEX_MAINTAIN_ON_START === "1") void tick();
 }

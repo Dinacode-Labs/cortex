@@ -15,6 +15,8 @@ import type { MemoRepository } from "./knowledge/domain/memo-repository.js";
 import type { MemoIndex } from "./knowledge/domain/memo-index.js";
 import type { MemoReader } from "./knowledge/domain/memo-reader.js";
 import type { ReviewQueue } from "./knowledge/domain/review-queue.js";
+import type { MergeDraftStore } from "./knowledge/domain/memo-merge.js";
+import { PgMergeDraftStore } from "./knowledge/infrastructure/merge-draft.repository.js";
 import { PgReviewQueue } from "./knowledge/infrastructure/review-queue.repository.js";
 import type { VerificationQueue } from "./knowledge/domain/verification-queue.js";
 import { PgVerificationQueue } from "./knowledge/infrastructure/verification-queue.repository.js";
@@ -37,6 +39,7 @@ export interface CorePorts {
   memoReader: MemoReader;
   reviewQueue: ReviewQueue;
   verificationQueue: VerificationQueue;
+  mergeDrafts: MergeDraftStore;
   health: HealthReader;
   healthSnapshots: HealthSnapshots;
   projects: ProjectRepository;
@@ -56,6 +59,7 @@ const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   memoReader: () => new PgMemoReader(getSql()),
   reviewQueue: () => new PgReviewQueue(getSql()),
   verificationQueue: () => new PgVerificationQueue(getSql()),
+  mergeDrafts: () => new PgMergeDraftStore(getSql()),
   health: () => new PgHealthReader(getSql()),
   healthSnapshots: () => new PgHealthSnapshots(getSql()),
   projects: () => new PgProjectRepository(getSql()),

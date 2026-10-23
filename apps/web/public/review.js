@@ -1,6 +1,6 @@
 /* Only an enhancement (ADR-0042): the key hints stay hidden until this runs. */
 (() => {
-  const decisions = { k: "keep", d: "discard", s: "skip" };
+  const decisions = { k: "keep", d: "discard", m: "merge", s: "skip" };
   for (const hint of document.querySelectorAll("[data-key-hint]")) hint.hidden = false;
   document.addEventListener("keydown", (event) => {
     if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;

@@ -510,10 +510,11 @@ h2.compare-label, h2.eyebrow { margin-bottom:var(--s-2); font-size:var(--t-xs); 
 .memo-text { margin-top:var(--s-2); max-width:70ch; line-height:1.65; white-space:pre-wrap; overflow-wrap:anywhere; }
 .memo-foot { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3); margin-top:var(--s-4);
   padding-top:var(--s-3); border-top:1px solid var(--line); }
+.prepared-merge { margin-bottom:var(--s-4); }
 .rewrite { margin-top:var(--s-4); padding-top:var(--s-3); border-top:1px solid var(--line); }
 .rewrite > summary, details.source > summary { cursor:pointer; font-size:var(--t-sm); font-weight:600; color:var(--muted); }
 .rewrite form { margin-top:var(--s-3); }
-.rewrite form > .row, .entry-main-col form > .row { margin-top:var(--s-3); }
+.rewrite form > .row, .entry-main-col form > .row, .merge-form > .row { margin-top:var(--s-3); }
 .key-hint { display:inline-flex; align-items:center; justify-content:center; min-width:20px; height:20px;
   margin-left:var(--s-2); padding:0 var(--s-1); font:500 var(--t-xs)/1 var(--mono); color:var(--muted);
   background:var(--surface-2); border:1px solid var(--line-strong); border-radius:var(--r-sm); }

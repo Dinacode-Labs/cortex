@@ -15,6 +15,8 @@ export interface VerificationQueue {
   enqueue(memoId: string): Promise<void>;
   /** Not skipped first, then by `typeOrder` with the types outside it last, then the newest. */
   next(projectId: string, typeOrder: readonly MemoType[]): Promise<Memo | null>;
+  /** The next ones, in the same order. */
+  upcoming(projectId: string, typeOrder: readonly MemoType[], limit: number): Promise<Memo[]>;
   pendingCount(projectId: string): Promise<number>;
   /** A project with nothing waiting is absent. */
   pendingCounts(projectIds: string[]): Promise<Map<string, number>>;

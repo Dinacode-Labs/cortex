@@ -3140,7 +3140,8 @@ decisions they carried stay recorded here.
 
 - **Status:** accepted as a hypothesis (2026-10-15). Builds on [0090](#adr-0090). Its rejection of
   a queue of every unreviewed memo is **revised by [0093](#adr-0093)**, for what comes in from then on;
-  leaving bulk ingestion out of the queue (point 2) is **revised by [0094](#adr-0094)**.
+  leaving bulk ingestion out of the queue (point 2) is **revised by [0094](#adr-0094)**. The four
+  decisions of point 3 get a fifth, merging, in [0096](#adr-0096).
 - **Context:** when a memo was saved, the memory compared it with the single nearest memo, and
   only from 0.82 similarity up, where the reconciler decides whether to merge, supersede or do
   nothing. An older memo the newer one contradicted in other words — the usual case: "a fixed
@@ -3266,7 +3267,8 @@ decisions they carried stay recorded here.
 ## ADR-0093 · Every new memo waits for a person too, in a second lane of Review
 
 - **Status:** accepted as a hypothesis (2026-10-22). Revises one alternative [0091](#adr-0091)
-  rejected, going forward only; builds on [0090](#adr-0090).
+  rejected, going forward only; builds on [0090](#adr-0090). Point 4's decisions get a fifth,
+  merging, in [0096](#adr-0096).
 - **Context:** since [0091](#adr-0091) a person is asked about a memo only when something newer is
   about it. The older one comes up; the newer one is taken as true and nobody is asked whether it
   is right. Most memos are distilled by a model at the end of a session and enter with low
@@ -3403,3 +3405,72 @@ decisions they carried stay recorded here.
   - another agent keeps a memory of its own worth bringing in;
   - the earlier versions of changed notes linger in the pack, because they were not close enough
     to their new versions to be paired.
+
+<a id="adr-0096"></a>
+
+## ADR-0096 · Two memos about the same thing can be merged into one, drafted by an agent
+
+- **Status:** accepted as a hypothesis (2026-10-23). Adds a fifth decision to those of
+  [0091](#adr-0091) and [0093](#adr-0093).
+- **Context:** Review sets a memo against the ones it is about and lets a person keep, discard or
+  rewrite the memo in question. Two memos alike are often not one right and one wrong: each holds
+  part of it. "Retries wait a fixed 30 s" and "the backoff is exponential, capped at 60 s" can both
+  be half of what holds, and the older memo may carry a detail the newer one dropped. The person
+  had to rewrite one of them with the other's text copied in by hand, and the other stayed in
+  force. The pieces were there: the consolidation agent the reconciler already uses to fold one
+  memo into another, and the rule that new knowledge wins ([0091](#adr-0091)).
+- **Decision:**
+  1. **A fifth decision in both lanes: merge them.** In the older lane, the older memo with what
+     came in since; in the new lane, the new memo with the older ones it touches, and only when it
+     touches some. With more than one to merge in, each has a checkbox, all ticked.
+  2. **The consolidation agent drafts it ahead**, so the proposal is waiting when the person gets
+     to the review. It is the `merger` role, handed the memos oldest first with their type and
+     date; its criterion now says that where they disagree the newer one holds, which is
+     [0091](#adr-0091)'s rule. The worker drafts every minute, for the next
+     `CORTEX_MERGE_DRAFTS_AHEAD` reviews of each lane in each project (10 by default), in the order
+     Review shows them. A draft is kept for its memos as they read then (`merge_drafts`, migration
+     `0033_merge_drafts.sql`): a memo rewritten since, or one more memo in the review, and it is
+     drafted again. One that failed is not asked for again until its memos change.
+  3. **The review shows the draft next to the memos**, and merging opens it to edit. The screen
+     never waits on a model: with no draft ready — the worker has not got there, it failed, there
+     is no worker, or the person left a memo out — the model is asked when they choose to merge.
+  4. **The person edits the draft before anything is saved**: title, text and type, the type
+     starting from the newest memo's. Without a model, or when it fails, the texts are put
+     together, the newest first, for the person to merge.
+  5. **The merged memo replaces them.** It is saved as a person's memo (`manual`, by whoever
+     merged it, with `mergedFrom` in its metadata) and validated on the web, so `verified`
+     ([0090](#adr-0090)). Every memo it merges is superseded by it — invalidated, not deleted —
+     which takes each one out of both lanes. Their reviews close as `merged` (migration
+     `0032_review_merged.sql`).
+  6. **Saved like any memo, it raises its own reviews** ([0091](#adr-0091)): whatever else was
+     about the memos it replaced is set against it next.
+  7. **Only the memos the screen showed can be merged**, and only by the project's team. Purging
+     a memo deletes every draft that quotes it, in the same transaction.
+- **Alternatives:**
+  - **Draft only when the person asks for it.** Cheaper: most reviews end in a keep or a discard.
+    It was the first version, and it left the person waiting on the model on the screen meant to
+    be quick, with the agent proposing nothing until asked. Kept only as the fallback.
+  - **Draft when the review is raised, in the request that saves the memo.** Every save that
+    raises reviews — an agent's mid-task, a bulk upload — would wait for up to seven model calls.
+    Rejected: the worker already holds the model and answers to nobody.
+  - **Draft the whole queue.** A bulk upload can raise hundreds of reviews nobody reaches for
+    days, each one a model call. Rejected for a window per lane.
+  - **A new `reviewer` role.** The work is consolidation, which the merger already does and whose
+    criterion an admin can already tune. Rejected: two roles for one job drift apart. The agent
+    that judges each pair before a person sees it ([0091](#adr-0091), revisit when) is still to
+    come; recommending a merge would be one of its answers, and this is where it would land.
+  - **Rewrite the older memo with the merged text and discard the newer one.** No new memo, but
+    the result would keep the older memo's date and origin, and neither describes it. Rejected.
+  - **Save the draft without a person reading it.** That is what the reconciler does with what
+    agents capture; here a person asked, and `verified` means that a person read it. Rejected.
+- **Consequences:** each review costs a model call whether or not it ends in a merge, and again
+  whenever one of its memos changes. A review raised now gets its draft within a minute, so the
+  first one after a save may still be drafted on request. Without the worker — a laptop running
+  only the web app — nothing is drafted ahead. The newer memo stops counting too, although it was
+  the one taken as true. A review one of the merged memos had with a third memo survives only if
+  the merged memo is alike enough to that memo to raise it again. The merger's criterion changed
+  for the reconciler as well: when it folds new information into a memo, the newer information
+  holds. Without a model merging still works, by hand.
+- **Revisit when:** the agent that judges each pair lands, which could draft only the merges it
+  recommends; the drafts cost far more than the merges people make of them; people outrun the
+  window; or merged memos keep coming back up for review against each other.

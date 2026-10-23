@@ -307,6 +307,8 @@ export class PgMemoRepository implements MemoRepository {
       await tx`
         DELETE FROM relations WHERE source_id = ANY(${found}::uuid[]) OR target_id = ANY(${found}::uuid[])
       `;
+      // A merge drafted for a review quotes these memos word for word.
+      await tx`DELETE FROM merge_drafts WHERE memo_ids && ${found}::uuid[]`;
       // One statement rather than one per entry: purging a whole project means thousands of rows,
       // and a round trip each kept the transaction and its row locks open for all of them.
       await tx`

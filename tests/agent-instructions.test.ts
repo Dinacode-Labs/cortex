@@ -8,21 +8,23 @@ import { graphPrompt } from "../packages/agents/src/agents/graph/prompt";
 import { rerankerPrompt } from "../packages/agents/src/agents/reranker/prompt";
 import { retrieverPrompt } from "../packages/agents/src/agents/retriever/prompt";
 import { distillerPrompt } from "../packages/agents/src/agents/distiller/prompt";
-import { mergerPrompt } from "../packages/agents/src/agents/merger/prompt";
+import { mergerPrompt, reviewMergePrompt } from "../packages/agents/src/agents/merger/prompt";
 import { reconcilerPrompt } from "../packages/agents/src/agents/reconciler/prompt";
 
 const WRITING_ROLES: AgentRole[] = ["classifier", "graph", "retriever", "distiller", "merger"];
 
 const hit = { score: 1, entry: { type: "decision", title: "Use ULIDs", summary: "Public ids are ULIDs." } } as unknown as SearchHit;
 
-const PROMPTS: Record<AgentRole, string> = {
-  classifier: classifierPrompt("a memo"),
-  graph: graphPrompt("a memo"),
-  reranker: rerankerPrompt("a question", [hit]),
-  retriever: retrieverPrompt("a question", [{ type: "decision", title: "Use ULIDs", summary: "Public ids are ULIDs." }]),
-  distiller: distillerPrompt("P", "a window"),
-  merger: mergerPrompt("an entry", "another"),
-  reconciler: reconcilerPrompt("an entry", "another"),
+const memo = { type: "decision" as const, title: "Use ULIDs", content: "Public ids are ULIDs.", createdAt: new Date("2026-10-01") };
+
+const PROMPTS: Record<AgentRole, string[]> = {
+  classifier: [classifierPrompt("a memo")],
+  graph: [graphPrompt("a memo")],
+  reranker: [rerankerPrompt("a question", [hit])],
+  retriever: [retrieverPrompt("a question", [{ type: "decision", title: "Use ULIDs", summary: "Public ids are ULIDs." }])],
+  distiller: [distillerPrompt("P", "a window")],
+  merger: [mergerPrompt("an entry", "another"), reviewMergePrompt([memo, memo])],
+  reconciler: [reconcilerPrompt("an entry", "another")],
 };
 
 function fiveWordRuns(text: string): string[] {
@@ -73,12 +75,14 @@ describe("a role's instructions are its criterion followed by a contract nobody 
  */
 describe("the per-call prompt carries the data and the format, and none of the criterion", () => {
   it("shares no run of five words with its role's default criterion", () => {
-    const repeated = AGENT_ROLES.flatMap((role) => {
-      const prompt = PROMPTS[role].toLowerCase().replace(/\s+/g, " ");
-      return fiveWordRuns(defaultCriterion(role))
-        .filter((run) => prompt.includes(run))
-        .map((run) => `${role}: "${run}"`);
-    });
+    const repeated = AGENT_ROLES.flatMap((role) =>
+      PROMPTS[role].flatMap((text) => {
+        const prompt = text.toLowerCase().replace(/\s+/g, " ");
+        return fiveWordRuns(defaultCriterion(role))
+          .filter((run) => prompt.includes(run))
+          .map((run) => `${role}: "${run}"`);
+      }),
+    );
     expect(repeated).toEqual([]);
   });
 });
