@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { CapturePlatform, CaptureSessionCounters, SourceType } from "@cortex/shared";
+import { claudeProjectFolder } from "./claude-memory.js";
 import { captureSession } from "./cortex-api.js";
 import { condenseSession } from "./transcript-utils.js";
 import { readSessions } from "./session-readers.js";
@@ -86,7 +86,7 @@ export function sendSessionFile(
 
 /** A repo's Claude Code transcripts, newest first. */
 export function readClaudeSessions(repoPath: string, limit?: number): { sessionId: string; condensed: string }[] {
-  const folder = join(homedir(), ".claude/projects", repoPath.replace(/[^a-zA-Z0-9]/g, "-"));
+  const folder = claudeProjectFolder(repoPath);
   if (!existsSync(folder)) return [];
   let files = readdirSync(folder)
     .filter((f) => f.endsWith(".jsonl"))

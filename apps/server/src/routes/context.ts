@@ -39,6 +39,7 @@ const captureSchema = z.object({
 const batchItemSchema = z.object({
   title: z.string().optional(),
   content: z.string().min(1),
+  summary: z.string().optional(),
   type: contextEntryTypeInput.optional(),
   sourceType: sourceType.optional(),
   sourceReference: z.string().optional(),

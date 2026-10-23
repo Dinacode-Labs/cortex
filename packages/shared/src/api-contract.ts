@@ -152,6 +152,7 @@ export type CaptureRequest = z.infer<typeof captureRequest>;
 export interface BatchItem {
   title?: string;
   content: string;
+  summary?: string;
   type?: string;
   sourceType?: string;
   sourceReference?: string;

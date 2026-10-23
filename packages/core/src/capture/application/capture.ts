@@ -43,6 +43,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
       ...rawItem,
       content: scrub(rawItem.content),
       title: rawItem.title ? scrub(rawItem.title) : rawItem.title,
+      summary: rawItem.summary ? scrub(rawItem.summary) : rawItem.summary,
     };
     if (it.sourceReference) {
       const existingId = await repository.findIdBySourceReference(projectId, it.sourceReference);
@@ -56,6 +57,7 @@ export async function captureBatch(projectName: string, items: BatchItem[], crea
         content: it.content,
         project: projectName,
         title: it.title,
+        summary: it.summary,
         type: (it.type as never) || undefined,
         confidence: (it.confidence as never) || "medium",
         sourceType: (it.sourceType as never) || "manual",

@@ -9,6 +9,19 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **`cortex connect-memory` brings Claude Code's own memory of a repository into its project.**
+  Run it in a linked repository. It reads the notes Claude Code keeps for that repository and
+  sends one memo per note:
+  - the title comes from the index, the summary is the note's description, and `[[links]]` become
+    relations;
+  - each memo enters with low confidence and waits in *Review* until someone checks it;
+  - feedback notes go in as conventions;
+  - the notes about you stay out unless you pass `--include-user`.
+
+  Running it again sends only the notes that changed, `--dry-run` shows what would go, and
+  nothing in Claude Code's folder changes ([ADR-0095](docs/decisions.md#adr-0095)).
+- **`/capture/batch` takes a `summary` for each item.** It is kept, scrubbed, instead of a summary
+  derived from the text. An older server ignores the field.
 - **Review also asks about the new memos.** Every memo saved from now on — by a session, an agent,
   a person or a connector — waits in a second lane of *Review*, *Not checked yet*, until someone on
   the project's team says whether it is right. It counts as true in the meantime. One memo at a
