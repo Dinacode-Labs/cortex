@@ -11,12 +11,13 @@ import { distillerPrompt } from "../packages/agents/src/agents/distiller/prompt"
 import { mergerPrompt, reviewMergePrompt } from "../packages/agents/src/agents/merger/prompt";
 import { reconcilerPrompt } from "../packages/agents/src/agents/reconciler/prompt";
 import { judgePrompt } from "../packages/agents/src/agents/judge/prompt";
+import { editorPrompt } from "../packages/agents/src/agents/editor/prompt";
 
-const WRITING_ROLES: AgentRole[] = ["classifier", "graph", "retriever", "distiller", "merger", "judge"];
+const WRITING_ROLES: AgentRole[] = ["classifier", "graph", "retriever", "distiller", "merger", "judge", "editor"];
 
 const hit = { score: 1, entry: { type: "decision", title: "Use ULIDs", summary: "Public ids are ULIDs." } } as unknown as SearchHit;
 
-const memo = { id: "memo-id", type: "decision" as const, title: "Use ULIDs", content: "Public ids are ULIDs.", createdAt: new Date("2026-10-01") };
+const memo = { id: "memo-id", sourceType: "agent_session" as const, type: "decision" as const, title: "Use ULIDs", content: "Public ids are ULIDs.", createdAt: new Date("2026-10-01") };
 
 const PROMPTS: Record<AgentRole, string[]> = {
   classifier: [classifierPrompt("a memo")],
@@ -27,6 +28,7 @@ const PROMPTS: Record<AgentRole, string[]> = {
   merger: [mergerPrompt("an entry", "another"), reviewMergePrompt([memo, memo])],
   reconciler: [reconcilerPrompt("an entry", "another")],
   judge: [judgePrompt(memo, [memo, memo])],
+  editor: [editorPrompt(memo), editorPrompt(memo, { types: {}, keep: ["the why of each decision"], discard: ["release dates"] })],
 };
 
 function fiveWordRuns(text: string): string[] {

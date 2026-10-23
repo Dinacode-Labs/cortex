@@ -46,10 +46,11 @@ Working, and in daily use by a team:
   when something new waits there ([ADR-0097](decisions.md#adr-0097)). A merge is drafted ahead by
   an agent for the next reviews of each lane ([ADR-0096](decisions.md#adr-0096)), and every night
   an agent groups the day's memos with the ones they repeat or contradict, raising each group as
-  one review ([ADR-0098](decisions.md#adr-0098)). What is left: the same judgement on what a save
-  raises, before a person sees it, so it sets the order of the whole queue; suggestions to rewrite
-  a memo on its own — say it better, add or drop something; and duplicates across a parent and its
-  child projects, which are never compared.
+  one review ([ADR-0098](decisions.md#adr-0098)) while another suggests how to rewrite, or to
+  reject, the next memos waiting to be checked ([ADR-0099](decisions.md#adr-0099)). What is left:
+  the same judgement on what a save raises, before a person sees it, so it sets the order of the
+  whole queue; suggestions for the older memos; and duplicates across a parent and its child
+  projects, which are never compared.
 - **`search` and `ask` do not inherit from the parent.** The context pack climbs the ancestor
   chain and search does not, so inside a child project you do not find what is stored in the
   client. With real hierarchies being set up right now, this already shows.
