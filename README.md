@@ -261,9 +261,11 @@ mistake you notice later.
 - **Review queue.** When a memo is saved, the older ones about the same thing in its project
   wait for a person, and so does the new one until somebody checks it. The project's Review
   section brings them one at a time in two lanes, the older memo next to what came in since and
-  the new memo nobody has checked. Each decision (it holds, discard or reject, rewrite, skip)
-  lands on the next one. Only the project's team judges its memos
-  ([ADR-0091](docs/decisions.md#adr-0091), [ADR-0093](docs/decisions.md#adr-0093)).
+  the new memo nobody has checked. Each decision (it holds, discard or reject, rewrite, merge
+  them into one, skip) lands on the next one; a merge is drafted ahead by an agent, shown next to
+  the memos, and edited by the person before it replaces them. Only the project's team judges its memos
+  ([ADR-0091](docs/decisions.md#adr-0091), [ADR-0093](docs/decisions.md#adr-0093),
+  [ADR-0096](docs/decisions.md#adr-0096)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.
   Sub-projects **inherit** from their parent.
 - **Agents you can tune.** What each of the seven agents judges by — what the distiller keeps,
@@ -455,7 +457,7 @@ pnpm db:up && pnpm db:migrate # Postgres + pgvector on host port 5433, plus the 
 pnpm admin server             # HTTP API and auth on 8787; also serves /install.sh
 pnpm web                      # web UI on 8080
 pnpm admin mcp-http           # authenticated MCP over HTTP on 8788
-pnpm admin maintain-worker    # scheduled maintenance
+pnpm admin maintain-worker    # scheduled maintenance, and the merges Review proposes
 ```
 
 - **Two binaries, deliberately.** `cortex` is the **developer** CLI: auth, link, setup,

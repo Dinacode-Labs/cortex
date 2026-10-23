@@ -2,7 +2,7 @@ import type { Memo } from "./memo.js";
 import type { SearchHit } from "./memo-index.js";
 
 export type ReviewDecision = "keep" | "discard" | "modify" | "skip";
-export type ReviewResolution = "kept" | "discarded" | "modified";
+export type ReviewResolution = "kept" | "discarded" | "modified" | "merged";
 
 export function isReviewDecision(value: string): value is ReviewDecision {
   return value === "keep" || value === "discard" || value === "modify" || value === "skip";
@@ -37,6 +37,10 @@ export interface ReviewQueue {
   enqueue(projectId: string, newerMemoId: string, candidates: ReviewCandidate[]): Promise<void>;
   /** Not skipped first, then the highest priority. Memos no longer in force drop out. */
   next(projectId: string): Promise<PendingReview | null>;
+  /** The next ones, in the same order. */
+  upcoming(projectId: string, limit: number): Promise<PendingReview[]>;
+  /** Null once the memo no longer waits. */
+  pending(projectId: string, memoId: string): Promise<PendingReview | null>;
   pendingCount(projectId: string): Promise<number>;
   /** A project with nothing waiting is absent. */
   pendingCounts(projectIds: string[]): Promise<Map<string, number>>;

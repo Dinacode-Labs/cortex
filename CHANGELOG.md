@@ -22,6 +22,16 @@ fixes things.
   nothing in Claude Code's folder changes ([ADR-0095](docs/decisions.md#adr-0095)).
 - **`/capture/batch` takes a `summary` for each item.** It is kept, scrubbed, instead of a summary
   derived from the text. An older server ignores the field.
+- **Review can merge two memos into one, and the agent proposes the merge ahead.** The worker has
+  the consolidation agent draft, for the next reviews of each lane, one memo holding what the
+  memos say, the newer one winning where they disagree; the review shows it next to them. *Merge
+  them* (key `M`) opens it to edit — title, text and type — and saving it replaces them: the
+  merged memo is yours and verified, and the ones it merges are superseded, out of both lanes.
+  With several memos to merge in, you tick which; a draft not ready yet is asked for then.
+  Without a model, the texts are put together for you to merge by hand. `CORTEX_MERGE_DRAFTS_AHEAD`
+  (10) sets how many reviews per lane are drafted ahead. When the reconciler folds new information
+  into a memo, the newer information now holds too. Migrations `0032_review_merged.sql` and
+  `0033_merge_drafts.sql` ([ADR-0096](docs/decisions.md#adr-0096)).
 - **Review also asks about the new memos.** Every memo saved from now on — by a session, an agent,
   a person or a connector — waits in a second lane of *Review*, *Not checked yet*, until someone on
   the project's team says whether it is right. It counts as true in the meantime. One memo at a

@@ -2,16 +2,24 @@ import { Hono } from "hono";
 import { html } from "hono/html";
 import {
   isReviewDecision,
+  isReviewLane,
+  mergeInReview,
   nextReview,
   nextUnchecked,
   NotAReviewerError,
+  preparedMerge,
+  proposeMerge,
   resolveReview,
   resolveUnchecked,
+  type MergeDraft,
+  type MergeProposal,
   type Memo,
   type PendingReview,
   type ReviewDecision,
+  type ReviewLane,
   type UncheckedMemo,
 } from "@cortex/core";
+import { contextEntryType } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
 import { badge, confidenceMeter, empty, panel, segmented, statusBadge, typeTag } from "../views/components.js";
 import { projectPage } from "../views/project-nav.js";
@@ -29,21 +37,31 @@ export const reviewRoutes = new Hono<WebEnv>();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type Lane = "older" | "new";
+// A form rendered before the lanes existed carries none, and it could only be the older lane's.
+const laneOf = (value: unknown): ReviewLane => {
+  const asked = String(value ?? "");
+  return isReviewLane(asked) ? asked : "older";
+};
 
-const isLane = (value: string): value is Lane => value === "older" || value === "new";
+type Outcome = ReviewDecision | "merge";
 
-const DONE: Record<Lane, Record<ReviewDecision, string>> = {
+const isOutcome = (value: string): value is Outcome => value === "merge" || isReviewDecision(value);
+
+const MERGED = "Merged into one memo, marked verified. The memos it replaces no longer count.";
+
+const DONE: Record<ReviewLane, Record<Outcome, string>> = {
   older: {
     keep: "Kept, and marked verified.",
     discard: "Discarded: it no longer counts as true.",
     modify: "Rewritten, and marked verified.",
+    merge: MERGED,
     skip: "Skipped: it waits behind the rest.",
   },
   new: {
     keep: "Confirmed, and marked verified.",
     discard: "Rejected: agents are no longer told it.",
     modify: "Rewritten, and marked verified.",
+    merge: MERGED,
     skip: "Skipped: it waits behind the rest.",
   },
 };
@@ -56,7 +74,7 @@ interface DecisionWording {
   rewritten: string;
 }
 
-const WORDING: Record<Lane, DecisionWording> = {
+const WORDING: Record<ReviewLane, DecisionWording> = {
   older: {
     question: "Does this still hold?",
     keep: "It still holds",
@@ -80,7 +98,10 @@ const notAReviewer = (page: ProjectPage, user: WebEnv["Variables"]["user"]) =>
     user,
   );
 
-function memoPanel(memo: Memo, opts: { question?: boolean; similarity?: number } = {}): Html {
+const MERGE_FORM = "merge-form";
+
+/** The checkbox sits in the memo's panel, outside the merge form, so it joins that form through `form=`. */
+function memoPanel(memo: Memo, opts: { question?: boolean; similarity?: number; pickedFor?: string } = {}): Html {
   const day = memo.createdAt.toISOString().slice(0, 10);
   return html`<article class="memo-panel ${opts.question ? "question" : ""}">
     <div class="memo-meta">
@@ -92,10 +113,15 @@ function memoPanel(memo: Memo, opts: { question?: boolean; similarity?: number }
     <h3 class="memo-title"><a href="/entry/${memo.id}">${memo.title}</a></h3>
     <p class="memo-text">${memo.content}</p>
     ${opts.question ? html`<div class="memo-foot">${statusBadge(memo.status)} ${confidenceMeter(memo.confidence)}</div>` : ""}
+    ${opts.pickedFor
+      ? html`<div class="memo-foot">
+          <label class="check"><input type="checkbox" form="${opts.pickedFor}" name="with" value="${memo.id}" checked> Merge this one in</label>
+        </div>`
+      : ""}
   </article>`;
 }
 
-function decisionForm(action: string, lane: Lane, memoId: string, decision: ReviewDecision, label: string, style: string, key: string): Html {
+function decisionForm(action: string, lane: ReviewLane, memoId: string, decision: ReviewDecision, label: string, style: string, key: string): Html {
   return html`<form method="post" action="${action}" data-decision="${decision}">
     <input type="hidden" name="lane" value="${lane}">
     <input type="hidden" name="memo" value="${memoId}">
@@ -104,7 +130,17 @@ function decisionForm(action: string, lane: Lane, memoId: string, decision: Revi
   </form>`;
 }
 
-function decisionPanel(page: ProjectPage, lane: Lane, memo: Memo): Html {
+/** A GET: it only asks for a draft, and nothing changes until the merged memo is saved. */
+function mergeForm(action: string, lane: ReviewLane, memoId: string, others: Memo[]): Html {
+  return html`<form method="get" action="${action}/merge" id="${MERGE_FORM}" data-decision="merge">
+    <input type="hidden" name="lane" value="${lane}">
+    <input type="hidden" name="memo" value="${memoId}">
+    ${others.length === 1 ? html`<input type="hidden" name="with" value="${others[0]!.id}">` : ""}
+    <button class="secondary" type="submit">Merge them into one<kbd class="key-hint" data-key-hint hidden>M</kbd></button>
+  </form>`;
+}
+
+function decisionPanel(page: ProjectPage, lane: ReviewLane, memo: Memo, others: Memo[]): Html {
   const action = `/p/${page.project.slug}/review`;
   const words = WORDING[lane];
   return html`${panel(
@@ -112,6 +148,7 @@ function decisionPanel(page: ProjectPage, lane: Lane, memo: Memo): Html {
     html`<div class="row">
         ${decisionForm(action, lane, memo.id, "keep", words.keep, "secondary", "K")}
         ${decisionForm(action, lane, memo.id, "discard", words.discard, "danger", "D")}
+        ${others.length ? mergeForm(action, lane, memo.id, others) : ""}
         ${decisionForm(action, lane, memo.id, "skip", "Skip for now", "quiet", "S")}
       </div>
       <details class="rewrite" data-rewrite>
@@ -124,14 +161,28 @@ function decisionPanel(page: ProjectPage, lane: Lane, memo: Memo): Html {
           <div class="row"><button type="submit">Save and go to the next</button></div>
         </form>
       </details>`,
-    { help: "Whatever you choose, the next one comes up. Keeping or rewriting it marks it verified." },
+    { help: "Whatever you choose, the next one comes up. Keeping or rewriting it marks it verified; merging replaces them with one memo, verified." },
   )}
     <script src="/review.js?v=${ASSET_VERSION}" defer></script>`;
 }
 
+const pickable = (others: unknown[]) => (others.length > 1 ? MERGE_FORM : undefined);
+
+/** Drafted ahead by the worker (ADR-0096); without one the screen shows nothing rather than wait on a model. */
+function preparedPanel(prepared: MergeDraft | null): Html {
+  if (!prepared) return html``;
+  return html`<section class="prepared-merge">
+    <h2 class="compare-label">Merged, the agent would make it this · nothing changes unless you merge them</h2>
+    <article class="memo-panel">
+      <h3 class="memo-title">${prepared.title}</h3>
+      <p class="memo-text">${prepared.content}</p>
+    </article>
+  </section>`;
+}
+
 const waitingIn = (n: number) => `${n} ${n === 1 ? "memo waits" : "memos wait"} in this lane.`;
 
-function olderScreen(page: ProjectPage, review: PendingReview): Html {
+function olderScreen(page: ProjectPage, review: PendingReview, prepared: MergeDraft | null): Html {
   const { memo, newer } = review;
   return html`
     <p class="sub lead">
@@ -145,13 +196,14 @@ function olderScreen(page: ProjectPage, review: PendingReview): Html {
       </section>
       <section>
         <h2 class="compare-label">${newer.length === 1 ? "What came in since" : `What came in since (${newer.length})`} · taken as true</h2>
-        <div class="stack">${newer.map((n) => memoPanel(n.memo, { similarity: n.similarity }))}</div>
+        <div class="stack">${newer.map((n) => memoPanel(n.memo, { similarity: n.similarity, pickedFor: pickable(newer) }))}</div>
       </section>
     </div>
-    ${decisionPanel(page, "older", memo)}`;
+    ${preparedPanel(prepared)}
+    ${decisionPanel(page, "older", memo, newer.map((n) => n.memo))}`;
 }
 
-function uncheckedScreen(page: ProjectPage, unchecked: UncheckedMemo): Html {
+function uncheckedScreen(page: ProjectPage, unchecked: UncheckedMemo, prepared: MergeDraft | null): Html {
   const { memo, touches } = unchecked;
   return html`
     <p class="sub lead">
@@ -166,14 +218,47 @@ function uncheckedScreen(page: ProjectPage, unchecked: UncheckedMemo): Html {
       ${touches.length
         ? html`<section>
             <h2 class="compare-label">${touches.length === 1 ? "The older memo it touches" : `The older memos it touches (${touches.length})`} · waiting in the other lane</h2>
-            <div class="stack">${touches.map((t) => memoPanel(t.memo, { similarity: t.similarity }))}</div>
+            <div class="stack">${touches.map((t) => memoPanel(t.memo, { similarity: t.similarity, pickedFor: pickable(touches) }))}</div>
           </section>`
         : ""}
     </div>
-    ${decisionPanel(page, "new", memo)}`;
+    ${preparedPanel(prepared)}
+    ${decisionPanel(page, "new", memo, touches.map((t) => t.memo))}`;
 }
 
-function laneNav(page: ProjectPage, lane: Lane): Html {
+function mergeScreen(page: ProjectPage, lane: ReviewLane, memoId: string, proposal: MergeProposal): Html {
+  const action = `/p/${page.project.slug}/review`;
+  const lead = proposal.drafted
+    ? "The consolidation agent drafted one memo from these. Correct whatever it got wrong: saving replaces them with it, marked verified."
+    : "No model drafted this merge, so their texts are put together, the newest first, for you to merge. Saving replaces them with it, marked verified.";
+  return html`
+    <p class="sub lead">${lead}</p>
+    <div class="compare">
+      <section>
+        <h2 class="compare-label">What it replaces (${proposal.memos.length}) · oldest first</h2>
+        <div class="stack">${proposal.memos.map((m) => memoPanel(m, { question: m.id === memoId }))}</div>
+      </section>
+      <section>
+        <h2 class="compare-label">The merged memo · yours to edit</h2>
+        <form method="post" action="${action}/merge" class="memo-panel merge-form" aria-label="The merged memo">
+          <input type="hidden" name="lane" value="${lane}">
+          <input type="hidden" name="memo" value="${memoId}">
+          ${proposal.memos.filter((m) => m.id !== memoId).map((m) => html`<input type="hidden" name="with" value="${m.id}">`)}
+          <input type="text" name="title" value="${proposal.title}" required aria-label="Title" class="wide">
+          <textarea name="content" rows="14" required aria-label="Text">${proposal.content}</textarea>
+          <div class="row">
+            <select name="type" aria-label="Type">
+              ${contextEntryType.options.map((t) => html`<option value="${t}" ${t === proposal.type ? "selected" : ""}>${t}</option>`)}
+            </select>
+            <button type="submit">Save it and go to the next</button>
+            <a class="button quiet" href="${action}?lane=${lane}">Back</a>
+          </div>
+        </form>
+      </section>
+    </div>`;
+}
+
+function laneNav(page: ProjectPage, lane: ReviewLane): Html {
   const base = `/p/${page.project.slug}/review`;
   return html`<div class="list-controls">${segmented("Review lanes", [
     { label: "Touched by something newer", href: `${base}?lane=older`, on: lane === "older", count: page.pendingReviews },
@@ -182,7 +267,7 @@ function laneNav(page: ProjectPage, lane: Lane): Html {
 }
 
 /** An empty lane points at the other one when something waits there: an empty screen is a dead end. */
-function emptyLane(page: ProjectPage, lane: Lane): Html {
+function emptyLane(page: ProjectPage, lane: ReviewLane): Html {
   const base = `/p/${page.project.slug}/review`;
   const other =
     lane === "older"
@@ -200,8 +285,8 @@ function emptyLane(page: ProjectPage, lane: Lane): Html {
 }
 
 /** Without a lane asked for, the first one with something in it. */
-function laneShown(asked: string | undefined, page: ProjectPage): Lane {
-  if (asked && isLane(asked)) return asked;
+function laneShown(asked: string | undefined, page: ProjectPage): ReviewLane {
+  if (asked && isReviewLane(asked)) return asked;
   return page.pendingReviews === 0 && page.uncheckedMemos > 0 ? "new" : "older";
 }
 
@@ -213,14 +298,16 @@ reviewRoutes.get("/p/:slug/review", async (c) => {
 
   const lane = laneShown(c.req.query("lane"), page);
   const done = c.req.query("done") ?? "";
-  const flash = isReviewDecision(done) ? html`<p class="flash" role="status">${DONE[lane][done]}</p>` : html``;
+  const flash = isOutcome(done) ? html`<p class="flash" role="status">${DONE[lane][done]}</p>` : html``;
   let screen: Html;
   if (lane === "older") {
     const review = await nextReview(page.project);
-    screen = review ? olderScreen(page, review) : emptyLane(page, lane);
+    screen = review ? olderScreen(page, review, await preparedMerge([review.memo, ...review.newer.map((n) => n.memo)])) : emptyLane(page, lane);
   } else {
     const unchecked = await nextUnchecked(page.project);
-    screen = unchecked ? uncheckedScreen(page, unchecked) : emptyLane(page, lane);
+    const touched = unchecked?.touches.map((t) => t.memo) ?? [];
+    const prepared = unchecked && touched.length > 0 ? await preparedMerge([unchecked.memo, ...touched]) : null;
+    screen = unchecked ? uncheckedScreen(page, unchecked, prepared) : emptyLane(page, lane);
   }
   return c.html(layout(`Review · ${page.project.name}`, projectPage(page, "review", html`${flash}${laneNav(page, lane)}${screen}`), user));
 });
@@ -232,9 +319,7 @@ reviewRoutes.post("/p/:slug/review", async (c) => {
   const next = `/p/${page.project.slug}/review`;
 
   const form = await c.req.parseBody();
-  // A form rendered before the lanes existed carries none, and it could only be the older lane's.
-  const askedLane = String(form.lane ?? "");
-  const lane: Lane = isLane(askedLane) ? askedLane : "older";
+  const lane = laneOf(form.lane);
   const memoId = String(form.memo ?? "");
   const decision = String(form.decision ?? "");
   if (!UUID.test(memoId) || !isReviewDecision(decision)) return c.redirect(`${next}?lane=${lane}`);
@@ -246,4 +331,43 @@ reviewRoutes.post("/p/:slug/review", async (c) => {
     throw e;
   }
   return c.redirect(`${next}?lane=${lane}&done=${decision}`);
+});
+
+/** A merge that no longer applies -- the memo was decided meanwhile, nothing left to merge it with -- goes back to the lane. */
+reviewRoutes.get("/p/:slug/review/merge", async (c) => {
+  const user = c.get("user");
+  const page = await requireProjectPage(c, c.req.param("slug"));
+  if (page instanceof Response) return page;
+  if (!page.reviewer || !user) return c.html(notAReviewer(page, user), 403);
+
+  const lane = laneOf(c.req.query("lane"));
+  const back = `/p/${page.project.slug}/review?lane=${lane}`;
+  const memoId = c.req.query("memo") ?? "";
+  const withIds = (c.req.queries("with") ?? []).filter((id) => UUID.test(id));
+  if (!UUID.test(memoId)) return c.redirect(back);
+  const proposal = await proposeMerge(page.project, lane, memoId, withIds, user);
+  if (!proposal) return c.redirect(back);
+  return c.html(layout(`Merge · ${page.project.name}`, projectPage(page, "review", mergeScreen(page, lane, memoId, proposal)), user));
+});
+
+reviewRoutes.post("/p/:slug/review/merge", async (c) => {
+  const user = c.get("user")!;
+  const page = await requireProjectPage(c, c.req.param("slug"));
+  if (page instanceof Response) return page;
+
+  const form = await c.req.parseBody({ all: true });
+  const lane = laneOf(form.lane);
+  const next = `/p/${page.project.slug}/review?lane=${lane}`;
+  const memoId = String(form.memo ?? "");
+  const withIds = [form.with ?? []].flat().map(String).filter((id) => UUID.test(id));
+  const type = contextEntryType.safeParse(form.type);
+  if (!UUID.test(memoId) || !type.success || typeof form.content !== "string") return c.redirect(next);
+  const draft = { title: String(form.title ?? ""), content: form.content, type: type.data };
+  try {
+    const merged = await mergeInReview(page.project, lane, memoId, withIds, draft, user);
+    return c.redirect(merged ? `${next}&done=merge` : next);
+  } catch (e) {
+    if (e instanceof NotAReviewerError) return c.html(notAReviewer(page, user), 403);
+    throw e;
+  }
 });

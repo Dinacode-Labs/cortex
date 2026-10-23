@@ -89,7 +89,7 @@ What agents see, Map, Code — and Settings apart. Review says how many memos wa
 /p/<slug>               Memory           what is remembered, filtered and ordered, plus "Add"
 /p/<slug>/review        Review           two lanes, one memo at a time: an older memo something newer
                                          is about, and a new memo nobody has checked; every decision
-                                         brings the next (its team only)
+                                         brings the next, merging them into one included (its team only)
 /p/<slug>/ask           Ask
 /p/<slug>/agents        What agents see  the pack, with every entry linked
 /p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked, a clash settled

@@ -10,6 +10,17 @@ export * from "./knowledge/application/review.js";
 export { isAwaitingReview, nextReview, pendingReviewCount, queueReviewsOfBatch, reviewsAwaiting, REVIEW_THRESHOLD } from "./knowledge/application/review-queue.js";
 export { isReviewDecision, type NewerMemo, type OlderMemo, type PendingReview, type ReviewDecision } from "./knowledge/domain/review-queue.js";
 export { nextUnchecked, uncheckedCount } from "./knowledge/application/verification-queue.js";
+export {
+  draftMergesAhead,
+  mergeInReview,
+  MERGE_DRAFTS_AHEAD,
+  preparedMerge,
+  proposeMerge,
+  pruneMergeDrafts,
+  setMergeDrafter,
+  type MergeDrafter,
+} from "./knowledge/application/review-merge.js";
+export { isReviewLane, type MergeDraft, type MergedMemo, type MergeProposal, type MergeSource, type ReviewLane } from "./knowledge/domain/memo-merge.js";
 export type { UncheckedMemo } from "./knowledge/domain/verification-queue.js";
 export * from "./knowledge/application/queries.js";
 export * from "./knowledge/application/render.js";

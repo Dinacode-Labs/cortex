@@ -24,13 +24,18 @@ export class PgVerificationQueue implements VerificationQueue {
   }
 
   async next(projectId: string, typeOrder: readonly MemoType[]): Promise<Memo | null> {
-    const [row] = (await this.sql`
+    const [head] = await this.upcoming(projectId, typeOrder, 1);
+    return head ?? null;
+  }
+
+  async upcoming(projectId: string, typeOrder: readonly MemoType[], limit: number): Promise<Memo[]> {
+    const rows = (await this.sql`
       SELECT *
         FROM (${this.live([projectId])}) live
        ORDER BY check_skipped_at ASC NULLS FIRST, array_position(${[...typeOrder]}::text[], type) ASC NULLS LAST, created_at DESC
-       LIMIT 1
+       LIMIT ${limit}
     `) as unknown as Row[];
-    return row ? rowToMemo(row) : null;
+    return rows.map(rowToMemo);
   }
 
   async pendingCount(projectId: string): Promise<number> {

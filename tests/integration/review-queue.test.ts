@@ -4,13 +4,18 @@ import {
   addProjectMember,
   captureBatch,
   createProject,
+  draftMergesAhead,
   getEntryDetail,
   nextReview,
   nextUnchecked,
   pendingReviewCount,
+  pruneMergeDrafts,
+  purgeEntries,
   requestOtp,
   saveContext,
+  setMergeDrafter,
   uncheckedCount,
+  updateEntryFields,
   validateEntry,
   verifyOtp,
   type MemoType,
@@ -32,6 +37,10 @@ const BACKOFF = [
 const DEPLOYS = [
   "Deploys go out on Tuesdays after the release review.",
   "Deploys go out on Tuesdays after the release review, and never on a Friday.",
+] as const;
+const INVOICES = [
+  "Invoices are archived for seven years in the audit bucket.",
+  "Invoices are archived for seven years in the audit bucket, and encrypted at rest.",
 ] as const;
 
 async function cookieFor(email: string): Promise<string> {
@@ -422,5 +431,320 @@ describe("a memo nobody has checked yet", () => {
     const id = await save(project, `Backups are kept for thirty days ${RID}.`);
     expect((await check(project, id, "keep", outsiderCookie)).status).toBe(403);
     expect(await uncheckedCount(project)).toBe(1);
+  });
+});
+
+function merge(project: ProjectRef, fields: { memo: string; with: string[]; content: string; title?: string; type?: string; lane?: string }, cookie = ownerCookie) {
+  const body = new URLSearchParams({ lane: fields.lane ?? "older", memo: fields.memo, title: fields.title ?? "Retry backoff", content: fields.content, type: fields.type ?? "decision" });
+  for (const id of fields.with) body.append("with", id);
+  return createWebApp().request(`/p/${project.slug}/review/merge`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+}
+
+const mergeScreen = (project: ProjectRef, memo: string, withIds: string[], lane = "older", cookie = ownerCookie) => {
+  const query = new URLSearchParams({ lane, memo });
+  for (const id of withIds) query.append("with", id);
+  return page(`/p/${project.slug}/review/merge?${query}`, cookie);
+};
+
+const draftIn = (html: string) => html.match(/<textarea name="content"[^>]*>([\s\S]*?)<\/textarea>/)?.[1] ?? "";
+
+/*
+ * Two memos that look alike are not always one right and one wrong: each can hold part of it. Review
+ * only let a person keep, discard or rewrite one of them, so what the other one added was lost or
+ * copied over by hand (ADR-0096).
+ */
+describe("merging them into one", () => {
+  it("is offered next to the other decisions, in both lanes, when there is something to merge with", async () => {
+    const project = await newProject("merge-offer");
+    const { stale, fresh } = await staleAndFresh(project);
+    const alone = await save(project, `Feature flags live in the config service ${RID}.`);
+
+    const older = await (await page(`/p/${project.slug}/review?lane=older`)).text();
+    expect(older).toContain(`action="/p/${project.slug}/review/merge"`);
+    expect(older).toContain(`name="with" value="${fresh}"`);
+    expect(older).toContain(`name="memo" value="${stale}"`);
+    await check(project, fresh, "keep");
+    await check(project, stale, "keep");
+    const lonely = await (await page(`/p/${project.slug}/review?lane=new`)).text();
+    expect(lonely).toContain(`name="memo" value="${alone}"`);
+    expect(lonely).not.toContain("review/merge");
+  });
+
+  it("without a model, the texts are put together, the newest first, for a person to merge", async () => {
+    const project = await newProject("merge-by-hand");
+    const { stale, fresh } = await staleAndFresh(project);
+
+    const html = await (await mergeScreen(project, stale, [fresh])).text();
+    expect(html).toContain("No model drafted this merge");
+    expect(draftIn(html)).toBe(`${BACKOFF[1]}\n\n${BACKOFF[0]}`);
+  });
+
+  it("with the consolidation agent wired, its draft is what the person edits, and it saw both memos oldest first", async () => {
+    const project = await newProject("merge-drafted");
+    const { stale, fresh } = await staleAndFresh(project);
+    const seen: { contents: string[]; projectId: string | null }[] = [];
+    setMergeDrafter(async (memos, context) => {
+      seen.push({ contents: memos.map((m) => m.content), projectId: context.projectId });
+      return { title: "Retry backoff", content: "Exponential, capped at 60 s, with random jitter." };
+    });
+    try {
+      const html = await (await mergeScreen(project, stale, [fresh])).text();
+      expect(html).toContain("The consolidation agent drafted one memo");
+      expect(draftIn(html)).toBe("Exponential, capped at 60 s, with random jitter.");
+      expect(seen).toEqual([{ contents: [...BACKOFF], projectId: project.id }]);
+    } finally {
+      setMergeDrafter(null);
+    }
+  });
+
+  it("a draft that fails leaves the texts for the person, rather than an error page", async () => {
+    const project = await newProject("merge-failed");
+    const { stale, fresh } = await staleAndFresh(project);
+    setMergeDrafter(async () => {
+      throw new Error("the provider timed out");
+    });
+    try {
+      const res = await mergeScreen(project, stale, [fresh]);
+      expect(res.status).toBe(200);
+      expect(draftIn(await res.text())).toContain(BACKOFF[0]);
+    } finally {
+      setMergeDrafter(null);
+    }
+  });
+
+  it("saving it replaces both with one memo, a person's, scrubbed and verified, and empties both lanes", async () => {
+    const project = await newProject("merge-save");
+    const { stale, fresh } = await staleAndFresh(project);
+
+    const res = await merge(project, {
+      memo: stale,
+      with: [fresh],
+      type: "constraint",
+      content: "Exponential backoff, capped at 60 s, with jitter. Token: sk-abcdefghijklmnopqrstuvwxyz123456",
+    });
+    expect(res.headers.get("location")).toBe(`/p/${project.slug}/review?lane=older&done=merge`);
+
+    const replaced = [(await getEntryDetail(stale))!.entry, (await getEntryDetail(fresh))!.entry];
+    const mergedId = replaced[0]!.supersededBy!;
+    expect(replaced.map((m) => [m.status, m.supersededBy])).toEqual([
+      ["superseded", mergedId],
+      ["superseded", mergedId],
+    ]);
+    const merged = (await getEntryDetail(mergedId))!.entry;
+    expect([merged.title, merged.type, merged.status, merged.confidence, merged.sourceType, merged.createdBy, merged.projectId]).toEqual([
+      "Retry backoff",
+      "constraint",
+      "validated",
+      "verified",
+      "manual",
+      OWNER,
+      project.id,
+    ]);
+    expect(merged.content).toContain("Exponential backoff, capped at 60 s, with jitter.");
+    expect(merged.content).not.toContain("sk-abcdefghijklmnopqrstuvwxyz123456");
+    expect([await pendingReviewCount(project), await uncheckedCount(project)]).toEqual([0, 0]);
+    const resolutions = (await getSql()`SELECT DISTINCT resolution FROM review_queue WHERE memo_id = ${stale}`) as unknown as { resolution: string }[];
+    expect(resolutions.map((r) => r.resolution)).toEqual(["merged"]);
+    expect(await (await page(res.headers.get("location")!)).text()).toContain("Merged into one memo, marked verified.");
+  });
+
+  it("with several newer memos, only the ones left ticked are merged in", async () => {
+    const project = await newProject("merge-pick");
+    const stale = await save(project, BACKOFF[0]);
+    const ticked = await save(project, BACKOFF[1]);
+    const unticked = await save(project, "The retry backoff is exponential, capped at 60 seconds, with jitter on every outbound call.");
+
+    const html = await (await page(`/p/${project.slug}/review?lane=older`)).text();
+    for (const id of [ticked, unticked]) expect(html).toContain(`form="merge-form" name="with" value="${id}" checked`);
+    await merge(project, { memo: stale, with: [ticked], content: "Exponential backoff, capped at 60 s." });
+
+    expect((await getEntryDetail(ticked))!.entry.status).toBe("superseded");
+    expect((await getEntryDetail(unticked))!.entry.validTo).toBeNull();
+  });
+
+  it("a memo the screen did not show cannot be merged in", async () => {
+    const project = await newProject("merge-foreign");
+    const { stale } = await staleAndFresh(project);
+    const foreign = await save(project, `Invoices are signed with the vendor key ${RID}.`);
+
+    await merge(project, { memo: stale, with: [foreign], content: "Anything at all." });
+
+    expect([(await getEntryDetail(stale))!.entry.supersededBy, (await getEntryDetail(foreign))!.entry.supersededBy]).toEqual([null, null]);
+    expect(await pendingReviewCount(project)).toBe(1);
+  });
+
+  it("in the new lane, a new memo merges with the older one it touches", async () => {
+    const project = await newProject("merge-new-lane");
+    const { stale, fresh } = await staleAndFresh(project);
+
+    const res = await merge(project, { lane: "new", memo: fresh, with: [stale], content: "Exponential backoff, capped at 60 s." });
+
+    expect(res.headers.get("location")).toBe(`/p/${project.slug}/review?lane=new&done=merge`);
+    expect([(await getEntryDetail(stale))!.entry.status, (await getEntryDetail(fresh))!.entry.status]).toEqual(["superseded", "superseded"]);
+    expect([await pendingReviewCount(project), await uncheckedCount(project)]).toEqual([0, 0]);
+  });
+
+  it("a second save of the same merge adds nothing", async () => {
+    const project = await newProject("merge-twice");
+    const { stale, fresh } = await staleAndFresh(project);
+    await merge(project, { memo: stale, with: [fresh], content: "Exponential backoff, capped at 60 s." });
+    const again = await merge(project, { memo: stale, with: [fresh], content: "Exponential backoff, capped at 60 s." });
+
+    expect(again.headers.get("location")).toBe(`/p/${project.slug}/review?lane=older`);
+    const merged = (await getSql()`SELECT id FROM memos WHERE project_id = ${project.id} AND metadata ? 'mergedFrom'`) as unknown as unknown[];
+    expect(merged).toHaveLength(1);
+  });
+
+  it("someone off the team can neither ask for a draft nor save one", async () => {
+    const project = await newProject("merge-outsider");
+    const { stale, fresh } = await staleAndFresh(project);
+
+    expect((await mergeScreen(project, stale, [fresh], "older", outsiderCookie)).status).toBe(403);
+    expect((await merge(project, { memo: stale, with: [fresh], content: "Hijacked." }, outsiderCookie)).status).toBe(403);
+    expect((await getEntryDetail(stale))!.entry.supersededBy).toBeNull();
+  });
+});
+
+/** A drafter that answers at once and counts how often it was asked. */
+function countingDrafter(answer: () => { title: string; content: string } | null = () => ({ title: "Retry backoff", content: "Merged ahead." })) {
+  const calls: string[][] = [];
+  setMergeDrafter(async (memos) => {
+    calls.push(memos.map((m) => m.content));
+    const drafted = answer();
+    if (!drafted) throw new Error("the provider timed out");
+    return drafted;
+  });
+  return calls;
+}
+
+const draftsQuoting = async (memoId: string) =>
+  ((await getSql()`SELECT 1 FROM merge_drafts WHERE ${memoId}::uuid = ANY(memo_ids)`) as unknown as unknown[]).length;
+
+/*
+ * Drafting a merge only when the person asked for it left them waiting on the model on the very
+ * screen meant to be fast, and the agent proposed nothing until asked (ADR-0096).
+ */
+describe("the merge drafted ahead", () => {
+  it("is waiting on the review when the person gets there, and is drafted once", async () => {
+    const project = await newProject("ahead");
+    await staleAndFresh(project);
+    const calls = countingDrafter();
+    try {
+      expect(await draftMergesAhead([project.id])).toBe(1);
+      expect(await draftMergesAhead([project.id])).toBe(0);
+      expect(calls).toEqual([[...BACKOFF]]);
+
+      for (const lane of ["older", "new"]) {
+        const html = await (await page(`/p/${project.slug}/review?lane=${lane}`)).text();
+        expect(html).toContain("Merged, the agent would make it this");
+        expect(html).toContain("Merged ahead.");
+      }
+    } finally {
+      setMergeDrafter(null);
+    }
+  });
+
+  it("opening the merge uses it, without asking the model again", async () => {
+    const project = await newProject("ahead-open");
+    const { stale, fresh } = await staleAndFresh(project);
+    const calls = countingDrafter();
+    try {
+      await draftMergesAhead([project.id]);
+      const html = await (await mergeScreen(project, stale, [fresh])).text();
+      expect(draftIn(html)).toBe("Merged ahead.");
+      expect(calls).toHaveLength(1);
+    } finally {
+      setMergeDrafter(null);
+    }
+  });
+
+  it("is drafted again once one of its memos is rewritten, and not shown meanwhile", async () => {
+    const project = await newProject("ahead-stale");
+    const { fresh } = await staleAndFresh(project);
+    const calls = countingDrafter();
+    try {
+      await draftMergesAhead([project.id]);
+      await updateEntryFields(fresh, { content: `${BACKOFF[1]} Every outbound call.` });
+      expect(await (await page(`/p/${project.slug}/review?lane=older`)).text()).not.toContain("Merged ahead.");
+
+      expect(await draftMergesAhead([project.id])).toBe(1);
+      expect(calls).toHaveLength(2);
+    } finally {
+      setMergeDrafter(null);
+    }
+  });
+
+  it("only the next few of each lane, not the whole queue", async () => {
+    const project = await newProject("ahead-window");
+    for (const pair of [BACKOFF, DEPLOYS, INVOICES]) await staleAndFresh(project, pair);
+    expect(await pendingReviewCount(project)).toBe(3);
+    countingDrafter();
+    try {
+      // One review per lane, and the two lanes may lead with different pairs.
+      const ahead = await draftMergesAhead([project.id], 1);
+      expect(ahead).toBeLessThan(3);
+      expect(await draftMergesAhead([project.id])).toBe(3 - ahead);
+    } finally {
+      setMergeDrafter(null);
+    }
+  });
+
+  it("a draft that failed is not asked for on every pass, and the button still asks for one", async () => {
+    const project = await newProject("ahead-failed");
+    const { stale, fresh } = await staleAndFresh(project);
+    let fails = true;
+    const calls = countingDrafter(() => (fails ? null : { title: "Retry backoff", content: "Merged on request." }));
+    try {
+      expect(await draftMergesAhead([project.id])).toBe(0);
+      expect(await draftMergesAhead([project.id])).toBe(0);
+      expect(calls).toHaveLength(1);
+
+      fails = false;
+      expect(draftIn(await (await mergeScreen(project, stale, [fresh])).text())).toBe("Merged on request.");
+      expect(await (await page(`/p/${project.slug}/review?lane=older`)).text()).toContain("Merged on request.");
+    } finally {
+      setMergeDrafter(null);
+    }
+  });
+
+  it("without a model nothing is drafted ahead, and the review shows no proposal", async () => {
+    const project = await newProject("ahead-none");
+    await staleAndFresh(project);
+    expect(await draftMergesAhead([project.id])).toBe(0);
+    expect(await (await page(`/p/${project.slug}/review?lane=older`)).text()).not.toContain("Merged, the agent would make it this");
+  });
+
+  it("purging a memo deletes every draft that quotes it", async () => {
+    const project = await newProject("ahead-purge");
+    const { stale } = await staleAndFresh(project);
+    countingDrafter();
+    try {
+      await draftMergesAhead([project.id]);
+    } finally {
+      setMergeDrafter(null);
+    }
+    expect(await draftsQuoting(stale)).toBe(1);
+
+    await purgeEntries([stale], { email: OWNER });
+    expect(await draftsQuoting(stale)).toBe(0);
+  });
+
+  it("is dropped once its review is over", async () => {
+    const project = await newProject("ahead-prune");
+    const { stale, fresh } = await staleAndFresh(project);
+    countingDrafter();
+    try {
+      await draftMergesAhead([project.id]);
+    } finally {
+      setMergeDrafter(null);
+    }
+    await merge(project, { memo: stale, with: [fresh], content: "Exponential backoff, capped at 60 s." });
+
+    await pruneMergeDrafts();
+    expect(await draftsQuoting(stale)).toBe(0);
   });
 });

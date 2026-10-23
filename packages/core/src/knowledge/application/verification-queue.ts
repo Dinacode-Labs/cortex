@@ -5,7 +5,7 @@ import type { ProjectRef } from "../../projects/domain/project.js";
 import { PACK_SECTIONS } from "./context-pack.js";
 
 /** What the pack hands over first is what a wrong memo misleads most with (ADR-0093). */
-const CHECK_ORDER = PACK_SECTIONS.map((s) => s.type);
+export const CHECK_ORDER = PACK_SECTIONS.map((s) => s.type);
 
 export async function queueForVerification(memo: Memo): Promise<void> {
   if (!memo.projectId) return;
