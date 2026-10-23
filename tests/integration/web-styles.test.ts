@@ -86,6 +86,7 @@ describe("the UI's styles", () => {
       "/search?q=decision",
       "/admin/usage",
       "/admin/agents",
+      "/unsubscribe/not-a-token",
     ];
     const sinEstilo = new Set<string>();
     const painted: string[] = [];

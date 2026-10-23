@@ -1,6 +1,7 @@
 import type { Row, Sql } from "@cortex/database";
 import { rowToMemo } from "./memo.row.js";
 import type { Memo, MemoType } from "../domain/memo.js";
+import type { QueuedMemo } from "../domain/review-queue.js";
 import type { VerificationQueue } from "../domain/verification-queue.js";
 
 export class PgVerificationQueue implements VerificationQueue {
@@ -14,7 +15,7 @@ export class PgVerificationQueue implements VerificationQueue {
   // (ADR-0090), or once the memo is no longer in force.
   private live(projectIds: string[]) {
     return this.sql`
-      SELECT m.*, q.skipped_at AS check_skipped_at
+      SELECT m.*, q.skipped_at AS check_skipped_at, q.created_at AS queued_at
         FROM verification_queue q
         JOIN memos m ON m.id = q.memo_id
        WHERE m.project_id = ANY(${projectIds})
@@ -49,6 +50,17 @@ export class PgVerificationQueue implements VerificationQueue {
       SELECT project_id, count(*)::int AS n FROM (${this.live(projectIds)}) live GROUP BY project_id
     `) as unknown as Row[];
     return new Map(rows.map((r) => [r.project_id as string, Number(r.n)]));
+  }
+
+  async queuedMemos(projectIds: string[]): Promise<Map<string, QueuedMemo[]>> {
+    if (projectIds.length === 0) return new Map();
+    const rows = (await this.sql`SELECT project_id, id, queued_at FROM (${this.live(projectIds)}) live`) as unknown as Row[];
+    const queued = new Map<string, QueuedMemo[]>();
+    for (const r of rows) {
+      const projectId = r.project_id as string;
+      queued.set(projectId, [...(queued.get(projectId) ?? []), { memoId: r.id as string, lastQueuedAt: new Date(r.queued_at as string) }]);
+    }
+    return queued;
   }
 
   async isPending(projectId: string, memoId: string): Promise<boolean> {

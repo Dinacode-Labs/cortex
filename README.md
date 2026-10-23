@@ -265,7 +265,9 @@ mistake you notice later.
   them into one, skip) lands on the next one; a merge is drafted ahead by an agent, shown next to
   the memos, and edited by the person before it replaces them. Only the project's team judges its memos
   ([ADR-0091](docs/decisions.md#adr-0091), [ADR-0093](docs/decisions.md#adr-0093),
-  [ADR-0096](docs/decisions.md#adr-0096)).
+  [ADR-0096](docs/decisions.md#adr-0096)). Whoever switches it on in a project's settings gets
+  one email a day when something new waits there, saying how many and never what
+  ([ADR-0097](docs/decisions.md#adr-0097)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.
   Sub-projects **inherit** from their parent.
 - **Agents you can tune.** What each of the seven agents judges by — what the distiller keeps,
@@ -457,7 +459,7 @@ pnpm db:up && pnpm db:migrate # Postgres + pgvector on host port 5433, plus the 
 pnpm admin server             # HTTP API and auth on 8787; also serves /install.sh
 pnpm web                      # web UI on 8080
 pnpm admin mcp-http           # authenticated MCP over HTTP on 8788
-pnpm admin maintain-worker    # scheduled maintenance, and the merges Review proposes
+pnpm admin maintain-worker    # scheduled maintenance, Review's merge drafts and the daily digest
 ```
 
 - **Two binaries, deliberately.** `cortex` is the **developer** CLI: auth, link, setup,

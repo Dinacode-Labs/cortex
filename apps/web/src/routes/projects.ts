@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import { addProjectMember, deleteProject, getAgentPrompts, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, ProjectNotEmptyError, removeProjectMember, reviewsAwaiting, updateProject, keepsType } from "@cortex/core";
+import { addProjectMember, deleteProject, getAgentPrompts, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, NotAReviewerError, ProjectNotEmptyError, removeProjectMember, reviewDigestOn, reviewsAwaiting, setReviewDigest, updateProject, keepsType } from "@cortex/core";
 import {
   contextEntryType,
   getBrandName,
@@ -104,11 +104,13 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const user = c.get("user")!;
   const res = await requireProjectPage(c, c.req.param("slug"));
   if (res instanceof Response) return res;
-  const { project, manager } = res;
+  const { project, manager, reviewer } = res;
+  const notifications = reviewer ? reviewDigestPanel(project.slug!, await reviewDigestOn(user, project)) : "";
 
   // Whoever cannot manage sees who to ask, rather than a dead-end 403.
   if (!manager) {
     const body = projectPage(res, "settings", html`
+      ${notifications}
       <div class="panel">
         <h2>Access</h2>
         <p class="sub">
@@ -131,6 +133,8 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
 
   const body = projectPage(res, "settings", html`
     ${notice ? html`<div class="warn">${notice}</div>` : ""}
+
+    ${notifications}
 
     <div class="panel">
       <h2>Visibility</h2>
@@ -236,11 +240,39 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   return c.html(layout(`${project.name} · Settings`, body, { user }));
 });
 
+function reviewDigestPanel(slug: string, on: boolean) {
+  return html`<div class="panel">
+    <h2>Your notifications</h2>
+    <p class="sub">
+      Once a day, when something new waits in this project's Review, an email says how many — never what the
+      memos say. Only for you, and only for this project.
+    </p>
+    <form class="row" method="post" action="/p/${slug}/settings/review-digest">
+      <label class="check"><input type="checkbox" name="on" value="1" ${on ? "checked" : ""}> Email me what waits in Review</label>
+      <button type="submit">Save</button>
+    </form>
+  </div>`;
+}
+
 /** Turns the domain's refusal into a return to the page with the reason, not into a 500. */
 function backWithError(slug: string, e: unknown): string {
   if (e instanceof NotAManagerError) return `/p/${slug}/settings?error=${encodeURIComponent(e.message)}`;
   throw e;
 }
+
+projectsRoutes.post("/p/:slug/settings/review-digest", async (c) => {
+  const user = c.get("user")!;
+  const slug = c.req.param("slug");
+  const res = await requireProjectPage(c, slug);
+  if (res instanceof Response) return res;
+  try {
+    await setReviewDigest(user, res.project, (await c.req.parseBody()).on === "1");
+  } catch (e) {
+    if (!(e instanceof NotAReviewerError)) throw e;
+    return c.redirect(`/p/${slug}/settings?error=${encodeURIComponent(e.message)}`);
+  }
+  return c.redirect(`/p/${slug}/settings`);
+});
 
 projectsRoutes.post("/p/:slug/settings/visibility", async (c) => {
   const user = c.get("user")!;

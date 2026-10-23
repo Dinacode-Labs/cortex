@@ -29,6 +29,11 @@ export interface PendingReview {
   newer: NewerMemo[];
 }
 
+export interface QueuedMemo {
+  memoId: string;
+  lastQueuedAt: Date;
+}
+
 /**
  * The port behind the Review section (ADR-0091). The queue is per OLDER memo: a person decides
  * about a memo once, whatever number of newer ones arrived about it.
@@ -44,6 +49,7 @@ export interface ReviewQueue {
   pendingCount(projectId: string): Promise<number>;
   /** A project with nothing waiting is absent. */
   pendingCounts(projectIds: string[]): Promise<Map<string, number>>;
+  queuedMemos(projectIds: string[]): Promise<Map<string, QueuedMemo[]>>;
   isPending(projectId: string, memoId: string): Promise<boolean>;
   /** The older memos a newer one raised that still wait, the most alike first. */
   raisedBy(projectId: string, newerMemoId: string): Promise<OlderMemo[]>;

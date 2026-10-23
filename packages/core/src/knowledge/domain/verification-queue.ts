@@ -1,5 +1,5 @@
 import type { Memo, MemoType } from "./memo.js";
-import type { OlderMemo } from "./review-queue.js";
+import type { OlderMemo, QueuedMemo } from "./review-queue.js";
 
 /** A memo nobody has checked, with the older ones it put up for review, so it is judged knowing them. */
 export interface UncheckedMemo {
@@ -20,6 +20,7 @@ export interface VerificationQueue {
   pendingCount(projectId: string): Promise<number>;
   /** A project with nothing waiting is absent. */
   pendingCounts(projectIds: string[]): Promise<Map<string, number>>;
+  queuedMemos(projectIds: string[]): Promise<Map<string, QueuedMemo[]>>;
   isPending(projectId: string, memoId: string): Promise<boolean>;
   skip(memoId: string): Promise<void>;
 }

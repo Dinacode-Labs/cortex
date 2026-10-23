@@ -55,8 +55,9 @@ packages/
   database/    # SQL schema + migrations + Postgres client
   embeddings/  # pluggable provider (local | openai-compatible | openai | voyage)
   core/        # the domain and its use cases: save/search/context-pack, dedup/reconciliation,
-               # lint, bi-temporal, projects/permissions, extract, code indexing. Each module is
-               # domain/ + application/ + infrastructure/ (READ docs/architecture.md)
+               # lint, bi-temporal, projects/permissions, extract, code indexing, the review
+               # digest. Each module is domain/ + application/ + infrastructure/
+               # (READ docs/architecture.md)
   agents/      # the LLM layer (Mastra over an OpenAI-compatible endpoint): classifier, graph,
                # rerank, synthesize, distill, reconcile, maintain
 apps/

@@ -52,7 +52,10 @@ What to check before calling the deployment good:
 - `CORTEX_AUTH_DOMAIN` is not empty. Empty means any email address in the world can register.
   The server warns about it on startup; look for it in the logs.
 - `CORTEX_EMAIL_PROVIDER` is not `log`. With `log`, the sign-in code is only printed to the
-  server's logs and nobody can get in.
+  server's logs and nobody can get in, and the daily review digest only reaches the worker's
+  log. The digest goes at `CORTEX_REVIEW_DIGEST_CRON`, on the worker's clock: UTC unless you
+  give the `worker` service a `TZ`. `cortex-admin review-digest --dry-run` prints what it would
+  send.
 - `CORTEX_VERSION` is a specific version, not `latest`. With `latest`, a restart can change
   version without anybody having decided to.
 

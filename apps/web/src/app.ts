@@ -18,6 +18,7 @@ import { usageRoutes } from "./routes/usage.js";
 import { agentPromptRoutes } from "./routes/agent-prompts.js";
 import { graphRoutes } from "./routes/graph.js";
 import { redirectRoutes } from "./routes/redirects.js";
+import { unsubscribeRoutes } from "./routes/unsubscribe.js";
 
 /**
  * This module has NO import-time effects (neither loadEnv nor serve): `createApp()` only
@@ -60,9 +61,10 @@ export function createApp(): Hono<WebEnv> {
   // /styles.css. When the file does not exist, serveStatic calls next().
   app.use("*", serveStatic({ root: PUBLIC_DIR }));
 
-  // Routes exempt from the gate (the CLI handshake and logout): mounted BEFORE the gate --
-  // registration order is the exemption.
+  // Routes exempt from the gate (the CLI handshake, logout and the digest's unsubscribe link):
+  // mounted BEFORE the gate -- registration order is the exemption.
   app.route("/", authRoutes);
+  app.route("/", unsubscribeRoutes);
 
   app.use("*", sessionGate);
 

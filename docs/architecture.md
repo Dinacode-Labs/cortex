@@ -24,8 +24,8 @@ of `core` uses them.
 
 ## Inside `core`
 
-Every module (`knowledge`, `projects`, `graph`, `auth`, `capture`, `observability`) has the same
-three layers:
+Every module (`knowledge`, `projects`, `graph`, `auth`, `capture`, `observability`,
+`notifications`) has the same three layers:
 
 | Layer | What goes in it | May import |
 | --- | --- | --- |
