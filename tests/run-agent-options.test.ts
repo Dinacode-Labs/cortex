@@ -34,7 +34,7 @@ vi.mock("@cortex/database", () => ({
   getSql: () => Object.assign(() => Promise.resolve([]), { json: (value: unknown) => value }),
 }));
 
-const ROLES = ["classifier", "graph", "reranker", "distiller", "reconciler", "judge", "merger", "retriever"] as const;
+const ROLES = ["classifier", "graph", "reranker", "distiller", "reconciler", "judge", "editor", "merger", "retriever"] as const;
 
 const completion = {
   id: "chatcmpl-test",
@@ -95,6 +95,7 @@ describe("what runAgent asks the provider for", () => {
       distiller: 0,
       reconciler: 0,
       judge: 0,
+      editor: 0,
       merger: undefined,
       retriever: undefined,
     });
@@ -108,11 +109,11 @@ describe("what runAgent asks the provider for", () => {
 describe("the language the agents write in", () => {
   it("is the one the call asks for, for every role that writes prose", async () => {
     const run = await runAgent();
-    const writers = ["classifier", "graph", "distiller", "merger", "retriever", "judge"] as const;
+    const writers = ["classifier", "graph", "distiller", "merger", "retriever", "judge", "editor"] as const;
     for (const role of writers) await run(role, "a prompt", { language: "en" });
 
     const written = Object.fromEntries(writers.map((role, i) => [role, systemMessage(i).includes("English")]));
-    expect(written).toEqual({ classifier: true, graph: true, distiller: true, merger: true, retriever: true, judge: true });
+    expect(written).toEqual({ classifier: true, graph: true, distiller: true, merger: true, retriever: true, judge: true, editor: true });
   });
 
   it("is the server's default when the call names none", async () => {

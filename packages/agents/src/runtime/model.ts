@@ -3,7 +3,7 @@ import { Agent } from "@mastra/core/agent";
 import type { AgentRole } from "./roles.js";
 import { getLlmConfig } from "./llm-config.js";
 
-export const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller", "reconciler", "judge"]);
+export const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller", "reconciler", "judge", "editor"]);
 
 // Some models do not honour Mastra's `structuredOutput` reliably, but with
 // `response_format: json_object` they are fast and valid (ADR-0006/0015).

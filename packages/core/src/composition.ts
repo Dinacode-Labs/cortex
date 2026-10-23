@@ -19,6 +19,8 @@ import type { MergeDraftStore } from "./knowledge/domain/memo-merge.js";
 import { PgMergeDraftStore } from "./knowledge/infrastructure/merge-draft.repository.js";
 import type { SweepLog } from "./knowledge/domain/review-sweep.js";
 import { PgSweepLog } from "./knowledge/infrastructure/sweep-log.repository.js";
+import type { MemoSuggestionStore } from "./knowledge/domain/memo-suggestion.js";
+import { PgMemoSuggestionStore } from "./knowledge/infrastructure/memo-suggestion.repository.js";
 import { PgReviewQueue } from "./knowledge/infrastructure/review-queue.repository.js";
 import type { VerificationQueue } from "./knowledge/domain/verification-queue.js";
 import { PgVerificationQueue } from "./knowledge/infrastructure/verification-queue.repository.js";
@@ -45,6 +47,7 @@ export interface CorePorts {
   verificationQueue: VerificationQueue;
   mergeDrafts: MergeDraftStore;
   sweepLog: SweepLog;
+  memoSuggestions: MemoSuggestionStore;
   health: HealthReader;
   healthSnapshots: HealthSnapshots;
   projects: ProjectRepository;
@@ -67,6 +70,7 @@ const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   verificationQueue: () => new PgVerificationQueue(getSql()),
   mergeDrafts: () => new PgMergeDraftStore(getSql()),
   sweepLog: () => new PgSweepLog(getSql()),
+  memoSuggestions: () => new PgMemoSuggestionStore(getSql()),
   health: () => new PgHealthReader(getSql()),
   healthSnapshots: () => new PgHealthSnapshots(getSql()),
   projects: () => new PgProjectRepository(getSql()),

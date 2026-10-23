@@ -20,6 +20,14 @@ fixes things.
   `CORTEX_SWEEP_FLOOR` (0.65), `CORTEX_SWEEP_NEIGHBOURS` (12) and `CORTEX_SWEEP_MAX_REVIEWS` (20
   per project and night) tune it, and `CORTEX_MODEL_JUDGE` picks the agent's model. Migration
   `0035_review_sweep.sql` ([ADR-0098](docs/decisions.md#adr-0098)).
+- **The same pass suggests how to rewrite, or to reject, the memos waiting to be checked.** Another
+  new agent, the *editor*, reads the next memos of *Not checked yet* and proposes a rewrite — a
+  title that says what it holds, what holds rather than how it was found, "yesterday" turned into a
+  date, nothing invented — or that it be rejected, as task progress or what the project never
+  keeps. Review shows it beside the memo and *Rewrite it* opens with the agent's version. Nothing
+  changes until you save it. A rewrite in Review can now change the title as well.
+  `CORTEX_SWEEP_MAX_SUGGESTIONS` (30 per project and night) and `CORTEX_MODEL_EDITOR`. Migration
+  `0036_memo_suggestions.sql` ([ADR-0099](docs/decisions.md#adr-0099)).
 - **`cortex connect-memory` brings Claude Code's own memory of a repository into its project.**
   Run it in a linked repository. It reads the notes Claude Code keeps for that repository and
   sends one memo per note:

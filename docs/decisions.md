@@ -3559,7 +3559,8 @@ decisions they carried stay recorded here.
 
 - **Status:** accepted as a hypothesis (2026-10-23). Builds on [0091](#adr-0091), whose older
   lane it fills, and on [0096](#adr-0096), whose merge settles a group in one go; revises the
-  priority of [0091](#adr-0091)'s point 4 for what an agent judged.
+  priority of [0091](#adr-0091)'s point 4 for what an agent judged. Its later step, a suggestion
+  for each memo on its own, is [0099](#adr-0099).
 - **Context:** a save compares a memo with the six memos nearest to it from 0.75 up
   ([0091](#adr-0091)), and the reconciler with the nearest alone from 0.82. Duplicates still got
   through, both memos handed to agents as true:
@@ -3621,3 +3622,57 @@ decisions they carried stay recorded here.
   too low or the criterion too loose; the cap leaves groups out night after night; people ask
   for the agent's suggestion on each memo too, not only on groups; or duplicates across a
   project's hierarchy show up in the pack.
+
+<a id="adr-0099"></a>
+
+## ADR-0099 · The nightly pass also suggests how to rewrite, or to reject, the memos waiting to be checked
+
+- **Status:** accepted as a hypothesis (2026-10-23). The later step [0098](#adr-0098) left out;
+  builds on [0093](#adr-0093), whose lane it serves.
+- **Context:** most memos are distilled by a model at the end of a session, and they read like it:
+  "yesterday we found the retries were hammering the API, so…" says when and how something was
+  found, not what holds, and "yesterday" means nothing a year later. Others are not knowledge at
+  all — the progress of a task, an open question. A person checking one in *Not checked yet*
+  ([0093](#adr-0093)) could let it through as it was or rewrite it from nothing, and the rewrite
+  could only change the text, never the title.
+- **Decision:**
+  1. **A new role, `editor`, reads the next memos of the lane** each night, in the order Review
+     shows them, up to `CORTEX_SWEEP_MAX_SUGGESTIONS` (30) per project, and proposes one of two
+     things, with one sentence on why:
+     - **rewrite it** — a title that says what it holds; what holds rather than how it was found;
+       task progress and noise dropped; the why stated when the memo implies it; what a reader a
+       year from now needs made explicit, a relative date turned into the day it was saved. It
+       never adds a fact the memo does not state or imply;
+     - **reject it** — the progress of a task, an open question, a hiccup of a tool, a secret, or
+       what the project's criteria say it never keeps; it is shown those criteria.
+
+     Or nothing, when the memo reads well: every suggestion costs a person's reading.
+  2. **It is kept for the memo as it reads** (`memo_suggestions`, migration
+     `0036_memo_suggestions.sql`): rewritten since, and it is no longer shown and is asked for
+     again. A memo is asked about once as it reads, whatever the answer; when the provider fails
+     it is asked the next night.
+  3. **A memo the pass grouped with others** ([0098](#adr-0098)) **is left out**: merging them is
+     the better rewrite, and two proposals for one memo would contradict each other.
+  4. **Review shows it next to the memo, as the agent's.** A rewrite opens *Rewrite it* already
+     filled in; a rejection is a line beside the memo. Nothing changes until a person saves or
+     rejects it, as for any check.
+  5. **A rewrite in Review now changes the title too**, in both lanes, scrubbed like the text.
+- **Alternatives:**
+  - **Only the memos of the day**, like the groups. They are not the ones a person reaches first:
+    the lane is ordered by what the pack hands over first ([0093](#adr-0093)). Rejected for the
+    next memos of the lane, which is also what bounds the cost.
+  - **The older memos too.** The whole memory would get a suggestion each, at a model call each.
+    Not now: an older memo comes back to a person only when something newer is about it.
+  - **Let the merger rewrite it.** It writes memos already, but its criterion is about folding
+    several into one, and an admin tunes it for that. Rejected: one criterion per job.
+  - **Draw on the closest memos to add what this one leaves out.** It would copy the same fact
+    into more memos, which is what [0098](#adr-0098) works to undo. Rejected.
+  - **Apply the rewrite and let a person undo it.** `verified` would stop meaning that a person
+    read the memo ([0090](#adr-0090)). Rejected.
+- **Consequences:** one model call per memo of the lane the pass reaches, at most the cap per
+  project and night, and again whenever one is rewritten. Without a model nothing is suggested
+  and the rewrite starts from the memo, as before. A suggestion written at night may be out of
+  date by the time a person arrives, if somebody rewrote the memo meanwhile; it is then not shown.
+- **Revisit when:** people save the agent's rewrite unchanged almost every time, which argues for
+  letting the pass do more; they rarely use it, which says the criterion is too eager; the lane
+  moves faster than the cap; or suggestions are asked for on the older memos too.

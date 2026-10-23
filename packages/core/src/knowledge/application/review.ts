@@ -24,13 +24,14 @@ export async function resolveReview(
   decision: ReviewDecision,
   actor: SessionUser,
   content?: string,
+  title?: string,
 ): Promise<void> {
   if (!(await canReviewProject(project, actor))) throw new NotAReviewerError(project.name);
   const queue = port("reviewQueue");
   if (!(await queue.isPending(project.id, memoId))) return;
 
   if (decision === "skip") return queue.skip(memoId);
-  if (await judge(memoId, decision, "obsolete", actor, content)) await queue.resolve(memoId, RESOLUTION[decision], actor.email);
+  if (await judge(memoId, decision, "obsolete", actor, content, title)) await queue.resolve(memoId, RESOLUTION[decision], actor.email);
 }
 
 /**
@@ -43,13 +44,14 @@ export async function resolveUnchecked(
   decision: ReviewDecision,
   actor: SessionUser,
   content?: string,
+  title?: string,
 ): Promise<void> {
   if (!(await canReviewProject(project, actor))) throw new NotAReviewerError(project.name);
   const queue = port("verificationQueue");
   if (!(await queue.isPending(project.id, memoId))) return;
 
   if (decision === "skip") return queue.skip(memoId);
-  await judge(memoId, decision, "rejected", actor, content);
+  await judge(memoId, decision, "rejected", actor, content, title);
 }
 
 async function judge(
@@ -58,11 +60,12 @@ async function judge(
   discardedAs: Extract<ReviewVerdict, "obsolete" | "rejected">,
   actor: SessionUser,
   content?: string,
+  title?: string,
 ): Promise<boolean> {
   if (decision === "modify") {
     const rewritten = content?.trim();
     if (!rewritten) return false;
-    await updateEntryFields(memoId, { content: rewritten });
+    await updateEntryFields(memoId, { content: rewritten, title: title?.trim() || undefined });
   }
   await validateEntry(memoId, decision === "discard" ? discardedAs : "validated", { email: actor.email, channel: "web" });
   return true;
