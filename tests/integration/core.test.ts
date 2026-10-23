@@ -64,6 +64,22 @@ describe("batch capture plus reconciliation (a real database)", () => {
     expect(entries.some((e) => e.createdBy === "dev@example.com")).toBe(true);
   });
 
+  /**
+   * A connector that already has a one-line summary, like the description of a Claude Code note
+   * (ADR-0095), used to lose it to one derived from the text. It goes through scrub like the rest.
+   */
+  it("captureBatch keeps the summary a connector sends, scrubbed", async () => {
+    const p = await createProject(`IT BatchSummary ${RID}`);
+    const item = {
+      content: "Releases are tagged from main and built by the release workflow.",
+      summary: "How a release is cut, with key sk-abcdefghijklmnop0123",
+      sourceReference: "notes/release",
+    };
+    await captureBatch(p.name, [item], "dev@example.com");
+    const [entry] = await listEntries({ project: p.name });
+    expect(entry!.summary).toBe("How a release is cut, with key [REDACTED]");
+  });
+
   it("captureBatch classifies with the LLM only when CORTEX_CAPTURE_LLM=1", async () => {
     const p = await createProject(`IT CaptureLLM ${RID}`);
     let calls = 0;

@@ -3350,3 +3350,56 @@ decisions they carried stay recorded here.
 - **Revisit when:** an upload buries the older lane, which argues for a cap per upload or a higher
   threshold for bulk; or the search per memo makes `/capture/batch` slow enough for a client to
   time out.
+
+<a id="adr-0095"></a>
+
+## ADR-0095 · Claude Code's own memory comes into the project as notes for a person to check
+
+- **Status:** accepted as a hypothesis (2026-10-22).
+- **Context:** Claude Code keeps a memory of its own for each repository. It is one Markdown note
+  per fact under `~/.claude/projects/<repo path>/memory/`, each with a YAML header (`name`,
+  `description`, and a `type` of `user`, `feedback`, `project` or `reference`). Beside them sits
+  `MEMORY.md`, a one-line-per-note index loaded into every session. What the agent learned about
+  the project stays on one laptop. `connect-docs` could read the folder, since it is Markdown, but
+  it handled it badly:
+  - it sent the index as one more memo;
+  - it left the header inside each memo's text;
+  - on a second run it reported a changed note as "already known";
+  - it passed `[[links]]` through as brackets.
+- **Decision:** `cortex connect-memory` reads that folder natively.
+  1. **Run with no arguments in a linked repository**, it finds the folder Claude Code keeps for
+     that repository. It walks up no further than the repository's root, because above it lies
+     the home folder's memory, which belongs to no project.
+     `cortex connect-memory <slug> <path>` takes another repository, or a memory folder.
+  2. **Each note becomes one memo.** Its title comes from the index, and its summary is the note's
+     `description` (`/capture/batch` now takes a `summary`). Its content is the body, without the
+     header.
+  3. **It enters `low`, from `claude_code`, and waits in Review** ([0093](#adr-0093)) like
+     anything new. A model wrote these notes, even when a person dictated them. A person's verdict
+     is what raises them.
+  4. **A `feedback` note becomes a `convention`**, because it says how an agent should work here.
+     `project` and `reference` notes are typed on arrival, like anything a connector sends.
+  5. **`user` notes stay out unless asked for** (`--include-user`). They describe a person, not
+     the project, and in the pack they would be told to every agent on the team.
+  6. **The reference carries a hash of the note.**
+     - A second run adds only what changed.
+     - A changed note goes in as a new memo. If the old memo is close enough to it, the old one
+       waits in the older lane ([0094](#adr-0094)).
+     - The same note from two people becomes one memo.
+  7. **A `[[link]]` reads as the title of the note it names**, and becomes a `related_to`
+     relation.
+  8. **Nothing in the folder changes.** Claude Code keeps using its own copy.
+- **Alternatives:**
+  - **`connect-docs` on the folder.** Rejected for the reasons in the context.
+  - **Rewrite the memo in place when its note changes.** A person's verdict would then cover text
+    nobody checked, and the earlier version would be lost. Rejected.
+  - **Supersede the earlier version automatically.** The server would need to know which memo each
+    note produced before, keyed by person and file. Left until earlier versions pile up.
+  - **Send every note, `user` included.** Rejected as the default; it stays available as a flag.
+  - **Enter at `medium`, as `connect-docs` does.** Rejected: `medium` is for documents a person
+    wrote.
+- **Revisit when:**
+  - Claude Code changes the format of its memory;
+  - another agent keeps a memory of its own worth bringing in;
+  - the earlier versions of changed notes linger in the pack, because they were not close enough
+    to their new versions to be paired.

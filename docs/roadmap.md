@@ -21,7 +21,7 @@ Working, and in daily use by a team:
   incremental when the session grew, and when it does not fit whole it spreads the windows
   across the entire conversation instead of keeping only the beginning.
 - **A lightweight client on npm** (`@dinacodelabs/cortex`), with `connect-docs`,
-  `connect-github` and `connect-sessions`. MCP over authenticated HTTP with the 8 tools
+  `connect-github`, `connect-sessions` and `connect-memory`. MCP over authenticated HTTP with the 8 tools
   applying permissions.
 - **A complete context pack**: the eleven types that describe the project's state, split by
   budget and weighted, with contradiction warnings glued to each entry.

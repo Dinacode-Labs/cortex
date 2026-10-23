@@ -403,6 +403,7 @@ server. The first argument is the project **slug** from `cortex link`:
 cortex connect-docs     "<slug>" <dir>          # a folder: Markdown and plain text
 cortex connect-github   "<slug>" <owner/repo>   # pull requests and issues, via gh
 cortex connect-sessions "<slug>" <repo-path> [claude|codex|opencode|hermes|pi]
+cortex connect-memory   ["<slug>" <path>]       # Claude Code's own memory of the repo
 
 cortex-admin connect-docs    "<slug>" <dir>     # the same, plus documents, images, audio, video
 cortex-admin connect-notion  "<slug>" <export>  # a Notion export, pages and attachments linked
@@ -414,6 +415,18 @@ grouped by extension. Documents, spreadsheets, images and audio need extraction 
 model, which stay on the server side rather than on every laptop
 ([ADR-0058](./docs/decisions.md#adr-0058)); for those, an operator runs the `cortex-admin`
 version.
+
+`connect-memory` brings in the notes Claude Code keeps on its own for a repository, under
+`~/.claude/projects/<repo path>/memory/`. Run it with no arguments in a linked repository, or add
+`--dry-run` first to see what would go. Each note becomes a memo:
+- its title comes from `MEMORY.md`, its summary is the note's description, and its `[[links]]`
+  become relations;
+- it enters with low confidence and waits in *Review* until someone on the project checks it;
+- a feedback note goes in as a convention.
+
+The notes about you stay out unless you pass `--include-user`. A second run sends only the notes
+that changed, and Claude Code's folder is left as it was
+([ADR-0095](./docs/decisions.md#adr-0095)).
 
 By default capture types each item **heuristically**, which is cheap, and the intelligence,
 re-typing with an LLM, a real summary, the graph, reconciliation and curation, is applied
