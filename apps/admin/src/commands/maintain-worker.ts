@@ -8,9 +8,10 @@ const MERGE_DRAFT_EVERY_MS = 60_000;
 
 /**
  * The scheduled worker: it runs the `runMaintenance` pipeline periodically (the loops of
- * section 12 -- enrich/resolve/temporal/lint), drafts the merges Review proposes (ADR-0096) and
- * sends the review digest (ADR-0097). Meant to run on the server as a process/service
- * (docker-compose) or through the system's cron calling `maintain` and `review-digest`.
+ * section 12 -- enrich/resolve/temporal/sweep/lint), drafts the merges Review proposes
+ * (ADR-0096) and sends the review digest (ADR-0097). Meant to run on the server as a
+ * process/service (docker-compose) or through the system's cron calling `maintain` and
+ * `review-digest`.
  *
  * Usage: cortex-admin maintain-worker
  * Env: CORTEX_MAINTAIN_CRON (a cron expression; default "0 3 * * *" = 03:00 daily),

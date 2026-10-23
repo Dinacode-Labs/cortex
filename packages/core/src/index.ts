@@ -8,7 +8,9 @@ export * from "./knowledge/application/search.js";
 export * from "./knowledge/application/context-pack.js";
 export * from "./knowledge/application/review.js";
 export { isAwaitingReview, nextReview, pendingReviewCount, queueReviewsOfBatch, reviewsAwaiting, REVIEW_THRESHOLD } from "./knowledge/application/review-queue.js";
-export { isReviewDecision, type NewerMemo, type OlderMemo, type PendingReview, type ReviewDecision } from "./knowledge/domain/review-queue.js";
+export { isReviewDecision, type Finding, type NewerMemo, type OlderMemo, type PendingReview, type ReviewDecision } from "./knowledge/domain/review-queue.js";
+export { setGroupJudge, sweepProject, type GroupJudge, type SweepReport } from "./knowledge/application/review-sweep.js";
+export { isGroupRelation, type GroupRelation, type JudgedGroup, type JudgeSource } from "./knowledge/domain/review-sweep.js";
 export { nextUnchecked, uncheckedCount } from "./knowledge/application/verification-queue.js";
 export {
   draftMergesAhead,

@@ -137,6 +137,16 @@ export class PgMemoReader implements MemoReader {
     return rows.map(rowToMemo);
   }
 
+  async savedBetween(projectId: string, after: Date, upTo: Date): Promise<Memo[]> {
+    const rows = (await this.sql`
+      SELECT * FROM memos
+      WHERE project_id = ${projectId} AND created_at > ${after} AND created_at <= ${upTo}
+        AND valid_to IS NULL AND status NOT IN ('rejected', 'obsolete', 'superseded')
+      ORDER BY created_at ASC, id ASC
+    `) as unknown as Row[];
+    return rows.map(rowToMemo);
+  }
+
   async byType(projectIds: string[], type: MemoType, asOf: Date | undefined, limit: number): Promise<Memo[]> {
     const sql = this.sql;
     const temporal = asOf
