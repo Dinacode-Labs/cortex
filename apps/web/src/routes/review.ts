@@ -85,7 +85,7 @@ const WORDING: Record<ReviewLane, DecisionWording> = {
   new: {
     question: "Is this right?",
     keep: "It is right",
-    discard: "Reject it: it is wrong",
+    discard: "Reject it: wrong, or not worth knowing",
     rewrite: "Partly right? Rewrite it",
     rewritten: "The new memo, rewritten",
   },

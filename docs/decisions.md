@@ -3293,6 +3293,8 @@ decisions they carried stay recorded here.
      waiting. A memo that is no longer in force drops out.
   4. **The same four decisions and keys as the older lane**, except that discarding a new memo
      **rejects** it: it was never true, where an older memo discarded held once and is `obsolete`.
+     Since 2026-10-26 the button says it covers a memo that is true but not worth knowing too —
+     a task's progress, an open question — which nobody would call wrong.
   5. **The order is the pack's**: by the order of its sections, newest first within a type, the
      types the pack leaves out after them, and what was skipped last. A wrong decision misleads
      more than a wrong how-to.
