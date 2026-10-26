@@ -214,6 +214,10 @@ fixes things.
   keywords that survive translation.
 
 ### Changed
+- **Rejecting a memo in *Not checked yet* reads "wrong, or not worth knowing".** A memo that is
+  true but useless to an agent — a task's progress, an open question — was hard to reject under
+  "it is wrong". It does the same as before: agents are no longer told it
+  ([ADR-0093](docs/decisions.md#adr-0093)).
 - **The projects page is a list, and says where verdicts wait.** One row per project — entries,
   memos waiting for your verdict, last health check, owner — with each client's projects
   indented under it, at every depth: a grandchild used to go unlisted. Above the list, how many

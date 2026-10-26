@@ -35,7 +35,8 @@ export async function resolveReview(
 
 /**
  * The same decisions on a memo nobody has checked yet, except that discarding it rejects it: it was
- * never true, where an older memo held once (ADR-0093). The verdict itself takes it out of the lane.
+ * never true or never worth knowing, where an older memo held once (ADR-0093). The verdict itself
+ * takes it out of the lane.
  */
 export async function resolveUnchecked(
   project: Pick<ProjectRef, "id" | "name">,
