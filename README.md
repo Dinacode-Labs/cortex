@@ -267,13 +267,14 @@ mistake you notice later.
   ([ADR-0091](docs/decisions.md#adr-0091), [ADR-0093](docs/decisions.md#adr-0093),
   [ADR-0096](docs/decisions.md#adr-0096)). Every night a second pass sets the day's memos against
   the whole project and an agent raises, as one review, each group of memos that repeat or
-  contradict each other and that a save missed; it only proposes
-  ([ADR-0098](docs/decisions.md#adr-0098)). Whoever switches it on in a project's settings gets
+  contradict each other and that a save missed, and another suggests how to rewrite, or to
+  reject, the memos waiting to be checked; both only propose
+  ([ADR-0098](docs/decisions.md#adr-0098), [ADR-0099](docs/decisions.md#adr-0099)). Whoever switches it on in a project's settings gets
   one email a day when something new waits there, saying how many and never what
   ([ADR-0097](docs/decisions.md#adr-0097)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.
   Sub-projects **inherit** from their parent.
-- **Agents you can tune.** What each of the eight agents judges by — what the distiller keeps,
+- **Agents you can tune.** What each of the nine agents judges by — what the distiller keeps,
   how the graph names things, how Ask answers — is a text an admin can rewrite for the whole
   server and each project can add to, from the web UI or the API. The format they answer in
   stays fixed ([ADR-0088](docs/decisions.md#adr-0088)).

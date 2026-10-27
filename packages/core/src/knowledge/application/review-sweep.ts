@@ -4,6 +4,7 @@ import { findProjectIdByName, languageOfProject } from "../../projects/applicati
 import { DUPLICATE_DISTANCE } from "../domain/health.js";
 import type { Memo } from "../domain/memo.js";
 import { oldestFirst } from "../domain/memo-merge.js";
+import { suggestEdits } from "./memo-suggestions.js";
 import {
   alikeGroup,
   groupsToRaise,
@@ -46,6 +47,8 @@ export interface SweepReport {
   swept: number;
   judged: number;
   raised: number;
+  /** Memos waiting to be checked that the editing agent proposed to rewrite or reject (ADR-0099). */
+  suggested: number;
 }
 
 async function judgedGroups(memo: Memo, alike: Memo[], context: { language: Language; projectId: string }): Promise<JudgedGroup[] | null> {
@@ -66,10 +69,11 @@ async function toSweepGroup(memos: Memo[], knownPairs: Set<string>, judged: Judg
 /**
  * The nightly second pass (ADR-0098): every memo saved since the last one is set against the whole
  * project, with a wider net than a save casts, and what belongs together is raised as one review in
- * the older lane. It never changes a memo; a person decides, as for any review.
+ * the older lane. Then the memos next in the lane of those not checked yet get the editing agent's
+ * suggestion. It never changes a memo; a person decides, as for any review.
  */
 export async function sweepProject(project: string, now = new Date()): Promise<SweepReport> {
-  const report: SweepReport = { project, swept: 0, judged: 0, raised: 0 };
+  const report: SweepReport = { project, swept: 0, judged: 0, raised: 0, suggested: 0 };
   const projectId = await findProjectIdByName(project);
   if (!projectId) return report;
   const since = (await port("sweepLog").sweptUntil(projectId)) ?? new Date(now.getTime() - FIRST_SWEEP_MS);
@@ -107,5 +111,7 @@ export async function sweepProject(project: string, now = new Date()): Promise<S
   for (const group of raised) await port("reviewQueue").raiseGroup(projectId, group);
   report.raised = raised.length;
   await port("sweepLog").record(projectId, now);
+  // After the groups are raised, so a memo in one is not also proposed a rewrite of its own.
+  report.suggested = await suggestEdits(projectId);
   return report;
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const agentRole = z.enum(["classifier", "graph", "reranker", "retriever", "distiller", "merger", "reconciler", "judge"]);
+export const agentRole = z.enum(["classifier", "graph", "reranker", "retriever", "distiller", "merger", "reconciler", "judge", "editor"]);
 export type AgentRole = z.infer<typeof agentRole>;
 
 /** The whole chain travels with every call, and the reranker makes one on every search. */

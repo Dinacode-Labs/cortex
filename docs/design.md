@@ -91,7 +91,8 @@ What agents see, Map, Code — and Settings apart. Review says how many memos wa
                                          is about, and a new memo nobody has checked; every decision
                                          brings the next, merging them into one included; the nightly
                                          pass adds groups of memos that repeat or contradict each
-                                         other, with what its agent said of them (its team only)
+                                         other, with what its agent said of them, and a suggested
+                                         rewrite or rejection for the new ones (its team only)
 /p/<slug>/ask           Ask
 /p/<slug>/agents        What agents see  the pack, with every entry linked
 /p/<slug>/health        Health           contradictions, gaps, duplicates — each one linked, a clash settled

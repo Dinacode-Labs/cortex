@@ -11,11 +11,13 @@ import {
   proposeMerge,
   resolveReview,
   resolveUnchecked,
+  suggestionFor,
   type Finding,
   type GroupRelation,
   type MergeDraft,
   type MergeProposal,
   type Memo,
+  type MemoSuggestion,
   type PendingReview,
   type ReviewDecision,
   type ReviewLane,
@@ -155,9 +157,10 @@ function mergeForm(action: string, lane: ReviewLane, memoId: string, others: Mem
   </form>`;
 }
 
-function decisionPanel(page: ProjectPage, lane: ReviewLane, memo: Memo, others: Memo[]): Html {
+function decisionPanel(page: ProjectPage, lane: ReviewLane, memo: Memo, others: Memo[], suggestion: MemoSuggestion | null = null): Html {
   const action = `/p/${page.project.slug}/review`;
   const words = WORDING[lane];
+  const draft = suggestion?.kind === "rewrite" ? suggestion : memo;
   return html`${panel(
     words.question,
     html`<div class="row">
@@ -167,12 +170,13 @@ function decisionPanel(page: ProjectPage, lane: ReviewLane, memo: Memo, others: 
         ${decisionForm(action, lane, memo.id, "skip", "Skip for now", "quiet", "S")}
       </div>
       <details class="rewrite" data-rewrite>
-        <summary>${words.rewrite} <kbd class="key-hint" data-key-hint hidden>R</kbd></summary>
+        <summary>${suggestion?.kind === "rewrite" ? "Rewrite it, from the agent's version" : words.rewrite} <kbd class="key-hint" data-key-hint hidden>R</kbd></summary>
         <form method="post" action="${action}">
           <input type="hidden" name="lane" value="${lane}">
           <input type="hidden" name="memo" value="${memo.id}">
           <input type="hidden" name="decision" value="modify">
-          <textarea name="content" rows="10" required aria-label="${words.rewritten}">${memo.content}</textarea>
+          <input type="text" name="title" value="${draft.title}" required aria-label="Title" class="wide">
+          <textarea name="content" rows="10" required aria-label="${words.rewritten}">${draft.content}</textarea>
           <div class="row"><button type="submit">Save and go to the next</button></div>
         </form>
       </details>`,
@@ -191,6 +195,22 @@ function preparedPanel(prepared: MergeDraft | null): Html {
     <article class="memo-panel">
       <h3 class="memo-title">${prepared.title}</h3>
       <p class="memo-text">${prepared.content}</p>
+    </article>
+  </section>`;
+}
+
+/** Written by the nightly pass (ADR-0099); the screen shows what is there and never asks a model. */
+function suggestionPanel(suggestion: MemoSuggestion | null): Html {
+  if (!suggestion) return html``;
+  if (suggestion.kind === "reject") {
+    return html`<p class="memo-finding">${badge("Suggests rejecting it", "danger")} <span class="sub">The editing agent: ${suggestion.reason}</span></p>`;
+  }
+  return html`<section class="prepared-merge">
+    <h2 class="compare-label">Rewritten, the editing agent would make it this · nothing changes unless you save it</h2>
+    <article class="memo-panel">
+      ${suggestion.reason ? html`<p class="memo-finding"><span class="sub">${suggestion.reason}</span></p>` : ""}
+      <h3 class="memo-title">${suggestion.title}</h3>
+      <p class="memo-text">${suggestion.content}</p>
     </article>
   </section>`;
 }
@@ -218,7 +238,7 @@ function olderScreen(page: ProjectPage, review: PendingReview, prepared: MergeDr
     ${decisionPanel(page, "older", memo, newer.map((n) => n.memo))}`;
 }
 
-function uncheckedScreen(page: ProjectPage, unchecked: UncheckedMemo, prepared: MergeDraft | null): Html {
+function uncheckedScreen(page: ProjectPage, unchecked: UncheckedMemo, prepared: MergeDraft | null, suggestion: MemoSuggestion | null): Html {
   const { memo, touches } = unchecked;
   return html`
     <p class="sub lead">
@@ -238,7 +258,8 @@ function uncheckedScreen(page: ProjectPage, unchecked: UncheckedMemo, prepared: 
         : ""}
     </div>
     ${preparedPanel(prepared)}
-    ${decisionPanel(page, "new", memo, touches.map((t) => t.memo))}`;
+    ${suggestionPanel(suggestion)}
+    ${decisionPanel(page, "new", memo, touches.map((t) => t.memo), suggestion)}`;
 }
 
 function mergeScreen(page: ProjectPage, lane: ReviewLane, memoId: string, proposal: MergeProposal): Html {
@@ -322,7 +343,7 @@ reviewRoutes.get("/p/:slug/review", async (c) => {
     const unchecked = await nextUnchecked(page.project);
     const touched = unchecked?.touches.map((t) => t.memo) ?? [];
     const prepared = unchecked && touched.length > 0 ? await preparedMerge([unchecked.memo, ...touched]) : null;
-    screen = unchecked ? uncheckedScreen(page, unchecked, prepared) : emptyLane(page, lane);
+    screen = unchecked ? uncheckedScreen(page, unchecked, prepared, await suggestionFor(unchecked.memo)) : emptyLane(page, lane);
   }
   return c.html(layout(`Review · ${page.project.name}`, projectPage(page, "review", html`${flash}${laneNav(page, lane)}${screen}`), user));
 });
@@ -340,7 +361,8 @@ reviewRoutes.post("/p/:slug/review", async (c) => {
   if (!UUID.test(memoId) || !isReviewDecision(decision)) return c.redirect(`${next}?lane=${lane}`);
   const resolve = lane === "older" ? resolveReview : resolveUnchecked;
   try {
-    await resolve(page.project, memoId, decision, user, typeof form.content === "string" ? form.content : undefined);
+    const text = (field: unknown) => (typeof field === "string" ? field : undefined);
+    await resolve(page.project, memoId, decision, user, text(form.content), text(form.title));
   } catch (e) {
     if (e instanceof NotAReviewerError) return c.html(notAReviewer(page, user), 403);
     throw e;
