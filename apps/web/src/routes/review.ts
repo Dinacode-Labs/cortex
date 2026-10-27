@@ -11,6 +11,8 @@ import {
   proposeMerge,
   resolveReview,
   resolveUnchecked,
+  type Finding,
+  type GroupRelation,
   type MergeDraft,
   type MergeProposal,
   type Memo,
@@ -21,7 +23,7 @@ import {
 } from "@cortex/core";
 import { contextEntryType } from "@cortex/shared";
 import { layout, type Html } from "../views/layout.js";
-import { badge, confidenceMeter, empty, panel, segmented, statusBadge, typeTag } from "../views/components.js";
+import { badge, confidenceMeter, empty, panel, segmented, statusBadge, typeTag, type Tone } from "../views/components.js";
 import { projectPage } from "../views/project-nav.js";
 import { requireProjectPage, type ProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
@@ -100,8 +102,20 @@ const notAReviewer = (page: ProjectPage, user: WebEnv["Variables"]["user"]) =>
 
 const MERGE_FORM = "merge-form";
 
+const RELATION_SHOWN: Record<GroupRelation, { label: string; tone: Tone }> = {
+  duplicate: { label: "Says the same", tone: "warn" },
+  overlap: { label: "Part of the same", tone: "neutral" },
+  contradiction: { label: "Disagrees", tone: "danger" },
+};
+
+/** What the nightly pass's agent said of it (ADR-0098): a suggestion beside the memo, never a verdict. */
+function findingLine(finding: Finding): Html {
+  const shown = RELATION_SHOWN[finding.relation];
+  return html`<p class="memo-finding">${badge(shown.label, shown.tone)} <span class="sub">The nightly pass${finding.reason ? html`: ${finding.reason}` : ""}</span></p>`;
+}
+
 /** The checkbox sits in the memo's panel, outside the merge form, so it joins that form through `form=`. */
-function memoPanel(memo: Memo, opts: { question?: boolean; similarity?: number; pickedFor?: string } = {}): Html {
+function memoPanel(memo: Memo, opts: { question?: boolean; similarity?: number; pickedFor?: string; finding?: Finding | null } = {}): Html {
   const day = memo.createdAt.toISOString().slice(0, 10);
   return html`<article class="memo-panel ${opts.question ? "question" : ""}">
     <div class="memo-meta">
@@ -112,6 +126,7 @@ function memoPanel(memo: Memo, opts: { question?: boolean; similarity?: number; 
     </div>
     <h3 class="memo-title"><a href="/entry/${memo.id}">${memo.title}</a></h3>
     <p class="memo-text">${memo.content}</p>
+    ${opts.finding ? findingLine(opts.finding) : ""}
     ${opts.question ? html`<div class="memo-foot">${statusBadge(memo.status)} ${confidenceMeter(memo.confidence)}</div>` : ""}
     ${opts.pickedFor
       ? html`<div class="memo-foot">
@@ -196,7 +211,7 @@ function olderScreen(page: ProjectPage, review: PendingReview, prepared: MergeDr
       </section>
       <section>
         <h2 class="compare-label">${newer.length === 1 ? "What came in since" : `What came in since (${newer.length})`} · taken as true</h2>
-        <div class="stack">${newer.map((n) => memoPanel(n.memo, { similarity: n.similarity, pickedFor: pickable(newer) }))}</div>
+        <div class="stack">${newer.map((n) => memoPanel(n.memo, { similarity: n.similarity, pickedFor: pickable(newer), finding: n.finding }))}</div>
       </section>
     </div>
     ${preparedPanel(prepared)}

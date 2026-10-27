@@ -9,6 +9,17 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **Every night, a second pass looks for the duplicates a save missed.** The worker sets each memo
+  saved since the night before against the whole project, closer to more memos than a save looks
+  at, and a new agent, the *judge*, says which of them belong together: they say the same thing,
+  each holds part of one memo, or they disagree. Each group comes up in *Review* as **one** review,
+  on its oldest memo, so three memos about one thing are merged in one go; what the agent said
+  is shown beside each memo. It only proposes: nothing changes until a person decides, and a pair
+  somebody already judged is not asked again. Contradictions come first. Without a model only the
+  near duplicates are raised. A project's first pass looks back one day, never at the backlog.
+  `CORTEX_SWEEP_FLOOR` (0.65), `CORTEX_SWEEP_NEIGHBOURS` (12) and `CORTEX_SWEEP_MAX_REVIEWS` (20
+  per project and night) tune it, and `CORTEX_MODEL_JUDGE` picks the agent's model. Migration
+  `0035_review_sweep.sql` ([ADR-0098](docs/decisions.md#adr-0098)).
 - **`cortex connect-memory` brings Claude Code's own memory of a repository into its project.**
   Run it in a linked repository. It reads the notes Claude Code keeps for that repository and
   sends one memo per note:

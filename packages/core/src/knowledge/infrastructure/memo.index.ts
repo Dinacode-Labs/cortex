@@ -87,6 +87,18 @@ export class PgMemoIndex implements MemoIndex {
     return rows.map((row) => ({ entry: rowToMemo(row), score: 1 - Number(row.distance) }));
   }
 
+  async similarities(memoId: string, otherIds: string[]): Promise<Map<string, number>> {
+    if (otherIds.length === 0) return new Map();
+    const rows = (await this.sql`
+      SELECT e.memo_id, 1 - (e.vector <=> q.vector) AS score
+      FROM embeddings q
+      JOIN embeddings e ON e.embedding_model = q.embedding_model AND e.embedding_version = q.embedding_version
+      WHERE q.memo_id = ${memoId} AND q.embedding_model = ${this.provider.model} AND q.embedding_version = ${this.provider.version}
+        AND e.memo_id = ANY(${otherIds})
+    `) as unknown as Row[];
+    return new Map(rows.map((r) => [r.memo_id as string, Number(r.score)]));
+  }
+
   /** The lexical side brings precision on ids, proper nouns and jargon; the vector side, meaning. */
   async hybrid(queryText: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]> {
     const pool = Math.max(limit * 4, 40);

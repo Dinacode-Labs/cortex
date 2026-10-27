@@ -59,7 +59,7 @@ packages/
                # digest. Each module is domain/ + application/ + infrastructure/
                # (READ docs/architecture.md)
   agents/      # the LLM layer (Mastra over an OpenAI-compatible endpoint): classifier, graph,
-               # rerank, synthesize, distill, reconcile, maintain
+               # rerank, synthesize, distill, reconcile, judge (the nightly review sweep), maintain
 apps/
   mcp-server/  # the MCP server with the 8 tools (stdio + authenticated Streamable HTTP)
   server/      # HTTP API + email/OTP auth (Hono) — the CLI, the hooks and the connectors use it

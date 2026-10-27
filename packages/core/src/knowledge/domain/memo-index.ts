@@ -27,4 +27,6 @@ export interface MemoIndex {
   /** The nearest to a memo already indexed, from its stored vector: nothing is embedded again. */
   neighboursOf(memoId: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]>;
   hybrid(queryText: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]>;
+  /** Cosine similarity of a memo to each of the others, from the stored vectors; one without a vector is absent. */
+  similarities(memoId: string, otherIds: string[]): Promise<Map<string, number>>;
 }

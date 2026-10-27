@@ -9,6 +9,7 @@ import { distill } from "../packages/agents/src/agents/distiller/distill";
 import { mergeKnowledge } from "../packages/agents/src/agents/merger/merge";
 import { draftMerge } from "../packages/agents/src/agents/merger/draft";
 import { reconcile } from "../packages/agents/src/agents/reconciler/reconcile";
+import { judgeGroups } from "../packages/agents/src/agents/judge/judge";
 
 const runAgent = vi.fn(async (..._args: unknown[]) => "{}");
 vi.mock("../packages/agents/src/runtime/run-agent.js", () => ({ runAgent: (...a: unknown[]) => runAgent(...a) }));
@@ -16,7 +17,7 @@ vi.mock("../packages/agents/src/runtime/registry.js", () => ({ getAgent: () => (
 
 const hit = { score: 1, entry: { type: "decision", title: "Use ULIDs", summary: "Public ids are ULIDs." } } as unknown as SearchHit;
 const PROJECT = "project-id";
-const memo = { type: "decision" as const, title: "Use ULIDs", content: "Public ids are ULIDs.", createdAt: new Date("2026-10-01") };
+const memo = { id: "memo-id", type: "decision" as const, title: "Use ULIDs", content: "Public ids are ULIDs.", createdAt: new Date("2026-10-01") };
 
 const CALLS: Record<AgentRole, () => Promise<unknown>> = {
   classifier: () => classifyEntry("a memo", { language: "en", projectId: PROJECT }),
@@ -30,6 +31,7 @@ const CALLS: Record<AgentRole, () => Promise<unknown>> = {
       draftMerge([memo, memo], { language: "en", projectId: PROJECT }),
     ]),
   reconciler: () => reconcile("an entry", "another", { projectId: PROJECT }),
+  judge: () => judgeGroups(memo, [memo], { language: "en", projectId: PROJECT }),
 };
 
 /**

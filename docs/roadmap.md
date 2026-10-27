@@ -43,11 +43,13 @@ Working, and in daily use by a team:
   verdict is recorded ([ADR-0090](decisions.md#adr-0090)). The Review section queues the older
   memos something newer is about and brings them one after another
   ([ADR-0091](decisions.md#adr-0091)), and whoever switches it on in a project gets a daily email
-  when something new waits there ([ADR-0097](decisions.md#adr-0097)). What is left is judging
-  each pair before a person sees it: an agent saying how important the memo is, what it repeats
-  and what it contradicts, and recommending to keep, discard, rewrite or merge it. Its verdict
-  would also set the queue's order. A merge is already drafted ahead by an agent for the next
-  reviews of each lane, whether or not it is the right call ([ADR-0096](decisions.md#adr-0096)).
+  when something new waits there ([ADR-0097](decisions.md#adr-0097)). A merge is drafted ahead by
+  an agent for the next reviews of each lane ([ADR-0096](decisions.md#adr-0096)), and every night
+  an agent groups the day's memos with the ones they repeat or contradict, raising each group as
+  one review ([ADR-0098](decisions.md#adr-0098)). What is left: the same judgement on what a save
+  raises, before a person sees it, so it sets the order of the whole queue; suggestions to rewrite
+  a memo on its own — say it better, add or drop something; and duplicates across a parent and its
+  child projects, which are never compared.
 - **`search` and `ask` do not inherit from the parent.** The context pack climbs the ancestor
   chain and search does not, so inside a child project you do not find what is stored in the
   client. With real hierarchies being set up right now, this already shows.

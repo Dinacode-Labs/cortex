@@ -3145,7 +3145,8 @@ decisions they carried stay recorded here.
 - **Status:** accepted as a hypothesis (2026-10-15). Builds on [0090](#adr-0090). Its rejection of
   a queue of every unreviewed memo is **revised by [0093](#adr-0093)**, for what comes in from then on;
   leaving bulk ingestion out of the queue (point 2) is **revised by [0094](#adr-0094)**. The four
-  decisions of point 3 get a fifth, merging, in [0096](#adr-0096).
+  decisions of point 3 get a fifth, merging, in [0096](#adr-0096). The priority of point 4 is
+  **revised by [0098](#adr-0098)** for the reviews an agent has judged.
 - **Context:** when a memo was saved, the memory compared it with the single nearest memo, and
   only from 0.82 similarity up, where the reconciler decides whether to merge, supersede or do
   nothing. An older memo the newer one contradicted in other words — the usual case: "a fixed
@@ -3553,3 +3554,72 @@ decisions they carried stay recorded here.
   and argues for a narrower "new" or a weekly cadence; following a client project by project
   turns into a chore; or the agent that judges each review lands ([0091](#adr-0091)), and the
   digest can say which reviews matter.
+
+<a id="adr-0098"></a>
+
+## ADR-0098 · Every night a second pass sets the day's memos against the whole project, and raises in groups what a save missed
+
+- **Status:** accepted as a hypothesis (2026-10-23). Builds on [0091](#adr-0091), whose older
+  lane it fills, and on [0096](#adr-0096), whose merge settles a group in one go; revises the
+  priority of [0091](#adr-0091)'s point 4 for what an agent judged.
+- **Context:** a save compares a memo with the six memos nearest to it from 0.75 up
+  ([0091](#adr-0091)), and the reconciler with the nearest alone from 0.82. Duplicates still got
+  through, both memos handed to agents as true:
+  - a memo uploaded in bulk has no vector until its batch ends. One saved meanwhile never meets
+    it, and the upload then skips it because it is newer ([0094](#adr-0094), point 4), so the
+    pair is never raised;
+  - the same thing in other words, or in the other language the memory holds
+    ([0080](#adr-0080)), scores under 0.75, or behind the sixth neighbour;
+  - three memos about one thing come up as separate reviews, one per older memo, so nobody sees
+    them together;
+  - Health lists the pairs from 0.85 up, 25 at most, and nothing acts on the list; the nightly
+    dedup only retires what is near identical, from 0.95 and from the same origin.
+- **Decision:**
+  1. **A step of the nightly maintenance**, after the dedup and before the lint, goes through
+     the memos in force saved since the project's last pass (`review_sweeps`, migration
+     `0035_review_sweep.sql`); a night the worker missed is caught up the next. A project's first
+     pass looks back one day: the backlog stays out, as in [0091](#adr-0091) and
+     [0093](#adr-0093).
+  2. **Each memo of the day is set against the whole project with a wider net than a save
+     casts**: the `CORTEX_SWEEP_NEIGHBOURS` closest (12), from `CORTEX_SWEEP_FLOOR` (0.65).
+  3. **A new role, `judge`, says which of them belong in one review with it**, and how:
+     *duplicate* (they say the same), *overlap* (each holds part of one memo) or *contradiction*
+     (only one can hold), with one sentence on why, in the project's language. What it leaves out
+     is not raised, which is what lets the net be wider. Its criterion can be tuned like any
+     role's ([0088](#adr-0088)).
+  4. **A group is one review, anchored on its oldest memo** with every other memo set against
+     it, so the older lane shows them side by side and the merge of [0096](#adr-0096) takes all of
+     them at once. The memos of the day it groups are not judged again on their own.
+  5. **It only proposes.** Nothing is merged, superseded or rewritten; a person decides, as for
+     any review. A pair already in the queue, pending or decided, is not raised again.
+  6. **What the agent said is shown beside each memo it grouped**, as the agent's, not as a
+     verdict.
+  7. **The order:** a contradiction first, then a duplicate, then an overlap, all of them before
+     what only similarity raised, and by similarity within each. A night raises no more than
+     `CORTEX_SWEEP_MAX_REVIEWS` (20) per project, the most pressing first.
+  8. **Without a model, or when it fails,** only the memos close enough for Health to call them
+     likely duplicates (0.85) join the memo of the day, with no relation or reason.
+- **Alternatives:**
+  - **Compare pairs, as a save does.** Three memos about one thing would be two reviews, and the
+    merge would take two passes. Rejected: what the user asked for is one review of everything
+    that can become one memo.
+  - **Let the pass retire clear duplicates by itself.** The nightly dedup already does it from
+    0.95; below that, `verified` would stop meaning that a person read it ([0090](#adr-0090)).
+    Rejected.
+  - **Sweep the whole project every night.** Every memo against every other is the quadratic
+    self-join that slowed Health down ([0089](#adr-0089)), and a model call per memo every night.
+    Rejected for the day's memos against the whole project.
+  - **Raise again a pair a person decided once a third memo joins it.** The group would be
+    whole, at the cost of asking again what somebody answered. Not now.
+  - **A lane of its own.** Review would ask a third question. Rejected: a group of memos about one
+    thing is the older lane's question, with more than one newer memo.
+- **Consequences:** one model call per memo of the day that has anything close enough, which a
+  large upload multiplies the night after it. A memo still without a vector when the pass runs is
+  not swept. A group whose oldest memo already had a pair decided shows only the memos not
+  decided against it. Memos that belong together across a parent and its child are not compared.
+  Proposals to rewrite a memo on its own — say it better, add or drop something — are a later
+  step.
+- **Revisit when:** most groups the pass raises end in *it still holds*, which says the floor is
+  too low or the criterion too loose; the cap leaves groups out night after night; people ask
+  for the agent's suggestion on each memo too, not only on groups; or duplicates across a
+  project's hierarchy show up in the pack.
