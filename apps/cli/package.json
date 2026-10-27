@@ -16,7 +16,7 @@
   "devDependencies": {
     "@cortex/client": "workspace:*",
     "@cortex/shared": "workspace:*",
-    "tsup": "^8.5.0"
+    "tsup": "^9.0.0"
   },
   "license": "Apache-2.0",
   "description": "Cortex CLI: project memory for AI coding agents",
