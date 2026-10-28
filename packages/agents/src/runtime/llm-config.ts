@@ -1,4 +1,5 @@
 import { getEnv, loadEnv } from "@cortex/shared";
+import type { AgentRole } from "./roles.js";
 
 /**
  * LLM credential/model resolution. Every supported endpoint speaks the OpenAI dialect
@@ -67,7 +68,19 @@ function splitModelSpec(spec: string): { provider?: string; model: string } {
   return { provider: prefix, model: spec.slice(i + 1).trim() };
 }
 
-function resolveProvider(provider: string, model: string, defaults: AliasDefaults): LlmConfig | null {
+type ModelCandidate = [model: string | undefined, setBy: string | null];
+
+interface Resolved {
+  config: LlmConfig;
+  modelSetBy: string | null;
+}
+
+function firstModel(candidates: ModelCandidate[], codeDefault: string): { model: string; setBy: string | null } {
+  for (const [model, setBy] of candidates) if (model) return { model, setBy };
+  return { model: codeDefault, setBy: null };
+}
+
+function resolveProvider(provider: string, requested: ModelCandidate, defaults: AliasDefaults): Resolved | null {
   if (provider === "openai-compatible") {
     const baseURL = (getEnv("LLM_BASE_URL", "").trim() || defaults.baseURL || "").trim();
     if (!baseURL) return null;
@@ -77,24 +90,41 @@ function resolveProvider(provider: string, model: string, defaults: AliasDefault
     // Local endpoints (Ollama, LM Studio) need no key: that has to be stated explicitly so a
     // deployment does not silently end up with no LLM because of a forgotten key.
     if (!apiKey && !getEnv("LLM_ALLOW_NO_KEY", "").trim()) return null;
-    return {
-      provider,
-      apiKey: apiKey || "no-key",
-      model: model || getEnv("LLM_MODEL", "").trim() || defaults.model || "deepseek-v4-flash",
-      baseURL,
-    };
+    const { model, setBy } = firstModel(
+      [requested, [getEnv("LLM_MODEL", "").trim(), "LLM_MODEL"], [defaults.model, "NAN_LLM_MODEL"]],
+      "deepseek-v4-flash",
+    );
+    return { config: { provider, apiKey: apiKey || "no-key", model, baseURL }, modelSetBy: setBy };
   }
   if (provider === "openrouter") {
     const apiKey = (process.env.OPENROUTER_API_KEY ?? "").trim();
     if (!apiKey) return null;
-    return {
-      provider,
-      apiKey,
-      model: model || getEnv("OPENROUTER_MODEL", "deepseek/deepseek-v4-pro"),
-      baseURL: OPENROUTER_BASE_URL,
-    };
+    const { model, setBy } = firstModel(
+      [requested, [getEnv("OPENROUTER_MODEL", "").trim(), "OPENROUTER_MODEL"]],
+      "deepseek/deepseek-v4-pro",
+    );
+    return { config: { provider, apiKey, model, baseURL: OPENROUTER_BASE_URL }, modelSetBy: setBy };
   }
   return null;
+}
+
+export function roleModelVariable(role: string): string {
+  return `CORTEX_MODEL_${role.toUpperCase()}`;
+}
+
+function resolveRole(role?: string): Resolved | null {
+  loadEnv();
+  const declared = (getEnv("LLM_PROVIDER", "none").trim() || "none").toLowerCase();
+  const { provider: baseProvider, defaults } = normalizeProvider(declared);
+  const roleVariable = role ? roleModelVariable(role) : null;
+  const spec = roleVariable ? getEnv(roleVariable, "").trim() : "";
+  const { provider: roleProvider, model: roleModel } = splitModelSpec(spec);
+  const requested: ModelCandidate = [roleModel, roleVariable];
+  if (!roleProvider) return resolveProvider(baseProvider, requested, defaults);
+  // The role points at another provider: resolve it with ITS credentials, without
+  // inheriting the base provider's alias defaults (they belong to a different endpoint).
+  const { provider, defaults: roleDefaults } = normalizeProvider(roleProvider);
+  return resolveProvider(provider, requested, roleDefaults);
 }
 
 /**
@@ -109,20 +139,27 @@ function resolveProvider(provider: string, model: string, defaults: AliasDefault
  * This allows cheap/powerful routing per role without touching code (ADR-0023/0024).
  */
 export function getLlmConfig(role?: string): LlmConfig | null {
-  loadEnv();
-  const declared = (getEnv("LLM_PROVIDER", "none").trim() || "none").toLowerCase();
-  const { provider: baseProvider, defaults } = normalizeProvider(declared);
-  const spec = role ? getEnv(`CORTEX_MODEL_${role.toUpperCase()}`, "").trim() : "";
-  const { provider: roleProvider, model: roleModel } = splitModelSpec(spec);
-  if (!roleProvider) return resolveProvider(baseProvider, roleModel, defaults);
-  // The role points at another provider: resolve it with ITS credentials, without
-  // inheriting the base provider's alias defaults (they belong to a different endpoint).
-  const { provider, defaults: roleDefaults } = normalizeProvider(roleProvider);
-  return resolveProvider(provider, roleModel, roleDefaults);
+  return resolveRole(role)?.config ?? null;
 }
 
 export function isLlmEnabled(): boolean {
   return getLlmConfig() !== null;
+}
+
+export interface RoleModel {
+  provider: string;
+  model: string;
+  /** Null when no variable names a model and the code's default applies. */
+  setBy: string | null;
+}
+
+/** What a role will ask for, without its credentials. Null when it calls no model: with no base
+ *  provider no agent is built at all (`registry.ts`), whatever `CORTEX_MODEL_<ROLE>` says. */
+export function describeRoleModel(role: AgentRole): RoleModel | null {
+  if (!isLlmEnabled()) return null;
+  const resolved = resolveRole(role);
+  if (!resolved) return null;
+  return { provider: resolved.config.provider, model: resolved.config.model, setBy: resolved.modelSetBy };
 }
 
 /** Config for the VISION model (image captioning / OCR). Same endpoint as the chat LLM
@@ -135,7 +172,7 @@ export function getVisionConfig(): LlmConfig | null {
   const { provider: visionProvider, model: visionModel } = splitModelSpec(model);
   if (visionProvider) {
     const { provider, defaults } = normalizeProvider(visionProvider);
-    return resolveProvider(provider, visionModel, defaults);
+    return resolveProvider(provider, [visionModel, "CORTEX_VISION_MODEL"], defaults)?.config ?? null;
   }
   const cfg = getLlmConfig();
   return cfg ? { ...cfg, model: visionModel } : null;

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { closeSql, getSql } from "@cortex/database";
 import {
   agentPromptChain,
@@ -16,7 +16,8 @@ import {
   setReranker,
   type ProjectRef,
 } from "@cortex/core";
-import { agentPromptsResponse } from "@cortex/shared";
+import { roleModelVariable } from "@cortex/agents";
+import { agentPromptsResponse, agentRole } from "@cortex/shared";
 import { createApp as createServerApp } from "../../apps/server/src/app.js";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
 
@@ -247,5 +248,39 @@ describe("what the agents are told, set from the web and the API", () => {
     expect(ok.status).toBe(200);
     const reranker = agentPromptsResponse.parse(await ok.json()).prompts.find((p) => p.role === "reranker")!;
     expect(reranker.effective).toBe(`Newest first ${RID}.`);
+  });
+});
+
+/**
+ * Which model each agent runs on was written only in the server's `.env`, so an admin could not
+ * tell short of a shell on the box. The page that now says it reads the same config that holds
+ * the key, and must never print it.
+ */
+describe("the model each agent asks for, on the admin page", () => {
+  const adminPage = async () =>
+    (await createWebApp().request("/admin/agents", { headers: { cookie: cookieOf(ADMIN) } })).text();
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("says which model each agent asks for and which variable sets it, never the key", async () => {
+    for (const role of agentRole.options) vi.stubEnv(roleModelVariable(role), "");
+    vi.stubEnv("LLM_PROVIDER", "openai-compatible");
+    vi.stubEnv("LLM_BASE_URL", "https://llm.example.com/v1");
+    vi.stubEnv("LLM_API_KEY", `key-${RID}`);
+    vi.stubEnv("LLM_MODEL", "base-model");
+    vi.stubEnv("CORTEX_MODEL_JUDGE", "judge-model");
+
+    const page = await adminPage();
+    expect(page).toContain("Model <code>judge-model</code> on openai-compatible, set by <code>CORTEX_MODEL_JUDGE</code>.");
+    const onTheBaseModel = page.split("Model <code>base-model</code> on openai-compatible, set by <code>LLM_MODEL</code>.").length - 1;
+    expect(onTheBaseModel).toBe(agentRole.options.length - 1);
+    expect(page).not.toContain(`key-${RID}`);
+  });
+
+  it("with no provider it says so once, instead of a line per agent", async () => {
+    vi.stubEnv("LLM_PROVIDER", "none");
+    const page = await adminPage();
+    expect(page).toContain("No inference provider is configured");
+    expect(page).not.toContain("Model <code>");
   });
 });

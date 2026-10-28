@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
+import { describeRoleModel, isLlmEnabled } from "@cortex/agents";
 import { getAgentPrompts, isAdmin, setAgentPrompts, type AgentPromptView } from "@cortex/core";
 import { AGENT_PROMPT_MAX_LENGTH, agentPromptChanges, type AgentPromptChanges } from "@cortex/shared";
 import { layout } from "../views/layout.js";
@@ -41,6 +42,8 @@ agentPromptRoutes.get("/admin/agents", async (c) => {
     );
   }
   const notice = c.req.query("error");
+  const views = await getAgentPrompts(null);
+  const models = isLlmEnabled() ? new Map(views.map((view) => [view.role, describeRoleModel(view.role)])) : null;
   const body = html`
     <p><a class="back" href="/">← Projects</a></p>
     <h1>What the agents are told</h1>
@@ -49,9 +52,13 @@ agentPromptRoutes.get("/admin/agents", async (c) => {
       project; each project can then add its own under its Settings, never take this away. The format each agent
       answers in is fixed and goes after all of it.
     </p>
+    <p class="sub">
+      The model each one asks for comes from this server's environment — <code>CORTEX_MODEL_&lt;ROLE&gt;</code>, or
+      <code>LLM_MODEL</code> for all of them — and is changed there, not here.
+    </p>
     ${adminTabs("agents")}
     ${notice ? html`<div class="warn">${notice}</div>` : ""}
-    ${rootAgentPromptsPanel(await getAgentPrompts(null))}`;
+    ${rootAgentPromptsPanel(views, models)}`;
   return c.html(layout("Agents", body, { user, active: "admin" }));
 });
 

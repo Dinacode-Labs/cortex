@@ -9,6 +9,10 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **`/admin/agents` says which model each agent asks for.** Under each role, the model, its
+  provider and the variable that sets it (`CORTEX_MODEL_<ROLE>`, `LLM_MODEL`, or the default in the
+  code), and a plain line when a role names a provider with no credentials. It is read from the
+  server's environment and changed there; the key never reaches the page.
 - **Every night, a second pass looks for the duplicates a save missed.** The worker sets each memo
   saved since the night before against the whole project, closer to more memos than a save looks
   at, and a new agent, the *judge*, says which of them belong together: they say the same thing,
@@ -351,6 +355,8 @@ fixes things.
   generated files, so run it again to pick this up ([ADR-0066](docs/decisions.md#adr-0066)).
 
 ### Fixed
+- **An empty `OPENROUTER_MODEL` falls back to the default model**, as an empty `LLM_MODEL` already
+  did, instead of asking OpenRouter for a model with no name.
 - **Health stops listing a clash somebody already settled.** A memo marked obsolete, rejected or
   superseded still counted as a duplicate or as one side of a contradiction, in the web UI and in
   the MCP lint alike, because only an end date took a memo out of the lint

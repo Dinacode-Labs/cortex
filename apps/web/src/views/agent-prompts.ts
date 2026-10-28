@@ -1,5 +1,5 @@
 import { html } from "hono/html";
-import { defaultCriterion } from "@cortex/agents";
+import { defaultCriterion, roleModelVariable, type RoleModel } from "@cortex/agents";
 import { effectiveCriterion, type AgentPromptView } from "@cortex/core";
 import { AGENT_PROMPT_MAX_LENGTH, type AgentRole } from "@cortex/shared";
 import { panel } from "./components.js";
@@ -17,10 +17,19 @@ const ROLE_SUMMARIES: Record<AgentRole, string> = {
   editor: "suggests, each night, a better wording for the memos waiting to be checked, or rejecting them",
 };
 
-function promptField(view: AgentPromptView, above: { label: string; text: string }, placeholder: string): Html {
+function modelLine(role: AgentRole, model: RoleModel | null): Html {
+  if (!model) {
+    return html`<p class="sub">No model: <code>${roleModelVariable(role)}</code> names a provider with no credentials.</p>`;
+  }
+  const origin = model.setBy ? html`set by <code>${model.setBy}</code>` : "the default in the code";
+  return html`<p class="sub">Model <code>${model.model}</code> on ${model.provider}, ${origin}.</p>`;
+}
+
+function promptField(view: AgentPromptView, above: { label: string; text: string }, placeholder: string, model: Html | "" = ""): Html {
   const id = `prompt-${view.role}`;
   return html`<div class="stack-sm">
     <label for="${id}"><b>${view.role}</b> <span class="sub">— ${ROLE_SUMMARIES[view.role]}</span></label>
+    ${model}
     <details>
       <summary class="sub">${above.label}</summary>
       <div class="content-block">${above.text}</div>
@@ -56,12 +65,21 @@ export function projectAgentPromptsPanel(slug: string, views: AgentPromptView[])
   );
 }
 
-export function rootAgentPromptsPanel(views: AgentPromptView[]): Html {
+/** `models` is null when no inference provider is configured. */
+export function rootAgentPromptsPanel(views: AgentPromptView[], models: Map<AgentRole, RoleModel | null> | null): Html {
   return panel(
     null,
     html`<form method="post" action="/admin/agents" class="stack">
+      ${models
+        ? ""
+        : html`<p class="sub">No inference provider is configured (<code>LLM_PROVIDER</code>), so no agent calls a model.</p>`}
       ${views.map((view) =>
-        promptField(view, { label: "The default, in the code", text: defaultCriterion(view.role) }, "Empty: the default applies."),
+        promptField(
+          view,
+          { label: "The default, in the code", text: defaultCriterion(view.role) },
+          "Empty: the default applies.",
+          models ? modelLine(view.role, models.get(view.role) ?? null) : "",
+        ),
       )}
       <div class="row"><button type="submit">Save</button></div>
     </form>`,
