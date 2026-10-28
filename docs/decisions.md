@@ -330,7 +330,8 @@ decisions they carried stay recorded here.
 
 ## ADR-0016 · Measuring what the AI costs
 
-- **Status:** accepted (2026-06-22). Two layers.
+- **Status:** accepted (2026-06-22). Two layers. Split by project, subscription and day by
+  [0100](#adr-0100).
 - **Context:** nothing measured tokens or cost. With a subscription provider the cost is zero,
   but "zero today" is not a reason to fly blind: switching to a metered provider should not be
   a leap in the dark.
@@ -3678,3 +3679,56 @@ decisions they carried stay recorded here.
 - **Revisit when:** people save the agent's rewrite unchanged almost every time, which argues for
   letting the pass do more; they rarely use it, which says the criterion is too eager; the lane
   moves faster than the cap; or suggestions are asked for on the older memos too.
+
+<a id="adr-0100"></a>
+
+## ADR-0100 · What the models cost is split by project, by subscription and by day
+
+- **Status:** accepted as a hypothesis (2026-10-27). Takes up the "revisit when" of
+  [0016](#adr-0016) on cost per project.
+- **Context:** `/admin/usage` added up everything since the first call, by operation and by
+  model, and could not answer three questions:
+  - *Which project spends it.* `llm_usage` had a `project` column from the start and nothing
+    wrote it, although every agent call already carried its project to pick the project's
+    prompts ([0088](#adr-0088)).
+  - *On which subscription.* An installation holds several at once — the `openai-compatible`
+    endpoint, OpenRouter, a transcription endpoint, an embeddings endpoint
+    ([0023](#adr-0023), [0024](#adr-0024)) — and `provider` reads `openai-compatible` for a
+    self-hosted model and a paid one alike. On a flat-rate subscription every price is zero, so
+    its tokens are the only measure there is, and they must not mix with the metered ones.
+  - *When.* A total since the beginning hides whether last week cost more than the one before.
+- **Decision:**
+  1. **Each call records the project it served and the host it went to** (`project_id`,
+     `endpoint`; migration `0037_usage_by_project_and_endpoint.sql`, which drops the unused
+     `project`). The host and not the base URL, which can carry a key in its user-info. A
+     subscription is a host.
+  2. **An agent call is charged to the project it was made for**, which `runAgent` already
+     receives. **An embedding** is charged to the project of the memos it indexes, read from
+     their rows by the index, or to the project a search was scoped to. A batch spanning
+     projects, and a search across several, are charged to none.
+  3. **The page filters by period (7, 30 or 90 days, in UTC), by project and by subscription**,
+     as links, and every figure on it follows the filters except the traces, which carry no
+     project.
+  4. **A chart of the tokens of each day**, as bars drawn in HTML and CSS: the page has no script
+     ([0042](#adr-0042)), the hover is the browser's own tooltip, and the same figures are a
+     table one click away. A day with no calls is a zero, never a gap.
+  5. **It stays an admin page** ([0050](#adr-0050)): the split by project is for whoever pays,
+     not for each project's pages.
+- **Alternatives:**
+  - **Carry the project in an `AsyncLocalStorage` scope** set wherever a request knows it, so the
+    embeddings learn it with no parameter. One change reaches every path, and nothing in the code
+    says where a call's project came from. Rejected for an explicit tag on `embed()`.
+  - **Every caller of the memo index passes the project.** Five paths index a memo and two of
+    them hold only its id. Rejected for reading it from the rows, one query per batch.
+  - **The full base URL as the subscription.** Credentials can travel in it, and its path says
+    nothing the host does not. Rejected.
+  - **A chart library, or an SVG scaled to the width.** The first needs a script; the second
+    shrinks its own labels on a phone. Rejected.
+  - **Each project sees its own spend.** Rejected for now by [0050](#adr-0050).
+- **Consequences:** what was recorded before the migration has no project and, but for
+  OpenRouter's, no host: it shows as *No project* and *Unknown*. A deleted project takes its
+  attribution with it (`ON DELETE SET NULL`); the totals do not change. Vision and transcription
+  still record nothing. Indexing a memo costs one more query, to read its project.
+- **Revisit when:** a budget or an alert per project or per subscription is wanted; projects ask
+  to see their own spend; vision or transcription start to cost something; or chat accepts two
+  endpoints of the same kind, and a host stops naming one subscription.

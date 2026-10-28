@@ -3,7 +3,7 @@ import { LocalEmbeddingProvider } from "./local.js";
 import { type EmbeddingProvider } from "./provider.js";
 import { OpenAICompatibleEmbeddingProvider } from "./remote.js";
 
-export { type EmbeddingProvider, l2normalize } from "./provider.js";
+export { type EmbeddingProvider, type EmbeddingUsageTag, l2normalize } from "./provider.js";
 export { LocalEmbeddingProvider } from "./local.js";
 export { OpenAICompatibleEmbeddingProvider } from "./remote.js";
 export { setEmbeddingUsageSink, type EmbeddingUsage } from "./usage-sink.js";

@@ -33,7 +33,7 @@ export class PgCodeIndex implements CodeIndex {
         batch.push(all[i]!);
         i++;
       }
-      const vecs = await provider.embed(batch.map((c) => c.content));
+      const vecs = await provider.embed(batch.map((c) => c.content), { projectId });
       for (let j = 0; j < batch.length; j++) {
         const c = batch[j]!;
         await sql`
@@ -50,7 +50,7 @@ export class PgCodeIndex implements CodeIndex {
   async search(projectId: string, query: string, limit: number): Promise<CodeHit[]> {
     const { sql, provider } = this;
     const pool = Math.max(limit * 4, 32);
-    const vectors = await provider.embed([query]);
+    const vectors = await provider.embed([query], { projectId });
     const lit = toVectorLiteral(vectors[0]!);
 
     const vecRows = (await sql`

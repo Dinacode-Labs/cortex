@@ -115,6 +115,10 @@ export function panel(title: string | null, body: Html, opts: PanelOptions = {})
   </section>`;
 }
 
+export function stat(label: string, value: string): Html {
+  return html`<div class="stat"><div class="stat-label">${label}</div><div class="stat-value">${value}</div></div>`;
+}
+
 /**
  * "There is nothing here" is useless information: whoever reads it can already see that. What
  * they need to know is whether that is fine, and what to do if it is not.

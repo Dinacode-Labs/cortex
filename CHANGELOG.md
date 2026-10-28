@@ -231,6 +231,13 @@ fixes things.
   whatever they are fed (`OUTPUT_LANGUAGE`), the English set measures whether the judgement
   survives a session that is not in the language of the corpus, and it is annotated only with
   keywords that survive translation.
+- **The AI cost page splits the spend by project, by subscription and by day.** `/admin/usage`
+  filters by period (7, 30 or 90 days), by project and by subscription — the host each call went
+  to, so a flat-rate endpoint and a metered one no longer both read `openai-compatible` — and
+  draws the tokens of each day as a chart, with the same figures as a table. Every agent call is
+  charged to the project it served, and an embedding to the project of what it indexes or
+  searches; what was recorded before shows as *No project*. Migration
+  `0037_usage_by_project_and_endpoint.sql` ([ADR-0100](docs/decisions.md#adr-0100)).
 
 ### Changed
 - **Rejecting a memo in *Not checked yet* reads "wrong, or not worth knowing".** A memo that is

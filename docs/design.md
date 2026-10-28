@@ -107,7 +107,7 @@ What agents see, Map, Code — and Settings apart. Review says how many memos wa
                         saying when it waits in Review
 /search?q=              across everything you can see
 /unsubscribe/<token>    the digest's way out, with no session: it asks, and only the button acts
-/admin/usage            what the inference costs (admins only)
+/admin/usage            what the inference costs, by day, project and subscription (admins only)
 /admin/agents           what every agent is told, before any project adds to it (admins only)
 ```
 

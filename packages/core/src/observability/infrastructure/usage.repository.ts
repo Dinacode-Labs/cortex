@@ -1,46 +1,102 @@
-import type { Sql } from "@cortex/database";
-import type { TraceSpan, TraceTree, UsageEntry, UsageRepository, UsageSummary } from "../domain/usage.js";
+import type { Row, Sql, SqlFragment } from "@cortex/database";
+import type {
+  TraceSpan,
+  TraceTree,
+  UsageEntry,
+  UsageFacets,
+  UsageFigures,
+  UsageFilter,
+  UsageRepository,
+  UsageSummary,
+} from "../domain/usage.js";
+
+// bigint, not int: a year of a busy installation runs past 2^31 tokens, and an int sum then errors.
+const figuresOf = (r: Row): UsageFigures => ({
+  calls: Number(r.calls ?? 0),
+  inputTokens: Number(r.input ?? 0),
+  outputTokens: Number(r.output ?? 0),
+  totalTokens: Number(r.total ?? 0),
+  costUsd: Number(r.cost ?? 0),
+});
 
 export class PgUsageRepository implements UsageRepository {
   constructor(private readonly sql: Sql) {}
 
   async record(e: UsageEntry): Promise<void> {
     await this.sql`
-      INSERT INTO llm_usage (kind, provider, model, operation, project, input_tokens, output_tokens, total_tokens, est_cost_usd, duration_ms)
-      VALUES (${e.kind}, ${e.provider}, ${e.model}, ${e.operation}, ${e.project},
+      INSERT INTO llm_usage (kind, provider, model, operation, project_id, endpoint, input_tokens, output_tokens, total_tokens, est_cost_usd, duration_ms)
+      VALUES (${e.kind}, ${e.provider}, ${e.model}, ${e.operation}, ${e.projectId}, ${e.endpoint},
               ${e.inputTokens}, ${e.outputTokens}, ${e.totalTokens}, ${e.costUsd}, ${e.durationMs})
     `;
   }
 
-  async summary(): Promise<UsageSummary> {
+  async summary(filter: UsageFilter): Promise<UsageSummary> {
     const sql = this.sql;
-    type R = Record<string, unknown>;
-    const [tot] = (await sql`
-      SELECT count(*)::int AS calls, coalesce(sum(input_tokens),0)::int AS input,
-             coalesce(sum(output_tokens),0)::int AS output, coalesce(sum(total_tokens),0)::int AS total,
-             coalesce(sum(est_cost_usd),0)::float8 AS cost FROM llm_usage`) as unknown as R[];
-    const byOp = (await sql`
-      SELECT operation, kind, count(*)::int AS calls, coalesce(sum(total_tokens),0)::int AS total,
-             coalesce(sum(est_cost_usd),0)::float8 AS cost
-      FROM llm_usage GROUP BY operation, kind ORDER BY total DESC`) as unknown as R[];
-    const byModel = (await sql`
-      SELECT model, provider, count(*)::int AS calls, coalesce(sum(total_tokens),0)::int AS total,
-             coalesce(sum(est_cost_usd),0)::float8 AS cost
-      FROM llm_usage GROUP BY model, provider ORDER BY total DESC`) as unknown as R[];
-    const recent = (await sql`
-      SELECT created_at, operation, model, total_tokens, est_cost_usd, project
-      FROM llm_usage ORDER BY created_at DESC LIMIT 20`) as unknown as R[];
+    const figures = sql`count(*)::int AS calls, coalesce(sum(u.input_tokens),0)::bigint AS input,
+      coalesce(sum(u.output_tokens),0)::bigint AS output, coalesce(sum(u.total_tokens),0)::bigint AS total,
+      coalesce(sum(u.est_cost_usd),0)::float8 AS cost`;
+    const where = this.where(filter);
 
-    const t = tot ?? {};
+    const [totals, daily, byProject, byEndpoint, byOperation, byModel, recent] = (await Promise.all([
+      sql`SELECT ${figures} FROM llm_usage u ${where}`,
+      sql`SELECT to_char(date_trunc('day', u.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day, ${figures}
+          FROM llm_usage u ${where} GROUP BY 1 ORDER BY 1`,
+      sql`SELECT u.project_id, e.name, e.slug, ${figures}
+          FROM llm_usage u LEFT JOIN entities e ON e.id = u.project_id ${where}
+          GROUP BY u.project_id, e.name, e.slug ORDER BY total DESC`,
+      sql`SELECT u.endpoint, array_agg(DISTINCT u.provider ORDER BY u.provider) AS providers, ${figures}
+          FROM llm_usage u ${where} GROUP BY u.endpoint ORDER BY total DESC`,
+      sql`SELECT u.operation, u.kind, ${figures} FROM llm_usage u ${where} GROUP BY u.operation, u.kind ORDER BY total DESC`,
+      sql`SELECT u.model, u.provider, ${figures} FROM llm_usage u ${where} GROUP BY u.model, u.provider ORDER BY total DESC`,
+      sql`SELECT u.created_at, u.operation, u.model, u.total_tokens, u.est_cost_usd, u.endpoint, e.name AS project_name
+          FROM llm_usage u LEFT JOIN entities e ON e.id = u.project_id ${where}
+          ORDER BY u.created_at DESC LIMIT 20`,
+    ])) as unknown as Row[][];
+
     return {
-      totals: {
-        calls: Number(t.calls ?? 0), inputTokens: Number(t.input ?? 0), outputTokens: Number(t.output ?? 0),
-        totalTokens: Number(t.total ?? 0), costUsd: Number(t.cost ?? 0),
-      },
-      byOperation: byOp.map((r) => ({ operation: String(r.operation), kind: String(r.kind), calls: Number(r.calls), totalTokens: Number(r.total), costUsd: Number(r.cost) })),
-      byModel: byModel.map((r) => ({ model: String(r.model), provider: String(r.provider), calls: Number(r.calls), totalTokens: Number(r.total), costUsd: Number(r.cost) })),
-      recent: recent.map((r) => ({ createdAt: new Date(r.created_at as string).toISOString(), operation: String(r.operation), model: String(r.model), totalTokens: Number(r.total_tokens), costUsd: Number(r.est_cost_usd), project: (r.project as string) ?? null })),
+      totals: figuresOf(totals![0] ?? {}),
+      daily: daily!.map((r) => ({ day: String(r.day), ...figuresOf(r) })),
+      byProject: byProject!.map((r) => ({
+        projectId: (r.project_id as string) ?? null,
+        name: (r.name as string) ?? null,
+        slug: (r.slug as string) ?? null,
+        ...figuresOf(r),
+      })),
+      byEndpoint: byEndpoint!.map((r) => ({ endpoint: (r.endpoint as string) ?? null, providers: (r.providers as string[]) ?? [], ...figuresOf(r) })),
+      byOperation: byOperation!.map((r) => ({ operation: String(r.operation), kind: String(r.kind), ...figuresOf(r) })),
+      byModel: byModel!.map((r) => ({ model: String(r.model), provider: String(r.provider), ...figuresOf(r) })),
+      recent: recent!.map((r) => ({
+        createdAt: new Date(r.created_at as string).toISOString(),
+        operation: String(r.operation),
+        model: String(r.model),
+        totalTokens: Number(r.total_tokens),
+        costUsd: Number(r.est_cost_usd),
+        projectName: (r.project_name as string) ?? null,
+        endpoint: (r.endpoint as string) ?? null,
+      })),
     };
+  }
+
+  async facets(): Promise<UsageFacets> {
+    const sql = this.sql;
+    const [projects, endpoints] = (await Promise.all([
+      sql`SELECT e.id, e.name, e.slug FROM entities e
+          WHERE e.id IN (SELECT DISTINCT project_id FROM llm_usage WHERE project_id IS NOT NULL)
+          ORDER BY lower(e.name)`,
+      sql`SELECT DISTINCT endpoint FROM llm_usage WHERE endpoint IS NOT NULL ORDER BY endpoint`,
+    ])) as unknown as Row[][];
+    return {
+      projects: projects!.map((r) => ({ id: String(r.id), name: String(r.name), slug: (r.slug as string) ?? null })),
+      endpoints: endpoints!.map((r) => String(r.endpoint)),
+    };
+  }
+
+  private where(filter: UsageFilter): SqlFragment {
+    const sql = this.sql;
+    let conditions = sql`WHERE u.created_at >= ${filter.since}`;
+    if (filter.projectId) conditions = sql`${conditions} AND u.project_id = ${filter.projectId}`;
+    if (filter.endpoint) conditions = sql`${conditions} AND u.endpoint = ${filter.endpoint}`;
+    return conditions;
   }
 
   async recentTraces(limit: number): Promise<TraceTree[]> {

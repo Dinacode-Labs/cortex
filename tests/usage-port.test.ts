@@ -22,7 +22,7 @@ describe("recording usage", () => {
 
     await recordUsage({ provider: "openai", model: "gpt-4o", operation: "o", inputTokens: 999.6, outputTokens: 0 });
     expect(recorded).toEqual([
-      expect.objectContaining({ kind: "llm", inputTokens: 1000, outputTokens: 0, totalTokens: 1000, costUsd: 0.0025, project: null }),
+      expect.objectContaining({ kind: "llm", inputTokens: 1000, outputTokens: 0, totalTokens: 1000, costUsd: 0.0025, projectId: null, endpoint: null }),
     ]);
   });
 });
