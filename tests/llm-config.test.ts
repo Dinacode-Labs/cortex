@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getLlmConfig, getSttConfig, getVisionConfig, isLlmEnabled } from "../packages/agents/src/runtime/llm-config";
+import { agentRole } from "@cortex/shared";
+import {
+  describeRoleModel,
+  getLlmConfig,
+  getSttConfig,
+  getVisionConfig,
+  isLlmEnabled,
+  roleModelVariable,
+} from "../packages/agents/src/runtime/llm-config";
 
 /**
  * The LLM provider stopped being a closed list of vendors (`nan`, `openrouter`) and became any
@@ -15,7 +23,7 @@ const VARS = [
   "LLM_PROVIDER", "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "LLM_ALLOW_NO_KEY",
   "NAN_API_KEY", "NAN_BASE_URL", "NAN_LLM_MODEL",
   "OPENROUTER_API_KEY", "OPENROUTER_MODEL",
-  "CORTEX_MODEL_RETRIEVER", "CORTEX_MODEL_DISTILLER", "CORTEX_VISION_MODEL",
+  ...agentRole.options.map(roleModelVariable), "CORTEX_VISION_MODEL",
   "CORTEX_STT_API_KEY", "CORTEX_STT_BASE_URL", "CORTEX_STT_MODEL", "OPENAI_API_KEY",
 ];
 
@@ -126,6 +134,63 @@ describe("getLlmConfig — routing por rol", () => {
     vi.stubEnv("LLM_API_KEY", "nan-key");
     vi.stubEnv("CORTEX_MODEL_RETRIEVER", "openrouter:x-ai/grok-4.5");
     expect(getLlmConfig("retriever")).toBeNull();
+  });
+});
+
+/**
+ * `/admin/agents` says which model each agent asks for and which variable set it. Worked out
+ * apart from `getLlmConfig` it would drift from it, and the page would name a model nobody calls;
+ * and it is read from the config that holds the key, which must not travel with it.
+ */
+describe("describeRoleModel — what the admin page shows", () => {
+  const onNaN = () => {
+    vi.stubEnv("LLM_PROVIDER", "openai-compatible");
+    vi.stubEnv("LLM_BASE_URL", "https://api.nan.builders/v1");
+    vi.stubEnv("LLM_API_KEY", "nan-key");
+  };
+
+  it("names the variable the model comes from, or none when it is the code's default", () => {
+    onNaN();
+    expect(describeRoleModel("judge")).toEqual({ provider: "openai-compatible", model: "deepseek-v4-flash", setBy: null });
+
+    vi.stubEnv("LLM_MODEL", "base-model");
+    vi.stubEnv("CORTEX_MODEL_JUDGE", "judge-model");
+    expect(describeRoleModel("judge")).toEqual({ provider: "openai-compatible", model: "judge-model", setBy: "CORTEX_MODEL_JUDGE" });
+    expect(describeRoleModel("editor")).toEqual({ provider: "openai-compatible", model: "base-model", setBy: "LLM_MODEL" });
+  });
+
+  it("with the `nan` alias, the model comes from NAN_LLM_MODEL", () => {
+    vi.stubEnv("LLM_PROVIDER", "nan");
+    vi.stubEnv("NAN_API_KEY", "nan-key");
+    vi.stubEnv("NAN_LLM_MODEL", "nan-model");
+    expect(describeRoleModel("classifier")).toEqual({ provider: "openai-compatible", model: "nan-model", setBy: "NAN_LLM_MODEL" });
+  });
+
+  it("a role sent to another provider shows that provider, and its default model's variable", () => {
+    onNaN();
+    vi.stubEnv("OPENROUTER_API_KEY", "or-key");
+    vi.stubEnv("OPENROUTER_MODEL", "or-model");
+    vi.stubEnv("CORTEX_MODEL_RETRIEVER", "openrouter:");
+    expect(describeRoleModel("retriever")).toEqual({ provider: "openrouter", model: "or-model", setBy: "OPENROUTER_MODEL" });
+  });
+
+  it("with no base provider no role calls a model, even one sent to a provider with credentials", () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "or-key");
+    vi.stubEnv("CORTEX_MODEL_RETRIEVER", "openrouter:x-ai/grok-4.5");
+    expect(getLlmConfig("retriever")).not.toBeNull();
+    expect(describeRoleModel("retriever")).toBeNull();
+  });
+
+  it("a role whose provider has no credentials has no model", () => {
+    onNaN();
+    vi.stubEnv("CORTEX_MODEL_RETRIEVER", "openrouter:x-ai/grok-4.5");
+    expect(describeRoleModel("retriever")).toBeNull();
+  });
+
+  it("never carries the key", () => {
+    onNaN();
+    const leaking = agentRole.options.filter((role) => JSON.stringify(describeRoleModel(role)).includes("nan-key"));
+    expect(leaking).toEqual([]);
   });
 });
 
