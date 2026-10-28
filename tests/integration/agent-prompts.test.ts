@@ -19,7 +19,7 @@ import {
   setReranker,
   type ProjectRef,
 } from "@cortex/core";
-import { roleModelVariable } from "@cortex/agents";
+import { forgetQuotaReadings, roleModelVariable } from "@cortex/agents";
 import { agentPromptsResponse, agentRole } from "@cortex/shared";
 import { createApp as createServerApp } from "../../apps/server/src/app.js";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
@@ -286,6 +286,62 @@ describe("the model each agent asks for, on the admin page", () => {
     const page = await adminPage();
     expect(page).toContain("No inference provider is configured");
     expect(page).not.toContain("Model <code>");
+    expect(page).not.toContain("Left of its quota");
+  });
+});
+
+/**
+ * One table answers what each agent runs on and how much of that model's quota is left, and links
+ * to the field that changes it: a quota running dry is only worth seeing next to the way out
+ * (docs/design.md, "nothing visible without being actionable").
+ */
+describe("every agent at a glance, on the admin page", () => {
+  const adminPage = async () =>
+    (await createWebApp().request("/admin/agents", { headers: { cookie: cookieOf(ADMIN) } })).text();
+
+  beforeEach(() => {
+    forgetQuotaReadings();
+    for (const role of agentRole.options) vi.stubEnv(roleModelVariable(role), "");
+    vi.stubEnv("LLM_PROVIDER", "openai-compatible");
+    vi.stubEnv("LLM_BASE_URL", "https://llm.example.com/v1");
+    vi.stubEnv("LLM_API_KEY", `key-${RID}`);
+    vi.stubEnv("LLM_MODEL", "base-model");
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("lists each agent with its model, what is left of its quota and a link to the field that changes it", async () => {
+    vi.stubEnv("CORTEX_MODEL_QUOTAS_JSON", JSON.stringify({ "base-model": { tokens: 4_000_000 } }));
+    vi.stubEnv("CORTEX_MODEL_JUDGE", "judge-model");
+    const provider = vi.fn(async () =>
+      Response.json({ object: "usage.report", data: [], totals: { by_model: [{ model: "base-model", total_tokens: 3_000_000 }] } }),
+    );
+    vi.stubGlobal("fetch", provider);
+
+    const page = await adminPage();
+
+    for (const role of agentRole.options) {
+      expect(page).toContain(`<a href="#model-${role}">Change</a>`);
+      expect(page).toContain(`id="model-${role}"`);
+    }
+    expect(page.split("<b>25%</b> left").length - 1).toBe(agentRole.options.length - 1);
+    expect(page).toContain("3M of 4M tokens spent since");
+    expect(page).toContain("No quota on file for this model");
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect(page).not.toContain(`key-${RID}`);
+  });
+
+  it("still opens, saying so, when the provider does not answer", async () => {
+    vi.stubEnv("CORTEX_MODEL_QUOTAS_JSON", JSON.stringify({ "base-model": { tokens: 4_000_000 } }));
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("ECONNREFUSED"))));
+
+    const page = await adminPage();
+
+    expect(page).toContain("The provider did not answer");
+    expect(page).toContain(`<a href="#model-judge">Change</a>`);
   });
 });
 

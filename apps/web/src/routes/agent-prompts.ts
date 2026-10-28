@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import { describeRoleModel, isLlmEnabled } from "@cortex/agents";
+import { describeRoleModel, isLlmEnabled, quotaLeft } from "@cortex/agents";
 import {
   getAgentModels,
   getAgentPrompts,
@@ -15,7 +15,7 @@ import {
 import { AGENT_PROMPT_MAX_LENGTH, agentPromptChanges, agentRole, type AgentPromptChanges, type AgentRole } from "@cortex/shared";
 import { layout } from "../views/layout.js";
 import { adminTabs } from "../views/admin-nav.js";
-import { rootAgentPromptsPanel, type AgentModelView } from "../views/agent-prompts.js";
+import { agentsAtAGlance, rootAgentPromptsPanel, type AgentModelView } from "../views/agent-prompts.js";
 import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
@@ -65,13 +65,14 @@ function modelWithNoCredentials(changes: AgentModelChanges): string | null {
   return null;
 }
 
-function agentModelViews(saved: Map<AgentRole, SavedAgentModel>): Map<AgentRole, AgentModelView> {
-  return new Map(
-    agentRole.options.map((role) => [
-      role,
-      { saved: saved.get(role) ?? null, inForce: describeRoleModel(role, saved.get(role)?.model) },
-    ]),
+async function agentModelViews(saved: Map<AgentRole, SavedAgentModel>): Promise<Map<AgentRole, AgentModelView>> {
+  const views = await Promise.all(
+    agentRole.options.map(async (role): Promise<[AgentRole, AgentModelView]> => {
+      const model = saved.get(role)?.model;
+      return [role, { saved: saved.get(role) ?? null, inForce: describeRoleModel(role, model), left: await quotaLeft(role, model) }];
+    }),
   );
+  return new Map(views);
 }
 
 agentPromptRoutes.get("/admin/agents", async (c) => {
@@ -84,10 +85,10 @@ agentPromptRoutes.get("/admin/agents", async (c) => {
   }
   const notice = c.req.query("error");
   const views = await getAgentPrompts(null);
-  const models = isLlmEnabled() ? agentModelViews(await getAgentModels()) : null;
+  const models = isLlmEnabled() ? await agentModelViews(await getAgentModels()) : null;
   const body = html`
     <p><a class="back" href="/">← Projects</a></p>
-    <h1>What the agents are told</h1>
+    <h1>Agents</h1>
     <p class="sub">
       Each agent judges by the default written in the code. A text saved here replaces that default for every
       project; each project can then add its own under its Settings, never take this away. The format each agent
@@ -100,6 +101,7 @@ agentPromptRoutes.get("/admin/agents", async (c) => {
     </p>
     ${adminTabs("agents")}
     ${notice ? html`<div class="warn">${notice}</div>` : ""}
+    ${models ? agentsAtAGlance(models) : ""}
     ${rootAgentPromptsPanel(views, models)}`;
   return c.html(layout("Agents", body, { user, active: "admin" }));
 });

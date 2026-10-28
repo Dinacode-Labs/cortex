@@ -18,6 +18,14 @@ fixes things.
   refused, and if a saved model's provider later loses its key the role falls back to the
   environment and the page says so. Migration `0038_agent_models.sql`
   ([ADR-0101](docs/decisions.md#adr-0101)).
+- **`/admin/agents` opens with every agent, its model and what is left of that model's quota.** One
+  table: the agent, the model it runs on, a bar with what is left of the model's quota as the
+  provider counts it — the whole account, not only what Cortex spent — and a link to the field
+  that changes the model. An endpoint that reports its usage at `/usage` is measured against the
+  quota in `CORTEX_MODEL_QUOTAS_JSON` (`{"model": {"tokens": 3000000000}}`, with `resetDay` for a
+  plan billed from another day than the 1st, or `null` for a model the plan does not count); a role
+  on OpenRouter shows its key's credit. A model with no quota on file, or a provider that does not
+  answer, says so instead of drawing a bar ([ADR-0102](docs/decisions.md#adr-0102)).
 - **Every night, a second pass looks for the duplicates a save missed.** The worker sets each memo
   saved since the night before against the whole project, closer to more memos than a save looks
   at, and a new agent, the *judge*, says which of them belong together: they say the same thing,

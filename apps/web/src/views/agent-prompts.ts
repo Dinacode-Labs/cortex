@@ -1,9 +1,10 @@
 import { html } from "hono/html";
-import { defaultCriterion, roleModelVariable, type RoleModel } from "@cortex/agents";
+import { defaultCriterion, roleModelVariable, shareLeft, type QuotaLeft, type RoleModel } from "@cortex/agents";
 import { AGENT_MODEL_MAX_LENGTH, effectiveCriterion, type AgentPromptView, type SavedAgentModel } from "@cortex/core";
 import { AGENT_PROMPT_MAX_LENGTH, type AgentRole } from "@cortex/shared";
-import { panel } from "./components.js";
+import { panel, stateMark } from "./components.js";
 import type { Html } from "./layout.js";
+import { compactNumber, dayLabel } from "./usage.js";
 
 const ROLE_SUMMARIES: Record<AgentRole, string> = {
   classifier: "types and titles each memo saved, and names the entities in it",
@@ -21,6 +22,61 @@ export interface AgentModelView {
   saved: SavedAgentModel | null;
   /** What the role runs on; null when it resolves to no model. */
   inForce: RoleModel | null;
+  left: QuotaLeft | null;
+}
+
+const UNKNOWN_QUOTA: Record<Extract<QuotaLeft, { kind: "unknown" }>["why"], string> = {
+  "no-quota-on-file": "No quota on file for this model",
+  "not-reported": "The provider does not report its usage",
+  "no-answer": "The provider did not answer",
+};
+
+const NEARLY_SPENT = 10;
+
+function percent(share: number): string {
+  if (share > 0 && share < 1) return "<1%";
+  // Rounded to a tenth first: 0.87 / 3 comes out as 28.999…, and flooring that says 28.
+  return `${Math.floor(Math.round(share * 10) / 10)}%`;
+}
+
+function shareMeter(share: number, label: string): Html {
+  const mark =
+    share <= 0 ? stateMark("danger", "Spent") : share < NEARLY_SPENT ? stateMark("warn", "Nearly spent") : "";
+  return html`<div class="meter" role="img" aria-label="${percent(share)} ${label}"><span style="width:${share}%"></span></div>
+    <b>${percent(share)}</b> ${label} ${mark}`;
+}
+
+function quotaCell(left: QuotaLeft | null): Html {
+  if (!left) return html`<span class="faint">—</span>`;
+  if (left.kind === "unknown") return html`<span class="faint">—</span> <span class="sub">${UNKNOWN_QUOTA[left.why]}</span>`;
+  if (left.kind === "unlimited") return html`No limit`;
+  if (left.kind === "tokens") {
+    return html`${shareMeter(shareLeft(left)!, "left")}
+      <div class="sub">${compactNumber(left.used)} of ${compactNumber(left.limit)} tokens spent since ${dayLabel(left.since)}</div>`;
+  }
+  return html`${shareMeter(shareLeft(left)!, "of the key's credit left")}
+    <div class="sub">$${left.remaining.toFixed(2)} of $${left.limit.toFixed(2)}${left.resets ? `, resets ${left.resets}` : ""}</div>`;
+}
+
+export function agentsAtAGlance(models: Map<AgentRole, AgentModelView>): Html {
+  return panel(
+    "Every agent",
+    html`<div class="agents-glance"><table>
+      <tr><th>Agent and model</th><th>Left of its quota</th></tr>
+      ${[...models].map(
+        ([role, { inForce, left }]) => html`<tr>
+          <td><b>${role}</b>
+            <div>${inForce ? html`<code>${inForce.model}</code> <span class="sub">on ${inForce.provider}</span>` : html`<span class="faint">No model</span>`}
+              · <a href="#model-${role}">Change</a></div></td>
+          <td>${quotaCell(left)}</td>
+        </tr>`,
+      )}
+    </table></div>`,
+    {
+      help: html`What is left is the provider's count for the whole account, not only what Cortex spent. A model's
+        quota comes from <code>CORTEX_MODEL_QUOTAS_JSON</code>; a key with a credit limit reports its own.`,
+    },
+  );
 }
 
 function modelLine(role: AgentRole, { saved, inForce }: AgentModelView): Html {

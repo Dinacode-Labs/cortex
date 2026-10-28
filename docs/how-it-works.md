@@ -565,7 +565,10 @@ pricing table can be corrected without a deploy through `CORTEX_PRICING_JSON`. O
 that, each agent run emits a **trace tree** (`agent_run → model_generation → …`) into the
 `ai_traces` table. Each call is charged to the project it served and to the host it went to, which
 is what tells one subscription from another. The `/admin/usage` page in the UI shows tokens and
-cost per day, project, subscription, operation and model, alongside the trace tree.
+cost per day, project, subscription, operation and model, alongside the trace tree. What is left
+of each model's quota is not Cortex's count but the provider's, for the whole account: `/admin/agents`
+asks for it and measures it against the quota in `CORTEX_MODEL_QUOTAS_JSON`
+([ADR-0102](decisions.md#adr-0102)).
 
 > **⚠️ What to watch for.** The lint is **deterministic**, but not cheap: the duplicate search
 > measures every pair of a project's vectors, so it grows with the square of the memos. That is

@@ -108,8 +108,9 @@ What agents see, Map, Code — and Settings apart. Review says how many memos wa
 /search?q=              across everything you can see
 /unsubscribe/<token>    the digest's way out, with no session: it asks, and only the button acts
 /admin/usage            what the inference costs, by day, project and subscription (admins only)
-/admin/agents           what every agent is told, before any project adds to it, and the model it
-                        runs on: where it comes from, and a field to change it that wins over the
+/admin/agents           every agent at a glance — its model, what is left of that model's quota
+                        as the provider counts it, a link to change it — then what each is told,
+                        before any project adds to it, and the field that sets its model over the
                         server's environment; the keys stay there (admins only)
 ```
 

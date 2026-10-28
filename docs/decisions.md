@@ -3783,3 +3783,49 @@ decisions they carried stay recorded here.
   yet.
 - **Revisit when:** a team wants a model per project; a provider's model list is reliable enough to
   offer as a choice; a saved model with a typo costs a night's pass; or the API is asked to set it.
+
+<a id="adr-0102"></a>
+
+## ADR-0102 · What is left of each model's quota is the provider's count, against a quota on file
+
+- **Status:** accepted as a hypothesis (2026-10-28). Builds on [0101](#adr-0101); the quota on
+  file follows `CORTEX_PRICING_JSON` ([0024](#adr-0024)) and the lesson of [0021](#adr-0021).
+- **Context:** a provider sold by subscription caps each model's tokens per period, and when the
+  cap runs out every call to that model fails — the nightly sweep, the distiller, Ask — with
+  nothing in Cortex saying why. The admin who can now move a role to another model
+  ([0101](#adr-0101)) could not see it coming. Cortex records its own spend ([0100](#adr-0100)),
+  but the cap counts the whole account: every other tool on the same key spends from it too.
+- **Decision:**
+  1. **`/admin/agents` opens with one table**: each agent, the model it runs on, what is left of
+     that model's quota, and a link to the field that changes it. It is not the dashboard
+     `docs/design.md` rules out: every row carries its own way out.
+  2. **What has been spent is the provider's count, never Cortex's.** An OpenAI-compatible
+     endpoint that serves `GET /usage` in the `usage.report` shape — one total per model over a
+     window of days — is asked for the period so far. OpenRouter has no quota per model; it reports
+     a key's credit at `GET /key`, in dollars, and that is what its rows show.
+  3. **The quota is configuration, not code.** `CORTEX_MODEL_QUOTAS_JSON` maps a model id to
+     `{"tokens": n}`, with a `resetDay` for a plan billed from another day than the 1st; `null`
+     marks a model the plan does not count. Which plan a deployment has is the operator's
+     ([0031](#adr-0031)), and plans written in the code would go stale as the price table did.
+  4. **An unknown is said in words, never drawn as a full bar**: no quota on file, a provider that
+     does not report its usage, a provider that did not answer. A full bar that means "nothing
+     known" is [0021](#adr-0021)'s silent zero again.
+  5. **One request per provider and period, remembered for a minute, waited on for four seconds
+     at most.** The usage endpoint has a rate limit of its own, and a provider that is down must
+     not keep shut the page that moves a role off it.
+- **Alternatives:**
+  - **Cortex's own usage table.** Counts only what Cortex spent, while the account runs dry on
+    everything sharing the key. Rejected.
+  - **A table of each provider's plans in the code**, like `PRICING`. Plans change, members of one
+    provider hold different ones, and which one a deployment holds is operational. Rejected.
+  - **The provider's own quota endpoint.** Where one exists it is undocumented, and a shape nobody
+    promised breaks silently when it changes. Left for when one is documented.
+  - **A budget set in Cortex**, a share of what the operator decides to spend. Not what is needed:
+    the cap that stops the calls is the provider's. Rejected.
+- **Consequences:** a row shows nothing useful until the operator writes that model's quota. A cap
+  on a rolling window, on top of the period's, is not covered: one period per model. The provider
+  counts by UTC day, so a period starts at midnight UTC. Opening the page makes up to one request
+  per provider.
+- **Revisit when:** a provider documents an endpoint that returns the quota itself, and the one on
+  file becomes the fallback; a rolling window runs dry before the period's cap does; or a second
+  provider reports its usage in another shape.

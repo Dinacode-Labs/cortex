@@ -18,7 +18,7 @@ export function niceCeiling(n: number): number {
 }
 
 const DAY = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-const dayLabel = (day: string): string => DAY.format(new Date(`${day}T00:00:00Z`));
+export const dayLabel = (day: string): string => DAY.format(new Date(`${day}T00:00:00Z`));
 
 /** A day that spent anything stays visible, however small next to the busiest. */
 function barHeight(value: number, top: number): number {
