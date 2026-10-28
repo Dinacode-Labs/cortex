@@ -75,6 +75,10 @@ interface Resolved {
   modelSetBy: string | null;
 }
 
+interface ResolvedRole extends Resolved {
+  saved: boolean;
+}
+
 function firstModel(candidates: ModelCandidate[], codeDefault: string): { model: string; setBy: string | null } {
   for (const [model, setBy] of candidates) if (model) return { model, setBy };
   return { model: codeDefault, setBy: null };
@@ -112,19 +116,33 @@ export function roleModelVariable(role: string): string {
   return `CORTEX_MODEL_${role.toUpperCase()}`;
 }
 
-function resolveRole(role?: string): Resolved | null {
-  loadEnv();
-  const declared = (getEnv("LLM_PROVIDER", "none").trim() || "none").toLowerCase();
-  const { provider: baseProvider, defaults } = normalizeProvider(declared);
-  const roleVariable = role ? roleModelVariable(role) : null;
-  const spec = roleVariable ? getEnv(roleVariable, "").trim() : "";
-  const { provider: roleProvider, model: roleModel } = splitModelSpec(spec);
-  const requested: ModelCandidate = [roleModel, roleVariable];
-  if (!roleProvider) return resolveProvider(baseProvider, requested, defaults);
+export function noModelError(role: string): Error {
+  return new Error(`No model for ${role}: ${roleModelVariable(role)} names a provider with no credentials.`);
+}
+
+function resolveSpec(spec: string, setBy: string | null, base: { provider: string; defaults: AliasDefaults }): Resolved | null {
+  const { provider: specProvider, model } = splitModelSpec(spec);
+  const requested: ModelCandidate = [model, setBy];
+  if (!specProvider) return resolveProvider(base.provider, requested, base.defaults);
   // The role points at another provider: resolve it with ITS credentials, without
   // inheriting the base provider's alias defaults (they belong to a different endpoint).
-  const { provider, defaults: roleDefaults } = normalizeProvider(roleProvider);
-  return resolveProvider(provider, requested, roleDefaults);
+  const { provider, defaults } = normalizeProvider(specProvider);
+  return resolveProvider(provider, requested, defaults);
+}
+
+function resolveRole(role?: string, saved?: string | null): ResolvedRole | null {
+  loadEnv();
+  const declared = (getEnv("LLM_PROVIDER", "none").trim() || "none").toLowerCase();
+  const base = normalizeProvider(declared);
+  if (role && saved) {
+    // A saved model whose provider lost its key falls back to the environment rather than
+    // leaving the role with no model at all (ADR-0101).
+    const fromSaved = resolveSpec(saved, null, base);
+    if (fromSaved) return { ...fromSaved, saved: true };
+  }
+  const roleVariable = role ? roleModelVariable(role) : null;
+  const fromEnvironment = resolveSpec(roleVariable ? getEnv(roleVariable, "").trim() : "", roleVariable, base);
+  return fromEnvironment && { ...fromEnvironment, saved: false };
 }
 
 /**
@@ -137,9 +155,11 @@ function resolveRole(role?: string): Resolved | null {
  *                            `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`),
  *                            resolved with its own credentials.
  * This allows cheap/powerful routing per role without touching code (ADR-0023/0024).
+ * `saved`, the model an admin saved for the role from the web, takes the same two shapes and
+ * beats the variable (ADR-0101).
  */
-export function getLlmConfig(role?: string): LlmConfig | null {
-  return resolveRole(role)?.config ?? null;
+export function getLlmConfig(role?: string, saved?: string | null): LlmConfig | null {
+  return resolveRole(role, saved)?.config ?? null;
 }
 
 export function isLlmEnabled(): boolean {
@@ -149,17 +169,19 @@ export function isLlmEnabled(): boolean {
 export interface RoleModel {
   provider: string;
   model: string;
-  /** Null when no variable names a model and the code's default applies. */
+  /** Null when no variable names a model: the one saved from the web, or the code's default, applies. */
   setBy: string | null;
+  /** Whether the model saved from the web is the one in force. */
+  saved: boolean;
 }
 
 /** What a role will ask for, without its credentials. Null when it calls no model: with no base
  *  provider no agent is built at all (`registry.ts`), whatever `CORTEX_MODEL_<ROLE>` says. */
-export function describeRoleModel(role: AgentRole): RoleModel | null {
+export function describeRoleModel(role: AgentRole, saved?: string | null): RoleModel | null {
   if (!isLlmEnabled()) return null;
-  const resolved = resolveRole(role);
+  const resolved = resolveRole(role, saved);
   if (!resolved) return null;
-  return { provider: resolved.config.provider, model: resolved.config.model, setBy: resolved.modelSetBy };
+  return { provider: resolved.config.provider, model: resolved.config.model, setBy: resolved.modelSetBy, saved: resolved.saved };
 }
 
 /** Config for the VISION model (image captioning / OCR). Same endpoint as the chat LLM

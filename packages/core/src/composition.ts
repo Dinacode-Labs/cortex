@@ -36,6 +36,8 @@ import type { ProjectRepository } from "./projects/domain/project-repository.js"
 import { PgProjectRepository } from "./projects/infrastructure/project.repository.js";
 import type { AgentPromptRepository } from "./projects/domain/agent-prompt-repository.js";
 import { PgAgentPromptRepository } from "./projects/infrastructure/agent-prompt.repository.js";
+import type { AgentModelRepository } from "./projects/domain/agent-model-repository.js";
+import { PgAgentModelRepository } from "./projects/infrastructure/agent-model.repository.js";
 import type { DigestSubscriptions } from "./notifications/domain/digest-subscriptions.js";
 import { PgDigestSubscriptions } from "./notifications/infrastructure/digest-subscriptions.repository.js";
 
@@ -52,6 +54,7 @@ export interface CorePorts {
   healthSnapshots: HealthSnapshots;
   projects: ProjectRepository;
   agentPrompts: AgentPromptRepository;
+  agentModels: AgentModelRepository;
   entities: EntityRepository;
   usage: UsageRepository;
   auth: AuthRepository;
@@ -75,6 +78,7 @@ const defaults: { [P in keyof CorePorts]: () => CorePorts[P] } = {
   healthSnapshots: () => new PgHealthSnapshots(getSql()),
   projects: () => new PgProjectRepository(getSql()),
   agentPrompts: () => new PgAgentPromptRepository(getSql()),
+  agentModels: () => new PgAgentModelRepository(getSql()),
   entities: () => new PgEntityRepository(getSql()),
   usage: () => new PgUsageRepository(getSql()),
   auth: () => new PgAuthRepository(getSql()),

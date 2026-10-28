@@ -252,6 +252,8 @@ label.check { display:inline-flex; align-items:center; gap:var(--s-2); font-size
 label.check input { height:auto; }
 form { margin:0; }
 form.row input[type=text], form.row input[type=search], form.row input[type=email] { flex:1; min-width:200px; }
+.model-field input[type=text] { flex:1; min-width:200px; max-width:420px; font-family:var(--mono); font-size:var(--t-sm); }
+.model-field input::placeholder { font-family:var(--font); }
 
 /* --- Surfaces ------------------------------------------------------------ */
 

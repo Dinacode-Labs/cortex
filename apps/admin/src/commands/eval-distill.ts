@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { distill, shutdownObservability, getLlmConfig } from "@cortex/agents";
 import { matchDistillItems, summarizeDistillMatches, type DistillItem, type GoldWindow, type WindowMatch } from "../eval/distill-match.js";
-import { defaultLanguage, EMPTY_CHAIN } from "@cortex/core";
+import { agentModelFor, defaultLanguage, EMPTY_CHAIN } from "@cortex/core";
 
 /**
  * `cortex-admin eval-distill` -- measures what the distiller keeps, drops and mistypes.
@@ -110,7 +110,7 @@ async function evalDistill(args: string[]): Promise<void> {
   const unlisted = [...files].filter((f) => !gold.some((g) => g.window === f)).sort();
   if (unlisted.length > 0) console.warn(`⚠️  No expectation in the gold file, not evaluated: ${unlisted.join(", ")}\n`);
 
-  const model = getLlmConfig("distiller");
+  const model = getLlmConfig("distiller", await agentModelFor("distiller"));
   // A run says which set it came from: two languages are never averaged into one number, so a
   // table that does not name its own set is a table nobody can compare against anything.
   const source = custom ? windowsDir : language;

@@ -1,17 +1,28 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
 import { describeRoleModel, isLlmEnabled } from "@cortex/agents";
-import { getAgentPrompts, isAdmin, setAgentPrompts, type AgentPromptView } from "@cortex/core";
-import { AGENT_PROMPT_MAX_LENGTH, agentPromptChanges, type AgentPromptChanges } from "@cortex/shared";
+import {
+  getAgentModels,
+  getAgentPrompts,
+  InvalidAgentModelError,
+  isAdmin,
+  setAgentModels,
+  setAgentPrompts,
+  type AgentModelChanges,
+  type AgentPromptView,
+  type SavedAgentModel,
+} from "@cortex/core";
+import { AGENT_PROMPT_MAX_LENGTH, agentPromptChanges, agentRole, type AgentPromptChanges, type AgentRole } from "@cortex/shared";
 import { layout } from "../views/layout.js";
 import { adminTabs } from "../views/admin-nav.js";
-import { rootAgentPromptsPanel } from "../views/agent-prompts.js";
+import { rootAgentPromptsPanel, type AgentModelView } from "../views/agent-prompts.js";
 import { requireProjectPage } from "../middleware/access.js";
 import type { WebEnv } from "../middleware/session.js";
 
 /**
  * What the agents are told (ADR-0088): root under the admin area, because it is about the whole
- * installation, and each project's under its Settings, next to what it keeps.
+ * installation, and each project's under its Settings, next to what it keeps. The model each runs
+ * on is the installation's too, so it is only set from the admin area (ADR-0101).
  */
 export const agentPromptRoutes = new Hono<WebEnv>();
 
@@ -33,6 +44,36 @@ function changedPrompts(form: Record<string, unknown>, current: AgentPromptView[
   return changes;
 }
 
+function changedModels(form: Record<string, unknown>, saved: Map<AgentRole, SavedAgentModel>): AgentModelChanges {
+  const changes: AgentModelChanges = {};
+  for (const role of agentRole.options) {
+    const field = form[`model.${role}`];
+    if (field === undefined) continue;
+    const model = String(field).trim();
+    if (model !== (saved.get(role)?.model ?? "")) changes[role] = model || null;
+  }
+  return changes;
+}
+
+/** A model whose provider has no key here would be saved and then never used: refuse it while the admin is looking. */
+function modelWithNoCredentials(changes: AgentModelChanges): string | null {
+  for (const [role, model] of Object.entries(changes) as [AgentRole, string | null][]) {
+    if (model && !describeRoleModel(role, model)?.saved) {
+      return `${model} names a provider with no credentials on this server, so ${role} was left as it was.`;
+    }
+  }
+  return null;
+}
+
+function agentModelViews(saved: Map<AgentRole, SavedAgentModel>): Map<AgentRole, AgentModelView> {
+  return new Map(
+    agentRole.options.map((role) => [
+      role,
+      { saved: saved.get(role) ?? null, inForce: describeRoleModel(role, saved.get(role)?.model) },
+    ]),
+  );
+}
+
 agentPromptRoutes.get("/admin/agents", async (c) => {
   const user = c.get("user")!;
   if (!isAdmin(user)) {
@@ -43,7 +84,7 @@ agentPromptRoutes.get("/admin/agents", async (c) => {
   }
   const notice = c.req.query("error");
   const views = await getAgentPrompts(null);
-  const models = isLlmEnabled() ? new Map(views.map((view) => [view.role, describeRoleModel(view.role)])) : null;
+  const models = isLlmEnabled() ? agentModelViews(await getAgentModels()) : null;
   const body = html`
     <p><a class="back" href="/">← Projects</a></p>
     <h1>What the agents are told</h1>
@@ -53,8 +94,9 @@ agentPromptRoutes.get("/admin/agents", async (c) => {
       answers in is fixed and goes after all of it.
     </p>
     <p class="sub">
-      The model each one asks for comes from this server's environment — <code>CORTEX_MODEL_&lt;ROLE&gt;</code>, or
-      <code>LLM_MODEL</code> for all of them — and is changed there, not here.
+      The model each one asks for is <code>model</code>, or <code>provider:model</code> to send it elsewhere. One saved
+      here wins over this server's environment — <code>CORTEX_MODEL_&lt;ROLE&gt;</code>, or <code>LLM_MODEL</code> for
+      all of them — from the next call on; an empty field gives the agent back to it. The keys stay in the environment.
     </p>
     ${adminTabs("agents")}
     ${notice ? html`<div class="warn">${notice}</div>` : ""}
@@ -65,11 +107,20 @@ agentPromptRoutes.get("/admin/agents", async (c) => {
 agentPromptRoutes.post("/admin/agents", async (c) => {
   const user = c.get("user")!;
   if (!isAdmin(user)) return c.redirect("/admin/agents");
-  const changes = changedPrompts(await c.req.parseBody(), await getAgentPrompts(null));
-  if (!agentPromptChanges.safeParse(changes).success) {
-    return c.redirect(`/admin/agents?error=${encodeURIComponent(TOO_LONG)}`);
+  const refuse = (error: string) => c.redirect(`/admin/agents?error=${encodeURIComponent(error)}`);
+  const form = await c.req.parseBody();
+  const prompts = changedPrompts(form, await getAgentPrompts(null));
+  if (!agentPromptChanges.safeParse(prompts).success) return refuse(TOO_LONG);
+  const models = changedModels(form, await getAgentModels());
+  const noCredentials = modelWithNoCredentials(models);
+  if (noCredentials) return refuse(noCredentials);
+  try {
+    await setAgentModels(models, user);
+  } catch (e) {
+    if (e instanceof InvalidAgentModelError) return refuse(e.message);
+    throw e;
   }
-  await setAgentPrompts(null, changes, user);
+  await setAgentPrompts(null, prompts, user);
   return c.redirect("/admin/agents");
 });
 

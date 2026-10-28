@@ -3732,3 +3732,54 @@ decisions they carried stay recorded here.
 - **Revisit when:** a budget or an alert per project or per subscription is wanted; projects ask
   to see their own spend; vision or transcription start to cost something; or chat accepts two
   endpoints of the same kind, and a host stops naming one subscription.
+
+<a id="adr-0101"></a>
+
+## ADR-0101 · The model each agent runs on can be changed from the web, and wins over the environment
+
+- **Status:** accepted as a hypothesis (2026-10-28). Extends [0023](#adr-0023) and
+  [0024](#adr-0024)'s routing by role; reverses the "read here, changed in the environment" of the
+  `/admin/agents` model line shipped the same day.
+- **Context:** the model of each role lived only in the server's environment
+  (`CORTEX_MODEL_<ROLE>`, then `LLM_MODEL` or `OPENROUTER_MODEL`). `/admin/agents` came to say
+  which one each agent asks for, but changing it still meant a shell on the box, an edit to `.env`
+  and a restart of every process that calls a model — the API, the MCP, the worker. Trying a
+  cheaper model on one role, or moving a role off a provider that degraded, was an operation, not
+  a setting.
+- **Decision:**
+  1. **An admin saves a role's model on `/admin/agents`**, in the same grammar as the variable:
+     `model`, or `provider:model` to route the role to another provider. It is stored in
+     `agent_models` (migration `0038_agent_models.sql`), one row per role, signed with who saved
+     it and when. Only an admin: the model is the installation's, like root's prompts
+     ([0088](#adr-0088)). There is no model per project.
+  2. **A saved model wins over the environment**; an empty field deletes it and gives the role
+     back to `CORTEX_MODEL_<ROLE>` and what follows it.
+  3. **The keys stay in the environment.** A saved `provider:model` is resolved with that
+     provider's credentials, as the variable is; the page refuses one whose provider has none on
+     this server, and a saved model whose provider later loses its key falls back to the
+     environment, with a warning on the page saying what runs instead.
+  4. **It applies from the next call, in every process.** The agents are still registered once
+     per process, but with no model of their own: `runAgent` reads the saved model on every call
+     and hands the resolved config to the agent through Mastra's `requestContext`. One more
+     read per call, of a table of at most one row per role, next to the prompt chain it already
+     reads.
+  5. **Nothing changes without a base provider.** With `LLM_PROVIDER=none` no agent is built and
+     the page offers no model field, whatever is saved.
+- **Alternatives:**
+  - **Keep it read-only and point at the variable.** What shipped first; it leaves every change
+    needing a shell and a restart. Rejected.
+  - **The environment wins over the saved model.** An operator could pin a role, but a field on
+    the page that a variable silently overrides is a field that lies. Rejected.
+  - **Rebuild the agents when a model is saved.** Only reaches the process that served the form;
+    the API, the MCP and the worker would keep the old model until restarted. Rejected for
+    resolving per call.
+  - **Save the key with the model.** Puts credentials in the database and on a web form. Rejected.
+  - **A list of models to pick from**, read from each provider's `/v1/models`. Not every endpoint
+    serves it, and a page that waits on a provider to render is slower to fix one with. Left for
+    later; the field is free text.
+- **Consequences:** the model a role runs on can now differ from what `.env` says; the page is
+  where to look, and `eval-distill` reports the saved one. A saved model with a typo is only found
+  out on the next call that fails: nothing tries it before saving. The API offers no way to set it
+  yet.
+- **Revisit when:** a team wants a model per project; a provider's model list is reliable enough to
+  offer as a choice; a saved model with a typo costs a night's pass; or the API is asked to set it.

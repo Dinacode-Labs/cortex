@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { closeSql, getSql } from "@cortex/database";
 import {
   agentPromptChain,
@@ -6,10 +6,13 @@ import {
   requestOtp,
   verifyOtp,
   deleteProject,
+  agentModelFor,
+  getAgentModels,
   getAgentPrompts,
   saveContext,
   saveWithReconciliation,
   searchContext,
+  setAgentModels,
   setAgentPrompts,
   setClassifier,
   setReconciler,
@@ -57,6 +60,7 @@ beforeAll(async () => {
 afterAll(async () => {
   // Root is shared by every test in this database: what this file sets there, it takes back.
   await setAgentPrompts(null, { graph: null, reranker: null }, ADMIN);
+  await setAgentModels(Object.fromEntries(agentRole.options.map((role) => [role, null])), ADMIN);
   process.env.CORTEX_ADMIN_EMAIL = previousAdmins;
   await closeSql();
 });
@@ -282,5 +286,78 @@ describe("the model each agent asks for, on the admin page", () => {
     const page = await adminPage();
     expect(page).toContain("No inference provider is configured");
     expect(page).not.toContain("Model <code>");
+  });
+});
+
+/**
+ * The model each agent runs on can be changed from the same page (ADR-0101). The key stays in the
+ * environment, so a model whose provider has none here is refused while the admin is looking,
+ * rather than saved and silently never used.
+ */
+describe("the model each agent runs on, changed from the admin page", () => {
+  const adminPage = async () =>
+    (await createWebApp().request("/admin/agents", { headers: { cookie: cookieOf(ADMIN) } })).text();
+
+  beforeEach(() => {
+    for (const role of agentRole.options) vi.stubEnv(roleModelVariable(role), "");
+    vi.stubEnv("LLM_PROVIDER", "openai-compatible");
+    vi.stubEnv("LLM_BASE_URL", "https://llm.example.com/v1");
+    vi.stubEnv("LLM_API_KEY", `key-${RID}`);
+    vi.stubEnv("LLM_MODEL", "base-model");
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+  });
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    await setAgentModels(Object.fromEntries(agentRole.options.map((role) => [role, null])), ADMIN);
+  });
+
+  it("saves it from the form, says who did, and gives it back to the environment on an empty field", async () => {
+    await postForm("/admin/agents", ADMIN, { "model.judge": `judge-${RID}` });
+
+    expect(await agentModelFor("judge")).toBe(`judge-${RID}`);
+    const page = await adminPage();
+    expect(page).toContain(`Model <code>judge-${RID}</code> on openai-compatible, saved here by ${ADMIN.email}`);
+
+    await postForm("/admin/agents", ADMIN, { "model.judge": "" });
+    expect(await agentModelFor("judge")).toBeNull();
+  });
+
+  it("refuses a provider with no credentials here, and saves nothing else from that form", async () => {
+    const res = await postForm("/admin/agents", ADMIN, {
+      "model.retriever": "openrouter:x-ai/grok-4.5",
+      "prompt.reranker": `Not saved ${RID}.`,
+    });
+
+    expect(decodeURIComponent(res.headers.get("location") ?? "")).toContain("names a provider with no credentials");
+    expect(await agentModelFor("retriever")).toBeNull();
+    expect((await getAgentPrompts(null)).find((v) => v.role === "reranker")?.own?.text).not.toBe(`Not saved ${RID}.`);
+  });
+
+  it("does not sign the models nobody touched when the form is saved", async () => {
+    await setAgentModels({ editor: `editor-${RID}` }, ADMIN);
+    const before = (await getAgentModels()).get("editor")!.updatedAt;
+
+    await postForm("/admin/agents", ADMIN, { "model.editor": `editor-${RID}`, "model.graph": "" });
+
+    const after = await getAgentModels();
+    expect(after.get("editor")!.updatedAt).toEqual(before);
+    expect(after.has("graph")).toBe(false);
+  });
+
+  it("ignores the form from someone who is not an admin", async () => {
+    await postForm("/admin/agents", OWNER, { "model.judge": `judge-${RID}` });
+
+    expect(await agentModelFor("judge")).toBeNull();
+  });
+
+  it("warns when a saved model's provider has lost its key, and says what runs instead", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "or-key");
+    await postForm("/admin/agents", ADMIN, { "model.retriever": "openrouter:x-ai/grok-4.5" });
+    expect(await agentModelFor("retriever")).toBe("openrouter:x-ai/grok-4.5");
+
+    vi.stubEnv("OPENROUTER_API_KEY", "");
+    const page = await adminPage();
+    expect(page).toContain("The model saved here, <code>openrouter:x-ai/grok-4.5</code>, names a provider with no credentials");
+    expect(page).toContain("so it runs on <code>base-model</code> on openai-compatible, set by <code>LLM_MODEL</code>.");
   });
 });

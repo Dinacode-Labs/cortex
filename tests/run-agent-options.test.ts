@@ -21,11 +21,13 @@ process.env.LLM_BASE_URL = "http://llm.invalid/v1"; // .invalid never resolves: 
 process.env.LLM_API_KEY = "test-key";
 process.env.LLM_MODEL = "test-model";
 
-const { agentPromptChain, recordUsage } = vi.hoisted(() => ({
+const { agentModelFor, agentPromptChain, recordUsage } = vi.hoisted(() => ({
+  agentModelFor: vi.fn(async (_role: string): Promise<string | null> => null),
   agentPromptChain: vi.fn(async (_role: string, _projectId: string | null) => ({ root: null, projects: [] as string[] })),
   recordUsage: vi.fn(),
 }));
 vi.mock("@cortex/core", async () => ({
+  agentModelFor,
   recordUsage,
   endpointHost: (await import("../packages/core/src/observability/domain/usage")).endpointHost,
   defaultLanguage: (await import("../packages/core/src/projects/domain/project")).defaultLanguage,
@@ -64,6 +66,7 @@ function requestAt(i: number): Record<string, unknown> {
 
 beforeEach(() => {
   fetchStub.mockClear();
+  agentModelFor.mockClear();
   agentPromptChain.mockClear();
   recordUsage.mockClear();
 });
@@ -154,6 +157,30 @@ describe("what a role is told for a project", () => {
 
     expect(agentPromptChain).not.toHaveBeenCalled();
     expect(systemMessage(0)).toMatch(/^You are Cortex's distillation agent\./);
+  });
+});
+
+/**
+ * The agents are registered once per process, with no model of their own: a model saved from the
+ * web (ADR-0101) only counts if each call resolves it again, or the API, the MCP and the nightly
+ * pass would keep asking for the old one until somebody restarted them.
+ */
+describe("the model a call asks for", () => {
+  it("is the one saved from the web, from the next call on", async () => {
+    const run = await runAgent();
+    agentModelFor.mockResolvedValueOnce("saved-model");
+    await run("judge", "a pair");
+    agentModelFor.mockResolvedValueOnce("another-model");
+    await run("judge", "a pair");
+
+    expect(agentModelFor).toHaveBeenCalledWith("judge");
+    expect([requestAt(0).model, requestAt(1).model]).toEqual(["saved-model", "another-model"]);
+  });
+
+  it("is the environment's when nothing is saved", async () => {
+    await (await runAgent())("editor", "a memo");
+
+    expect(requestAt(0).model).toBe("test-model");
   });
 });
 

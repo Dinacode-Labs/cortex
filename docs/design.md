@@ -109,8 +109,8 @@ What agents see, Map, Code — and Settings apart. Review says how many memos wa
 /unsubscribe/<token>    the digest's way out, with no session: it asks, and only the button acts
 /admin/usage            what the inference costs, by day, project and subscription (admins only)
 /admin/agents           what every agent is told, before any project adds to it, and the model it
-                        asks for and which variable sets it — read here, changed in the server's
-                        environment (admins only)
+                        runs on: where it comes from, and a field to change it that wins over the
+                        server's environment; the keys stay there (admins only)
 ```
 
 `*` only on a project that has children: a link leading to an empty screen is worse than no link.
