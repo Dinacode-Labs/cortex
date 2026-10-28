@@ -8,7 +8,12 @@ export interface EmbeddingProvider {
   readonly version: string;
   readonly dim: number;
   /** Produces one embedding per text, in the same order. */
-  embed(texts: string[]): Promise<number[][]>;
+  embed(texts: string[], usage?: EmbeddingUsageTag): Promise<number[][]>;
+}
+
+/** Who the tokens are charged to (ADR-0100). Opaque here: this package only hands it to the sink. */
+export interface EmbeddingUsageTag {
+  projectId?: string | null;
 }
 
 export function l2normalize(vec: number[]): number[] {

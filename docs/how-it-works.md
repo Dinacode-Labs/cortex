@@ -562,8 +562,9 @@ nothing** to external systems. Actually creating tasks is a separate, supervised
 `llm_usage` table, with a pricing table to **estimate cost**. Costs are estimates, and the
 pricing table can be corrected without a deploy through `CORTEX_PRICING_JSON`. On top of
 that, each agent run emits a **trace tree** (`agent_run → model_generation → …`) into the
-`ai_traces` table. The `/admin/usage` page in the UI shows cost per operation, agent and model,
-alongside the trace tree.
+`ai_traces` table. Each call is charged to the project it served and to the host it went to, which
+is what tells one subscription from another. The `/admin/usage` page in the UI shows tokens and
+cost per day, project, subscription, operation and model, alongside the trace tree.
 
 > **⚠️ What to watch for.** The lint is **deterministic**, but not cheap: the duplicate search
 > measures every pair of a project's vectors, so it grows with the square of the memos. That is

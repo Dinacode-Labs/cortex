@@ -1,4 +1,4 @@
-import { agentPromptChain, effectiveCriterion, recordUsage, defaultLanguage, type AgentPromptChain } from "@cortex/core";
+import { agentPromptChain, effectiveCriterion, endpointHost, recordUsage, defaultLanguage, type AgentPromptChain } from "@cortex/core";
 import { withLlmSlot, type Language } from "@cortex/shared";
 import { JSON_ROLES } from "./model.js";
 import { defaultCriterion, getAgent, instructionsFor } from "./registry.js";
@@ -53,6 +53,8 @@ export async function runAgent(
     await recordUsage({
       operation: role,
       provider: cfg.provider,
+      endpoint: endpointHost(cfg.baseURL),
+      projectId: opts.projectId ?? null,
       model: servedModel,
       inputTokens: u.inputTokens ?? u.promptTokens ?? 0,
       outputTokens: u.outputTokens ?? u.completionTokens ?? 0,

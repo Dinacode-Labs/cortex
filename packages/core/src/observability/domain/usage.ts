@@ -5,7 +5,9 @@ export interface UsageRecord {
   provider: string;
   model: string;
   operation: string;
-  project?: string | null;
+  projectId?: string | null;
+  /** The host the call went to (ADR-0100): `provider` reads `openai-compatible` for every self-hosted or paid endpoint alike. */
+  endpoint?: string | null;
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
@@ -17,7 +19,8 @@ export interface UsageEntry {
   provider: string;
   model: string;
   operation: string;
-  project: string | null;
+  projectId: string | null;
+  endpoint: string | null;
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
@@ -25,11 +28,38 @@ export interface UsageEntry {
   durationMs: number | null;
 }
 
+export interface UsageFilter {
+  since: Date;
+  projectId?: string;
+  endpoint?: string;
+}
+
+export interface UsageFigures {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+}
+
+export interface UsageDay extends UsageFigures {
+  /** `YYYY-MM-DD`, in UTC. */
+  day: string;
+}
+
 export interface UsageSummary {
-  totals: { calls: number; inputTokens: number; outputTokens: number; totalTokens: number; costUsd: number };
-  byOperation: { operation: string; kind: string; calls: number; totalTokens: number; costUsd: number }[];
-  byModel: { model: string; provider: string; calls: number; totalTokens: number; costUsd: number }[];
-  recent: { createdAt: string; operation: string; model: string; totalTokens: number; costUsd: number; project: string | null }[];
+  totals: UsageFigures;
+  daily: UsageDay[];
+  byProject: ({ projectId: string | null; name: string | null; slug: string | null } & UsageFigures)[];
+  byEndpoint: ({ endpoint: string | null; providers: string[] } & UsageFigures)[];
+  byOperation: ({ operation: string; kind: string } & UsageFigures)[];
+  byModel: ({ model: string; provider: string } & UsageFigures)[];
+  recent: { createdAt: string; operation: string; model: string; totalTokens: number; costUsd: number; projectName: string | null; endpoint: string | null }[];
+}
+
+export interface UsageFacets {
+  projects: { id: string; name: string; slug: string | null }[];
+  endpoints: string[];
 }
 
 export interface TraceSpan {
@@ -55,8 +85,37 @@ export interface TraceTree {
 
 export interface UsageRepository {
   record(entry: UsageEntry): Promise<void>;
-  summary(): Promise<UsageSummary>;
+  /** `daily` holds only the days with calls; the use case fills in the rest. */
+  summary(filter: UsageFilter): Promise<UsageSummary>;
+  /** The projects and endpoints that have spent anything, ever: what the filters offer. */
+  facets(): Promise<UsageFacets>;
   recentTraces(limit: number): Promise<TraceTree[]>;
+}
+
+export const USAGE_PERIODS = [7, 30, 90] as const;
+export const DEFAULT_USAGE_PERIOD = 30;
+
+/** The UTC days a period of `length` days covers, oldest first and ending on `now`'s. */
+export function periodDays(length: number, now: Date): string[] {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const count = Math.max(1, Math.floor(length));
+  return Array.from({ length: count }, (_, i) => new Date(today - (count - 1 - i) * 86_400_000).toISOString().slice(0, 10));
+}
+
+/** A day with no calls is a zero, not a gap: a chart that skips it draws a quiet week as busy. */
+export function fillDays(days: string[], spent: UsageDay[]): UsageDay[] {
+  const byDay = new Map(spent.map((d) => [d.day, d]));
+  return days.map((day) => byDay.get(day) ?? { day, calls: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0 });
+}
+
+/** Only the host: a base URL may carry credentials in its user-info, and the host is what names a subscription. */
+export function endpointHost(baseURL: string | null | undefined): string | null {
+  if (!baseURL) return null;
+  try {
+    return new URL(baseURL).host || null;
+  } catch {
+    return null;
+  }
 }
 
 /** Approximate public prices (USD per 1M tokens), as of 2026-07-13. For ESTIMATING cost

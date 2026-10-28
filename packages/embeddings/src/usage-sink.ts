@@ -7,6 +7,8 @@ export interface EmbeddingUsage {
   model: string;
   totalTokens: number;
   count: number;
+  baseURL: string;
+  projectId: string | null;
 }
 
 type Sink = (u: EmbeddingUsage) => void;

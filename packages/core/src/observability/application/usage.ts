@@ -1,5 +1,14 @@
 import { port } from "../../composition.js";
-import { estimateCostUsd, type TraceTree, type UsageRecord, type UsageSummary } from "../domain/usage.js";
+import {
+  DEFAULT_USAGE_PERIOD,
+  estimateCostUsd,
+  fillDays,
+  periodDays,
+  type TraceTree,
+  type UsageFacets,
+  type UsageRecord,
+  type UsageSummary,
+} from "../domain/usage.js";
 
 /** Best-effort: it never throws, because observability must not break the pipeline. */
 export async function recordUsage(r: UsageRecord): Promise<void> {
@@ -11,7 +20,8 @@ export async function recordUsage(r: UsageRecord): Promise<void> {
       provider: r.provider,
       model: r.model,
       operation: r.operation,
-      project: r.project ?? null,
+      projectId: r.projectId ?? null,
+      endpoint: r.endpoint ?? null,
       inputTokens,
       outputTokens,
       totalTokens: Math.max(0, Math.round(r.totalTokens ?? inputTokens + outputTokens)),
@@ -23,8 +33,25 @@ export async function recordUsage(r: UsageRecord): Promise<void> {
   }
 }
 
-export async function getUsageSummary(): Promise<UsageSummary> {
-  return port("usage").summary();
+export interface UsageQuery {
+  days?: number;
+  projectId?: string;
+  endpoint?: string;
+  now?: Date;
+}
+
+export async function getUsageSummary(query: UsageQuery = {}): Promise<UsageSummary> {
+  const days = periodDays(query.days ?? DEFAULT_USAGE_PERIOD, query.now ?? new Date());
+  const summary = await port("usage").summary({
+    since: new Date(`${days[0]}T00:00:00Z`),
+    projectId: query.projectId,
+    endpoint: query.endpoint,
+  });
+  return { ...summary, daily: fillDays(days, summary.daily) };
+}
+
+export async function getUsageFacets(): Promise<UsageFacets> {
+  return port("usage").facets();
 }
 
 export async function getRecentTraces(limit = 15): Promise<TraceTree[]> {

@@ -1,6 +1,7 @@
 import { setEmbeddingUsageSink } from "@cortex/embeddings";
 import { getEnv } from "@cortex/shared";
 import { recordUsage } from "../application/usage.js";
+import { endpointHost } from "../domain/usage.js";
 
 // Registering the sink is EXPLICIT: the entrypoints call it (directly or through
 // @cortex/agents' wireLlm()). It used to run as a side effect of importing a module, which made
@@ -16,6 +17,8 @@ export function registerUsageSink(): void {
       provider: getEnv("EMBEDDINGS_PROVIDER", "local").toLowerCase(),
       model: u.model,
       operation: "embedding",
+      projectId: u.projectId,
+      endpoint: endpointHost(u.baseURL),
       inputTokens: u.totalTokens,
       totalTokens: u.totalTokens,
     });

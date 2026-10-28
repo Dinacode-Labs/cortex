@@ -44,7 +44,8 @@ export class PgMemoIndex implements MemoIndex {
     const batchSize = opts.batchSize ?? 32;
     for (let i = 0; i < items.length; i += batchSize) {
       const chunk = items.slice(i, i + batchSize);
-      const vectors = await this.provider.embed(chunk.map((r) => r.text));
+      const projectId = await this.projectCharged(chunk.map((r) => r.memoId));
+      const vectors = await this.provider.embed(chunk.map((r) => r.text), { projectId });
       for (let j = 0; j < chunk.length; j++) {
         await this.sql`
           INSERT INTO embeddings (memo_id, embedding_model, embedding_version, dim, vector, chunk_index)
@@ -58,9 +59,18 @@ export class PgMemoIndex implements MemoIndex {
     }
   }
 
+  /**
+   * Read from the rows rather than asked of the callers: five paths index a memo and only the row
+   * knows for certain whose it is. A batch spanning projects is charged to none (ADR-0100).
+   */
+  private async projectCharged(memoIds: string[]): Promise<string | null> {
+    const rows = (await this.sql`SELECT DISTINCT project_id FROM memos WHERE id = ANY(${memoIds})`) as unknown as Row[];
+    return rows.length === 1 ? ((rows[0]!.project_id as string | null) ?? null) : null;
+  }
+
   /** Only vectors of the current embedding model are compared: another model has another dimension. */
   async similar(queryText: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]> {
-    const lit = await this.queryVector(queryText);
+    const lit = await this.queryVector(queryText, scope);
     const rows = (await this.sql`
       SELECT m.*, e.vector <=> ${lit}::vector AS distance
       FROM embeddings e
@@ -103,7 +113,7 @@ export class PgMemoIndex implements MemoIndex {
   async hybrid(queryText: string, scope: MemoSearchScope, limit: number): Promise<SearchHit[]> {
     const pool = Math.max(limit * 4, 40);
     const filters = this.scopeFilters(scope);
-    const lit = await this.queryVector(queryText);
+    const lit = await this.queryVector(queryText, scope);
     const vecRows = (await this.sql`
       SELECT m.id, (e.vector <=> ${lit}::vector) AS distance
       FROM embeddings e
@@ -126,8 +136,8 @@ export class PgMemoIndex implements MemoIndex {
       .map((s) => ({ entry: rowToMemo(byId.get(s.id)!), score: s.cosine ?? s.rrf / maxRrf }));
   }
 
-  private async queryVector(queryText: string): Promise<string> {
-    const vectors = await this.provider.embed([queryText]);
+  private async queryVector(queryText: string, scope: MemoSearchScope): Promise<string> {
+    const vectors = await this.provider.embed([queryText], { projectId: scope.projectId ?? null });
     return toVectorLiteral(vectors[0]!);
   }
 

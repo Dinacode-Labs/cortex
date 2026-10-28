@@ -1,5 +1,5 @@
 import { withLlmSlot } from "@cortex/shared";
-import { type EmbeddingProvider } from "./provider.js";
+import { type EmbeddingProvider, type EmbeddingUsageTag } from "./provider.js";
 import { reportEmbeddingUsage } from "./usage-sink.js";
 
 /** The slot is held by the caller (`embed`), so retries do NOT release the budget:
@@ -40,7 +40,7 @@ export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
     this.version = opts.version ?? "1";
   }
 
-  async embed(texts: string[]): Promise<number[][]> {
+  async embed(texts: string[], usage: EmbeddingUsageTag = {}): Promise<number[][]> {
     // Shares the budget with every other provider call (chat, vision, STT): the concurrency
     // limit is per API key, not per endpoint type.
     const res = await withLlmSlot(() =>
@@ -65,6 +65,8 @@ export class OpenAICompatibleEmbeddingProvider implements EmbeddingProvider {
       model: this.model,
       totalTokens: json.usage?.total_tokens ?? json.usage?.prompt_tokens ?? 0,
       count: texts.length,
+      baseURL: this.baseURL,
+      projectId: usage.projectId ?? null,
     });
     return json.data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
   }

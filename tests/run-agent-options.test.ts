@@ -21,11 +21,13 @@ process.env.LLM_BASE_URL = "http://llm.invalid/v1"; // .invalid never resolves: 
 process.env.LLM_API_KEY = "test-key";
 process.env.LLM_MODEL = "test-model";
 
-const { agentPromptChain } = vi.hoisted(() => ({
+const { agentPromptChain, recordUsage } = vi.hoisted(() => ({
   agentPromptChain: vi.fn(async (_role: string, _projectId: string | null) => ({ root: null, projects: [] as string[] })),
+  recordUsage: vi.fn(),
 }));
 vi.mock("@cortex/core", async () => ({
-  recordUsage: vi.fn(),
+  recordUsage,
+  endpointHost: (await import("../packages/core/src/observability/domain/usage")).endpointHost,
   defaultLanguage: (await import("../packages/core/src/projects/domain/project")).defaultLanguage,
   effectiveCriterion: (await import("../packages/core/src/projects/domain/agent-prompts")).effectiveCriterion,
   agentPromptChain,
@@ -63,6 +65,7 @@ function requestAt(i: number): Record<string, unknown> {
 beforeEach(() => {
   fetchStub.mockClear();
   agentPromptChain.mockClear();
+  recordUsage.mockClear();
 });
 
 function systemMessage(i: number): string {
@@ -174,5 +177,19 @@ describe("the Mastra that is installed", () => {
     const executionOptions = declarations.slice(start, declarations.indexOf("\n};", start));
     expect(executionOptions).toContain("modelSettings?:");
     expect(executionOptions.match(/^ {4}(maxOutputTokens|temperature|maxRetries)\?:/gm)).toBeNull();
+  });
+});
+
+/**
+ * The usage page splits the spend by project and by subscription (ADR-0100). Every caller already
+ * handed runAgent its project and the usage it recorded dropped it, so the column stayed empty.
+ */
+describe("what a call is charged to", () => {
+  it("is the project it was made for, and the host it went to", async () => {
+    await (await runAgent())("classifier", "a memo", { projectId: "project-1" });
+
+    expect(recordUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: "classifier", projectId: "project-1", endpoint: "llm.invalid" }),
+    );
   });
 });
