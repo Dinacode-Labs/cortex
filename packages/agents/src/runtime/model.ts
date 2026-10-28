@@ -1,7 +1,8 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { Agent } from "@mastra/core/agent";
+import { RequestContext } from "@mastra/core/request-context";
 import type { AgentRole } from "./roles.js";
-import { getLlmConfig } from "./llm-config.js";
+import { getLlmConfig, noModelError, type LlmConfig } from "./llm-config.js";
 
 export const JSON_ROLES = new Set<AgentRole>(["classifier", "graph", "reranker", "distiller", "reconciler", "judge", "editor"]);
 
@@ -20,23 +21,33 @@ export const jsonFetch: typeof fetch = async (url, init) => {
   return fetch(url as Parameters<typeof fetch>[0], init);
 };
 
+const LLM_CONFIG = "cortex.llmConfig";
+
+export function callingWith(cfg: LlmConfig): RequestContext {
+  return new RequestContext([[LLM_CONFIG, cfg]]);
+}
+
 /**
- * One model PER ROLE: `getLlmConfig(role)` resolves CORTEX_MODEL_<ROLE> (ADR-0023), so
- * different roles can use different models (cheap for the mechanical work, powerful for the
- * judgement). Same OpenAI-compatible endpoint; only the model id changes. The JSON roles force
+ * One model PER ROLE (ADR-0023), so different roles can use different models (cheap for the
+ * mechanical work, powerful for the judgement). The agents are registered once per process, so
+ * the model is resolved on every call from the config `runAgent` hands it (`callingWith`): a
+ * model saved from the web applies without restarting anything (ADR-0101). The JSON roles force
  * `response_format: json_object` through `jsonFetch`.
  */
 export function buildAgent(role: AgentRole, instructions: string): Agent {
-  const cfg = getLlmConfig(role)!; // not null: the caller checked getLlmConfig()
   return new Agent({
     id: `cortex-${role}`,
     name: `cortex-${role}`,
     instructions,
-    model: createOpenAICompatible({
-      name: cfg.provider,
-      baseURL: cfg.baseURL,
-      apiKey: cfg.apiKey,
-      ...(JSON_ROLES.has(role) ? { fetch: jsonFetch } : {}),
-    })(cfg.model),
+    model: ({ requestContext }) => {
+      const cfg = (requestContext.get(LLM_CONFIG) as LlmConfig | undefined) ?? getLlmConfig(role);
+      if (!cfg) throw noModelError(role);
+      return createOpenAICompatible({
+        name: cfg.provider,
+        baseURL: cfg.baseURL,
+        apiKey: cfg.apiKey,
+        ...(JSON_ROLES.has(role) ? { fetch: jsonFetch } : {}),
+      })(cfg.model);
+    },
   });
 }

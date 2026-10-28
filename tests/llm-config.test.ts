@@ -151,19 +151,19 @@ describe("describeRoleModel — what the admin page shows", () => {
 
   it("names the variable the model comes from, or none when it is the code's default", () => {
     onNaN();
-    expect(describeRoleModel("judge")).toEqual({ provider: "openai-compatible", model: "deepseek-v4-flash", setBy: null });
+    expect(describeRoleModel("judge")).toEqual({ provider: "openai-compatible", model: "deepseek-v4-flash", setBy: null, saved: false });
 
     vi.stubEnv("LLM_MODEL", "base-model");
     vi.stubEnv("CORTEX_MODEL_JUDGE", "judge-model");
-    expect(describeRoleModel("judge")).toEqual({ provider: "openai-compatible", model: "judge-model", setBy: "CORTEX_MODEL_JUDGE" });
-    expect(describeRoleModel("editor")).toEqual({ provider: "openai-compatible", model: "base-model", setBy: "LLM_MODEL" });
+    expect(describeRoleModel("judge")).toEqual({ provider: "openai-compatible", model: "judge-model", setBy: "CORTEX_MODEL_JUDGE", saved: false });
+    expect(describeRoleModel("editor")).toEqual({ provider: "openai-compatible", model: "base-model", setBy: "LLM_MODEL", saved: false });
   });
 
   it("with the `nan` alias, the model comes from NAN_LLM_MODEL", () => {
     vi.stubEnv("LLM_PROVIDER", "nan");
     vi.stubEnv("NAN_API_KEY", "nan-key");
     vi.stubEnv("NAN_LLM_MODEL", "nan-model");
-    expect(describeRoleModel("classifier")).toEqual({ provider: "openai-compatible", model: "nan-model", setBy: "NAN_LLM_MODEL" });
+    expect(describeRoleModel("classifier")).toEqual({ provider: "openai-compatible", model: "nan-model", setBy: "NAN_LLM_MODEL", saved: false });
   });
 
   it("a role sent to another provider shows that provider, and its default model's variable", () => {
@@ -171,7 +171,7 @@ describe("describeRoleModel — what the admin page shows", () => {
     vi.stubEnv("OPENROUTER_API_KEY", "or-key");
     vi.stubEnv("OPENROUTER_MODEL", "or-model");
     vi.stubEnv("CORTEX_MODEL_RETRIEVER", "openrouter:");
-    expect(describeRoleModel("retriever")).toEqual({ provider: "openrouter", model: "or-model", setBy: "OPENROUTER_MODEL" });
+    expect(describeRoleModel("retriever")).toEqual({ provider: "openrouter", model: "or-model", setBy: "OPENROUTER_MODEL", saved: false });
   });
 
   it("with no base provider no role calls a model, even one sent to a provider with credentials", () => {
@@ -191,6 +191,59 @@ describe("describeRoleModel — what the admin page shows", () => {
     onNaN();
     const leaking = agentRole.options.filter((role) => JSON.stringify(describeRoleModel(role)).includes("nan-key"));
     expect(leaking).toEqual([]);
+  });
+});
+
+/**
+ * A model saved from the web wins over the environment (ADR-0101). Its key still lives in the
+ * environment, and the day that key goes, a saved model that won regardless would leave the role
+ * with no model at all; it falls back instead, and the page says so.
+ */
+describe("a model saved from the web", () => {
+  const onNaN = () => {
+    vi.stubEnv("LLM_PROVIDER", "openai-compatible");
+    vi.stubEnv("LLM_BASE_URL", "https://api.nan.builders/v1");
+    vi.stubEnv("LLM_API_KEY", "nan-key");
+    vi.stubEnv("CORTEX_MODEL_JUDGE", "judge-model");
+  };
+
+  it("wins over CORTEX_MODEL_<ROLE>, on the same endpoint and with its key", () => {
+    onNaN();
+    expect(getLlmConfig("judge", "saved-model")).toEqual({
+      provider: "openai-compatible",
+      apiKey: "nan-key",
+      model: "saved-model",
+      baseURL: "https://api.nan.builders/v1",
+    });
+    expect(describeRoleModel("judge", "saved-model")).toEqual({ provider: "openai-compatible", model: "saved-model", setBy: null, saved: true });
+  });
+
+  it("sends the role to another provider with `provider:model`, with that provider's credentials", () => {
+    onNaN();
+    vi.stubEnv("OPENROUTER_API_KEY", "or-key");
+    expect(getLlmConfig("judge", "openrouter:x-ai/grok-4.5")).toEqual({
+      provider: "openrouter",
+      apiKey: "or-key",
+      model: "x-ai/grok-4.5",
+      baseURL: "https://openrouter.ai/api/v1",
+    });
+  });
+
+  it("falls back to the environment when its provider has no credentials here", () => {
+    onNaN();
+    expect(getLlmConfig("judge", "openrouter:x-ai/grok-4.5")?.model).toBe("judge-model");
+    expect(describeRoleModel("judge", "openrouter:x-ai/grok-4.5")).toEqual({
+      provider: "openai-compatible",
+      model: "judge-model",
+      setBy: "CORTEX_MODEL_JUDGE",
+      saved: false,
+    });
+  });
+
+  it("an empty one is no model saved", () => {
+    onNaN();
+    expect(describeRoleModel("judge", "")).toMatchObject({ model: "judge-model", saved: false });
+    expect(describeRoleModel("judge", null)).toMatchObject({ model: "judge-model", saved: false });
   });
 });
 

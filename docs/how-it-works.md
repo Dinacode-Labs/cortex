@@ -394,7 +394,8 @@ enough.
 > - **Default models:** `deepseek-v4-flash` on an OpenAI-compatible endpoint, or
 >   `deepseek/deepseek-v4-pro` through OpenRouter. Classification, graph extraction and
 >   reconciliation quality **depend on the model**, so evaluate with the one you intend to
->   run in production. `CORTEX_MODEL_<ROLE>` overrides the model per role.
+>   run in production. `CORTEX_MODEL_<ROLE>` overrides the model per role, and a model an admin saves
+>   under Admin → Agents wins over that.
 > - **Structured output is enforced by hand.** Models do not reliably honour Mastra's
 >   `structuredOutput`, so Cortex forces `response_format: json_object` and **validates the
 >   JSON manually**, discarding invalid keys and edges. It works and it is fast, but it is a

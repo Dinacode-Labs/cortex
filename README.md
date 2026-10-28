@@ -503,7 +503,8 @@ pnpm admin maintain-worker    # scheduled maintenance, Review's merge drafts and
   `local` is not semantic, it only exists so the thing starts without keys. Changing embedding
   provider means reindexing, because the dimensions change. `CORTEX_MODEL_<ROLE>` overrides the
   model for one agent and accepts `provider:model` to send a single role somewhere else, for
-  example `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`. `CORTEX_LLM_CONCURRENCY`,
+  example `CORTEX_MODEL_RETRIEVER=openrouter:x-ai/grok-4.5`. An admin can also set it from the web,
+  under Admin → Agents, and what is saved there wins over the variable with no restart. `CORTEX_LLM_CONCURRENCY`,
   default 4, caps parallel calls, because providers meter per API key rather than per endpoint.
 - **Maintenance** runs on the server, is idempotent and takes a lock:
   `pnpm admin maintain ["<Project>"]` chains reclassify, enrich, resolve, temporal, curate,

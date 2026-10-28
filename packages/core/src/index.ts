@@ -77,6 +77,8 @@ export { slugify } from "./projects/domain/slug.js";
 export { findProjectBySlug, findProjectByName, getEntryProject, createProject, canAccessProject, checkProjectAccess, checkEntryAccess, listAccessibleProjects, listChildProjects, listProjectAncestors, addProjectMember, removeProjectMember, listProjectMembers, isProjectMember, canManageProject, canReviewProject, canReviewEntryProject, NotAReviewerError, updateProject, deleteProject, getProjectLanguage, getProjectCriteria, type ProjectLanguage, type ProjectCriteriaView, NotAManagerError, ProjectNotEmptyError, type ProjectRef, type AccessibleProject, type AccessCheck } from "./projects/application/projects.js";
 export { agentPromptChain, getAgentPrompts, setAgentPrompts, NotAnAdminError } from "./projects/application/agent-prompts.js";
 export { EMPTY_CHAIN, chainAt, effectiveCriterion, type AgentPrompt, type AgentPromptChain, type AgentPromptView } from "./projects/domain/agent-prompts.js";
+export { agentModelFor, getAgentModels, setAgentModels, InvalidAgentModelError } from "./projects/application/agent-models.js";
+export { AGENT_MODEL_MAX_LENGTH, isModelSpec, type AgentModelChanges, type SavedAgentModel } from "./projects/domain/agent-models.js";
 export {
   purgeEntries,
   canManageEntryProject,

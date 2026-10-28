@@ -1,6 +1,6 @@
 import { html } from "hono/html";
 import { defaultCriterion, roleModelVariable, type RoleModel } from "@cortex/agents";
-import { effectiveCriterion, type AgentPromptView } from "@cortex/core";
+import { AGENT_MODEL_MAX_LENGTH, effectiveCriterion, type AgentPromptView, type SavedAgentModel } from "@cortex/core";
 import { AGENT_PROMPT_MAX_LENGTH, type AgentRole } from "@cortex/shared";
 import { panel } from "./components.js";
 import type { Html } from "./layout.js";
@@ -17,12 +17,36 @@ const ROLE_SUMMARIES: Record<AgentRole, string> = {
   editor: "suggests, each night, a better wording for the memos waiting to be checked, or rejecting them",
 };
 
-function modelLine(role: AgentRole, model: RoleModel | null): Html {
-  if (!model) {
+export interface AgentModelView {
+  saved: SavedAgentModel | null;
+  /** What the role runs on; null when it resolves to no model. */
+  inForce: RoleModel | null;
+}
+
+function modelLine(role: AgentRole, { saved, inForce }: AgentModelView): Html {
+  if (!inForce) {
     return html`<p class="sub">No model: <code>${roleModelVariable(role)}</code> names a provider with no credentials.</p>`;
   }
-  const origin = model.setBy ? html`set by <code>${model.setBy}</code>` : "the default in the code";
-  return html`<p class="sub">Model <code>${model.model}</code> on ${model.provider}, ${origin}.</p>`;
+  const runsOn = html`<code>${inForce.model}</code> on ${inForce.provider}`;
+  if (saved && inForce.saved) {
+    return html`<p class="sub">Model ${runsOn}, saved here by ${saved.updatedBy} on ${saved.updatedAt.toISOString().slice(0, 10)}.</p>`;
+  }
+  const origin = inForce.setBy ? html`set by <code>${inForce.setBy}</code>` : "the default in the code";
+  if (saved) {
+    return html`<div class="warn">The model saved here, <code>${saved.model}</code>, names a provider with no credentials on this
+      server, so it runs on ${runsOn}, ${origin}.</div>`;
+  }
+  return html`<p class="sub">Model ${runsOn}, ${origin}.</p>`;
+}
+
+function modelField(role: AgentRole, view: AgentModelView): Html {
+  const id = `model-${role}`;
+  return html`${modelLine(role, view)}
+    <div class="row model-field">
+      <label for="${id}" class="sub">Saved here</label>
+      <input type="text" id="${id}" name="model.${role}" maxlength="${AGENT_MODEL_MAX_LENGTH}" value="${view.saved?.model ?? ""}"
+        placeholder="Nothing: the environment's applies" autocomplete="off" spellcheck="false">
+    </div>`;
 }
 
 function promptField(view: AgentPromptView, above: { label: string; text: string }, placeholder: string, model: Html | "" = ""): Html {
@@ -66,7 +90,7 @@ export function projectAgentPromptsPanel(slug: string, views: AgentPromptView[])
 }
 
 /** `models` is null when no inference provider is configured. */
-export function rootAgentPromptsPanel(views: AgentPromptView[], models: Map<AgentRole, RoleModel | null> | null): Html {
+export function rootAgentPromptsPanel(views: AgentPromptView[], models: Map<AgentRole, AgentModelView> | null): Html {
   return panel(
     null,
     html`<form method="post" action="/admin/agents" class="stack">
@@ -78,7 +102,7 @@ export function rootAgentPromptsPanel(views: AgentPromptView[], models: Map<Agen
           view,
           { label: "The default, in the code", text: defaultCriterion(view.role) },
           "Empty: the default applies.",
-          models ? modelLine(view.role, models.get(view.role) ?? null) : "",
+          models?.has(view.role) ? modelField(view.role, models.get(view.role)!) : "",
         ),
       )}
       <div class="row"><button type="submit">Save</button></div>

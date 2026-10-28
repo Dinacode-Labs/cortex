@@ -1,9 +1,9 @@
-import { agentPromptChain, effectiveCriterion, endpointHost, recordUsage, defaultLanguage, type AgentPromptChain } from "@cortex/core";
+import { agentModelFor, agentPromptChain, effectiveCriterion, endpointHost, recordUsage, defaultLanguage, type AgentPromptChain } from "@cortex/core";
 import { withLlmSlot, type Language } from "@cortex/shared";
-import { JSON_ROLES } from "./model.js";
+import { callingWith, JSON_ROLES } from "./model.js";
 import { defaultCriterion, getAgent, instructionsFor } from "./registry.js";
 import type { AgentRole } from "./roles.js";
-import { getLlmConfig } from "./llm-config.js";
+import { getLlmConfig, noModelError } from "./llm-config.js";
 
 export async function runAgent(
   role: AgentRole,
@@ -18,6 +18,8 @@ export async function runAgent(
 ): Promise<string> {
   const agent = getAgent(role);
   if (!agent) throw new Error("LLM not enabled (LLM_PROVIDER / API key).");
+  const cfg = getLlmConfig(role, await agentModelFor(role));
+  if (!cfg) throw noModelError(role);
   // Everything the provider has to honour travels inside `modelSettings`: that is the only
   // channel @mastra/core 1.45 reads (`modelSettings?: Omit<CallSettings, "abortSignal">` in
   // dist/agent/agent.types.d.ts, spread into the model call by the loop), and the same keys at
@@ -38,29 +40,26 @@ export async function runAgent(
   const t0 = Date.now();
   // One slot per call: the provider caps concurrent requests per API key, and
   // enrich/maintain fires several in parallel (CORTEX_ENRICH_CONCURRENCY).
-  const res = (await withLlmSlot(() => agent.generate(prompt, { modelSettings, instructions }))) as {
+  const res = (await withLlmSlot(() => agent.generate(prompt, { modelSettings, instructions, requestContext: callingWith(cfg) }))) as {
     text?: string;
     usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number; promptTokens?: number; completionTokens?: number };
     response?: { modelId?: string };
   };
-  const cfg = getLlmConfig(role);
   const u = res.usage ?? {};
-  if (cfg) {
-    // We record the SERVED model (res.response.modelId) when it arrives, not the requested
-    // one: that catches OpenRouter routing and silent provider degradation (ADR-0023, section
-    // 6.3). It falls back to the model requested for the role.
-    const servedModel = res.response?.modelId?.trim() || cfg.model;
-    await recordUsage({
-      operation: role,
-      provider: cfg.provider,
-      endpoint: endpointHost(cfg.baseURL),
-      projectId: opts.projectId ?? null,
-      model: servedModel,
-      inputTokens: u.inputTokens ?? u.promptTokens ?? 0,
-      outputTokens: u.outputTokens ?? u.completionTokens ?? 0,
-      totalTokens: u.totalTokens,
-      durationMs: Date.now() - t0,
-    });
-  }
+  // We record the SERVED model (res.response.modelId) when it arrives, not the requested
+  // one: that catches OpenRouter routing and silent provider degradation (ADR-0023, section
+  // 6.3). It falls back to the model requested for the role.
+  const servedModel = res.response?.modelId?.trim() || cfg.model;
+  await recordUsage({
+    operation: role,
+    provider: cfg.provider,
+    endpoint: endpointHost(cfg.baseURL),
+    projectId: opts.projectId ?? null,
+    model: servedModel,
+    inputTokens: u.inputTokens ?? u.promptTokens ?? 0,
+    outputTokens: u.outputTokens ?? u.completionTokens ?? 0,
+    totalTokens: u.totalTokens,
+    durationMs: Date.now() - t0,
+  });
   return res.text ?? "";
 }
