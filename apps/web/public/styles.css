@@ -648,6 +648,11 @@ tr:last-child td { border-bottom:none; }
 
 td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
 
+.agents-glance { overflow-x:auto; }
+.agents-glance td { width:50%; vertical-align:top; }
+.agents-glance code { overflow-wrap:anywhere; }
+.agents-glance .meter { max-width:220px; margin:var(--s-1) 0; }
+
 /* --- Usage (admin) ------------------------------------------------------- */
 
 .stat-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:var(--s-3); margin-bottom:var(--s-4); }
