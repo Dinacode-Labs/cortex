@@ -70,6 +70,11 @@ export async function getProjectLanguage(ref: string): Promise<ProjectLanguage> 
   return languageOfProject(await port("projects").findIdByRef(ref));
 }
 
+/** Whether the nightly pass merges what its agent finds to be one memo without asking (ADR-0103). */
+export async function projectAutoMerges(projectId: string): Promise<boolean> {
+  return port("projects").autoMerges(projectId);
+}
+
 export interface ProjectCriteriaView {
   own: ProjectCriteria | null;
   inherited: ProjectCriteria;
@@ -269,6 +274,7 @@ export async function updateProject(
     parentSlug?: string | null;
     language?: Language | null;
     criteria?: ProjectCriteria | null;
+    autoMerge?: boolean;
   },
   actor: SessionUser | null,
 ): Promise<ProjectRef> {
@@ -304,6 +310,7 @@ export async function updateProject(
   await repository.update(p.id, { visibility, ownerEmail, parentId });
   if (changes.language !== undefined) await repository.setLanguage(p.id, changes.language);
   if (changes.criteria !== undefined) await repository.setCriteria(p.id, changes.criteria);
+  if (changes.autoMerge !== undefined) await repository.setAutoMerge(p.id, changes.autoMerge);
   return { ...p, visibility, ownerEmail, parentId };
 }
 

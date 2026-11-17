@@ -9,6 +9,15 @@ fixes things.
 ## [Unreleased]
 
 ### Added
+- **A project can let the nightly pass merge on its own what its agent finds to be one memo.** Off
+  by default; whoever manages the project switches it on under *Merging in Review* in its
+  Settings, or with `autoMerge` in `PATCH /projects/:slug`, and a child project keeps its own
+  setting. Switched on, the groups the agent judges to say the same thing, or to hold parts of one
+  memo, are merged by the consolidation agent instead of waiting in Review: the merged memo
+  replaces them and waits in *Not checked yet*, as an agent's memo, never verified. A
+  contradiction, a group with a memo a person verified, and anything the merger fails on still
+  wait for a person, and without a model nothing is merged. Migration
+  `0039_project_auto_merge.sql` ([ADR-0103](docs/decisions.md#adr-0103)).
 - **`/admin/agents` says which model each agent runs on, and an admin can change it there.** Under
   each role, the model, its provider and where it comes from (saved on the page, `CORTEX_MODEL_<ROLE>`,
   `LLM_MODEL`, or the default in the code), and a field to save another: `model`, or

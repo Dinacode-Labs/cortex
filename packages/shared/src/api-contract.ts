@@ -48,6 +48,8 @@ export const updateProjectRequest = z.object({
   parentSlug: z.string().nullable().optional(),
   language: language.nullable().optional(),
   criteria: projectCriteria.nullable().optional(),
+  /** Let the nightly pass merge what its agent finds to be one memo, with no person in between. */
+  autoMerge: z.boolean().optional(),
   agentPrompts: agentPromptChanges.optional(),
 });
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequest>;

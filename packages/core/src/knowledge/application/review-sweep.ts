@@ -1,13 +1,17 @@
 import { getEnvNum, scrub, type Language } from "@cortex/shared";
 import { port } from "../../composition.js";
-import { findProjectIdByName, languageOfProject } from "../../projects/application/projects.js";
+import { findProjectIdByName, languageOfProject, projectAutoMerges } from "../../projects/application/projects.js";
+import type { ProjectRef } from "../../projects/domain/project.js";
 import { DUPLICATE_DISTANCE } from "../domain/health.js";
 import type { Memo } from "../domain/memo.js";
 import { oldestFirst } from "../domain/memo-merge.js";
 import { suggestEdits } from "./memo-suggestions.js";
+import { mergeOnItsOwn } from "./review-merge.js";
 import {
   alikeGroup,
   groupsToRaise,
+  memosOfGroup,
+  mergesWithoutAPerson,
   pairKey,
   sweepGroup,
   type JudgedGroup,
@@ -47,8 +51,33 @@ export interface SweepReport {
   swept: number;
   judged: number;
   raised: number;
+  /** Groups merged with no person in between, in a project that switched it on (ADR-0103). */
+  merged: number;
   /** Memos waiting to be checked that the editing agent proposed to rewrite or reject (ADR-0099). */
   suggested: number;
+}
+
+interface FoundGroup {
+  group: SweepGroup;
+  memos: Memo[];
+}
+
+/**
+ * Merges every group it may, the most pressing first, and leaves the rest for a person. A group
+ * that shares a memo with one merged tonight goes to a person: that memo is no longer in force.
+ */
+async function mergeWhatNeedsNoPerson(project: Pick<ProjectRef, "id" | "name">, found: FoundGroup[]): Promise<{ merged: number; left: SweepGroup[] }> {
+  const mergedIds = new Set<string>();
+  const left: SweepGroup[] = [];
+  let merged = 0;
+  for (const { group, memos } of [...found].sort((a, b) => b.group.priority - a.group.priority)) {
+    const untouched = memos.every((m) => !mergedIds.has(m.id));
+    if (untouched && mergesWithoutAPerson(group, memos) && (await mergeOnItsOwn(project, memos))) {
+      for (const m of memos) mergedIds.add(m.id);
+      merged++;
+    } else left.push(group);
+  }
+  return { merged, left };
 }
 
 async function judgedGroups(memo: Memo, alike: Memo[], context: { language: Language; projectId: string }): Promise<JudgedGroup[] | null> {
@@ -70,17 +99,18 @@ async function toSweepGroup(memos: Memo[], knownPairs: Set<string>, judged: Judg
  * The nightly second pass (ADR-0098): every memo saved since the last one is set against the whole
  * project, with a wider net than a save casts, and what belongs together is raised as one review in
  * the older lane. Then the memos next in the lane of those not checked yet get the editing agent's
- * suggestion. It never changes a memo; a person decides, as for any review.
+ * suggestion. A person decides, as for any review, unless the project lets the pass merge what its
+ * agent finds to be one memo (ADR-0103).
  */
 export async function sweepProject(project: string, now = new Date()): Promise<SweepReport> {
-  const report: SweepReport = { project, swept: 0, judged: 0, raised: 0, suggested: 0 };
+  const report: SweepReport = { project, swept: 0, judged: 0, raised: 0, merged: 0, suggested: 0 };
   const projectId = await findProjectIdByName(project);
   if (!projectId) return report;
   const since = (await port("sweepLog").sweptUntil(projectId)) ?? new Date(now.getTime() - FIRST_SWEEP_MS);
   const memos = await port("memoReader").savedBetween(projectId, since, now);
   const { effective: language } = await languageOfProject(projectId);
 
-  const groups: SweepGroup[] = [];
+  const found: FoundGroup[] = [];
   const grouped = new Set<string>();
   for (const memo of memos) {
     report.swept++;
@@ -95,19 +125,23 @@ export async function sweepProject(project: string, now = new Date()): Promise<S
 
     if (judge) report.judged++;
     const judged = await judgedGroups(memo, neighbours.map((hit) => hit.entry), { language, projectId });
-    const found: { ids: string[]; judged: JudgedGroup | null }[] = judged
+    const candidates: { ids: string[]; judged: JudgedGroup | null }[] = judged
       ? judged.map((g) => ({ ids: g.memoIds, judged: g }))
       : [{ ids: alikeGroup(memo, neighbours, ALIKE_WITHOUT_MODEL), judged: null }];
-    for (const { ids, judged: verdict } of found) {
+    for (const { ids, judged: verdict } of candidates) {
       const members = ids.map((id) => byId.get(id)).filter((m): m is Memo => m !== undefined);
       if (members.length < 2) continue;
       for (const m of members) grouped.add(m.id);
       const group = await toSweepGroup(members, knownPairs, verdict);
-      if (group) groups.push(group);
+      if (group) found.push({ group, memos: memosOfGroup(group, members) });
     }
   }
 
-  const raised = groupsToRaise(groups, SWEEP_MAX_REVIEWS);
+  const { merged, left } = (await projectAutoMerges(projectId))
+    ? await mergeWhatNeedsNoPerson({ id: projectId, name: project }, found)
+    : { merged: 0, left: found.map((f) => f.group) };
+  report.merged = merged;
+  const raised = groupsToRaise(left, SWEEP_MAX_REVIEWS);
   for (const group of raised) await port("reviewQueue").raiseGroup(projectId, group);
   report.raised = raised.length;
   await port("sweepLog").record(projectId, now);

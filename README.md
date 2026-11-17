@@ -269,7 +269,10 @@ mistake you notice later.
   the whole project and an agent raises, as one review, each group of memos that repeat or
   contradict each other and that a save missed, and another suggests how to rewrite, or to
   reject, the memos waiting to be checked; both only propose
-  ([ADR-0098](docs/decisions.md#adr-0098), [ADR-0099](docs/decisions.md#adr-0099)). Whoever switches it on in a project's settings gets
+  ([ADR-0098](docs/decisions.md#adr-0098), [ADR-0099](docs/decisions.md#adr-0099)). A project
+  can let that pass merge, with nobody asked, the groups its agent finds to say the same thing or
+  to hold parts of one memo; the merged memo waits to be checked like any agent's
+  ([ADR-0103](docs/decisions.md#adr-0103)). Whoever switches it on in a project's settings gets
   one email a day when something new waits there, saying how many and never what
   ([ADR-0097](docs/decisions.md#adr-0097)).
 - **Context packs and Q&A.** A briefing per project or area, and answers with citations.

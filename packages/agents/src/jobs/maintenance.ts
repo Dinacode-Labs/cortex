@@ -84,6 +84,7 @@ export async function runMaintenance(only?: string): Promise<MaintenanceReport> 
       const r = await sweepProject(p);
       swept += r.raised;
       if (r.raised) console.log(`  [sweep] ${p}: ${r.raised} review(s) raised from ${r.swept} memo(s) saved since the last pass (${r.judged} judged)`);
+      if (r.merged) console.log(`  [sweep] ${p}: ${r.merged} group(s) merged with no review, as the project asks`);
       if (r.suggested) console.log(`  [sweep] ${p}: ${r.suggested} memo(s) waiting to be checked got a suggested rewrite or rejection`);
     }
 

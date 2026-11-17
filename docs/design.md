@@ -100,8 +100,9 @@ What agents see, Map, Code — and Settings apart. Review says how many memos wa
 /p/<slug>/map           Map
 /p/<slug>/code          Code
 /p/<slug>/settings      Settings         your own review digest (its team); visibility, owner,
-                                         parent, language, what it keeps, what the agents are
-                                         told, members (managers only)
+                                         parent, language, what it keeps, whether the nightly
+                                         pass merges on its own, what the agents are told,
+                                         members (managers only)
 
 /entry/<id>             read, edit, and say whether it still holds — inside its project, and
                         saying when it waits in Review

@@ -12,6 +12,7 @@ import {
   type MergeProposal,
   type MergeSource,
   type ReviewLane,
+  weakestConfidence,
 } from "../domain/memo-merge.js";
 import { invalidateEntry } from "./dedup.js";
 import { validateEntry } from "./review.js";
@@ -147,9 +148,41 @@ export async function mergeInReview(
     metadata: { mergedFrom: memos.map((m) => m.id) },
   });
   await validateEntry(entry.id, "validated", { email: actor.email, channel: "web" });
+  await supersedeWith(memos, entry, actor.email);
+  return entry;
+}
+
+async function supersedeWith(memos: Memo[], merged: Memo, resolvedBy: string): Promise<void> {
   for (const memo of memos) {
-    await invalidateEntry(memo.id, entry.id);
-    await port("reviewQueue").resolve(memo.id, "merged", actor.email);
+    await invalidateEntry(memo.id, merged.id);
+    await port("reviewQueue").resolve(memo.id, "merged", resolvedBy);
   }
+}
+
+/** Who closes a review the nightly pass merged, where a person's email goes otherwise. */
+const NIGHTLY_PASS = "sweep";
+
+/**
+ * The nightly pass's merge, for a project that switched it on (ADR-0103). The merger's draft is
+ * saved as an agent's memo and is not verified, since nobody read it: it waits to be checked like
+ * any other, and supersedes the memos it merges. Null when no model drafted it, so a person decides.
+ */
+export async function mergeOnItsOwn(project: Pick<ProjectRef, "id" | "name">, group: Memo[]): Promise<Memo | null> {
+  if (!drafter) return null;
+  const memos = oldestFirst(group);
+  const draft = (await port("mergeDrafts").find(memos)) ?? (await draftAndKeep(project.id, memos, drafter));
+  const content = draft?.content.trim();
+  if (!draft || !content) return null;
+
+  const { entry } = await saveContext({
+    project: project.name,
+    title: draft.title.trim() || undefined,
+    content,
+    type: mergeByHand(memos).type,
+    sourceType: "agent_session",
+    confidence: weakestConfidence(memos),
+    metadata: { mergedFrom: memos.map((m) => m.id), mergedBy: NIGHTLY_PASS },
+  });
+  await supersedeWith(memos, entry, NIGHTLY_PASS);
   return entry;
 }
