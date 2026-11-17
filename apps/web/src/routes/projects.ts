@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { html } from "hono/html";
-import { addProjectMember, deleteProject, getAgentPrompts, getProjectCriteria, getProjectLanguage, listAccessibleProjects, listProjectMembers, NotAManagerError, NotAReviewerError, ProjectNotEmptyError, removeProjectMember, reviewDigestOn, reviewsAwaiting, setReviewDigest, updateProject, keepsType } from "@cortex/core";
+import { addProjectMember, deleteProject, getAgentPrompts, getProjectCriteria, getProjectLanguage, listAccessibleProjects, projectAutoMerges, listProjectMembers, NotAManagerError, NotAReviewerError, ProjectNotEmptyError, removeProjectMember, reviewDigestOn, reviewsAwaiting, setReviewDigest, updateProject, keepsType } from "@cortex/core";
 import {
   contextEntryType,
   getBrandName,
@@ -126,6 +126,7 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
   const members = await listProjectMembers(project.slug!);
   const projectLanguage = await getProjectLanguage(project.slug!);
   const criteria = await getProjectCriteria(project.slug!);
+  const autoMerge = await projectAutoMerges(project.id);
   const agentPrompts = await getAgentPrompts(project.slug!);
   const notice = c.req.query("error");
   // The cycle check is done by the domain, which is what knows the whole ancestor chain.
@@ -198,6 +199,8 @@ projectsRoutes.get("/p/:slug/settings", async (c) => {
 
     ${criteriaPanel(project.slug!, criteria)}
 
+    ${autoMergePanel(project.slug!, autoMerge)}
+
     ${projectAgentPromptsPanel(project.slug!, agentPrompts)}
 
     <div class="panel">
@@ -254,6 +257,23 @@ function reviewDigestPanel(slug: string, on: boolean) {
   </div>`;
 }
 
+function autoMergePanel(slug: string, on: boolean) {
+  return html`<div class="panel">
+    <h2>Merging in Review</h2>
+    <p class="sub">
+      Every night an agent sets the day's memos against the rest of this project and raises in Review the ones
+      that say the same thing, or that each hold part of one memo. Switched on, it merges them itself rather
+      than waiting for somebody to: the merged memo replaces them and waits to be checked, like anything an
+      agent writes. A contradiction, and any memo a person has verified, still wait for a person. Child
+      projects keep their own setting.
+    </p>
+    <form class="row" method="post" action="/p/${slug}/settings/auto-merge">
+      <label class="check"><input type="checkbox" name="on" value="1" ${on ? "checked" : ""}> Merge them without asking</label>
+      <button type="submit">Save</button>
+    </form>
+  </div>`;
+}
+
 /** Turns the domain's refusal into a return to the page with the reason, not into a 500. */
 function backWithError(slug: string, e: unknown): string {
   if (e instanceof NotAManagerError) return `/p/${slug}/settings?error=${encodeURIComponent(e.message)}`;
@@ -281,6 +301,17 @@ projectsRoutes.post("/p/:slug/settings/visibility", async (c) => {
   if (v !== "public" && v !== "private") return c.redirect(`/p/${slug}/settings`);
   try {
     await updateProject(slug, { visibility: v }, user);
+  } catch (e) {
+    return c.redirect(backWithError(slug, e));
+  }
+  return c.redirect(`/p/${slug}/settings`);
+});
+
+projectsRoutes.post("/p/:slug/settings/auto-merge", async (c) => {
+  const user = c.get("user")!;
+  const slug = c.req.param("slug");
+  try {
+    await updateProject(slug, { autoMerge: (await c.req.parseBody()).on === "1" }, user);
   } catch (e) {
     return c.redirect(backWithError(slug, e));
   }

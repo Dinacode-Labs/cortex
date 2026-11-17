@@ -79,3 +79,20 @@ export function sweepGroup(
 export function groupsToRaise(groups: SweepGroup[], max: number): SweepGroup[] {
   return [...groups].sort((a, b) => b.priority - a.priority).slice(0, Math.max(0, max));
 }
+
+// Which side holds is the whole question of a contradiction, so it still goes to a person (ADR-0103).
+const MERGED_WITHOUT_A_PERSON: ReadonlySet<GroupRelation> = new Set(["duplicate", "overlap"]);
+
+/**
+ * A group a project that merges on its own (ADR-0103) hands to the merger rather than to a person.
+ * A memo a person verified is never rewritten unasked, as the nightly dedup never retires one.
+ */
+export function mergesWithoutAPerson(group: Pick<SweepGroup, "relation">, memos: Pick<Memo, "confidence">[]): boolean {
+  return group.relation !== null && MERGED_WITHOUT_A_PERSON.has(group.relation) && memos.every((m) => m.confidence !== "verified");
+}
+
+/** Its oldest memo and every other one not already decided against it. */
+export function memosOfGroup<T extends Pick<Memo, "id">>(group: SweepGroup, candidates: T[]): T[] {
+  const ids = new Set([group.anchorId, ...group.members.map((m) => m.memoId)]);
+  return candidates.filter((m) => ids.has(m.id));
+}

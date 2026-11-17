@@ -4,13 +4,19 @@ import {
   createProject,
   indexMemos,
   nextReview,
+  nextUnchecked,
   pendingReviewCount,
+  projectAutoMerges,
   requestOtp,
   saveContext,
   setGroupJudge,
+  setMergeDrafter,
   sweepProject,
+  uncheckedCount,
+  validateEntry,
   verifyOtp,
   type GroupJudge,
+  type MergeSource,
   type ProjectRef,
 } from "@cortex/core";
 import { createApp as createWebApp } from "../../apps/web/src/app.js";
@@ -67,7 +73,10 @@ async function judgedAs(groups: Awaited<ReturnType<GroupJudge>>): Promise<{ seen
   return { seen };
 }
 
-afterEach(() => setGroupJudge(null));
+afterEach(() => {
+  setGroupJudge(null);
+  setMergeDrafter(null);
+});
 
 /*
  * A save sets a memo against the six nearest from 0.75, the reconciler against the nearest alone,
@@ -165,5 +174,110 @@ describe("the nightly second pass", () => {
     await getSql()`UPDATE memos SET created_at = now() - interval '2 days' WHERE id = ANY(${ids})`;
 
     expect(await sweepProject(project.name)).toMatchObject({ swept: 0, raised: 0 });
+  });
+});
+
+const MERGED = { title: `Session timeout ${RID}`, content: `Session tokens expire after fifteen minutes of inactivity ${RID}.` };
+
+function mergerDrafts(): { asked: MergeSource[][] } {
+  const asked: MergeSource[][] = [];
+  setMergeDrafter(async (memos) => {
+    asked.push(memos);
+    return MERGED;
+  });
+  return { asked };
+}
+
+async function switchOnAutoMerge(project: ProjectRef): Promise<Response> {
+  return createWebApp().request(`/p/${project.slug}/settings/auto-merge`, {
+    method: "POST",
+    headers: { cookie: ownerCookie, "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ on: "1" }).toString(),
+  });
+}
+
+/*
+ * Review waited on a person for every group the nightly pass raised, including the ones its agent
+ * had already judged to say the same thing, and a project with more memos than reviewers kept them
+ * all in force, every copy handed to agents. A project can now let the pass merge those itself;
+ * a contradiction and a verified memo still wait for a person, and it is off unless asked (ADR-0103).
+ */
+describe("a project that lets the nightly pass merge on its own", () => {
+  it("is off by default: a duplicate the agent found waits for a person, even with a model to merge it", async () => {
+    const project = await newProject("auto-off");
+    await missedAtSave(project, TOKENS[0]);
+    const newer = await missedAtSave(project, TOKENS[1]);
+    await judgedAs([{ memoIds: ["day", newer], relation: "duplicate", reason: "Same timeout." }]);
+    const { asked } = mergerDrafts();
+
+    expect(await projectAutoMerges(project.id)).toBe(false);
+    expect(await sweepProject(project.name)).toMatchObject({ raised: 1, merged: 0 });
+    expect(asked).toEqual([]);
+  });
+
+  it("switched on in Settings, merges a duplicate with no review: the merged memo replaces them and waits to be checked", async () => {
+    const project = await newProject("auto-on");
+    const ids = [];
+    for (const text of TOKENS) ids.push(await missedAtSave(project, text));
+    await judgedAs([{ memoIds: ["day", ids[1]!, ids[2]!], relation: "duplicate", reason: "All three set the timeout." }]);
+    const { asked } = mergerDrafts();
+
+    expect((await switchOnAutoMerge(project)).status).toBe(302);
+    expect(await projectAutoMerges(project.id)).toBe(true);
+    const settings = await (await createWebApp().request(`/p/${project.slug}/settings`, { headers: { cookie: ownerCookie } })).text();
+    expect(settings).toMatch(/name="on" value="1" checked> Merge them without asking/);
+
+    expect(await sweepProject(project.name)).toMatchObject({ raised: 0, merged: 1 });
+
+    expect(asked.map((memos) => memos.map((m) => m.content))).toEqual([[...TOKENS]]);
+    const originals = await getSql()`SELECT DISTINCT superseded_by FROM memos WHERE id = ANY(${ids}) AND status = 'superseded'`;
+    expect(originals).toHaveLength(1);
+    const mergedId = String(originals[0]!.superseded_by);
+    const [merged] = await getSql()`SELECT title, content, source_type, confidence, metadata FROM memos WHERE id = ${mergedId}`;
+    expect(merged).toMatchObject({ title: MERGED.title, content: MERGED.content, source_type: "agent_session", confidence: "medium" });
+    expect(merged?.metadata).toMatchObject({ mergedFrom: ids, mergedBy: "sweep" });
+
+    expect(await pendingReviewCount(project)).toBe(0);
+    expect(await uncheckedCount(project)).toBe(1);
+    expect((await nextUnchecked(project))?.memo.id).toBe(mergedId);
+  });
+
+  it("leaves a contradiction to a person: which side holds is the question", async () => {
+    const project = await newProject("auto-contradiction");
+    await missedAtSave(project, TOKENS[0]);
+    const newer = await missedAtSave(project, TOKENS[1]);
+    await judgedAs([{ memoIds: ["day", newer], relation: "contradiction", reason: "They disagree." }]);
+    const { asked } = mergerDrafts();
+    await switchOnAutoMerge(project);
+
+    expect(await sweepProject(project.name)).toMatchObject({ raised: 1, merged: 0 });
+    expect(asked).toEqual([]);
+  });
+
+  it("never merges a memo a person verified", async () => {
+    const project = await newProject("auto-verified");
+    const older = await missedAtSave(project, TOKENS[0]);
+    const newer = await missedAtSave(project, TOKENS[1]);
+    await validateEntry(older, "validated", { email: OWNER, channel: "web" });
+    await judgedAs([{ memoIds: ["day", newer], relation: "duplicate", reason: "Same timeout." }]);
+    mergerDrafts();
+    await switchOnAutoMerge(project);
+
+    expect(await sweepProject(project.name)).toMatchObject({ raised: 1, merged: 0 });
+    expect((await nextReview(project))?.memo.id).toBe(older);
+  });
+
+  it("hands the group to a person when the merger fails, rather than losing it", async () => {
+    const project = await newProject("auto-merger-fails");
+    const older = await missedAtSave(project, TOKENS[0]);
+    const newer = await missedAtSave(project, TOKENS[1]);
+    await judgedAs([{ memoIds: ["day", newer], relation: "overlap", reason: "Each holds half." }]);
+    setMergeDrafter(async () => {
+      throw new Error("provider down");
+    });
+    await switchOnAutoMerge(project);
+
+    expect(await sweepProject(project.name)).toMatchObject({ raised: 1, merged: 0 });
+    expect((await nextReview(project))?.memo.id).toBe(older);
   });
 });

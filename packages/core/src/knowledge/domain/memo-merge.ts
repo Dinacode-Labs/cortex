@@ -1,3 +1,4 @@
+import { confidenceLevel, type ConfidenceLevel } from "@cortex/shared";
 import type { Memo, MemoType } from "./memo.js";
 
 export type ReviewLane = "older" | "new";
@@ -55,4 +56,10 @@ export function mergeByHand(memos: MergeSource[]): MergedMemo {
     type: newest.type,
     content: newestFirst.map((m) => m.content.trim()).join("\n\n"),
   };
+}
+
+/** A merge nobody read vouches for nothing its memos did not: it is as sure as the least sure of them. */
+export function weakestConfidence(memos: Pick<Memo, "confidence">[]): ConfidenceLevel {
+  const ranks = memos.map((m) => confidenceLevel.options.indexOf(m.confidence));
+  return confidenceLevel.options[Math.min(...ranks)] ?? "low";
 }

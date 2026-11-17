@@ -43,6 +43,9 @@ export interface ProjectRepository {
   settingsChain(projectId: string): Promise<{ language: Language | null; criteria: unknown }[]>;
   setLanguage(id: string, language: Language | null): Promise<void>;
   setCriteria(id: string, criteria: ProjectCriteria | null): Promise<void>;
+  /** The project's own switch: a parent's does not reach its children (ADR-0103). */
+  autoMerges(id: string): Promise<boolean>;
+  setAutoMerge(id: string, on: boolean): Promise<void>;
   countEntries(projectId: string): Promise<number>;
   countChildren(projectId: string): Promise<number>;
   remove(id: string): Promise<void>;

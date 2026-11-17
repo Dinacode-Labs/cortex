@@ -169,6 +169,15 @@ export class PgProjectRepository implements ProjectRepository {
     await this.sql`UPDATE entities SET criteria = ${stored} WHERE id = ${id}`;
   }
 
+  async autoMerges(id: string): Promise<boolean> {
+    const [row] = (await this.sql`SELECT auto_merge FROM entities WHERE id = ${id}`) as unknown as Row[];
+    return row?.auto_merge === true;
+  }
+
+  async setAutoMerge(id: string, on: boolean): Promise<void> {
+    await this.sql`UPDATE entities SET auto_merge = ${on} WHERE id = ${id}`;
+  }
+
   async countEntries(projectId: string): Promise<number> {
     const [row] = (await this.sql`SELECT count(*)::int AS n FROM memos WHERE project_id = ${projectId}`) as unknown as Row[];
     return Number(row?.n ?? 0);

@@ -3419,7 +3419,8 @@ decisions they carried stay recorded here.
 ## ADR-0096 · Two memos about the same thing can be merged into one, drafted by an agent
 
 - **Status:** accepted as a hypothesis (2026-10-23). Adds a fifth decision to those of
-  [0091](#adr-0091) and [0093](#adr-0093).
+  [0091](#adr-0091) and [0093](#adr-0093). Its rejection of saving a draft nobody read is
+  **revised by [0103](#adr-0103)** for the projects that switch it on.
 - **Context:** Review sets a memo against the ones it is about and lets a person keep, discard or
   rewrite the memo in question. Two memos alike are often not one right and one wrong: each holds
   part of it. "Retries wait a fixed 30 s" and "the backoff is exponential, capped at 60 s" can both
@@ -3563,7 +3564,8 @@ decisions they carried stay recorded here.
 - **Status:** accepted as a hypothesis (2026-10-23). Builds on [0091](#adr-0091), whose older
   lane it fills, and on [0096](#adr-0096), whose merge settles a group in one go; revises the
   priority of [0091](#adr-0091)'s point 4 for what an agent judged. Its later step, a suggestion
-  for each memo on its own, is [0099](#adr-0099).
+  for each memo on its own, is [0099](#adr-0099). Point 5 is **revised by [0103](#adr-0103)** for
+  the projects that switch it on.
 - **Context:** a save compares a memo with the six memos nearest to it from 0.75 up
   ([0091](#adr-0091)), and the reconciler with the nearest alone from 0.82. Duplicates still got
   through, both memos handed to agents as true:
@@ -3829,3 +3831,55 @@ decisions they carried stay recorded here.
 - **Revisit when:** a provider documents an endpoint that returns the quota itself, and the one on
   file becomes the fallback; a rolling window runs dry before the period's cap does; or a second
   provider reports its usage in another shape.
+
+<a id="adr-0103"></a>
+
+## ADR-0103 · A project can let the nightly pass merge what its agent finds to be one memo
+
+- **Status:** accepted as a hypothesis (2026-11-17). Revises, for the projects that switch it on,
+  point 5 of [0098](#adr-0098) and the alternative of [0096](#adr-0096) that rejected saving a
+  draft nobody read. Keeps what `verified` means ([0090](#adr-0090)).
+- **Context:** every group the nightly pass raises waits for a person ([0098](#adr-0098)),
+  including the ones its agent judged to say the same thing. Merging them takes one click on a
+  draft already written ([0096](#adr-0096)), but a project with more memos than people reviewing
+  them keeps every copy in force until somebody gets there, and agents are handed all of them as
+  true meanwhile. Some teams would rather the memory consolidated itself and check the result than
+  approve each merge.
+- **Decision:**
+  1. **A switch per project, off by default**: *Merging in Review* in a project's Settings, for
+     whoever manages it, and `autoMerge` in `PATCH /projects/:slug`. It is not inherited: a child
+     added under a client that switched it on must not start merging unasked, as with the digest of
+     [0097](#adr-0097). Migration `0039_project_auto_merge.sql`.
+  2. **The nightly pass merges, instead of raising, each group its agent judged a *duplicate* or an
+     *overlap***, the most pressing first, with the merger's draft ([0096](#adr-0096)): the one
+     drafted ahead when it still applies, otherwise one asked for then.
+  3. **What still waits for a person:**
+     - a *contradiction*: which side holds is the whole question, and nobody would be asked;
+     - a group with a memo a person verified, which no model rewrites unasked — the nightly dedup
+       never retires one either;
+     - what only similarity raised, with no model to judge it;
+     - a group the merger fails on, or one that shares a memo with a group merged that night.
+  4. **The merged memo is an agent's, not a person's**: `agent_session`, no author, `mergedFrom` and
+     `mergedBy: "sweep"` in its metadata, and the confidence of the least sure memo it merges. It is
+     not verified, so it waits in *Not checked yet* ([0093](#adr-0093)) like anything an agent
+     writes: a person checks one memo rather than deciding on a group.
+  5. **It supersedes the memos it merges**, as a person's merge does: invalidated, not deleted, out
+     of both lanes, their pending reviews closed as `merged` by `sweep`. Saved like any memo, it
+     raises its own reviews ([0091](#adr-0091)).
+- **Alternatives:**
+  - **Merge the contradictions too.** The merger already writes the newer side as the one that
+    holds. Rejected for now: a wrong merge of a duplicate loses nothing, a wrong one of a
+    contradiction keeps the wrong side and drops the right one, with nobody asked.
+  - **On by default.** Rejected: a memory that rewrites itself is something a team chooses.
+  - **Save the merged memo verified**, so nothing is left waiting. `verified` would stop meaning
+    that a person read it ([0090](#adr-0090)). Rejected.
+  - **Inherited from the parent, like the language.** Rejected for the reason in 1.
+  - **Also merge the reviews already waiting when it is switched on.** They were judged on another
+    night, and some of their memos changed since. Not now: it applies from the next pass.
+- **Consequences:** each group merged costs one model call more unless its draft was ready. The
+  merged memo starts with none of the corroborations recorded on the memos it replaces, so a merge
+  of low-confidence agent memos decays as they would have. Without a model nothing is merged: the
+  switch only acts on what the agent judged. The memos it merges stay on record, superseded.
+- **Revisit when:** people reject or rewrite most merged memos, which says the judge's *duplicate*
+  and *overlap* are looser than a merge needs; teams that switch it on ask for contradictions too;
+  or merged memos keep coming back up for review against each other.

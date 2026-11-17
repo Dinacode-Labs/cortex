@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Memo, SearchHit } from "../packages/core/src/index";
-import { alikeGroup, groupsToRaise, pairKey, sweepGroup, type SweepGroup } from "../packages/core/src/knowledge/domain/review-sweep";
+import { alikeGroup, groupsToRaise, memosOfGroup, mergesWithoutAPerson, pairKey, sweepGroup, type SweepGroup } from "../packages/core/src/knowledge/domain/review-sweep";
+import { weakestConfidence } from "../packages/core/src/knowledge/domain/memo-merge";
 import { parseGroups } from "../packages/agents/src/agents/judge/judge";
 import { judgePrompt } from "../packages/agents/src/agents/judge/prompt";
 
@@ -108,5 +109,36 @@ describe("what the review agent answers", () => {
   it("is shown each memo with its number, type and day, the memo of the day as 0", () => {
     const prompt = judgePrompt(A, [B, C]);
     for (const shown of ["[0] decision · saved 2026-10-01", "[1] decision · saved 2026-10-10", "[2] decision · saved 2026-10-22"]) expect(prompt).toContain(shown);
+  });
+});
+
+/*
+ * A project can let the nightly pass merge what its agent judged to be one memo, with nobody asked
+ * (ADR-0103). Two things must still reach a person: a contradiction, where which side holds is
+ * the question, and a memo a person verified, which no model rewrites unasked.
+ */
+describe("what a project that merges on its own merges without a person", () => {
+  const unverified = [{ confidence: "medium" as const }, { confidence: "low" as const }];
+
+  it("a group the agent judged a duplicate or an overlap", () => {
+    expect((["duplicate", "overlap"] as const).map((relation) => mergesWithoutAPerson({ relation }, unverified))).toEqual([true, true]);
+  });
+
+  it("never a contradiction, nor what only similarity raised", () => {
+    expect([mergesWithoutAPerson({ relation: "contradiction" }, unverified), mergesWithoutAPerson({ relation: null }, unverified)]).toEqual([false, false]);
+  });
+
+  it("never a group with a memo a person verified", () => {
+    expect(mergesWithoutAPerson({ relation: "duplicate" }, [...unverified, { confidence: "verified" }])).toBe(false);
+  });
+
+  it("only the memos the group sets side by side, not one already decided against its oldest", () => {
+    const group = sweepGroup([A, B, C], similarities, new Set([pairKey("a", "b")]), { relation: "duplicate", reason: "r" })!;
+    expect(memosOfGroup(group, [A, B, C]).map((m) => m.id)).toEqual(["a", "c"]);
+  });
+
+  it("the merged memo is as sure as the least sure of those it merges, since nobody read it", () => {
+    expect(weakestConfidence([{ confidence: "high" }, { confidence: "low" }, { confidence: "medium" }])).toBe("low");
+    expect(weakestConfidence([{ confidence: "high" }, { confidence: "medium" }])).toBe("medium");
   });
 });
